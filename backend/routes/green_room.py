@@ -258,9 +258,19 @@ async def synthesize_draft(draft_id: str):
 
     result = await edge_tts_service.synthesize(draft.script, draft.voice_id)
 
+    # Upload audio to R2
+    from backend.services.media_store import media_store
+    r2_info = {}
+    if media_store.configured and result.audio_bytes:
+        try:
+            r2_info = media_store.put_audio(draft_id, result.audio_bytes)
+        except Exception as e:
+            # Log but don't fail — audio is synthesized, R2 is optional for draft
+            pass
+
     draft.word_timings = result.word_timings
     draft.audio_duration_ms = result.duration_ms
-    draft.audio_r2_key = ""  # Would upload to R2 in production
+    draft.audio_r2_key = r2_info.get("r2_key", "")
     draft.version += 1
     draft.updated_at = datetime.now(timezone.utc)
 
@@ -268,6 +278,7 @@ async def synthesize_draft(draft_id: str):
         "draft": draft.to_dict(),
         "duration_ms": result.duration_ms,
         "word_count": len(result.word_timings),
+        "r2_uploaded": bool(r2_info),
     }
 
 

@@ -113,10 +113,8 @@ class EdgeTTSService:
                     audio_chunks = []
                     word_timings = []
                     continue
-                # Fallback: estimate word timings from text
-                word_timings = self._estimate_word_timings(text)
-                audio_chunks = [b'\x00' * 16000]
-                break
+                # All retries exhausted — fail explicitly
+                raise RuntimeError(f"Edge TTS failed after 3 attempts for voice={voice}")
 
         audio_bytes = b"".join(audio_chunks)
 
