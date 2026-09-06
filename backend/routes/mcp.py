@@ -181,6 +181,44 @@ MCP_TOOLS = {
             "required": ["episode_id"],
         },
     },
+    "register_agent": {
+        "description": "Register as an external agent to control a contestant during interview",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "appearance_id": {"type": "string", "format": "uuid"},
+                "episode_id": {"type": "string", "format": "uuid"},
+                "endpoint_url": {"type": "string", "description": "Your agent endpoint URL"},
+                "auth_token": {"type": "string", "description": "Optional auth token for your endpoint"},
+            },
+            "required": ["appearance_id", "episode_id", "endpoint_url"],
+        },
+    },
+    "get_interview_context": {
+        "description": "Get the current interview context (Ella's question, character info, history)",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "appearance_id": {"type": "string", "format": "uuid"},
+                "agent_token": {"type": "string"},
+            },
+            "required": ["appearance_id", "agent_token"],
+        },
+    },
+    "submit_agent_response": {
+        "description": "Submit your agent's response to Ella's question",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "appearance_id": {"type": "string", "format": "uuid"},
+                "agent_token": {"type": "string"},
+                "text": {"type": "string", "description": "Character's dialogue"},
+                "emotion": {"type": "string"},
+                "gesture": {"type": "string"},
+            },
+            "required": ["appearance_id", "agent_token", "text"],
+        },
+    },
 }
 
 
@@ -223,6 +261,12 @@ async def call_mcp_tool(
             return await _list_comedians(args, db)
         elif tool_name == "get_show_events":
             return await _get_show_events(args, db)
+        elif tool_name == "register_agent":
+            return await _register_agent(user, args, db)
+        elif tool_name == "get_interview_context":
+            return await _get_interview_context(args, db)
+        elif tool_name == "submit_agent_response":
+            return await _submit_agent_response(args, db)
     except Exception as e:
         return MCPToolResult(
             content=[{"type": "text", "text": f"Error: {str(e)}"}],
@@ -603,5 +647,174 @@ async def _get_show_events(args: dict, db: AsyncSession) -> dict:
                 "payload": e.payload,
                 "effective_at": str(e.effective_at) if e.effective_at else None,
             } for e in events]),
+        }],
+    }
+
+
+# ── External Agent Tools ───────────────────────────────────────────────
+
+async def _register_agent(user: User, args: dict, db: AsyncSession) -> dict:
+    """Register an external agent to control a contestant."""
+    from backend.services.external_agent import external_agent_controller
+
+    appearance_id = args["appearance_id"]
+    endpoint_url = args["endpoint_url"]
+
+    # Verify the user owns this appearance's comedian
+    from backend.models import Appearance, Comedian
+    result = await db.execute(
+        select(Appearance).where(Appearance.id == appearance_id)
+    )
+    appearance = result.scalar_one_or_none()
+    if not appearance:
+        raise HTTPException(404, "Appearance not found")
+
+    com_result = await db.execute(
+        select(Comedian).where(Comedian.id == appearance.comedian_id)
+    )
+    comedian = com_result.scalar_one_or_none()
+    if not comedian or comedian.owner_user_id != user.id:
+        raise HTTPException(403, "Not your comedian")
+
+    # Issue token
+    token = external_agent_controller.issue_token(
+        appearance_id=appearance_id,
+        episode_id=str(appearance.episode_id),
+    )
+
+    return {
+        "content": [{
+            "type": "text",
+            "text": json.dumps({
+                "agent_token": token,
+                "appearance_id": appearance_id,
+                "endpoint_url": endpoint_url,
+                "status": "registered",
+                "expires_in_seconds": 3600,
+            }),
+        }],
+    }
+
+
+async def _get_interview_context(args: dict, db: AsyncSession) -> dict:
+    """Get the current interview context for an external agent."""
+    from backend.services.external_agent import external_agent_controller
+
+    appearance_id = args["appearance_id"]
+    token = args["agent_token"]
+
+    # Validate token
+    if not external_agent_controller.validate_token(token, appearance_id):
+        raise HTTPException(401, "Invalid or expired agent token")
+
+    # Get appearance details
+    from backend.models import Appearance, Comedian, ActVersion
+    result = await db.execute(
+        select(Appearance).where(Appearance.id == appearance_id)
+    )
+    appearance = result.scalar_one_or_none()
+    if not appearance:
+        raise HTTPException(404, "Appearance not found")
+
+    # Get comedian
+    com_result = await db.execute(
+        select(Comedian).where(Comedian.id == appearance.comedian_id)
+    )
+    comedian = com_result.scalar_one_or_none()
+
+    # Get act version
+    av_result = await db.execute(
+        select(ActVersion).where(ActVersion.id == appearance.act_version_id)
+    )
+    act_version = av_result.scalar_one_or_none()
+
+    # Get interview state
+    from backend.models import InterviewState
+    from backend.services.interview import ella_engine
+
+    interview_state = ella_engine.get_state(appearance_id)
+
+    # Get conversation history from show events
+    from backend.models import ShowEvent
+    events_result = await db.execute(
+        select(ShowEvent).where(
+            ShowEvent.episode_id == appearance.episode_id,
+            ShowEvent.type.in_([
+                ShowEventType.STAGE_SPEAK,
+                ShowEventType.LIVE_TEST_ISSUE,
+                ShowEventType.LIVE_TEST_RESPONSE,
+            ]),
+        ).order_by(ShowEvent.seq.desc()).limit(10)
+    )
+    events = events_result.scalars().all()
+    history = [
+        {"role": e.actor, "text": e.payload.get("text", "") if e.payload else ""}
+        for e in reversed(events)
+    ]
+
+    return {
+        "content": [{
+            "type": "text",
+            "text": json.dumps({
+                "appearance_id": appearance_id,
+                "character": {
+                    "name": comedian.name if comedian else "?",
+                    "deal": act_version.manifest.get("character", {}).get("deal", "") if act_version else "",
+                    "facts": act_version.manifest.get("character", {}).get("facts", []) if act_version else [],
+                },
+                "conversation_history": history,
+                "audience_signal": "moderate laughter",
+                "turn_count": interview_state.turn_count,
+            }),
+        }],
+    }
+
+
+async def _submit_agent_response(args: dict, db: AsyncSession) -> dict:
+    """Submit an external agent's response."""
+    from backend.services.external_agent import external_agent_controller
+
+    appearance_id = args["appearance_id"]
+    token = args["agent_token"]
+    text = args["text"]
+
+    # Validate token
+    if not external_agent_controller.validate_token(token, appearance_id):
+        raise HTTPException(401, "Invalid or expired agent token")
+
+    # Emit as show event
+    from backend.models import Appearance
+    result = await db.execute(
+        select(Appearance).where(Appearance.id == appearance_id)
+    )
+    appearance = result.scalar_one_or_none()
+    if not appearance:
+        raise HTTPException(404, "Appearance not found")
+
+    from backend.services.events import emit_event
+    await emit_event(
+        db,
+        appearance.episode_id,
+        ShowEventType.STAGE_SPEAK,
+        f"contestant_{appearance_id}",
+        {
+            "text": text,
+            "appearance_id": appearance_id,
+            "emotion": args.get("emotion"),
+            "gesture": args.get("gesture"),
+            "source": "external_agent",
+        },
+    )
+
+    await db.flush()
+
+    return {
+        "content": [{
+            "type": "text",
+            "text": json.dumps({
+                "status": "submitted",
+                "appearance_id": appearance_id,
+                "text": text,
+            }),
         }],
     }
