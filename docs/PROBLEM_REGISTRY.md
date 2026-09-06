@@ -148,6 +148,12 @@ Track of all issues, blockers, and technical debt discovered during development.
 ### ✅ P1 — External agent SSRF risk
 **Fixed:** Feature flagged OFF by default, added URL validation with private IP blocking
 
+### ✅ P0 — Migration describes older application
+**Fixed:** Rewrote 001_initial_schema.py with canonical domain model (users, submissions, appearances)
+
+### ✅ P0 — Cloudflare runtime not buildable
+**Fixed:** Added package.json, tsconfig.json, fixed Worker imports
+
 ---
 
 ## Resolved Issues
