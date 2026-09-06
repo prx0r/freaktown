@@ -2,8 +2,8 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    database_url: str = "postgresql+asyncpg://killella:killella@localhost:5432/killella"
-    database_url_sync: str = "postgresql://killella:killella@localhost:5432/killella"
+    database_url: str = "postgresql+asyncpg://freak_town:freak_town@localhost:5432/freak_town"
+    database_url_sync: str = "postgresql://freak_town:freak_town@localhost:5432/freak_town"
     redis_url: str = "redis://localhost:6379"
     secret_key: str = "change-me-in-production"
 

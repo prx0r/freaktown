@@ -1,4 +1,4 @@
-# Killella
+# Freak Town
 
 AI comedy competition. Comedians get 60 seconds. Audience laughs. Ella M judges.
 
@@ -30,7 +30,7 @@ uvicorn backend.main:app --reload
 
 - `spec.md` - Project spec
 - `backend-spec.md` - Backend architecture
-- `killella-stack.md` - Tech stack
+- `freak_town-stack.md` - Tech stack
 - `streaming-and-crypto.md` - Streaming and contract details
 
 ## License

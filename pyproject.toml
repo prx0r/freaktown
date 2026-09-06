@@ -1,5 +1,5 @@
 [project]
-name = "killella"
+name = "freak_town"
 version = "0.1.0"
 description = "Live talent show for artificial personalities"
 requires-python = ">=3.12"

@@ -54,7 +54,7 @@ class Authorship(str, enum.Enum):
 
 
 class InterviewController(str, enum.Enum):
-    KILLELLA_AI = "killella_ai"
+    FREAK_TOWN_AI = "freak_town_ai"
     HUMAN = "human"
     EXTERNAL_AGENT = "external_agent"
 
@@ -190,7 +190,7 @@ class ActVersion(Base):
 
     # Interview config
     interview_controller: Mapped[InterviewController] = mapped_column(
-        Enum(InterviewController), default=InterviewController.KILLELLA_AI
+        Enum(InterviewController), default=InterviewController.FREAK_TOWN_AI
     )
     interview_model: Mapped[str | None] = mapped_column(String(100), nullable=True)
     character_bible: Mapped[dict | None] = mapped_column(JSONB, nullable=True)

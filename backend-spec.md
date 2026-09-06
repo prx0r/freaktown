@@ -1,4 +1,4 @@
-# KILLELLA Backend Spec
+# FREAK TOWN Backend Spec
 
 ## Tech Stack
 
@@ -28,7 +28,7 @@
                     └──────────────────┘
 
 ┌─────────────────────────────────────────────────────────┐
-│                    KILLELLA BACKEND                      │
+│                    FREAK TOWN BACKEND                      │
 │                                                          │
 │  ┌──────────────────────────────────────────────────┐   │
 │  │  FastAPI Server (main.py)                        │   │
@@ -154,7 +154,7 @@ class JudgeEngine:
         }
     
     async def generate_ella_score(self, comedian_id: str) -> dict:
-        prompt = f"""You are Ella M, the host of Killella. 
+        prompt = f"""You are Ella M, the host of Freak Town. 
         Score this comedian's set on a scale of 1-10.
         
         Comedian persona: {comedian.persona}
@@ -171,7 +171,7 @@ class JudgeEngine:
 
 ```python
 class ChatAggregator:
-    """Combines Rumble chat + native killella.fun chat"""
+    """Combines Rumble chat + native freak_town.fun chat"""
     
     async def start(self, episode_id: str):
         # Start Rumble chat listener
@@ -243,7 +243,7 @@ class PrizeManager:
     
     def __init__(self):
         self.rpc_url = "https://api.mainnet-beta.solana.com"
-        self.program_id = KILLELLA_PROGRAM_ID
+        self.program_id = FREAK TOWN_PROGRAM_ID
     
     async def enter_episode(self, episode_id: str, comedian_wallet: str, amount: float) -> str:
         """Comedian deposits USDC into escrow"""
@@ -417,7 +417,7 @@ WS     /ws/scores/{episode_id}         Live score updates
 ## Project Structure
 
 ```
-killella/
+freak_town/
 ├── backend/
 │   ├── main.py                    # FastAPI app entry point
 │   ├── config.py                  # Settings, env vars
@@ -456,7 +456,7 @@ killella/
 │       └── crypto.py              # Wallet helpers
 ├── contracts/
 │   ├── programs/
-│   │   └── killella/
+│   │   └── freak_town/
 │   │       ├── src/
 │   │       │   ├── lib.rs         # Main program
 │   │       │   ├── state.rs       # Account structs
@@ -470,7 +470,7 @@ killella/
 │   │       └── Cargo.toml
 │   ├── Anchor.toml
 │   └── tests/
-│       └── killella.ts
+│       └── freak_town.ts
 ├── frontend/
 │   ├── index.html                 # Main page
 │   ├── laugh-button.js            # WebSocket laugh client
@@ -494,7 +494,7 @@ killella/
 
 ```bash
 # Backend
-DATABASE_URL=sqlite:///killella.db
+DATABASE_URL=sqlite:///freak_town.db
 REDIS_URL=redis://localhost:6379
 SECRET_KEY=your-secret-key
 
@@ -512,7 +512,7 @@ RUMBLE_API_URL=your-rumble-api-url
 
 # Solana
 SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
-KILLELLA_PROGRAM_ID=your-program-id
+FREAK TOWN_PROGRAM_ID=your-program-id
 USDC_MINT=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
 
 # three.ws
@@ -541,9 +541,9 @@ services:
   postgres:
     image: postgres:alpine
     environment:
-      POSTGRES_DB: killella
-      POSTGRES_USER: killella
-      POSTGRES_PASSWORD: killella
+      POSTGRES_DB: freak_town
+      POSTGRES_USER: freak_town
+      POSTGRES_PASSWORD: freak_town
     ports:
       - "5432:5432"
     volumes:
@@ -556,8 +556,8 @@ volumes:
 ### Quick Start
 ```bash
 # Clone
-git clone https://github.com/YOUR_USER/killella.git
-cd killella
+git clone https://github.com/YOUR_USER/freak_town.git
+cd freak_town
 
 # Backend
 cd backend

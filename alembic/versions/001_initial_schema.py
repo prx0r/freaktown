@@ -27,7 +27,7 @@ def upgrade() -> None:
     authorship = sa.Enum("human", "assisted", "ai", name="authorship")
     authorship.create(op.get_bind(), checkfirst=True)
 
-    interviewcontroller = sa.Enum("killella_ai", "human", "external_agent", name="interviewcontroller")
+    interviewcontroller = sa.Enum("freak_town_ai", "human", "external_agent", name="interviewcontroller")
     interviewcontroller.create(op.get_bind(), checkfirst=True)
 
     episodestatus = sa.Enum("draft", "open", "locked", "preparing", "ready", "live", "completed", "cancelled", "failed", name="episodestatus")
@@ -84,7 +84,7 @@ def upgrade() -> None:
         sa.Column("minute_text", sa.Text, nullable=False),
         sa.Column("minute_authorship", authorship, nullable=False),
         sa.Column("minute_ai_assistance", sa.Text, nullable=True),
-        sa.Column("interview_controller", interviewcontroller, server_default="killella_ai"),
+        sa.Column("interview_controller", interviewcontroller, server_default="freak_town_ai"),
         sa.Column("interview_model", sa.String(100), nullable=True),
         sa.Column("character_bible", JSONB, nullable=True),
         sa.Column("character_facts", JSONB, nullable=True),

@@ -1,10 +1,10 @@
-# KILLELLA — Canonical Backend Specification
+# FREAK TOWN — Canonical Backend Specification
 
 The concept is technically very buildable. After reviewing the repo and checking the current APIs, I would **replace most of `backend-spec.md` rather than implement it literally**.
 
-The repo currently has the right *product decomposition* but the wrong *runtime decomposition*. Your existing spec assumes FastAPI centrally controls voice, avatars, OBS, chat, scoring, state, and payments.  In reality, Killella should be a **durable event-driven show engine**, while a browser-based stage renderer does the audiovisual work.
+The repo currently has the right *product decomposition* but the wrong *runtime decomposition*. Your existing spec assumes FastAPI centrally controls voice, avatars, OBS, chat, scoring, state, and payments.  In reality, Freak Town should be a **durable event-driven show engine**, while a browser-based stage renderer does the audiovisual work.
 
-The biggest external correction is three.ws. It really does provide browser-native `<agent-3d>`, avatar speech/lipsync, emotions, gestures, `playClip()`, and related APIs, so it fits this project unusually well. ([GitHub][1]) But your spec says it is Apache-2.0 and instructs you to clone/self-host it; the current upstream `LICENSE` says **proprietary, all rights reserved**. Do not build Killella around redistributing/self-hosting their code until that licensing position is resolved. ([GitHub][2])
+The biggest external correction is three.ws. It really does provide browser-native `<agent-3d>`, avatar speech/lipsync, emotions, gestures, `playClip()`, and related APIs, so it fits this project unusually well. ([GitHub][1]) But your spec says it is Apache-2.0 and instructs you to clone/self-host it; the current upstream `LICENSE` says **proprietary, all rights reserved**. Do not build Freak Town around redistributing/self-hosting their code until that licensing position is resolved. ([GitHub][2])
 
 Here is the backend architecture I would actually build.
 
@@ -12,7 +12,7 @@ Here is the backend architecture I would actually build.
 
 ## 1. Architectural principle
 
-Killella is not primarily an API application.
+Freak Town is not primarily an API application.
 
 It is a **live show runtime**.
 
@@ -27,7 +27,7 @@ The browser stage's job is to execute:
 Therefore:
 
 ```text
-                         KILLELLA
+                         FREAK TOWN
 
  Audience phones
        │
@@ -136,7 +136,7 @@ It does **not** execute the show loop.
 
 One active Show Runner owns each live episode.
 
-It is the actual heart of Killella.
+It is the actual heart of Freak Town.
 
 ```text
 Episode
@@ -976,9 +976,9 @@ Everything becomes:
 }
 ```
 
-Rumble Studio itself can already multistream and provides aggregated chat for the broadcaster, so Killella doesn't need to solve cross-platform chat before the first show. ([Rumble Studio][8])
+Rumble Studio itself can already multistream and provides aggregated chat for the broadcaster, so Freak Town doesn't need to solve cross-platform chat before the first show. ([Rumble Studio][8])
 
-Native Killella audience interaction should remain canonical.
+Native Freak Town audience interaction should remain canonical.
 
 ---
 
@@ -989,7 +989,7 @@ For MVP:
 ```text
 OBS manually started
 +
-one Killella Stage Browser Source
+one Freak Town Stage Browser Source
 ```
 
 That's enough.
@@ -997,13 +997,13 @@ That's enough.
 For full automation, install a tiny local process on the OBS machine:
 
 ```text
-killella-obs-bridge
+freak_town-obs-bridge
 ```
 
 It connects outbound to:
 
 ```text
-wss://api.killella/.../control
+wss://api.freak_town/.../control
 ```
 
 and locally to:
@@ -1032,7 +1032,7 @@ No inbound ports on the streaming machine.
 
 ## 21. three.ws integration
 
-For Killella, use three.ws as a **renderer**, not as the show brain.
+For Freak Town, use three.ws as a **renderer**, not as the show brain.
 
 Stage owns three avatar instances:
 
@@ -1208,7 +1208,7 @@ R2 assets
 you should be able to run:
 
 ```bash
-killella replay ep_123
+freak_town replay ep_123
 ```
 
 and see essentially the same episode.
@@ -1223,7 +1223,7 @@ This gives you:
 * training data
 * automated regression testing
 
-It is one of the highest-leverage properties Killella can have.
+It is one of the highest-leverage properties Freak Town can have.
 
 ---
 
@@ -1319,9 +1319,9 @@ The present FastAPI app exposes only `/` and `/health`, confirming that essentia
 
 The key simplification is this:
 
-**Killella backend = conductor. Stage browser = orchestra. OBS = camera.**
+**Freak Town backend = conductor. Stage browser = orchestra. OBS = camera.**
 
-And I would explicitly **not add LiveKit yet**. LiveKit is excellent when you need WebRTC audio/video participants or genuinely live conversational agents; its current architecture is designed around that. ([LiveKit Docs][14]) Killella's first version is predominantly one-way generated media plus tiny audience reaction events, so WebSockets + browser audio are much simpler.
+And I would explicitly **not add LiveKit yet**. LiveKit is excellent when you need WebRTC audio/video participants or genuinely live conversational agents; its current architecture is designed around that. ([LiveKit Docs][14]) Freak Town's first version is predominantly one-way generated media plus tiny audience reaction events, so WebSockets + browser audio are much simpler.
 
 The other major unlock is the `PerformancePlan`. Once every comedian becomes a reusable, timed artifact containing script + voice + cues + metadata, you can generate episodes ahead of time, rerun them, A/B models, swap judges, automatically make clips, and eventually train on the exact relationship between **generation configuration → delivery → audience laughter curve**. That is substantially more valuable than the current "FastAPI calls LLM then sends some audio to OBS" design.
 

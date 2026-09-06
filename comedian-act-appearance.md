@@ -72,7 +72,7 @@ human
 microphone
 ```
 
-Killella gets:
+Freak Town gets:
 
 ```text
 dog
@@ -167,17 +167,17 @@ Now you've accidentally created another recurring game:
 
 > **"Was that human or AI?"**
 
-That belongs naturally in Killella without becoming the entire premise.
+That belongs naturally in Freak Town without becoming the entire premise.
 
 ---
 
-## Killella's version of Reincarnation
+## Freak Town's version of Reincarnation
 
 Formalize this heavily internally while making it invisible to users.
 
 RoboBladez has a persistent identity and a bounded, immutable match-specific reincarnation. Its manifest explicitly records the author as `human_id / agent_id / daimon_id`, parent reincarnation, target match and executable state.
 
-Killella should have:
+Freak Town should have:
 
 ```text
 COMEDIAN
@@ -238,7 +238,7 @@ stage:
 
 Once submitted for that show, freeze it.
 
-That's almost exactly RoboBladez's append-only/hash-bound lineage principle. Its repo already treats historical incarnations as permanent "sports artifacts"; Killella can treat old Acts the same way.
+That's almost exactly RoboBladez's append-only/hash-bound lineage principle. Its repo already treats historical incarnations as permanent "sports artifacts"; Freak Town can treat old Acts the same way.
 
 ---
 
@@ -268,7 +268,7 @@ User supplies premise:
 
 > dog with no sense of smell
 
-Killella helps iterate:
+Freak Town helps iterate:
 
 ```text
 What's funnier?
@@ -336,7 +336,7 @@ MINUTE_AUTHOR
 human | assisted | ai
 
 INTERVIEW_CONTROLLER
-human | killella_ai | external_agent
+human | freak_town_ai | external_agent
 ```
 
 Which produces combinations:
@@ -444,7 +444,7 @@ If the user writes:
 
 > Dog with no sense of smell who thinks butt sniffing is flirting.
 
-Killella should immediately return a draft character card:
+Freak Town should immediately return a draft character card:
 
 ```text
 NO-NOSE NOLAN
@@ -625,7 +625,7 @@ That's how characters become stars rather than disposable generations.
 This resolves the human-vs-AI question, character ownership, recurring performers, versioning, submissions, creator UX, replays, and the long-term improvement loop in one abstraction.
 
 ```text
-ROBOBLADEZ                      KILLELLA
+ROBOBLADEZ                      FREAK TOWN
 
 Persistent Agent                Persistent Comedian
       ↓                               ↓
@@ -646,11 +646,11 @@ lineage/evolution               next Act version
 
 ## The thesis
 
-> **Killella is a stage where anyone can create a comedian.**
+> **Freak Town is a stage where anyone can create a comedian.**
 
 Not:
 
-> Killella is where AI models compete at comedy.
+> Freak Town is where AI models compete at comedy.
 
 AI powers the impossible parts—bringing a dog to life, improvising an interview, voices, animation, automated production—but **human creativity is absolutely welcome**.
 

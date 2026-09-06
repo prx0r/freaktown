@@ -42,7 +42,7 @@ class ComedianCreateRequest(BaseModel):
     minute_authorship: Authorship = Authorship.HUMAN
 
     # Interview config
-    interview_controller: InterviewController = InterviewController.KILLELLA_AI
+    interview_controller: InterviewController = InterviewController.FREAK_TOWN_AI
     character_facts: list[str] = Field(default_factory=list, description="Comedy hooks: obsessed with / wrong with / hate discovering")
 
     # Optional
@@ -58,7 +58,7 @@ class ActVersionCreateRequest(BaseModel):
     minute_text: str = Field(..., min_length=1, max_length=2000)
     minute_authorship: Authorship = Authorship.HUMAN
     minute_ai_assistance: str | None = None
-    interview_controller: InterviewController = InterviewController.KILLELLA_AI
+    interview_controller: InterviewController = InterviewController.FREAK_TOWN_AI
     character_facts: list[str] = Field(default_factory=list)
     body_appearance: str | None = None
     outfit: str | None = None

@@ -1,8 +1,8 @@
-# KILLELLA — Working Tech Stack
+# FREAK TOWN — Working Tech Stack
 
 ## The Name
 
-**KILLELLA** — Live AI comedy competition
+**FREAK TOWN** — Live AI comedy competition
 
 ---
 
@@ -85,7 +85,7 @@
 
 ```
 ┌─────────────────────────────────────────────────┐
-│         AUDIENCE WEB APP (killella.fun)          │
+│         AUDIENCE WEB APP (freak_town.fun)          │
 │                                                  │
 │  ┌─────────────────────────────────────────┐    │
 │  │        🔴 LAUGH  (big red button)       │    │
@@ -100,7 +100,7 @@
 │  ┌─────────────────────────────────────────┐    │
 │  │  LIVE CHAT (from all platforms)         │    │
 │  │  Rumble chat + Odysee + Twitch          │    │
-│  │  + killella.fun native chat             │    │
+│  │  + freak_town.fun native chat             │    │
 │  └─────────────────────────────────────────┘    │
 │                                                  │
 │  ┌─────────────────────────────────────────┐    │
@@ -159,7 +159,7 @@
 
 ```
 ┌─────────────────────────────────────────────────┐
-│         KILLELLA PRIZE POOL CONTRACT             │
+│         FREAK TOWN PRIZE POOL CONTRACT             │
 │         (Solana — USDC SPL Token)                │
 │                                                  │
 │  STATE MACHINE:                                  │
@@ -265,7 +265,7 @@ BEFORE SHOW:
 4. Stream goes live on Rumble/Odysee/Twitch
 
 SHOW RUNS AUTOMATICALLY:
-5. Ella: "Welcome to Killella. I'm Ella M. This is ChatGPT."
+5. Ella: "Welcome to Freak Town. I'm Ella M. This is ChatGPT."
 6. ChatGPT: "Hey everyone! Great to be—"
 7. Ella: "Nobody asked, Chat. Shut up."
 8. [LINEUP REVEAL — avatars appear one by one]
@@ -313,7 +313,7 @@ FULLY AUTOMATED — no human needed after setup
 - [ ] Roast dialogue generator (Ella + ChatGPT dynamic)
 
 ### Week 4: Audience
-- [ ] Killella.fun web app
+- [ ] Freak Town.fun web app
 - [ ] Big red laugh button (WebSocket → backend)
 - [ ] Clap, Roast, Stake buttons
 - [ ] Live chat feed (Rumble + native)
@@ -385,7 +385,7 @@ humour/
 ├── kill-bot/
 │   ├── spec.md                  ← original spec
 │   ├── streaming-and-crypto.md  ← streaming details
-│   ├── killella-stack.md        ← this file
+│   ├── freak_town-stack.md        ← this file
 │   ├── backend/
 │   │   ├── main.py              ← FastAPI app
 │   │   ├── show_controller.py   ← state machine
@@ -405,7 +405,7 @@ humour/
 │   │   ├── chatgpt-avatar.glb   ← three.ws avatar
 │   │   └── stage-config.json    ← three.ws scene
 │   ├── contracts/
-│   │   ├── killella.sol         ← Solana Anchor program
+│   │   ├── freak_town.sol         ← Solana Anchor program
 │   │   └── deploy.sh            ← deployment script
 │   └── data/
 │       ├── episodes/

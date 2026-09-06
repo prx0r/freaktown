@@ -5,7 +5,7 @@ from backend.config import settings
 from backend.routes import admin, audience, comedians, episodes, stage
 
 app = FastAPI(
-    title="Killella",
+    title="Freak Town",
     description="A live talent show for artificial personalities",
     version="0.1.0",
     docs_url="/docs",
@@ -39,7 +39,7 @@ async def health():
 @app.get("/")
 async def root():
     return {
-        "name": "Killella",
+        "name": "Freak Town",
         "description": "A live talent show for artificial personalities",
         "version": "0.1.0",
     }

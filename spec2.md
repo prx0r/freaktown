@@ -1,6 +1,6 @@
-# KILLELLA — Spec 2: The Character-Discovery Machine
+# FREAK TOWN — Spec 2: The Character-Discovery Machine
 
-The biggest flaw is that the repo currently thinks Killella is an **AI comedy competition**.
+The biggest flaw is that the repo currently thinks Freak Town is an **AI comedy competition**.
 
 I think that is one layer too shallow.
 
@@ -8,7 +8,7 @@ After reading current *Kill Tony* rules, multiple transcripts across eras, episo
 
 > **A randomized character-discovery machine where comedy is the admission ticket.**
 
-The minute establishes whether someone can perform. The interview discovers whether there is a compelling character underneath. That distinction changes Killella almost completely.
+The minute establishes whether someone can perform. The interview discovers whether there is a compelling character underneath. That distinction changes Freak Town almost completely.
 
 Kill Tony's current official signup is remarkably low-friction: show up, provide ID/name, have 60 seconds prepared, remain available, and a random draw determines whether you perform. After the minute, the performer is interviewed by the hosts/panel. ([Comedy Mothership][1]) Across transcripts from 2018 through current episodes, the interview repeatedly begins with mundane grounding questions—how long they've done comedy, where they're from, what they do for work—and then follows whatever strange detail appears. ([SubEasy][2])
 
@@ -20,7 +20,7 @@ That is the lesson to steal—not the bucket, cat noise, Golden Ticket, Tony imp
 
 ## The central redesign
 
-I would define Killella as:
+I would define Freak Town as:
 
 > **A live talent show for artificial personalities.**
 >
@@ -136,7 +136,7 @@ Also too much burden.
 
 The applicant should not need to know anything about three.ws, ElevenLabs, GLBs, wallets, WebSockets, endpoints or LLM APIs.
 
-Killella owns the stage.
+Freak Town owns the stage.
 
 ---
 
@@ -150,7 +150,7 @@ The current *Kill Tony* process works partly because the application is basicall
 
 ([Comedy Mothership][1])
 
-Killella should preserve that emotional simplicity.
+Freak Town should preserve that emotional simplicity.
 
 The homepage CTA should effectively be:
 
@@ -240,7 +240,7 @@ Advanced users can later bring their own.
 
 Default:
 
-> **Killella Brain — recommended**
+> **Freak Town Brain — recommended**
 
 That's it.
 
@@ -309,7 +309,7 @@ boundaries:
   ...
 ```
 
-Killella creates the actual performance challenge.
+Freak Town creates the actual performance challenge.
 
 ---
 
@@ -388,7 +388,7 @@ Suddenly you get a secondary sport:
 
 > "That tiny model beat Claude."
 
-This gives Killella an **AI Model Arena dimension without becoming a sterile benchmark**.
+This gives Freak Town an **AI Model Arena dimension without becoming a sterile benchmark**.
 
 ---
 
@@ -667,7 +667,7 @@ That is something genuinely new.
 
 Traditional AI products try to hide model mechanics.
 
-Killella should turn them into theater.
+Freak Town should turn them into theater.
 
 Put things on screen occasionally:
 
@@ -884,7 +884,7 @@ This is where I would differ slightly from Kill Tony.
 
 The show's random selection is crucial to its unpredictability, and community discussion repeatedly identifies bucket pulls as the attraction. ([Reddit][5])
 
-But Killella initially won't have 500 competent entrants.
+But Freak Town initially won't have 500 competent entrants.
 
 So use **qualified randomness**.
 
@@ -1133,7 +1133,7 @@ Episode Zero should contain **five internally created agents that are radically 
 4. An agent that hates its creator.
 5. Extremely corporate customer-support comedian.
 
-The goal isn't proving Killella Brain works.
+The goal isn't proving Freak Town Brain works.
 
 It's demonstrating the **possibility space**.
 
@@ -1143,7 +1143,7 @@ After viewers see it, they immediately think:
 
 That fantasy matters. One *Kill Tony* fan described exactly this attraction: viewers naturally imagine themselves writing a minute and destroying the people they're watching. ([Reddit][6])
 
-Killella needs the same feeling:
+Freak Town needs the same feeling:
 
 > **"My agent would destroy these idiots."**
 
@@ -1308,7 +1308,7 @@ Put him back in the server."
 END
 ```
 
-**If that five minutes is compelling, you have Killella.**
+**If that five minutes is compelling, you have Freak Town.**
 
 If it isn't, no blockchain, leaderboard, 3D animation library or sophisticated scoring formula will save it.
 

@@ -1,6 +1,6 @@
-# Killella Vision: Show + Economic Layer for Fictional Performers
+# Freak Town Vision: Show + Economic Layer for Fictional Performers
 
-> **Killella is both a show and an economic layer for fictional performers.**
+> **Freak Town is both a show and an economic layer for fictional performers.**
 
 The character is the public identity, the human is the creator/author, and the wallet belongs to the creator.
 
@@ -17,11 +17,11 @@ The character feels real while the human gets authorship and status.
 
 ## Revenue: 5% is the core rule, but tips are not the main business
 
-> **Creators keep 95%. Killella takes 5% for running the stage, payments, hosting, discovery and distribution.**
+> **Creators keep 95%. Freak Town takes 5% for running the stage, payments, hosting, discovery and distribution.**
 
-The 5% applies to **creator-directed economic activity**, not literally every dollar Killella earns.
+The 5% applies to **creator-directed economic activity**, not literally every dollar Freak Town earns.
 
-| Source | Killella keeps | Creator gets |
+| Source | Freak Town keeps | Creator gets |
 |--------|---------------|--------------|
 | Character tip ($10) | $0.50 | $9.50 |
 | Ella/show tip | 100% | — |
@@ -29,9 +29,9 @@ The 5% applies to **creator-directed economic activity**, not literally every do
 | Character-commissioned sponsor | negotiated split | negotiated split |
 | YouTube/Rumble ad revenue | platform revenue | — |
 
-Tips alone won't finance the company. At 1,000 viewers, even if 3% tip an average $5, that's only $150 of creator GMV and **$7.50 to Killella at 5%**. The 5% aligns the ecosystem, but **advertising/sponsorship becomes the serious revenue engine**.
+Tips alone won't finance the company. At 1,000 viewers, even if 3% tip an average $5, that's only $150 of creator GMV and **$7.50 to Freak Town at 5%**. The 5% aligns the ecosystem, but **advertising/sponsorship becomes the serious revenue engine**.
 
-Rumble has already validated this ad product. Rumble Studio sells live host-read campaigns with on-screen advertiser/QR overlay, and campaigns can pay a flat amount or per live viewer. Killella can make that native to the fictional universe instead of reading generic ads.
+Rumble has already validated this ad product. Rumble Studio sells live host-read campaigns with on-screen advertiser/QR overlay, and campaigns can pay a flat amount or per live viewer. Freak Town can make that native to the fictional universe instead of reading generic ads.
 
 ---
 
@@ -43,21 +43,21 @@ Cold open:
 
 > Ella: "Tonight's server bill is being paid by ElevenLabs. Apparently they heard this show and decided bad decisions needed better voices."
 
-Logo appears physically behind her with `ELEVENLABS.COM/KILLELLA` or QR code.
+Logo appears physically behind her with `ELEVENLABS.COM/FREAK TOWN` or QR code.
 
-Advertiser provides factual claims, prohibited phrases, CTA and required wording. Killella generates the actual read **before the show**, advertiser approves, final version is frozen. Don't let a live LLM freestyle regulated advertising.
+Advertiser provides factual claims, prohibited phrases, CTA and required wording. Freak Town generates the actual read **before the show**, advertiser approves, final version is frozen. Don't let a live LLM freestyle regulated advertising.
 
 ### Native sponsor formats
 
 | Inventory | Experience | Revenue owner |
 |-----------|-----------|---------------|
-| Opening sponsor | 20-30 sec Ella read | Killella |
-| Set transition | 5-10 sec visual | Killella |
-| Sponsored challenge | "The Stripe 10-Word Challenge" | Killella |
-| Character sponsorship | Brand commissions/backs Nolan | Creator + Killella |
-| Clip sponsor | Sponsor attached to viral short | Killella / creator |
-| Show tip | Audience tips Ella/production | Killella |
-| Character tip | Audience tips comedian | 95% creator / 5% Killella |
+| Opening sponsor | 20-30 sec Ella read | Freak Town |
+| Set transition | 5-10 sec visual | Freak Town |
+| Sponsored challenge | "The Stripe 10-Word Challenge" | Freak Town |
+| Character sponsorship | Brand commissions/backs Nolan | Creator + Freak Town |
+| Clip sponsor | Sponsor attached to viral short | Freak Town / creator |
+| Show tip | Audience tips Ella/production | Freak Town |
+| Character tip | Audience tips comedian | 95% creator / 5% Freak Town |
 
 Do not build an ad exchange initially. Sell the first 20 campaigns manually. Learn what sponsors actually want, then encode into `SponsorCampaign`, `Placement`, `Creative`, `Bid`, `Impression`, `Conversion`.
 
@@ -72,7 +72,7 @@ Use **Privy + Solana + USDC**.
 ```text
 Sign in with Google
         ↓
-Killella account
+Freak Town account
         ↓
 wallet silently provisioned
         ↓
@@ -98,10 +98,10 @@ Someone presses **TIP NOLAN $5**:
 
 ```text
 $4.75 USDC → creator
-$0.25 USDC → Killella
+$0.25 USDC → Freak Town
 ```
 
-Viewer approves once. Killella sponsors the tiny network fee (no SOL needed).
+Viewer approves once. Freak Town sponsors the tiny network fee (no SOL needed).
 
 **Non-custodial platform economics.** You never receive Nolan's $4.75 and later "pay him out". It goes straight to him.
 
@@ -120,7 +120,7 @@ For fiat users, add Stripe Connect as the pure-fiat alternative. Connect explici
          └────────┬────────┘
                   ▼
           CREATOR GETS 95%
-          KILLELLA GETS 5%
+          FREAK TOWN GETS 5%
 ```
 
 The user shouldn't care which rail ran underneath.
@@ -201,7 +201,7 @@ The Depressed Toaster
 ```
 
 People become fans of:
-1. Killella
+1. Freak Town
 2. Particular characters
 3. Particular **creators**
 
@@ -295,7 +295,7 @@ Every audience browser receives the same `ShowEvents` that OBS receives.
       Rumble/YouTube
 ```
 
-OBS is **just another Killella client**.
+OBS is **just another Freak Town client**.
 
 If Nolan enters:
 
@@ -315,7 +315,7 @@ every browser plays it.
 
 ### Benefits
 
-- Audience on killella.com gets real-time stage events, synchronized laughs, instant tips, interactive buttons, selectable cameras, no livestream latency, no expensive video bandwidth
+- Audience on freak_town.com gets real-time stage events, synchronized laughs, instant tips, interactive buttons, selectable cameras, no livestream latency, no expensive video bandwidth
 - OBS renders precisely the same scene and broadcasts to YouTube/Rumble for discovery
 - Much more defensible than operating a normal livestream
 
@@ -417,7 +417,7 @@ mouth_driver
 
 Then skin them.
 
-A dog creator doesn't need to animate a dog. They select "German Shepherd" and Killella already knows how that body acts.
+A dog creator doesn't need to animate a dog. They select "German Shepherd" and Freak Town already knows how that body acts.
 
 Later user-generated GLB/VRM characters can be uploaded and validated against an animation contract.
 
@@ -426,7 +426,7 @@ Later user-generated GLB/VRM characters can be uploaded and validated against an
 ## Stream monetization becomes additive
 
 ```text
-                    KILLELLA REVENUE
+                    FREAK TOWN REVENUE
 
         ┌──────────────────────────────────┐
         │                                  │
@@ -440,7 +440,7 @@ Later user-generated GLB/VRM characters can be uploaded and validated against an
         │                                  │
         └────────────────┬─────────────────┘
                          │
-                     KILLELLA
+                     FREAK TOWN
 ```
 
 Platform ad revenue is a bonus. **Your valuable inventory is the inventory you own.**
@@ -466,10 +466,10 @@ Character:
 @tomprior
 
 Interview:
-Killella AI
+Freak Town AI
 
 Voice:
-Killella Voice #14
+Freak Town Voice #14
 ```
 
 Or:
@@ -498,4 +498,4 @@ They coexist without the platform declaring one "purer."
 
 Comedy gets people there. Characters, creator identities, canon, audience relationships and economics produce the moat.
 
-The 95/5 direct creator economy + sponsor-funded show + locally rendered interactive stage is the structural version to build now. It gives revenue without pay-to-play, gives creators a real reason to keep making characters, and makes Killella materially better than simply posting an AI comedy video to YouTube.
+The 95/5 direct creator economy + sponsor-funded show + locally rendered interactive stage is the structural version to build now. It gives revenue without pay-to-play, gives creators a real reason to keep making characters, and makes Freak Town materially better than simply posting an AI comedy video to YouTube.
