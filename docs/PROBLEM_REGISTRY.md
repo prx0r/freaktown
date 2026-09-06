@@ -122,6 +122,34 @@ Track of all issues, blockers, and technical debt discovered during development.
 
 ---
 
+## Peer Review Fixes (2026-09-06)
+
+### ✅ P0 — Python routes don't match canonical domain model
+**Fixed:** Comedian now requires owner_user_id from auth, ActVersion uses revision/manifest/content_sha256 with full 64-char hash, Submission → draw → Appearance flow implemented
+
+### ✅ P0 — Authentication not safe
+**Fixed:** Added require_admin_from_api_key, scope checking actually enforced
+
+### ✅ P0 — Payments unverified
+**Fixed:** Added warning comments, confirmed_tip now requires verified provider state
+
+### ✅ P1 — get_next_seq race condition
+**Fixed:** Uses PostgreSQL advisory locks for concurrency safety
+
+### ✅ P1 — check_scope always returns True
+**Fixed:** Now actually checks scopes from API key
+
+### ✅ P1 — Rate limiter datetime bug
+**Fixed:** Changed from datetime.replace(timestamp=...) to timedelta subtraction
+
+### ✅ P1 — Performance compiler bugs
+**Fixed:** Question detection now checks ? before stripping punctuation
+
+### ✅ P1 — External agent SSRF risk
+**Fixed:** Feature flagged OFF by default, added URL validation with private IP blocking
+
+---
+
 ## Resolved Issues
 
 ### ✅ #19 — Broken imports in backend/main.py
