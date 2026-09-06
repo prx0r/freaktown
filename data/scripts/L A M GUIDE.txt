@@ -1,0 +1,51 @@
+AI Anthropologist: The Final Blueprint & Development RoadmapThesis: A Hierarchically-Trained, Agentic Assembly Line for ComedyThe AI Anthropologist is architected as a hierarchical Mixture of Agents, orchestrated by a master operational agent, BORIS. This system simulates a creative assembly line, where raw material from a "writer's room" is sequentially enriched by specialists in narrative, theory, and performance. BORIS does not create content; it manages the workflow, ensuring each specialist agent contributes its unique value to the final product.The core innovation is the self-improving prompt engine. Each agent in the assembly line maintains and refines its own algorithmic prompt, learning to perfect its specific task through a structured, multi-layered human-in-the-loop training process. This roadmap outlines the definitive plan to build and train this system, layer by layer.1. Core Technology StackDatabase: Postgres with the pgvector extension for efficient vector similarity search.Caching: Redis for high-speed, persistent caching of real-time data.LLM & Compute: NVIDIA Nemo 12B (or similar) fine-tuned with QLoRA on Google Colab Pro or RunPod.Agentic Framework: Microsoft AutoGen for orchestrating the multi-agent GroupChat workflow, with BORIS acting as the GroupChatManager.Training Framework: PyTorch with the Hugging Face ecosystem (transformers, peft, trl).Dashboard: Streamlit for the human-in-the-loop (HITL) training interface.2. High-Level Codebase ArchitectureThis architecture is built around your phase-aware BORIS orchestrator and a team of specialized agents.The BORIS OrchestratorBORIS is the central nervous system. It manages the flow of information between the specialist agents, activating them based on the current training phase.# high_level_architecture.py
+
+from dataclasses import dataclass
+
+@dataclass
+class ProductionConfig:
+    current_phase: int = 1 # Can be 1, 2, or 3
+
+class BORIS:
+    """The master operational agent that orchestrates the 4-stage assembly line."""
+    def __init__(self, db, config: ProductionConfig):
+        self.db = db
+        self.config = config
+        self.current_affairs_engine = CurrentAffairsEngine(db)
+        
+        # Initialize agents based on the current training phase
+        self.comedy_writers = {style: ComedyWriterAgent(style, db) for style in ["dark", "profound", "mocking", "deadpan", "rant"]}
+        self.relational_agent = RelationalAgent(db) if config.current_phase >= 2 else None
+        self.theory_agent = TheoryAgent(db) if config.current_phase >= 3 else None
+        self.polish_agent = PolishAgent(db) if config.current_phase >= 3 else None
+        print(f"🎭 BORIS initialized for Phase {config.current_phase}")
+
+    async def orchestrate_generation(self, comments: str, batch_id: str) -> dict:
+        """Orchestrates the complete, phase-aware assembly line process."""
+        print(f"\n🎬 BORIS orchestrating generation for {batch_id}")
+        
+        # Stage 0: Context (Always Active)
+        context = await self.current_affairs_engine.fetch_context_for_comments(comments)
+        
+        # Stage 1: The Writer's Room (Always Active)
+        writer_outputs = await self._run_stage1_writers_room(comments, context, batch_id)
+        
+        if self.config.current_phase == 1:
+            return {"final_output": writer_outputs, "phase": 1}
+
+        # Stage 2: Relational Agent (Phase 2+)
+        relational_output = await self.relational_agent.process(writer_outputs, batch_id)
+
+        if self.config.current_phase == 2:
+            return {"final_output": relational_output, "phase": 2, "stage1_outputs": writer_outputs}
+
+        # Stage 3 & 4 (Phase 3+)
+        theory_output = await self.theory_agent.process(relational_output, batch_id)
+        final_script = await self.polish_agent.process(theory_output, batch_id)
+        
+        return {"final_output": final_script, "phase": 3, "all_stage_outputs": [writer_outputs, relational_output, theory_output]}
+
+    async def _run_stage1_writers_room(self, comments, context, batch_id):
+        # ... (logic for concurrent writer generation)
+        pass
+The Specialist AgentsEach agent is a class with a clear purpose and a self-improving prompt.ComedyWriterAgent:Role: Generates a script in one specific style (e.g., 'dark').Core Prompt: "You are an AI anthropologist with dark humor... Analyze these comments: {comments}. Current context is: {context}. Generate a 150-300 word script."RelationalAgent:Role: Weaves together the five scripts from the writers, adding narrative context.Core Prompt: "You are a master storyteller. Here are five different comedic takes on the same comments: {writer_scripts}. Synthesize them into a single, cohesive draft. Consult your knowledge base to add references to recurring users like 'User_47' and running jokes."TheoryAgent:Role: Adds intellectual framing and updates its knowledge base.Core Prompt: "You are a theorist. Here is a draft script: {relational_draft}. Reframe its core message within the context of your established theories on human behavior (e.g., 'Human Temporal Anxiety'). Extract any new insights for your research."PolishAgent:Role: Adds the final layer of performance art.Core Prompt: "You are a performance director. Here is a final draft: {theory_draft}. Your job is to add the final polish. Insert precise timing markers [PAUSE 0.8s], script visual cues [VISUAL: ...], and, if the wildcard is active, inject this element: {wildcard_instruction}."4. The Layered Development & Training RoadmapThis is the sequential plan to build and train the system, mastering one layer at a time. Each phase is a nominal 30-day cycle.Phase 1 (First 30-Day Cycle): Foundational "Comedy Banks"Goal: To make the five ComedyWriterAgents autonomously proficient at their individual styles.Week 1: Infrastructure & Agent SetupAction: Deploy Postgres with pgvector and a Redis instance. Set up the AutoGen project with BORIS as the GroupChatManager and define the five ComedyWriterAgents, each with their initial seed prompt.Week 2: Curation Dashboard for Phase 1Action: Build the Streamlit dashboard. The UI will display the five generated scripts from the comedy agents side-by-side. For each script, provide a text area for the "Optimal Response" and a "Save Feedback" button.Week 3: Intensive Curation & Prompt EvolutionAction: Begin the 30-day training cycle. For each "day," provide an optimal response for each of the five styles. This feedback triggers the improve_prompt method for each agent, causing them to autonomously evolve their own core prompts.Week 4: Fine-Tuning the Comedy Banks with QLoRAAction: Create a train_lora.py script. This script will use the SFTTrainer from trl and configure the Nemo 12B model for QLoRA training (4-bit quantization, paged AdamW optimizer).Action: In Colab Pro, run the script five times, filtering the database for each archetype to train five specialized LoRA adapters (dark_lora.safetensors, etc.).Phase 2 (Second 30-Day Cycle): The Relational AgentGoal: To train the RelationalAgent to intelligently interpret and weave together the outputs from the now-proficient comedy agents.Week 5: Upgrading the Pipeline & DashboardAction: Implement the RelationalAgent class. BORIS's workflow is updated to include Stage 2. The dashboard now shows the five writer submissions and the RelationalAgent's draft script. The primary feedback mechanism shifts to this new output.Week 6-7: Curation for Narrative WeavingAction: Begin the second 30-day cycle. Your curation task is now to provide an "Optimal Relational Draft," teaching the agent how to best find connections and integrate running jokes.Week 8: Training the Relational AgentAction: Use the train_lora.py script to train a new, master relational_lora.safetensors adapter on the curated relational drafts.Phase 3 (Third 30-Day Cycle): Theory & Polish AgentsGoal: To train the final layers of the assembly line, focusing on intellectual depth and performance art.Week 9: Implementing the Final LayersAction: Implement the TheoryAgent and PolishAgent classes. The BORIS workflow is extended to the full multi-stage pipeline. The dashboard is upgraded again to show the output of each stage sequentially.Week 10-11: Curation for Theory and PolishAction: Begin the third 30-day cycle. You will now provide feedback on two outputs: the TheoryAgent's intellectual framing and the PolishAgent's final performance script.Week 12: Final Fine-Tuning & DeploymentAction: Perform the final fine-tuning runs to create a theory_lora.safetensors and a polish_lora.safetensors.Action: Containerize the entire application with Docker. Deploy the container and the Postgres/Redis databases to your production environment (RunPod).Action: Build and activate the n8n.io workflow to automate the live pipeline, officially launching the fully trained, multi-layered, and autonomous AI Anthropologist.

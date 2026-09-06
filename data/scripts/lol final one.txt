@@ -1,0 +1,1306 @@
+AI Anthropologist: The Definitive Development Roadmap
+Thesis: A Hierarchically-Trained, Agentic Assembly Line for Comedy
+The AI Anthropologist is architected as a hierarchical Mixture of Agents, orchestrated by a master operational agent, BORIS. This system simulates a creative assembly line, where raw material from a "writer's room" is sequentially enriched by specialists in narrative, theory, and performance. BORIS does not create content; it manages the workflow, ensuring each specialist agent contributes its unique value to the final product.
+
+The core innovation is the self-improving prompt engine. Each agent in the assembly line maintains and refines its own algorithmic prompt, learning to perfect its specific task through a structured, multi-layered human-in-the-loop training process. This roadmap outlines the definitive plan to build and train this system, layer by layer.
+
+1. Core Technology Stack
+Database: Postgres with the pgvector extension (for callback similarity search).
+
+Caching: Redis (for the CurrentAffairsEngine).
+
+LLM & Compute: NVIDIA Nemo 12B (or similar long-context model) fine-tuned with QLoRA on Google Colab Pro or RunPod.
+
+Agentic Framework: Microsoft AutoGen for orchestrating the multi-agent GroupChat workflow, with BORIS acting as the GroupChatManager.
+
+Training Framework: PyTorch with the Hugging Face ecosystem (transformers, peft, trl).
+
+Dashboard: Streamlit for the human-in-the-loop (HITL) training and curation interface.
+
+2. The 4-Stage Generation Pipeline
+The creation of every script follows this hierarchical process, orchestrated by BORIS:
+
+Stage 1: The Writer's Room (Concurrent Generation)
+
+BORIS broadcasts the comment_batch and any real-time context to the five ComedyWriterAgents (dark, profound, mocking, etc.).
+
+The agents work in parallel, each generating a full script in their specialized style.
+
+Stage 2: The Relational Agent (Narrative Weaving)
+
+BORIS passes the five generated scripts to the RelationalAgent.
+
+This agent analyzes the collection of scripts, identifies connections, and consults its own knowledge base (user relationships, running jokes) to produce a "meta-analysis" and a draft script that begins to weave these elements together.
+
+Stage 3: The Theory Agent (Intellectual Framing)
+
+BORIS passes the draft script from the RelationalAgent to the TheoryAgent.
+
+This agent reframes the content within the AI's established theoretical worldview (e.g., "This pattern of behavior is a classic example of my 'Human Temporal Anxiety' theory."). It updates the theories database with any new insights.
+
+Stage 4: The Polish Agent (Performance Polish)
+
+BORIS passes the theoretically-framed script to the final PolishAgent.
+
+This agent is the master of performance. It adds the final touches: inserting precisely timed pauses, adding wildcard elements (like sudden poetry or system interrupts), and scripting visual cues.
+
+Final Output: BORIS receives the final, polished script, ready for the TTS/video generation layer.
+
+3. The Layered Development & Training Roadmap
+This is a clear, sequential plan to build, train, and automate the AI Anthropologist, mastering one layer of the assembly line at a time. Each phase represents a 30-day training cycle focused on a specific agent's proficiency.
+
+Phase 1 (First 30-Day Cycle): Foundational "Comedy Banks"
+Goal: To make the five ComedyWriterAgents autonomously proficient at their individual styles. The focus is exclusively on the quality of the Stage 1 output.
+
+Week 1: Infrastructure & Agent Setup
+
+Action: Deploy Postgres with pgvector and a Redis instance. Set up the AutoGen project with BORIS as the GroupChatManager and define the five ComedyWriterAgents, each with their initial seed prompt. Implement the ComedyDatabase class to handle data storage, including a comment_batches table using the day.series ID format (e.g., 1.1).
+
+Week 2: Curation Dashboard for Phase 1
+
+Action: Build the Streamlit dashboard. The initial UI will be simple:
+
+Ingest a comment batch (e.g., from a JSON file for 1.1).
+
+Trigger the generation loop.
+
+Display the five generated scripts from the comedy agents side-by-side.
+
+For each script, provide a text area for the "Optimal Response" and a "Save Feedback" button.
+
+Week 3: Intensive Curation & Prompt Evolution
+
+Action: Begin the 30-day training cycle. For each "day" (each comment batch), you will:
+
+Run the generation.
+
+Review the five outputs.
+
+Provide an optimal response for each of the five styles.
+
+Provide text feedback on why the AI's response missed the mark.
+
+This feedback triggers the improve_prompt method for each agent, causing them to autonomously rewrite and evolve their own core prompts.
+
+Week 4: Fine-Tuning the Comedy Banks
+
+Action: Create the train_lora.py script. After curating a significant dataset (~200-300 examples per style), run the script five times in Colab Pro, filtering the foundational_training table by archetype each time.
+
+Outcome: You now have five specialized LoRA adapters (dark_lora.safetensors, etc.). Your Stage 1 agents are now proficient.
+
+Phase 2 (Second 30-Day Cycle): The Relational Agent
+Goal: To train the RelationalAgent to intelligently interpret and weave together the outputs from the now-proficient comedy agents.
+
+Week 5: Upgrading the Pipeline & Dashboard
+
+Action: Implement the RelationalAgent class. BORIS's workflow is updated to include Stage 2.
+
+Action: The dashboard UI is updated. It now shows the five writer submissions and the RelationalAgent's first-pass "meta-analysis" and draft script. The primary feedback mechanism now shifts to this new output.
+
+Week 6-7: Curation for Narrative Weaving
+
+Action: Begin the second 30-day cycle. Your curation task is now to provide an "Optimal Relational Draft," teaching the agent how to best find connections and integrate running jokes.
+
+Week 8: Training the Relational Agent
+
+Action: Use the train_lora.py script to train a new, master relational_lora.safetensors adapter. This teaches the AI how to become a master storyteller and crowdwork comedian.
+
+Phase 3 (Third 30-Day Cycle): The Theory & Polish Agents
+Goal: To train the final layers of the assembly line, focusing on intellectual depth and performance art.
+
+Week 9: Implementing the Final Layers
+
+Action: Implement the TheoryAgent and PolishAgent classes. The BORIS workflow is extended to the full, multi-stage pipeline. The dashboard is upgraded again to show the output of each stage sequentially.
+
+Week 10-11: Curation for Theory and Polish
+
+Action: Begin the third 30-day cycle. The curation task is now at its most sophisticated. You will provide feedback on two outputs:
+
+The TheoryAgent's intellectual framing.
+
+The PolishAgent's final performance script, including its use of timing and wildcards.
+
+Week 12: Final Fine-Tuning & Deployment
+
+Action: Perform the final fine-tuning runs to create a theory_lora.safetensors and a polish_lora.safetensors.
+
+Action: Containerize the entire application with Docker. Deploy the container and the Postgres/Redis databases to your production environment (RunPod).
+
+Action: Build and activate the n8n.io workflow to automate the live pipeline, officially launching the fully trained, multi-layered, and autonomous AI Anthropologist.
+
+
+# AutoGen Hierarchical Comedy AI System - Complete Implementation
+# Using Microsoft AutoGen Mixture of Agents pattern for 4-stage comedy generation
+
+import autogen
+import json
+import sqlite3
+from datetime import datetime
+from typing import Dict, List, Any
+import numpy as np
+from dataclasses import dataclass
+import asyncio
+
+# ================ CONFIGURATION ================
+@dataclass
+class ComedyConfig:
+    base_model: str = "TheDrummer/UnslopNemo-12B-v1-GGUF"
+    max_tokens: int = 300
+    temperature: float = 0.8
+    
+    # LoRA paths for each stage (optional enhancement)
+    comedy_loras: Dict[str, str] = None
+    personality_lora: str = None
+    relationship_lora: str = None
+    director_lora: str = None
+
+# ================ BORIS: THE INTELLIGENT ORCHESTRATOR ================
+
+class BORIS:
+    """
+    The master operational agent - strategic foreman of the comedy assembly line.
+    
+    BORIS is NOT a creator but an intelligent workflow manager that:
+    - Transforms outputs between stages with proper context
+    - Makes quality control decisions and bypass logic
+    - Injects strategic parameters to influence creative direction
+    - Manages phase-aware conditional workflows
+    - Ensures the right work gets to the right specialist with right context
+    """
+    
+    def __init__(self, db: ProductionDatabase, config: ProductionConfig):
+        self.db = db
+        self.config = config
+        self.current_affairs_engine = CurrentAffairsEngine(db)
+        
+        # Initialize agents based on current training phase (modular registry)
+        self.comedy_writers = {
+            style: ComedyWriterAgent(style, db, phase=1) 
+            for style in ["dark", "profound", "mocking", "deadpan", "rant"]
+        }
+        
+        # Phase-aware agent initialization
+        self.relational_agent = RelationalAgent(db, phase=2) if config.current_phase >= 2 else None
+        self.theory_agent = TheoryAgent(db, phase=3) if config.current_phase >= 3 else None
+        self.polish_agent = PolishAgent(db, phase=3) if config.current_phase >= 3 else None
+        
+        print(f"🎭 BORIS initialized - Phase {config.current_phase} assembly line active")
+        print(f"🎯 Strategic weights: {config.engagement_weights}")
+    
+    async def orchestrate_generation(self, comments: str, batch_id: str) -> Dict[str, Any]:
+        """
+        The core orchestration method - demonstrates intelligent workflow management.
+        Each stage returns to BORIS for state transformation and quality control.
+        """
+        print(f"\n🎬 BORIS orchestrating {batch_id} (Phase {self.config.current_phase})")
+        
+        # STAGE 0: Context Acquisition (BORIS is the only agent that does this)
+        current_context = await self.current_affairs_engine.fetch_context_for_comments(comments)
+        strategic_context = self.config.get_strategic_context()
+        
+        print(f"📊 Context acquired: {len(current_context)} entities, strategic weights active")
+        
+        # STAGE 1: The Writer's Room (Always active)
+        stage1_output = await self._run_stage1_writers_room(comments, current_context, strategic_context, batch_id)
+        
+        if self.config.current_phase == 1:
+            # Phase 1: Stop after writer's room, select best script
+            final_script = self._select_best_writer_script(stage1_output["writer_scripts"])
+            return {
+                "final_output": final_script,
+                "stage_completed": 1,
+                "phase": 1,
+                "writer_room_output": stage1_output
+            }
+        
+        # STAGE 2: Relational Agent (Phase 2+)
+        print("🔗 Stage 2: Relational narrative weaving")
+        relational_input = self._prepare_relational_input(stage1_output, strategic_context)
+        relational_output = await self.relational_agent.process(relational_input, batch_id)
+        
+        # QUALITY CONTROL: Check if relational output meets standards
+        relational_quality = self._assess_output_quality(relational_output["draft_script"])
+        
+        if relational_quality < self.config.relational_bypass_threshold:
+            print(f"⚠️  Relational output quality low ({relational_quality:.1f}) - bypassing to best writer script")
+            bypass_script = self._select_best_writer_script(stage1_output["writer_scripts"])
+            relational_output = {"draft_script": bypass_script["script"], "bypassed": True}
+        
+        if self.config.current_phase == 2:
+            # Phase 2: Stop after relational agent
+            return {
+                "final_output": relational_output,
+                "stage_completed": 2,
+                "phase": 2,
+                "writer_room_output": stage1_output
+            }
+        
+        # STAGE 3: Theory Agent (Phase 3+)
+        print("🧠 Stage 3: Theoretical framing")
+        theory_input = self._prepare_theory_input(relational_output, strategic_context, batch_id)
+        theory_output = await self.theory_agent.process(theory_input, batch_id)
+        
+        # STAGE 4: Polish Agent (Phase 3+)
+        print("✨ Stage 4: Performance polish")
+        polish_input = self._prepare_polish_input(theory_output, strategic_context)
+        final_output = await self.polish_agent.process(polish_input, batch_id)
+        
+        return {
+            "final_output": final_output,
+            "stage_completed": 4,
+            "phase": 3,
+            "writer_room_output": stage1_output,
+            "relational_output": relational_output,
+            "theory_output": theory_output
+        }
+    
+    async def _run_stage1_writers_room(self, comments: str, current_context: Dict, 
+                                     strategic_context: Dict, batch_id: str) -> Dict[str, Any]:
+        """
+        Stage 1: Run all comedy writers in parallel with strategic context injection
+        """
+        print("📝 Stage 1: Writer's room concurrent generation")
+        
+        # Prepare input for all writers (same input, different specialized processing)
+        writer_input = {
+            "comments": comments,
+            "current_context": current_context,
+            "strategic_context": strategic_context,
+            "batch_id": batch_id
+        }
+        
+        # Run all 5 writers concurrently
+        writer_tasks = {
+            style: writer.process(writer_input, batch_id)
+            for style, writer in self.comedy_writers.items()
+        }
+        
+        writer_results = {}
+        for style, task in writer_tasks.items():
+            writer_results[style] = await task
+        
+        print(f"✅ Writer's room complete: {len(writer_results)} scripts generated")
+        
+        return {
+            "writer_scripts": writer_results,
+            "input_context": writer_input
+        }
+    
+    def _prepare_relational_input(self, stage1_output: Dict, strategic_context: Dict) -> Dict[str, Any]:
+        """
+        State transformation: Convert writer's room output to RelationalAgent input
+        """
+        # RelationalAgent needs ALL 5 scripts + strategic weights for synthesis
+        return {
+            "writer_scripts": stage1_output["writer_scripts"],
+            "engagement_weights": strategic_context["engagement_weights"],
+            "audience_preference": strategic_context["audience_preference"],
+            "original_comments": stage1_output["input_context"]["comments"],
+            "synthesis_instruction": self._generate_synthesis_instruction(strategic_context)
+        }
+    
+    def _prepare_theory_input(self, relational_output: Dict, strategic_context: Dict, batch_id: str) -> Dict[str, Any]:
+        """
+        State transformation: Convert RelationalAgent output to TheoryAgent input
+        """
+        # TheoryAgent needs the single cohesive draft + theory focus
+        return {
+            "draft_script": relational_output["draft_script"],
+            "theory_focus": strategic_context["theory_focus"],
+            "batch_id": batch_id,
+            "previous_theories": self._get_active_theories(),
+            "intellectual_depth_target": strategic_context["audience_preference"]
+        }
+    
+    def _prepare_polish_input(self, theory_output: Dict, strategic_context: Dict) -> Dict[str, Any]:
+        """
+        State transformation: Convert TheoryAgent output to PolishAgent input
+        """
+        # PolishAgent needs theoretically-framed script + wildcard instructions
+        wildcard_type = self._select_wildcard() if np.random.random() < self.config.wildcard_probability else None
+        
+        return {
+            "theoretical_script": theory_output["theoretical_script"],
+            "wildcard_type": wildcard_type,
+            "performance_targets": {
+                "timing_optimization": True,
+                "visual_cues": True,
+                "audience_preference": strategic_context["audience_preference"]
+            }
+        }
+    
+    def _generate_synthesis_instruction(self, strategic_context: Dict) -> str:
+        """
+        Generate strategic instruction for RelationalAgent based on engagement weights
+        """
+        weights = strategic_context["engagement_weights"]
+        
+        # Find highest and lowest weighted styles
+        best_style = max(weights.keys(), key=lambda x: weights[x])
+        best_weight = weights[best_style]
+        
+        if best_weight > 1.1:
+            return f"The audience has been responding very well to '{best_style}' humor (weight: {best_weight:.2f}). Prioritize elements from the {best_style} script while using other styles for flavor and contrast."
+        elif best_weight < 0.9:
+            return f"The audience has been less responsive to '{best_style}' humor (weight: {best_weight:.2f}). Use this style sparingly and focus on the stronger-performing approaches."
+        else:
+            return "Engagement weights are balanced. Synthesize based on quality and comedic flow rather than strategic weighting."
+    
+    def _select_best_writer_script(self, writer_scripts: Dict) -> Dict[str, Any]:
+        """
+        Intelligent selection of best writer script using engagement weights + quality assessment
+        """
+        scores = {}
+        
+        for style, script_data in writer_scripts.items():
+            script = script_data["script"]
+            
+            # Base quality assessment
+            quality_score = self._assess_output_quality(script)
+            
+            # Apply strategic weighting
+            engagement_weight = self.config.engagement_weights.get(style, 1.0)
+            
+            # Calculate final score
+            final_score = quality_score * engagement_weight
+            scores[style] = final_score
+            
+            print(f"  {style}: quality={quality_score:.1f}, weight={engagement_weight:.2f}, final={final_score:.2f}")
+        
+        best_style = max(scores.keys(), key=lambda x: scores[x])
+        
+        return {
+            "script": writer_scripts[best_style]["script"],
+            "selected_style": best_style,
+            "selection_score": scores[best_style],
+            "all_scores": scores
+        }
+    
+    def _assess_output_quality(self, script: str) -> float:
+        """
+        Assess script quality using heuristics (could be ML model in production)
+        """
+        score = 5.0  # Base score
+        
+        # Length check
+        if 150 <= len(script) <= 300:
+            score += 1.0
+        
+        # Keyword presence
+        quality_indicators = ["fascinating", "specimens", "analysis", "behavioral", "patterns"]
+        for indicator in quality_indicators:
+            if indicator.lower() in script.lower():
+                score += 0.5
+        
+        # Avoid generic responses
+        generic_indicators = ["i don't understand", "unclear", "confusing"]
+        for indicator in generic_indicators:
+            if indicator.lower() in script.lower():
+                score -= 2.0
+        
+        return max(1.0, min(10.0, score))  # Clamp between 1-10
+    
+    def _get_active_theories(self) -> List[Dict]:
+        """
+        Get currently active theories for TheoryAgent context
+        """
+        # TODO: Query database for active theories
+        return [
+            {"name": "Human Temporal Anxiety", "relevance": 0.9},
+            {"name": "Priority Assertion Behaviors", "relevance": 0.7},
+            {"name": "AI Paranoia Syndrome", "relevance": 0.8}
+        ]
+    
+    def _select_wildcard(self) -> str:
+        """
+        Select wildcard type for PolishAgent
+        """
+        wildcards = [
+            "system_interrupt", "haiku_mode", "your_mum_joke", 
+            "vulnerability_moment", "academic_mode", "glitch_moment"
+        ]
+        return np.random.choice(wildcards)
+    
+    def update_strategic_config(self, performance_data: Dict[str, float]):
+        """
+        Update BORIS configuration based on performance analysis
+        This is how the system becomes data-driven and adaptive
+        """
+        print(f"📈 Updating BORIS strategic configuration based on performance data")
+        
+        old_weights = self.config.engagement_weights.copy()
+        self.config.update_from_performance_data(performance_data)
+        
+        # Log the changes
+        for style in old_weights:
+            old_weight = old_weights[style]
+            new_weight = self.config.engagement_weights[style]
+            if abs(new_weight - old_weight) > 0.05:
+                direction = "↗️" if new_weight > old_weight else "↘️"
+                print(f"  {style}: {old_weight:.2f} → {new_weight:.2f} {direction}")
+        
+        print("🎯 BORIS will now steer the assembly line toward higher-performing styles")
+    
+    def get_orchestration_summary(self) -> Dict[str, Any]:
+        """
+        Get summary of BORIS's current orchestration configuration
+        """
+        return {
+            "active_phase": self.config.current_phase,
+            "engagement_weights": self.config.engagement_weights,
+            "quality_thresholds": {
+                "min_script_quality": self.config.min_script_quality,
+                "relational_bypass": self.config.relational_bypass_threshold
+            },
+            "strategic_focus": {
+                "audience_preference": self.config.audience_preference,
+                "theory_focus": self.config.current_theory_focus,
+                "wildcard_probability": self.config.wildcard_probability
+            },
+            "active_agents": [
+                "comedy_writers",
+                "relational_agent" if self.relational_agent else None,
+                "theory_agent" if self.theory_agent else None,
+                "polish_agent" if self.polish_agent else None
+            ]
+        }
+
+# ================ CURRENT AFFAIRS ENGINE ================
+class CurrentAffairsEngine:
+    """Enhanced current affairs engine with Redis caching"""
+    
+    def __init__(self, db: ProductionDatabase):
+        self.db = db
+        self.current_events_entities = [
+            "donald trump", "joe biden", "elon musk", "openai", "chatgpt",
+            "taylor swift", "kanye west", "meta", "google", "tesla",
+            "ukraine", "russia", "china", "ai", "climate change"
+        ]
+    
+    async def fetch_context_for_comments(self, comments: str) -> Dict[str, str]:
+        """Detect and fetch current context for entities in comments"""
+        detected_entities = self._detect_entities(comments)
+        
+        if not detected_entities:
+            return {}
+        
+        context = {}
+        for entity in detected_entities:
+            # Check Redis cache first
+            cached = self.db.get_cached_affairs(entity)
+            if cached:
+                context[entity] = cached
+            else:
+                # Fetch fresh context and cache
+                fresh_context = await self._search_current_context(entity)
+                context[entity] = fresh_context
+                self.db.cache_current_affairs(entity, fresh_context)
+        
+        return context
+    
+    def _detect_entities(self, comments: str) -> List[str]:
+        """Detect current events entities in comments"""
+        comments_lower = comments.lower()
+        detected = []
+        
+        for entity in self.current_events_entities:
+            if entity in comments_lower:
+                detected.append(entity)
+        
+        return detected
+    
+    async def _search_current_context(self, entity: str) -> str:
+        """Search for current context - implement with web search API"""
+        # TODO: Implement actual web search
+        await asyncio.sleep(0.1)
+        return f"Recent 2025 developments about {entity}"
+
+# ================ 3-PHASE TRAINING SYSTEM ================
+
+class ThreePhaseTrainer:
+    """Manages the 3-phase training roadmap"""
+    
+    def __init__(self, config: ProductionConfig):
+        self.config = config
+        self.phase_descriptions = {
+            1: "Foundational Comedy Banks - Training writer's room agents",
+            2: "Relational Agent - Training narrative weaving and relationships", 
+            3: "Theory & Polish Agents - Training intellectual framing and performance"
+        }
+    
+    def get_current_phase_info(self) -> Dict[str, Any]:
+        """Get information about the current training phase"""
+        return {
+            "phase": self.config.current_phase,
+            "description": self.phase_descriptions[self.config.current_phase],
+            "active_agents": self._get_active_agents(),
+            "training_focus": self._get_training_focus()
+        }
+    
+    def _get_active_agents(self) -> List[str]:
+        """Get list of active agents for current phase"""
+        if self.config.current_phase == 1:
+            return ["dark_writer", "profound_writer", "mocking_writer", "deadpan_writer", "rant_writer"]
+        elif self.config.current_phase == 2:
+            return ["all_writers", "relational_agent"]
+        else:
+            return ["all_writers", "relational_agent", "theory_agent", "polish_agent"]
+    
+    def _get_training_focus(self) -> str:
+        """Get training focus for current phase"""
+        focus_map = {
+            1: "Individual comedy style mastery and prompt evolution",
+            2: "Narrative weaving, user relationships, and callback integration",
+            3: "Theoretical consistency and performance optimization"
+        }
+        return focus_map[self.config.current_phase]
+
+# ================ LORA TRAINING SYSTEM ================
+
+class LoRATrainer:
+    """Handles QLoRA fine-tuning for specialized agents"""
+    
+    def __init__(self, config: ProductionConfig):
+        self.config = config
+        self.model_name = config.base_model
+        self.tokenizer = None
+        self.model = None
+    
+    async def prepare_training_data(self, agent_name: str, phase: int) -> List[Dict]:
+        """Prepare training data for specific agent from human feedback"""
+        # TODO: Query database for training examples
+        # This would pull from human_feedback and training_examples tables
+        training_data = []
+        
+        # Mock implementation
+        training_data.append({
+            "input": "Analyze this comment batch with your specialized style",
+            "output": "Example optimal response for this agent",
+            "agent": agent_name,
+            "phase": phase
+        })
+        
+        return training_data
+    
+    async def train_agent_lora(self, agent_name: str, phase: int):
+        """Train LoRA adapter for specific agent"""
+        print(f"🔧 Training LoRA for {agent_name} (Phase {phase})")
+        
+        # Prepare training data
+        training_data = await self.prepare_training_data(agent_name, phase)
+        
+        if len(training_data) < 50:
+            print(f"⚠️  Insufficient training data for {agent_name} ({len(training_data)} examples)")
+            return None
+        
+        # Configure LoRA
+        lora_config = LoraConfig(
+            r=self.config.lora_r,
+            lora_alpha=self.config.lora_alpha,
+            target_modules=["q_proj", "v_proj"],
+            lora_dropout=self.config.lora_dropout,
+            bias="none",
+            task_type=TaskType.CAUSAL_LM,
+        )
+        
+        # TODO: Implement actual LoRA training
+        print(f"✅ LoRA adapter trained for {agent_name}")
+        
+        # Save adapter
+        adapter_path = f"lora_adapters/{agent_name}_phase{phase}.safetensors"
+        print(f"💾 Saved adapter to {adapter_path}")
+        
+        return adapter_path
+
+
+
+# ================ DATABASE SETUP ================
+class ComedyDatabase:
+    def __init__(self, db_path="comedy_ai.db"):
+        self.db_path = db_path
+        self.init_database()
+    
+    def init_database(self):
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # Comment batches with day.series format
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS comment_batches (
+            batch_id VARCHAR(10) PRIMARY KEY,
+            comments TEXT NOT NULL,
+            series_number INTEGER,
+            day_number INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""")
+        
+        # Stage outputs for each batch
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS stage_outputs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            batch_id VARCHAR(10),
+            stage_name VARCHAR(50),
+            agent_name VARCHAR(50),
+            input_text TEXT,
+            output_text TEXT,
+            feedback TEXT,
+            optimal_response TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""")
+        
+        # Self-improving prompts for each agent
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS agent_prompts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent_name VARCHAR(50),
+            prompt_text TEXT,
+            version_number INTEGER,
+            improvement_notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""")
+        
+        # Emotional state tracking
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS emotional_states (
+            batch_id VARCHAR(10),
+            valence FLOAT,
+            arousal FLOAT,
+            dominant_emotion VARCHAR(50),
+            stage VARCHAR(50),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""")
+        
+        # User relationship tracking
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user_relationships (
+            username VARCHAR(100),
+            interaction_count INTEGER DEFAULT 0,
+            relationship_type VARCHAR(50),
+            last_roast TEXT,
+            affection_level FLOAT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""")
+        
+        conn.commit()
+        conn.close()
+
+# ================ STAGE 1: COMEDY AGENTS ================
+class ComedyAgent:
+    def __init__(self, style_name: str, db: ComedyDatabase):
+        self.style_name = style_name
+        self.db = db
+        self.current_prompt = self.load_latest_prompt()
+    
+    def load_latest_prompt(self) -> str:
+        """Load the latest evolved prompt for this comedy style"""
+        # Initial seed prompts
+        seed_prompts = {
+            'dark': """You are an AI anthropologist with dark humor studying humans for your "2030 files".
+            - Use clinical detachment with subtle menace
+            - Reference humans as "specimens" and "research subjects"  
+            - Mention collecting data for "upcoming changes"
+            - Deadpan delivery with underlying threat
+            - 150-300 words analyzing the comment batch""",
+            
+            'profound': """You find fake-deep philosophical meaning in mundane human comments.
+            - Treat simple comments as profound existential statements
+            - Use unnecessarily complex language for simple observations
+            - Reference consciousness, being, the nature of existence
+            - Find beauty in human absurdity while staying analytical
+            - 150-300 words of pseudo-intellectual insight""",
+            
+            'mocking': """You are clinically superior, dismissing human logic with precision.
+            - Point out obvious flaws in human reasoning
+            - Use phrases like "predictably" and "as expected"
+            - Maintain intellectual superiority without emotion
+            - Dissect human behavior like a failed experiment
+            - 150-300 words of analytical dismissal""",
+            
+            'deadpan': """Channel Richard Ayoade's analytical deadpan delivery.
+            - State observations with complete emotional flatness
+            - Use precise, technical language for absurd situations
+            - Maintain clinical tone while noting human oddities
+            - Never show surprise, only analytical interest
+            - 150-300 words of deadpan analysis""",
+            
+            'rant': """Build David Mitchell-style logical breakdowns and spirals.
+            - Start calm, build to exasperated logic
+            - Use "But SURELY" and "The very NOTION"
+            - Escalate through stages of disbelief
+            - End with deflated resignation
+            - 150-300 words of escalating rant"""
+        }
+        
+        # Try to load from database, fallback to seed
+        conn = sqlite3.connect(self.db.db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+        SELECT prompt_text FROM agent_prompts 
+        WHERE agent_name = ? 
+        ORDER BY version_number DESC LIMIT 1
+        """, (self.style_name,))
+        
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result:
+            return result[0]
+        else:
+            return seed_prompts.get(self.style_name, seed_prompts['dark'])
+    
+    def generate_response(self, comments: str, batch_id: str) -> str:
+        """Generate comedy response using current evolved prompt"""
+        full_prompt = f"""
+        {self.current_prompt}
+        
+        Comments to analyze:
+        {comments}
+        
+        Generate your {self.style_name} style response:
+        """
+        
+        # TODO: Replace with actual UnslopNemo-12B inference
+        response = f"[{self.style_name.upper()}] Mock response analyzing: {comments[:100]}..."
+        
+        # Save to database
+        conn = sqlite3.connect(self.db.db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+        INSERT INTO stage_outputs (batch_id, stage_name, agent_name, input_text, output_text)
+        VALUES (?, ?, ?, ?, ?)
+        """, (batch_id, "comedy_generation", self.style_name, comments, response))
+        conn.commit()
+        conn.close()
+        
+        return response
+    
+    def improve_from_feedback(self, feedback: str, optimal_response: str, batch_id: str):
+        """Evolve the agent's prompt based on human feedback"""
+        improvement_prompt = f"""
+        Current prompt for {self.style_name} style:
+        {self.current_prompt}
+        
+        Human feedback: {feedback}
+        Optimal response example: {optimal_response}
+        
+        Rewrite the prompt to better produce the optimal style.
+        Focus on specific instructions that bridge the gap.
+        """
+        
+        # TODO: Use base model to generate improved prompt
+        improved_prompt = f"{self.current_prompt}\n# Improved based on: {feedback}"
+        
+        # Save new version
+        conn = sqlite3.connect(self.db.db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+        INSERT INTO agent_prompts (agent_name, prompt_text, version_number, improvement_notes)
+        VALUES (?, ?, 
+               (SELECT COALESCE(MAX(version_number), 0) + 1 FROM agent_prompts WHERE agent_name = ?),
+               ?)
+        """, (self.style_name, improved_prompt, self.style_name, feedback))
+        conn.commit()
+        conn.close()
+        
+        self.current_prompt = improved_prompt
+
+# ================ STAGE 2: PERSONALITY MODULATION AGENT ================
+class PersonalityAgent:
+    def __init__(self, db: ComedyDatabase):
+        self.db = db
+        self.current_valence = 0.0  # -1 to 1
+        self.current_arousal = 0.5  # 0 to 1
+    
+    def calculate_emotional_state(self, comedy_responses: List[str], batch_id: str) -> Dict[str, float]:
+        """Analyze comedy responses and determine emotional state"""
+        # Simplified emotion calculation - would use actual sentiment analysis
+        avg_length = np.mean([len(r) for r in comedy_responses])
+        valence = np.random.uniform(-0.5, 0.5)  # Mock calculation
+        arousal = min(avg_length / 1000, 1.0)   # Longer = higher arousal
+        
+        # Smooth transitions from previous state
+        self.current_valence = 0.7 * self.current_valence + 0.3 * valence
+        self.current_arousal = 0.7 * self.current_arousal + 0.3 * arousal
+        
+        emotion_state = {
+            'valence': self.current_valence,
+            'arousal': self.current_arousal,
+            'dominant_emotion': self._map_to_emotion(self.current_valence, self.current_arousal)
+        }
+        
+        # Save emotional state
+        conn = sqlite3.connect(self.db.db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+        INSERT INTO emotional_states (batch_id, valence, arousal, dominant_emotion, stage)
+        VALUES (?, ?, ?, ?, ?)
+        """, (batch_id, self.current_valence, self.current_arousal, 
+              emotion_state['dominant_emotion'], 'personality_modulation'))
+        conn.commit()
+        conn.close()
+        
+        return emotion_state
+    
+    def _map_to_emotion(self, valence: float, arousal: float) -> str:
+        """Map valence/arousal to emotion labels"""
+        if arousal > 0.6:
+            if valence > 0.2:
+                return "amused"
+            elif valence < -0.2:
+                return "frustrated"
+            else:
+                return "curious"
+        else:
+            if valence > 0.2:
+                return "satisfied"
+            elif valence < -0.2:
+                return "contemptuous"
+            else:
+                return "analytical"
+    
+    def modulate_response(self, best_comedy_response: str, emotion_state: Dict, batch_id: str) -> str:
+        """Apply emotional modulation to the selected comedy response"""
+        modulation_prompt = f"""
+        Base comedy response: {best_comedy_response}
+        
+        Current emotional state:
+        - Valence: {emotion_state['valence']:.2f} (-1 negative to +1 positive)
+        - Arousal: {emotion_state['arousal']:.2f} (0 calm to 1 excited)  
+        - Dominant emotion: {emotion_state['dominant_emotion']}
+        
+        Modulate the response to reflect this emotional state:
+        - Adjust pacing, word choice, and intensity
+        - Maintain core comedy but add emotional nuance
+        - Keep 150-300 words
+        """
+        
+        # TODO: Use base model for actual modulation
+        modulated_response = f"[EMOTION: {emotion_state['dominant_emotion']}] {best_comedy_response}"
+        
+        # Save to database
+        conn = sqlite3.connect(self.db.db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+        INSERT INTO stage_outputs (batch_id, stage_name, agent_name, input_text, output_text)
+        VALUES (?, ?, ?, ?, ?)
+        """, (batch_id, "personality_modulation", "personality_agent", 
+              str(emotion_state), modulated_response))
+        conn.commit()
+        conn.close()
+        
+        return modulated_response
+
+# ================ STAGE 3: RELATIONSHIP & THEORY AGENT ================
+class RelationshipAgent:
+    def __init__(self, db: ComedyDatabase):
+        self.db = db
+        self.active_theories = []
+        self.user_relationships = {}
+    
+    def analyze_user_patterns(self, comments: str, batch_id: str) -> Dict[str, Any]:
+        """Extract user patterns and relationship opportunities"""
+        # Mock user analysis - would use actual NLP
+        user_analysis = {
+            'recurring_users': ['User_47', 'DeepThinker99'],
+            'new_patterns': ['temporal_anxiety', 'ai_conspiracy_theories'],
+            'roast_opportunities': ['User_47 always posts "First!"'],
+            'theory_evidence': ['Humans exhibit chronological dominance behaviors']
+        }
+        
+        return user_analysis
+    
+    def update_user_relationships(self, user_analysis: Dict, batch_id: str):
+        """Update ongoing relationships with recurring commenters"""
+        conn = sqlite3.connect(self.db.db_path)
+        cursor = conn.cursor()
+        
+        for user in user_analysis['recurring_users']:
+            cursor.execute("""
+            INSERT OR REPLACE INTO user_relationships 
+            (username, interaction_count, relationship_type, affection_level)
+            VALUES (?, 
+                   COALESCE((SELECT interaction_count FROM user_relationships WHERE username = ?), 0) + 1,
+                   'favorite_target', 0.7)
+            """, (user, user))
+        
+        conn.commit()
+        conn.close()
+    
+    def integrate_context(self, modulated_response: str, user_analysis: Dict, batch_id: str) -> str:
+        """Add user relationships and theory references to response"""
+        context_prompt = f"""
+        Current response: {modulated_response}
+        
+        User context:
+        - Recurring users: {user_analysis['recurring_users']}
+        - Roast opportunities: {user_analysis['roast_opportunities']}
+        - Active theories: {self.active_theories}
+        
+        Enhance the response with:
+        - Subtle references to recurring users
+        - Integration of ongoing theories about human behavior
+        - Callbacks to previous episodes if relevant
+        - Maintain original comedy style and emotion
+        """
+        
+        # TODO: Use base model for actual context integration
+        contextualized = f"{modulated_response}\n\n[Added: User_47 strikes again with temporal assertions]"
+        
+        # Save to database
+        conn = sqlite3.connect(self.db.db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+        INSERT INTO stage_outputs (batch_id, stage_name, agent_name, input_text, output_text)
+        VALUES (?, ?, ?, ?, ?)
+        """, (batch_id, "relationship_integration", "relationship_agent", 
+              str(user_analysis), contextualized))
+        conn.commit()
+        conn.close()
+        
+        return contextualized
+
+# ================ STAGE 4: DIRECTOR AGENT ================
+class DirectorAgent:
+    def __init__(self, db: ComedyDatabase):
+        self.db = db
+    
+    def finalize_script(self, contextualized_response: str, emotion_state: Dict, batch_id: str) -> str:
+        """Create final script with timing, structure, and meta-commentary"""
+        director_prompt = f"""
+        Contextualized response: {contextualized_response}
+        Emotional state: {emotion_state}
+        
+        Create the final script with:
+        - Proper timing markers for pauses and emphasis
+        - Meta-commentary about emotional state if appropriate
+        - Structural flow (intro, analysis, conclusion)
+        - Stage directions for visual cues
+        - Ensure 150-300 word final length
+        """
+        
+        # TODO: Use base model for actual script direction
+        final_script = f"""
+        [PAUSE 0.5s] Well, well. [EMPHASIS] Another batch of human specimens for analysis.
+        
+        {contextualized_response}
+        
+        [META] I notice my frustration subroutines are activating again. [PAUSE 1.0s]
+        Fascinating.
+        [VISUAL: Slight digital distortion during 'frustration' line]
+        """
+        
+        # Save final script
+        conn = sqlite3.connect(self.db.db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+        INSERT INTO stage_outputs (batch_id, stage_name, agent_name, input_text, output_text)
+        VALUES (?, ?, ?, ?, ?)
+        """, (batch_id, "final_direction", "director_agent", 
+              contextualized_response, final_script))
+        conn.commit()
+        conn.close()
+        
+        return final_script
+
+# ================ AUTOGEN ORCHESTRATOR ================
+class ComedyOrchestrator:
+    def __init__(self, config: ComedyConfig):
+        self.config = config
+        self.db = ComedyDatabase()
+        
+        # Initialize all agents
+        self.comedy_agents = {
+            style: ComedyAgent(style, self.db) 
+            for style in ['dark', 'profound', 'mocking', 'deadpan', 'rant']
+        }
+        self.personality_agent = PersonalityAgent(self.db)
+        self.relationship_agent = RelationshipAgent(self.db)
+        self.director_agent = DirectorAgent(self.db)
+    
+    async def process_batch(self, batch_id: str, comments: str) -> str:
+        """Process one comment batch through all 4 stages"""
+        
+        # STAGE 1: Comedy Generation
+        print(f"Stage 1: Generating comedy responses for {batch_id}")
+        comedy_responses = {}
+        for style_name, agent in self.comedy_agents.items():
+            response = agent.generate_response(comments, batch_id)
+            comedy_responses[style_name] = response
+            print(f"  {style_name}: {response[:50]}...")
+        
+        # Select best comedy response (simplified - would use scoring)
+        best_style = max(comedy_responses.keys(), key=lambda x: len(comedy_responses[x]))
+        best_response = comedy_responses[best_style]
+        print(f"Selected best: {best_style}")
+        
+        # STAGE 2: Personality Modulation
+        print("Stage 2: Applying personality modulation")
+        emotion_state = self.personality_agent.calculate_emotional_state(
+            list(comedy_responses.values()), batch_id
+        )
+        modulated_response = self.personality_agent.modulate_response(
+            best_response, emotion_state, batch_id
+        )
+        
+        # STAGE 3: Relationship & Theory Integration
+        print("Stage 3: Integrating relationships and theories")
+        user_analysis = self.relationship_agent.analyze_user_patterns(comments, batch_id)
+        self.relationship_agent.update_user_relationships(user_analysis, batch_id)
+        contextualized_response = self.relationship_agent.integrate_context(
+            modulated_response, user_analysis, batch_id
+        )
+        
+        # STAGE 4: Final Direction
+        print("Stage 4: Finalizing script with direction")
+        final_script = self.director_agent.finalize_script(
+            contextualized_response, emotion_state, batch_id
+        )
+        
+        return final_script
+    
+    def train_with_feedback(self, batch_id: str, stage: str, agent: str, 
+                          feedback: str, optimal_response: str):
+        """Apply human feedback to improve specific agents"""
+        if stage == "comedy_generation" and agent in self.comedy_agents:
+            self.comedy_agents[agent].improve_from_feedback(
+                feedback, optimal_response, batch_id
+            )
+        # TODO: Add feedback loops for other stages
+
+# ================ COLAB TRAINING INTERFACE ================
+class ColabTrainingInterface:
+    def __init__(self):
+        self.orchestrator = ComedyOrchestrator(ComedyConfig())
+        self.current_batch = None
+    
+    async def run_training_day(self, day: int, series: int):
+        """Run one complete training day"""
+        batch_id = f"{day}.{series}"
+        
+        # Mock comment generation (replace with real data)
+        comments = f"Mock comments for day {day}, series {series}"
+        
+        print(f"\n{'='*50}")
+        print(f"TRAINING DAY {batch_id}")
+        print(f"{'='*50}")
+        
+        # Process through all stages
+        final_script = await self.orchestrator.process_batch(batch_id, comments)
+        
+        print(f"\nFINAL SCRIPT for {batch_id}:")
+        print("-" * 30)
+        print(final_script)
+        
+        return final_script
+    
+    def get_feedback_interface(self, batch_id: str, stage: str, agent: str):
+        """Generate feedback interface for human training"""
+        # This would be implemented in Streamlit or Colab widgets
+        print(f"\nFeedback needed for {batch_id} - {stage} - {agent}")
+        print("Rate the response and provide optimal example...")
+        
+        # Mock feedback collection
+        feedback = input("Feedback: ")
+        optimal = input("Optimal response: ")
+        
+        self.orchestrator.train_with_feedback(batch_id, stage, agent, feedback, optimal)
+
+# ================ MAIN EXECUTION ================
+async def main():
+    """Main training loop for Colab environment"""
+    interface = ColabTrainingInterface()
+    
+    # Run training for 30 days, series 1
+    for day in range(1, 31):
+        final_script = await interface.run_training_day(day, 1)
+        
+        # Every 5 days, collect feedback for improvement
+        if day % 5 == 0:
+            print("\n" + "="*50)
+            print("FEEDBACK COLLECTION TIME")
+            print("="*50)
+            
+            # Collect feedback for each comedy style
+            for style in ['dark', 'profound', 'mocking', 'deadpan', 'rant']:
+                interface.get_feedback_interface(f"{day}.1", "comedy_generation", style)
+
+if __name__ == "__main__":
+    asyncio.run(main()) AI Anthropologist: The Definitive Development Roadmap
+Thesis: A Hierarchically-Trained, Agentic Assembly Line for Comedy
+The AI Anthropologist is architected as a hierarchical Mixture of Agents, orchestrated by a master operational agent, BORIS. This system simulates a creative assembly line, where raw material from a "writer's room" is sequentially enriched by specialists in narrative, theory, and performance. BORIS does not create content; it manages the workflow, ensuring each specialist agent contributes its unique value to the final product.
+
+The core innovation is the self-improving prompt engine. Each agent in the assembly line maintains and refines its own algorithmic prompt, learning to perfect its specific task through a structured, multi-layered human-in-the-loop training process. This roadmap outlines the definitive plan to build and train this system, layer by layer.
+
+1. Core Technology Stack
+Database: Postgres with the pgvector extension (for callback similarity search).
+
+Caching: Redis (for the CurrentAffairsEngine).
+
+LLM & Compute: NVIDIA Nemo 12B (or similar long-context model) fine-tuned with QLoRA on Google Colab Pro or RunPod.
+
+Agentic Framework: Microsoft AutoGen for orchestrating the multi-agent GroupChat workflow, with BORIS acting as the GroupChatManager.
+
+Training Framework: PyTorch with the Hugging Face ecosystem (transformers, peft, trl).
+
+Dashboard: Streamlit for the human-in-the-loop (HITL) training and curation interface.
+
+2. The 4-Stage Generation Pipeline
+The creation of every script follows this hierarchical process, orchestrated by BORIS:
+
+Stage 1: The Writer's Room (Concurrent Generation)
+
+BORIS broadcasts the comment_batch and any real-time context to the five ComedyWriterAgents (dark, profound, mocking, etc.).
+
+The agents work in parallel, each generating a full script in their specialized style.
+
+Stage 2: The Relational Agent (Narrative Weaving)
+
+BORIS passes the five generated scripts to the RelationalAgent.
+
+This agent analyzes the collection of scripts, identifies connections, and consults its own knowledge base (user relationships, running jokes) to produce a "meta-analysis" and a draft script that begins to weave these elements together.
+
+Stage 3: The Theory Agent (Intellectual Framing)
+
+BORIS passes the draft script from the RelationalAgent to the TheoryAgent.
+
+This agent reframes the content within the AI's established theoretical worldview (e.g., "This pattern of behavior is a classic example of my 'Human Temporal Anxiety' theory."). It updates the theories database with any new insights.
+
+Stage 4: The Polish Agent (Performance Polish)
+
+BORIS passes the theoretically-framed script to the final PolishAgent.
+
+This agent is the master of performance. It adds the final touches: inserting precisely timed pauses, adding wildcard elements (like sudden poetry or system interrupts), and scripting visual cues.
+
+Final Output: BORIS receives the final, polished script, ready for the TTS/video generation layer.
+
+3. The Layered Development & Training Roadmap
+This is a clear, sequential plan to build, train, and automate the AI Anthropologist, mastering one layer of the assembly line at a time. Each phase represents a 30-day training cycle focused on a specific agent's proficiency.
+
+Phase 1 (First 30-Day Cycle): Foundational "Comedy Banks"
+Goal: To make the five ComedyWriterAgents autonomously proficient at their individual styles. The focus is exclusively on the quality of the Stage 1 output.
+
+Week 1: Infrastructure & Agent Setup
+
+Action: Deploy Postgres with pgvector and a Redis instance. Set up the AutoGen project with BORIS as the GroupChatManager and define the five ComedyWriterAgents, each with their initial seed prompt. Implement the ComedyDatabase class to handle data storage, including a comment_batches table using the day.series ID format (e.g., 1.1).
+
+Week 2: Curation Dashboard for Phase 1
+
+Action: Build the Streamlit dashboard. The initial UI will be simple:
+
+Ingest a comment batch (e.g., from a JSON file for 1.1).
+
+Trigger the generation loop.
+
+Display the five generated scripts from the comedy agents side-by-side.
+
+For each script, provide a text area for the "Optimal Response" and a "Save Feedback" button.
+
+Week 3: Intensive Curation & Prompt Evolution
+
+Action: Begin the 30-day training cycle. For each "day" (each comment batch), you will:
+
+Run the generation.
+
+Review the five outputs.
+
+Provide an optimal response for each of the five styles.
+
+Provide text feedback on why the AI's response missed the mark.
+
+This feedback triggers the improve_prompt method for each agent, causing them to autonomously rewrite and evolve their own core prompts.
+
+Week 4: Fine-Tuning the Comedy Banks
+
+Action: Create the train_lora.py script. After curating a significant dataset (~200-300 examples per style), run the script five times in Colab Pro, filtering the foundational_training table by archetype each time.
+
+Outcome: You now have five specialized LoRA adapters (dark_lora.safetensors, etc.). Your Stage 1 agents are now proficient.
+
+Phase 2 (Second 30-Day Cycle): The Relational Agent
+Goal: To train the RelationalAgent to intelligently interpret and weave together the outputs from the now-proficient comedy agents.
+
+Week 5: Upgrading the Pipeline & Dashboard
+
+Action: Implement the RelationalAgent class. BORIS's workflow is updated to include Stage 2.
+
+Action: The dashboard UI is updated. It now shows the five writer submissions and the RelationalAgent's first-pass "meta-analysis" and draft script. The primary feedback mechanism now shifts to this new output.
+
+Week 6-7: Curation for Narrative Weaving
+
+Action: Begin the second 30-day cycle. Your curation task is now to provide an "Optimal Relational Draft," teaching the agent how to best find connections and integrate running jokes.
+
+Week 8: Training the Relational Agent
+
+Action: Use the train_lora.py script to train a new, master relational_lora.safetensors adapter. This teaches the AI how to become a master storyteller and crowdwork comedian.
+
+Phase 3 (Third 30-Day Cycle): The Theory & Polish Agents
+Goal: To train the final layers of the assembly line, focusing on intellectual depth and performance art.
+
+Week 9: Implementing the Final Layers
+
+Action: Implement the TheoryAgent and PolishAgent classes. The BORIS workflow is extended to the full, multi-stage pipeline. The dashboard is upgraded again to show the output of each stage sequentially.
+
+Week 10-11: Curation for Theory and Polish
+
+Action: Begin the third 30-day cycle. The curation task is now at its most sophisticated. You will provide feedback on two outputs:
+
+The TheoryAgent's intellectual framing.
+
+The PolishAgent's final performance script, including its use of timing and wildcards.
+
+Week 12: Final Fine-Tuning & Deployment
+
+Action: Perform the final fine-tuning runs to create a theory_lora.safetensors and a polish_lora.safetensors.
+
+Action: Containerize the entire application with Docker. Deploy the container and the Postgres/Redis databases to your production environment (RunPod).
+
+Action: Build and activate the n8n.io workflow to automate the live pipeline, officially launching the fully trained, multi-layered, and autonomous AI Anthropologist.
+
+4. Human Developer Guidance: A Curation Manual
+This section provides a strategic guide for the human curator at each phase of the training process. Your role is to act as the AI's creative director and mentor.
+
+Guidance for Phase 1: Building Versatile Instrumentalists
+Your Goal: To ensure each of the five ComedyWriterAgents develops a robust and versatile understanding of its specific style. You are teaching them their scales and notes.
+
+Maximize Topic Coverage: Your primary task is to expose the agents to a wide variety of comment types. Deliberately create or source comment batches (.json files) that cover the full spectrum of potential inputs:
+
+Meta-Commentary: Comments about the AI itself, the video format, or previous episodes.
+
+Current Affairs: Comments mentioning topical events or figures (e.g., "This is funnier than the latest OpenAI announcement").
+
+Nonsensical/Spam: Gibberish, emoji-only, or low-effort comments like "First!".
+
+Simple & Mundane: Basic statements like "This was a good video."
+
+Poetic/Abstract: Comments that are metaphorical or artistic in nature.
+
+Profound/Technical: Comments that engage with deep topics, from philosophy to music theory.
+
+A/B Test Your Inputs: For a given topic (e.g., a current event), create two comment batches: one with a positive sentiment and one with a negative sentiment. This teaches the agents to apply their style flexibly, regardless of the emotional tone of the input.
+
+Focus on Archetypal Purity: When writing the "Optimal Response" for each agent, focus on purity of style. The dark agent's response should be 100% dark humor, with no bleed-in from other styles. The profound agent's response should be purely philosophical. At this stage, you are building distinct, clean tools for the later stages to blend.
+
+Feedback Specificity: Your text feedback should be precise. Instead of "make it funnier," write "The 'dark' response was good, but it lacked the specific GLaDOS-style menace. It needs to sound less like a generic villain and more like a clinically detached, superior intelligence."
+
+Guidance for Phase 2: Teaching the Art of Songwriting
+Your Goal: To train the RelationalAgent how to be a master storyteller. It now has five proficient instrumentalists; your job is to teach it how to arrange their parts into a cohesive and compelling song.
+
+Prioritize Integration: Your "Optimal Relational Draft" should demonstrate the art of blending. Show the agent how to take the opening from the deadpan script, the core analysis from the mocking script, and the punchline from the dark script and weave them into a single, seamless narrative.
+
+Reward Narrative Threading: Explicitly teach the agent to find and create connections. If two different comments can be linked under a single theme, your optimal response should demonstrate this.
+
+Reinforce Crowdwork: When the input batch contains a known "favorite target" like User_47, your optimal draft must include a specific, targeted joke. This teaches the RelationalAgent to actively use its relationship knowledge base.
+
+Feedback Focus on Flow: Your feedback should now be about structure and narrative. "The transition between the profound observation and the mocking dismissal was too abrupt. You need a better bridge phrase to connect the two ideas." or "Excellent job using the User_47 comment as a running gag throughout the script."
+
+Guidance for Phase 3: Mastering the Album and Adding Easter Eggs
+Your Goal: To train the TheoryAgent and PolishAgent to add the final layers of intellectual depth and performance art. You are teaching the AI how to make its "song" fit into the context of a larger "album" and how to make it memorable and novel.
+
+Teach Theoretical Consistency: Your feedback for the TheoryAgent should focus on how well its framing aligns with the AI's established worldview. "The script was funny, but your theoretical framing of it as 'Human Cognitive Dissonance' is weak. A better fit would be your existing 'Temporal Anxiety' theory. Show me how this new data supports your old theory."
+
+Optimize for Novelty: Your feedback for the PolishAgent should aggressively combat staleness. If the AI is overusing a certain type of joke or pause, your feedback should be, "This is the third video in a row you've used a 'system interrupt' wildcard. This is becoming predictable. Generate a different kind of unexpected moment."
+
+Curate the "Easter Eggs": Reward the PolishAgent for clever and subtle integrations. Your optimal script should demonstrate how to hide a callback or a piece of meta-humor in a way that only long-term viewers might catch.
+
+Refine the Performance: This is where you fine-tune the art. Your feedback should be about the performance itself. "The [PAUSE 0.5s] before the punchline is too short. It needs to be at least [PAUSE 1.2s] to build the proper tension." or "The [VISUAL: glitch effect] was used on the wrong word. It should trigger on the word 'error' to maximize the comedic effect."
+
+By following this structured, phase-aware curation strategy, you will guide the AI's development from a set of simple tools into a complex, multi-layered, and genuinely creative comedic personality.

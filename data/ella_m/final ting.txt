@@ -1,0 +1,1798 @@
+The Final, Final, Canonized Architecture (v5.1 - Corrected)
+This is the definitive blueprint, with the contradiction removed and replaced by a more robust, practical mechanism.
+
+Pillar 1: Analyst Core:
+
+Jobs:
+
+Maintains the objective UserModel (Personality Vector + Belief Graph).
+
+Performs Dual-Retrieval for context.
+
+NEW: Predicts the optimal, session-level DecayVector for the LinOSS Core based on the UserModel.
+
+Pillar 2: LinOSS Relational Core:
+
+Job: Maintains the stateful RelationalContextVector.
+
+Engine: D-LinOSS, which is initialized at the start of each session with the DecayVector provided by the Analyst Core.
+
+Pillar 3: Agentic Core:
+
+Job: Generates responses using the stable, episodically evolving Single LoRA.
+
+Key Process: Loads the user's current LoRA version (e.g., lora_v1.4) at the start of the session and uses it consistently throughout. No HyperNetwork. No real-time parameter generation.
+
+The Evolution Loop: The offline fine-tuning process remains the same. It updates the Analyst Core's models (including the new decay rate predictor) and the user's LoRA based on past interaction success.
+
+
+Samantha Protocol: Foolproof Development Guide
+Phase 1: Infrastructure Setup (Days 1-3)
+1.1 RunPod Setup
+bash# Choose RunPod template: PyTorch 2.1, CUDA 12.1, 48GB+ VRAM (A6000/A100)
+# SSH into your pod
+
+# Update system
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y git vim htop postgresql-client redis-tools
+
+# Install core dependencies
+pip install fastapi uvicorn torch transformers accelerate bitsandbytes
+pip install psycopg2-binary redis librosa whisper openai-whisper
+pip install pgvector sqlalchemy alembic numpy pandas
+1.2 Project Structure
+bashmkdir samantha && cd samantha
+git init
+
+# Create directory structure
+mkdir -p {src,data,models,logs,tests,db}
+mkdir -p src/{api,core,db,models,utils}
+mkdir -p models/{lora,checkpoints}
+1.3 Docker Setup
+Create docker-compose.yml:
+yamlversion: '3.8'
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: samantha
+      POSTGRES_USER: samantha
+      POSTGRES_PASSWORD: your_secure_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+  redis_data:
+1.4 Database Schema
+Create db/init.sql:
+sql-- Enable pgvector extension
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- User profiles
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    user_id TEXT UNIQUE NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW(),
+    current_lora_version TEXT DEFAULT 'v1.0'
+);
+
+-- Interaction log
+CREATE TABLE interaction_log (
+    id SERIAL PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    timestamp TIMESTAMP DEFAULT NOW(),
+    user_input TEXT NOT NULL,
+    ai_response TEXT NOT NULL,
+    prosody_features VECTOR(8),
+    relationship_state VECTOR(16),
+    personality_snapshot VECTOR(30),
+    feedback_score INTEGER CHECK (feedback_score >= 1 AND feedback_score <= 5),
+    lora_version TEXT
+);
+
+-- LoRA version tracking
+CREATE TABLE lora_versions (
+    id SERIAL PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    version TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW(),
+    parent_version TEXT,
+    storage_path TEXT,
+    training_interaction_ids INTEGER[],
+    performance_metrics JSONB,
+    is_active BOOLEAN DEFAULT FALSE
+);
+
+-- Belief graph nodes
+CREATE TABLE belief_graph_nodes (
+    id SERIAL PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    belief_text TEXT NOT NULL,
+    belief_embedding VECTOR(768),
+    strength FLOAT DEFAULT 1.0,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Indexes for performance
+CREATE INDEX idx_interaction_log_user_time ON interaction_log(user_id, timestamp DESC);
+CREATE INDEX idx_interaction_log_feedback ON interaction_log(feedback_score, timestamp DESC);
+CREATE INDEX idx_belief_embedding ON belief_graph_nodes USING hnsw (belief_embedding vector_cosine_ops);
+CREATE INDEX idx_lora_versions_user ON lora_versions(user_id, created_at DESC);
+Phase 2: Core Components (Days 4-10)
+2.1 Base Configuration
+Create src/config.py:
+pythonimport os
+from dataclasses import dataclass
+from typing import Optional
+
+@dataclass
+class Config:
+    # Database
+    DATABASE_URL: str = "postgresql://samantha:your_secure_password@localhost:5432/samantha"
+    REDIS_URL: str = "redis://localhost:6379"
+    
+    # Models
+    BASE_MODEL: str = "microsoft/DialoGPT-small"  # Start small for MVP
+    WHISPER_MODEL: str = "base"
+    
+    # Paths
+    LORA_DIR: str = "./models/lora"
+    CHECKPOINTS_DIR: str = "./models/checkpoints"
+    
+    # LinOSS Config
+    LINOSS_STATE_DIM: int = 16
+    LINOSS_DECAY_RATE: float = 0.1  # Fixed for MVP
+    
+    # Training
+    BATCH_SIZE: int = 4
+    LEARNING_RATE: float = 1e-4
+    LORA_RANK: int = 16
+    LORA_ALPHA: int = 32
+
+config = Config()
+2.2 Database Layer
+Create src/db/database.py:
+pythonfrom sqlalchemy import create_engine, Column, Integer, String, Text, TIMESTAMP, Boolean, Float, ARRAY
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.sql import func
+from pgvector.sqlalchemy import Vector
+import json
+
+from src.config import config
+
+Base = declarative_base()
+
+class User(Base):
+    __tablename__ = "users"
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(String, unique=True, nullable=False)
+    created_at = Column(TIMESTAMP, default=func.now())
+    current_lora_version = Column(String, default="v1.0")
+
+class InteractionLog(Base):
+    __tablename__ = "interaction_log"
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(String, nullable=False)
+    timestamp = Column(TIMESTAMP, default=func.now())
+    user_input = Column(Text, nullable=False)
+    ai_response = Column(Text, nullable=False)
+    prosody_features = Column(Vector(8))
+    relationship_state = Column(Vector(16))
+    personality_snapshot = Column(Vector(30))
+    feedback_score = Column(Integer)
+    lora_version = Column(String)
+
+class LoRAVersion(Base):
+    __tablename__ = "lora_versions"
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(String, nullable=False)
+    version = Column(String, nullable=False)
+    created_at = Column(TIMESTAMP, default=func.now())
+    parent_version = Column(String)
+    storage_path = Column(String)
+    training_interaction_ids = Column(ARRAY(Integer))
+    performance_metrics = Column(Text)  # JSON string
+    is_active = Column(Boolean, default=False)
+
+class BeliefGraphNode(Base):
+    __tablename__ = "belief_graph_nodes"
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(String, nullable=False)
+    belief_text = Column(Text, nullable=False)
+    belief_embedding = Column(Vector(768))
+    strength = Column(Float, default=1.0)
+    created_at = Column(TIMESTAMP, default=func.now())
+    updated_at = Column(TIMESTAMP, default=func.now())
+
+# Database setup
+engine = create_engine(config.DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+2.3 LinOSS Core Implementation
+Create src/core/linoss.py:
+pythonimport torch
+import torch.nn as nn
+import numpy as np
+from typing import Dict, List, Tuple
+import redis
+import json
+
+from src.config import config
+
+class DampedLinOSS(nn.Module):
+    """Damped Linear Oscillator State Space model for relationship dynamics"""
+    
+    def __init__(self, state_dim: int = 16, input_dim: int = 8, decay_rate: float = 0.1):
+        super().__init__()
+        self.state_dim = state_dim
+        self.input_dim = input_dim
+        self.decay_rate = decay_rate
+        
+        # Learnable parameters
+        self.A = nn.Parameter(torch.randn(state_dim, state_dim) * 0.1)  # State transition
+        self.B = nn.Parameter(torch.randn(state_dim, input_dim) * 0.1)  # Input mapping
+        self.C = nn.Parameter(torch.randn(state_dim, state_dim) * 0.1)  # Output mapping
+        
+        # Damping matrix (diagonal for stability)
+        self.register_buffer('D', torch.eye(state_dim) * decay_rate)
+        
+    def forward(self, state: torch.Tensor, input_event: torch.Tensor) -> torch.Tensor:
+        """
+        Update state based on new interaction event
+        
+        Args:
+            state: Current relationship state [state_dim]
+            input_event: New interaction features [input_dim]
+            
+        Returns:
+            Updated state [state_dim]
+        """
+        # Oscillator dynamics: dx/dt = Ax + Bu - Dx (damped)
+        state_update = torch.matmul(self.A, state) + torch.matmul(self.B, input_event)
+        damped_state = state - self.D * state  # Apply damping
+        
+        new_state = damped_state + 0.1 * state_update  # Euler integration with small step
+        
+        # Apply nonlinearity to prevent explosion
+        new_state = torch.tanh(new_state)
+        
+        return new_state
+    
+    def get_context_vector(self, state: torch.Tensor) -> torch.Tensor:
+        """Convert internal state to context vector for LLM"""
+        return torch.matmul(self.C, state)
+
+class RelationalCore:
+    """Manages LinOSS state and Redis persistence"""
+    
+    def __init__(self):
+        self.redis_client = redis.Redis.from_url(config.REDIS_URL)
+        self.linoss_model = DampedLinOSS(
+            state_dim=config.LINOSS_STATE_DIM,
+            input_dim=8,  # Prosody features
+            decay_rate=config.LINOSS_DECAY_RATE
+        )
+        
+    def get_state(self, user_id: str) -> torch.Tensor:
+        """Load current relationship state from Redis"""
+        key = f"linoss_state:{user_id}"
+        state_json = self.redis_client.get(key)
+        
+        if state_json:
+            state_list = json.loads(state_json)
+            return torch.tensor(state_list, dtype=torch.float32)
+        else:
+            # Initialize with small random state
+            return torch.randn(config.LINOSS_STATE_DIM) * 0.1
+    
+    def update_state(self, user_id: str, prosody_features: List[float]) -> torch.Tensor:
+        """Update relationship state with new interaction"""
+        current_state = self.get_state(user_id)
+        input_event = torch.tensor(prosody_features, dtype=torch.float32)
+        
+        # Update state through LinOSS
+        with torch.no_grad():
+            new_state = self.linoss_model(current_state, input_event)
+        
+        # Save to Redis
+        key = f"linoss_state:{user_id}"
+        self.redis_client.setex(key, 3600, json.dumps(new_state.tolist()))  # 1 hour TTL
+        
+        return new_state
+    
+    def get_context_vector(self, user_id: str) -> torch.Tensor:
+        """Get context vector for LLM prompt"""
+        state = self.get_state(user_id)
+        with torch.no_grad():
+            return self.linoss_model.get_context_vector(state)
+2.4 Audio Processing
+Create src/core/audio.py:
+pythonimport whisper
+import librosa
+import numpy as np
+from typing import Dict, List, Tuple
+import io
+import torch
+
+from src.config import config
+
+class AudioProcessor:
+    """Handles audio transcription and prosody extraction"""
+    
+    def __init__(self):
+        self.whisper_model = whisper.load_model(config.WHISPER_MODEL)
+        
+    def transcribe_audio(self, audio_bytes: bytes) -> str:
+        """Transcribe audio to text using Whisper"""
+        # Convert bytes to numpy array
+        audio_array = np.frombuffer(audio_bytes, dtype=np.float32)
+        
+        # Whisper expects 16kHz
+        if len(audio_array) > 0:
+            result = self.whisper_model.transcribe(audio_array)
+            return result["text"].strip()
+        return ""
+    
+    def extract_prosody(self, audio_bytes: bytes) -> List[float]:
+        """Extract prosodic features from audio"""
+        try:
+            # Convert to numpy array
+            audio_array = np.frombuffer(audio_bytes, dtype=np.float32)
+            
+            if len(audio_array) == 0:
+                return [0.0] * 8  # Return zeros if no audio
+            
+            # Ensure we have enough samples
+            if len(audio_array) < 1024:
+                audio_array = np.pad(audio_array, (0, 1024 - len(audio_array)))
+            
+            sr = 16000  # Assume 16kHz sample rate
+            
+            # Extract features
+            features = []
+            
+            # 1. Pitch (F0) - fundamental frequency
+            pitches, magnitudes = librosa.piptrack(y=audio_array, sr=sr, threshold=0.1)
+            pitch_mean = np.mean(pitches[pitches > 0]) if np.any(pitches > 0) else 0.0
+            features.append(float(pitch_mean))
+            
+            # 2. Energy (RMS)
+            rms = librosa.feature.rms(y=audio_array)[0]
+            energy_mean = np.mean(rms)
+            features.append(float(energy_mean))
+            
+            # 3. Zero crossing rate (speech activity)
+            zcr = librosa.feature.zero_crossing_rate(audio_array)[0]
+            zcr_mean = np.mean(zcr)
+            features.append(float(zcr_mean))
+            
+            # 4. Spectral centroid (brightness)
+            spectral_centroid = librosa.feature.spectral_centroid(y=audio_array, sr=sr)[0]
+            sc_mean = np.mean(spectral_centroid)
+            features.append(float(sc_mean))
+            
+            # 5. Spectral rolloff
+            spectral_rolloff = librosa.feature.spectral_rolloff(y=audio_array, sr=sr)[0]
+            sr_mean = np.mean(spectral_rolloff)
+            features.append(float(sr_mean))
+            
+            # 6. Tempo
+            tempo, _ = librosa.beat.beat_track(y=audio_array, sr=sr)
+            features.append(float(tempo))
+            
+            # 7-8. MFCC first two coefficients
+            mfccs = librosa.feature.mfcc(y=audio_array, sr=sr, n_mfcc=2)
+            features.extend([float(np.mean(mfccs[0])), float(np.mean(mfccs[1]))])
+            
+            # Normalize features to [-1, 1] range
+            features = [np.tanh(f / 1000.0) for f in features]
+            
+            return features
+            
+        except Exception as e:
+            print(f"Error extracting prosody: {e}")
+            return [0.0] * 8  # Return zeros on error
+
+class BehavioralSignature:
+    """Container for processed audio input"""
+    
+    def __init__(self, transcript: str, prosody_features: List[float]):
+        self.transcript = transcript
+        self.prosody_features = prosody_features
+    
+    def to_dict(self) -> Dict:
+        return {
+            "transcript": self.transcript,
+            "prosody_features": self.prosody_features
+        }
+
+Phase 3: Basic LLM Integration (Days 11-15)
+3.1 Simple Analyst Core (MVP Version)
+Create src/core/analyst.py:
+pythonimport torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import json
+from typing import Dict, List, Tuple, Optional
+import numpy as np
+
+from src.config import config
+from src.db.database import get_db, BeliefGraphNode
+from src.core.audio import BehavioralSignature
+
+class SimpleAnalyst:
+    """MVP version: prompt-based personality assessment"""
+    
+    def __init__(self):
+        self.big_five_dimensions = [
+            "openness", "conscientiousness", "extraversion", 
+            "agreeableness", "neuroticism"
+        ]
+        
+    def analyze_personality(self, signature: BehavioralSignature) -> Dict[str, float]:
+        """
+        Simple personality assessment based on text and prosody
+        Returns scores for Big Five traits (0-1 scale)
+        """
+        transcript = signature.transcript.lower()
+        prosody = signature.prosody_features
+        
+        # Simple heuristics for MVP
+        scores = {}
+        
+        # Openness - creative/curious language
+        openness_words = ["creative", "imagine", "wonder", "curious", "new", "different"]
+        openness_score = sum(1 for word in openness_words if word in transcript) / 10.0
+        openness_score += (prosody[3] + 1) / 4.0  # spectral centroid (brightness)
+        scores["openness"] = min(1.0, openness_score)
+        
+        # Conscientiousness - organized/disciplined language
+        conscientiousness_words = ["plan", "organize", "schedule", "goal", "task", "complete"]
+        conscientiousness_score = sum(1 for word in conscientiousness_words if word in transcript) / 10.0
+        conscientiousness_score += (prosody[5] + 1) / 4.0  # tempo regularity
+        scores["conscientiousness"] = min(1.0, conscientiousness_score)
+        
+        # Extraversion - social/energetic language and prosody
+        extraversion_words = ["people", "party", "social", "excited", "energy", "talk"]
+        extraversion_score = sum(1 for word in extraversion_words if word in transcript) / 10.0
+        extraversion_score += (prosody[1] + 1) / 2.0  # energy/volume
+        scores["extraversion"] = min(1.0, extraversion_score)
+        
+        # Agreeableness - cooperative/trusting language
+        agreeableness_words = ["help", "kind", "please", "thank", "agree", "understand"]
+        agreeableness_score = sum(1 for word in agreeableness_words if word in transcript) / 10.0
+        agreeableness_score += (1 - abs(prosody[0])) / 2.0  # stable pitch
+        scores["agreeableness"] = min(1.0, agreeableness_score)
+        
+        # Neuroticism - anxious/stress language and prosody
+        neuroticism_words = ["worry", "stress", "anxious", "nervous", "scared", "difficult"]
+        neuroticism_score = sum(1 for word in neuroticism_words if word in transcript) / 10.0
+        neuroticism_score += abs(prosody[2]) / 2.0  # zero crossing rate (shakiness)
+        scores["neuroticism"] = min(1.0, neuroticism_score)
+        
+        return scores
+    
+    def extract_beliefs(self, transcript: str) -> List[str]:
+        """Extract stated beliefs from transcript"""
+        belief_indicators = [
+            "i believe", "i think", "i feel", "i value", 
+            "important to me", "i care about", "i love", "i hate"
+        ]
+        
+        beliefs = []
+        transcript_lower = transcript.lower()
+        
+        for indicator in belief_indicators:
+            if indicator in transcript_lower:
+                # Extract sentence containing the belief
+                sentences = transcript.split('.')
+                for sentence in sentences:
+                    if indicator in sentence.lower():
+                        beliefs.append(sentence.strip())
+        
+        return beliefs
+    
+    def get_context_package(self, user_id: str, signature: BehavioralSignature) -> Dict:
+        """Get relevant context for LLM prompt"""
+        # Get recent interactions
+        db = next(get_db())
+        recent_interactions = db.query(InteractionLog).filter(
+            InteractionLog.user_id == user_id
+        ).order_by(InteractionLog.timestamp.desc()).limit(5).all()
+        
+        # Get relevant beliefs
+        beliefs = db.query(BeliefGraphNode).filter(
+            BeliefGraphNode.user_id == user_id
+        ).order_by(BeliefGraphNode.strength.desc()).limit(3).all()
+        
+        context = {
+            "personality_scores": self.analyze_personality(signature),
+            "recent_interactions": [
+                {"user": int_.user_input, "ai": int_.ai_response} 
+                for int_ in recent_interactions
+            ],
+            "core_beliefs": [belief.belief_text for belief in beliefs],
+            "current_prosody": signature.prosody_features
+        }
+        
+        return context
+
+3.2 Agentic Core with LoRA
+Create src/core/agentic.py:
+pythonimport torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from peft import PeftModel, LoraConfig, get_peft_model
+import os
+import json
+from typing import Dict, List, Optional
+
+from src.config import config
+from src.db.database import get_db, LoRAVersion
+
+class AgenticCore:
+    """Manages LLM generation with persistent LoRA adapters"""
+    
+    def __init__(self):
+        self.tokenizer = AutoTokenizer.from_pretrained(config.BASE_MODEL)
+        self.base_model = AutoModelForCausalLM.from_pretrained(
+            config.BASE_MODEL,
+            torch_dtype=torch.float16,
+            device_map="auto"
+        )
+        
+        # Add padding token if missing
+        if self.tokenizer.pad_token is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+        
+        self.current_user_id = None
+        self.current_lora_model = None
+        
+    def load_user_lora(self, user_id: str) -> bool:
+        """Load user's current LoRA adapter"""
+        try:
+            # Get current LoRA version from database
+            db = next(get_db())
+            current_version = db.query(LoRAVersion).filter(
+                LoRAVersion.user_id == user_id,
+                LoRAVersion.is_active == True
+            ).first()
+            
+            if current_version and os.path.exists(current_version.storage_path):
+                # Load existing LoRA
+                self.current_lora_model = PeftModel.from_pretrained(
+                    self.base_model,
+                    current_version.storage_path
+                )
+                print(f"Loaded LoRA {current_version.version} for user {user_id}")
+            else:
+                # Create new LoRA for user
+                self.current_lora_model = self._create_new_lora(user_id)
+                print(f"Created new LoRA for user {user_id}")
+            
+            self.current_user_id = user_id
+            return True
+            
+        except Exception as e:
+            print(f"Error loading LoRA for user {user_id}: {e}")
+            return False
+    
+    def _create_new_lora(self, user_id: str) -> PeftModel:
+        """Create new LoRA adapter for user"""
+        lora_config = LoraConfig(
+            r=config.LORA_RANK,
+            lora_alpha=config.LORA_ALPHA,
+            target_modules=["q_proj", "v_proj"],  # Common attention modules
+            lora_dropout=0.1,
+            bias="none",
+            task_type="CAUSAL_LM"
+        )
+        
+        lora_model = get_peft_model(self.base_model, lora_config)
+        
+        # Save to database
+        lora_path = os.path.join(config.LORA_DIR, f"{user_id}_lora_v1.0")
+        os.makedirs(lora_path, exist_ok=True)
+        
+        lora_model.save_pretrained(lora_path)
+        
+        # Record in database
+        db = next(get_db())
+        lora_version = LoRAVersion(
+            user_id=user_id,
+            version="v1.0",
+            storage_path=lora_path,
+            is_active=True
+        )
+        db.add(lora_version)
+        db.commit()
+        
+        return lora_model
+    
+    def generate_response(self, 
+                         user_input: str, 
+                         context: Dict, 
+                         relationship_context: torch.Tensor) -> str:
+        """Generate response using current LoRA"""
+        
+        if self.current_lora_model is None:
+            return "Error: No LoRA loaded"
+        
+        # Build comprehensive prompt
+        prompt = self._build_prompt(user_input, context, relationship_context)
+        
+        # Tokenize
+        inputs = self.tokenizer(
+            prompt, 
+            return_tensors="pt", 
+            padding=True, 
+            truncation=True, 
+            max_length=512
+        ).to(self.current_lora_model.device)
+        
+        # Generate
+        with torch.no_grad():
+            outputs = self.current_lora_model.generate(
+                **inputs,
+                max_new_tokens=150,
+                temperature=0.7,
+                do_sample=True,
+                pad_token_id=self.tokenizer.eos_token_id
+            )
+        
+        # Decode response
+        response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+        
+        # Extract only the new part (after the prompt)
+        response = response[len(prompt):].strip()
+        
+        return response
+    
+    def _build_prompt(self, 
+                     user_input: str, 
+                     context: Dict, 
+                     relationship_context: torch.Tensor) -> str:
+        """Build comprehensive prompt for LLM"""
+        
+        # Convert relationship context to interpretable values
+        rel_ctx = relationship_context.cpu().numpy()
+        relationship_summary = self._interpret_relationship_context(rel_ctx)
+        
+        prompt = f"""You are an AI companion having a conversation with your user. 
+
+User's Personality Profile:
+- Openness: {context['personality_scores']['openness']:.2f}
+- Conscientiousness: {context['personality_scores']['conscientiousness']:.2f}
+- Extraversion: {context['personality_scores']['extraversion']:.2f}
+- Agreeableness: {context['personality_scores']['agreeableness']:.2f}
+- Neuroticism: {context['personality_scores']['neuroticism']:.2f}
+
+Core Beliefs:
+{chr(10).join(f"- {belief}" for belief in context['core_beliefs'])}
+
+Relationship Context: {relationship_summary}
+
+Recent Conversation:
+{chr(10).join(f"User: {turn['user']}" + chr(10) + f"AI: {turn['ai']}" for turn in context['recent_interactions'][-2:])}
+
+User: {user_input}
+AI: """
+        
+        return prompt
+    
+    def _interpret_relationship_context(self, rel_ctx: np.ndarray) -> str:
+        """Convert relationship context vector to human-readable description"""
+        # Simple interpretation for MVP
+        energy_level = float(np.mean(rel_ctx[:4]))
+        emotional_valence = float(np.mean(rel_ctx[4:8]))
+        intimacy_level = float(np.mean(rel_ctx[8:12]))
+        conversation_flow = float(np.mean(rel_ctx[12:16]))
+        
+        descriptions = []
+        
+        if energy_level > 0.3:
+            descriptions.append("high energy")
+        elif energy_level < -0.3:
+            descriptions.append("low energy")
+        
+        if emotional_valence > 0.3:
+            descriptions.append("positive mood")
+        elif emotional_valence < -0.3:
+            descriptions.append("negative mood")
+        
+        if intimacy_level > 0.3:
+            descriptions.append("intimate conversation")
+        elif intimacy_level < -0.3:
+            descriptions.append("casual conversation")
+        
+        if conversation_flow > 0.3:
+            descriptions.append("smooth flow")
+        elif conversation_flow < -0.3:
+            descriptions.append("choppy flow")
+        
+        return ", ".join(descriptions) if descriptions else "neutral"
+
+Phase 4: API Layer (Days 16-20)
+4.1 FastAPI Application
+Create src/api/main.py:
+pythonfrom fastapi import FastAPI, HTTPException, UploadFile, File, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
+import json
+from typing import Dict, List, Optional
+import asyncio
+
+from src.db.database import get_db, User, InteractionLog
+from src.core.audio import AudioProcessor, BehavioralSignature
+from src.core.analyst import SimpleAnalyst
+from src.core.linoss import RelationalCore
+from src.core.agentic import AgenticCore
+from src.config import config
+
+app = FastAPI(title="Samantha Protocol API", version="1.0")
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Initialize components
+audio_processor = AudioProcessor()
+analyst = SimpleAnalyst()
+relational_core = RelationalCore()
+agentic_core = AgenticCore()
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize application"""
+    print("Samantha Protocol API starting...")
+
+@app.post("/api/v1/interact")
+async def interact(
+    user_id: str,
+    audio_file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """Main interaction endpoint"""
+    try:
+        # Ensure user exists
+        user = db.query(User).filter(User.user_id == user_id).first()
+        if not user:
+            user = User(user_id=user_id)
+            db.add(user)
+            db.commit()
+        
+        # Load user's LoRA
+        if agentic_core.current_user_id != user_id:
+            success = agentic_core.load_user_lora(user_id)
+            if not success:
+                raise HTTPException(status_code=500, detail="Failed to load user model")
+        
+        # Process audio
+        audio_bytes = await audio_file.read()
+        
+        # Extract behavioral signature
+        transcript = audio_processor.transcribe_audio(audio_bytes)
+        prosody_features = audio_processor.extract_prosody(audio_bytes)
+        signature = BehavioralSignature(transcript, prosody_features)
+        
+        if not transcript.strip():
+            raise HTTPException(status_code=400, detail="Could not transcribe audio")
+        
+        # Update relationship state
+        relationship_state = relational_core.update_state(user_id, prosody_features)
+        relationship_context = relational_core.get_context_vector(user_
+
+
+relationship_context = relational_core.get_context_vector(user_id)
+       
+       # Get analyst context
+       context = analyst.get_context_package(user_id, signature)
+       
+       # Extract and store beliefs
+       beliefs = analyst.extract_beliefs(transcript)
+       for belief_text in beliefs:
+           # Simple duplicate check
+           existing = db.query(BeliefGraphNode).filter(
+               BeliefGraphNode.user_id == user_id,
+               BeliefGraphNode.belief_text == belief_text
+           ).first()
+           
+           if not existing:
+               belief_node = BeliefGraphNode(
+                   user_id=user_id,
+                   belief_text=belief_text,
+                   belief_embedding=[0.0] * 768  # Placeholder for MVP
+               )
+               db.add(belief_node)
+       
+       # Generate response
+       ai_response = agentic_core.generate_response(
+           transcript, context, relationship_context
+       )
+       
+       # Log interaction
+       interaction = InteractionLog(
+           user_id=user_id,
+           user_input=transcript,
+           ai_response=ai_response,
+           prosody_features=prosody_features,
+           relationship_state=relationship_state.tolist(),
+           personality_snapshot=list(context['personality_scores'].values()),
+           lora_version=user.current_lora_version
+       )
+       db.add(interaction)
+       db.commit()
+       
+       return {
+           "response": ai_response,
+           "transcript": transcript,
+           "interaction_id": interaction.id
+       }
+       
+   except Exception as e:
+       print(f"Error in interact endpoint: {e}")
+       raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/feedback")
+async def submit_feedback(
+   interaction_id: int,
+   score: int,
+   db: Session = Depends(get_db)
+):
+   """Submit feedback for an interaction"""
+   if score < 1 or score > 5:
+       raise HTTPException(status_code=400, detail="Score must be between 1 and 5")
+   
+   interaction = db.query(InteractionLog).filter(
+       InteractionLog.id == interaction_id
+   ).first()
+   
+   if not interaction:
+       raise HTTPException(status_code=404, detail="Interaction not found")
+   
+   interaction.feedback_score = score
+   db.commit()
+   
+   return {"message": "Feedback recorded"}
+
+@app.get("/api/v1/user/{user_id}/profile")
+async def get_user_profile(user_id: str, db: Session = Depends(get_db)):
+   """Get user personality profile"""
+   user = db.query(User).filter(User.user_id == user_id).first()
+   if not user:
+       raise HTTPException(status_code=404, detail="User not found")
+   
+   # Get recent interactions for personality analysis
+   recent_interactions = db.query(InteractionLog).filter(
+       InteractionLog.user_id == user_id
+   ).order_by(InteractionLog.timestamp.desc()).limit(10).all()
+   
+   if not recent_interactions:
+       return {"message": "No interactions yet"}
+   
+   # Average personality scores
+   personality_scores = {}
+   for dimension in ["openness", "conscientiousness", "extraversion", "agreeableness", "neuroticism"]:
+       scores = []
+       for interaction in recent_interactions:
+           if interaction.personality_snapshot:
+               idx = ["openness", "conscientiousness", "extraversion", "agreeableness", "neuroticism"].index(dimension)
+               scores.append(interaction.personality_snapshot[idx])
+       
+       personality_scores[dimension] = sum(scores) / len(scores) if scores else 0.0
+   
+   return {
+       "user_id": user_id,
+       "personality_scores": personality_scores,
+       "total_interactions": len(recent_interactions),
+       "current_lora_version": user.current_lora_version
+   }
+
+@app.get("/health")
+async def health_check():
+   """Health check endpoint"""
+   return {"status": "healthy", "version": "1.0"}
+
+if __name__ == "__main__":
+   import uvicorn
+   uvicorn.run(app, host="0.0.0.0", port=8000)
+4.2 Training Script for Offline Evolution
+Create src/training/offline_trainer.py:
+pythonimport torch
+from torch.utils.data import Dataset, DataLoader
+from transformers import Trainer, TrainingArguments
+from peft import PeftModel
+import json
+import os
+from datetime import datetime, timedelta
+from typing import List, Dict, Tuple
+
+from src.db.database import SessionLocal, InteractionLog, LoRAVersion, User
+from src.core.agentic import AgenticCore
+from src.config import config
+
+class InteractionDataset(Dataset):
+    """Dataset for LoRA fine-tuning"""
+    
+    def __init__(self, interactions: List[InteractionLog], tokenizer):
+        self.interactions = interactions
+        self.tokenizer = tokenizer
+        
+    def __len__(self):
+        return len(self.interactions)
+    
+    def __getitem__(self, idx):
+        interaction = self.interactions[idx]
+        
+        # Create training example: user input -> AI response
+        text = f"User: {interaction.user_input}\nAI: {interaction.ai_response}"
+        
+        # Tokenize
+        encoding = self.tokenizer(
+            text,
+            truncation=True,
+            padding='max_length',
+            max_length=512,
+            return_tensors='pt'
+        )
+        
+        return {
+            'input_ids': encoding['input_ids'].flatten(),
+            'attention_mask': encoding['attention_mask'].flatten(),
+            'labels': encoding['input_ids'].flatten()
+        }
+
+class OfflineTrainer:
+    """Handles offline LoRA fine-tuning"""
+    
+    def __init__(self):
+        self.db = SessionLocal()
+        
+    def get_training_data(self, user_id: str, days_back: int = 7) -> List[InteractionLog]:
+        """Get high-quality interactions for training"""
+        cutoff_date = datetime.now() - timedelta(days=days_back)
+        
+        interactions = self.db.query(InteractionLog).filter(
+            InteractionLog.user_id == user_id,
+            InteractionLog.timestamp >= cutoff_date,
+            InteractionLog.feedback_score >= 4  # Only good interactions
+        ).all()
+        
+        return interactions
+    
+    def train_user_lora(self, user_id: str) -> bool:
+        """Train new LoRA version for user"""
+        try:
+            # Get training data
+            training_interactions = self.get_training_data(user_id)
+            
+            if len(training_interactions) < 5:
+                print(f"Not enough training data for user {user_id}")
+                return False
+            
+            # Load current LoRA
+            agentic_core = AgenticCore()
+            success = agentic_core.load_user_lora(user_id)
+            if not success:
+                return False
+            
+            # Create dataset
+            dataset = InteractionDataset(training_interactions, agentic_core.tokenizer)
+            
+            # Get current version
+            current_version = self.db.query(LoRAVersion).filter(
+                LoRAVersion.user_id == user_id,
+                LoRAVersion.is_active == True
+            ).first()
+            
+            if not current_version:
+                return False
+            
+            # Parse version number
+            version_num = float(current_version.version.replace('v', ''))
+            new_version = f"v{version_num + 0.1:.1f}"
+            
+            # Setup training
+            training_args = TrainingArguments(
+                output_dir=f"./tmp_training_{user_id}",
+                per_device_train_batch_size=config.BATCH_SIZE,
+                num_train_epochs=3,
+                learning_rate=config.LEARNING_RATE,
+                logging_steps=10,
+                save_strategy="no",  # Don't save intermediate checkpoints
+                remove_unused_columns=False,
+            )
+            
+            trainer = Trainer(
+                model=agentic_core.current_lora_model,
+                args=training_args,
+                train_dataset=dataset,
+                tokenizer=agentic_core.tokenizer,
+            )
+            
+            # Train
+            print(f"Training {new_version} for user {user_id}...")
+            trainer.train()
+            
+            # Save new LoRA version
+            new_lora_path = os.path.join(config.LORA_DIR, f"{user_id}_lora_{new_version}")
+            os.makedirs(new_lora_path, exist_ok=True)
+            agentic_core.current_lora_model.save_pretrained(new_lora_path)
+            
+            # Deactivate old version
+            current_version.is_active = False
+            
+            # Create new version record
+            new_lora_record = LoRAVersion(
+                user_id=user_id,
+                version=new_version,
+                parent_version=current_version.version,
+                storage_path=new_lora_path,
+                training_interaction_ids=[int_.id for int_ in training_interactions],
+                performance_metrics=json.dumps({"training_loss": trainer.state.log_history[-1].get("train_loss", 0.0)}),
+                is_active=True
+            )
+            
+            self.db.add(new_lora_record)
+            
+            # Update user's current version
+            user = self.db.query(User).filter(User.user_id == user_id).first()
+            user.current_lora_version = new_version
+            
+            self.db.commit()
+            
+            # Cleanup
+            import shutil
+            shutil.rmtree(f"./tmp_training_{user_id}", ignore_errors=True)
+            
+            print(f"Successfully trained {new_version} for user {user_id}")
+            return True
+            
+        except Exception as e:
+            print(f"Error training LoRA for user {user_id}: {e}")
+            self.db.rollback()
+            return False
+    
+    def train_all_users(self):
+        """Train LoRAs for all active users"""
+        users = self.db.query(User).all()
+        
+        for user in users:
+            print(f"Processing user {user.user_id}...")
+            self.train_user_lora(user.user_id)
+    
+    def __del__(self):
+        self.db.close()
+
+if __name__ == "__main__":
+    trainer = OfflineTrainer()
+    trainer.train_all_users()
+Phase 5: Deployment & Testing (Days 21-25)
+5.1 Deployment Scripts
+Create scripts/deploy.sh:
+bash#!/bin/bash
+
+# RunPod deployment script
+set -e
+
+echo "Starting Samantha Protocol deployment..."
+
+# Start services
+docker-compose up -d postgres redis
+
+# Wait for PostgreSQL to be ready
+echo "Waiting for PostgreSQL..."
+until docker-compose exec postgres pg_isready -U samantha; do
+    sleep 2
+done
+
+# Install Python dependencies
+pip install -r requirements.txt
+
+# Run database migrations
+python -c "
+from src.db.database import engine, Base
+Base.metadata.create_all(bind=engine)
+print('Database initialized')
+"
+
+# Start the API server
+echo "Starting API server..."
+python -m src.api.main &
+
+# Setup cron job for offline training
+(crontab -l 2>/dev/null; echo "0 3 * * * cd /workspace/samantha && python -m src.training.offline_trainer") | crontab -
+
+echo "Deployment complete!"
+echo "API available at: http://localhost:8000"
+echo "Health check: curl http://localhost:8000/health"
+Create requirements.txt:
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+torch==2.1.0
+transformers==4.35.0
+accelerate==0.24.0
+peft==0.6.0
+bitsandbytes==0.41.0
+psycopg2-binary==2.9.7
+sqlalchemy==2.0.23
+alembic==1.12.1
+pgvector==0.2.3
+redis==5.0.1
+librosa==0.10.1
+openai-whisper==20231117
+numpy==1.24.3
+pandas==2.1.3
+python-multipart==0.0.6
+5.2 Test Client
+Create test_client.py:
+pythonimport requests
+import json
+import time
+from pathlib import Path
+
+class SamanthaClient:
+    def __init__(self, base_url: str = "http://localhost:8000"):
+        self.base_url = base_url
+        
+    def health_check(self):
+        """Test if API is running"""
+        response = requests.get(f"{self.base_url}/health")
+        return response.json()
+    
+    def interact(self, user_id: str, audio_file_path: str):
+        """Send audio interaction"""
+        with open(audio_file_path, 'rb') as f:
+            files = {'audio_file': f}
+            data = {'user_id': user_id}
+            
+            response = requests.post(
+                f"{self.base_url}/api/v1/interact",
+                files=files,
+                data=data
+            )
+            
+        return response.json()
+    
+    def submit_feedback(self, interaction_id: int, score: int):
+        """Submit feedback for interaction"""
+        response = requests.post(
+            f"{self.base_url}/api/v1/feedback",
+            json={'interaction_id': interaction_id, 'score': score}
+        )
+        return response.json()
+    
+    def get_profile(self, user_id: str):
+        """Get user personality profile"""
+        response = requests.get(f"{self.base_url}/api/v1/user/{user_id}/profile")
+        return response.json()
+
+def test_basic_workflow():
+    """Test basic interaction workflow"""
+    client = SamanthaClient()
+    
+    # Health check
+    print("Health check:", client.health_check())
+    
+    # Test interaction (you'll need a test audio file)
+    # For testing, create a simple WAV file or use text-to-speech
+    
+    user_id = "test_user_001"
+    
+    # Simulate multiple interactions
+    for i in range(3):
+        print(f"\n--- Interaction {i+1} ---")
+        
+        # You would replace this with actual audio file
+        # For now, create a dummy interaction via direct API call
+        
+        # Get profile
+        profile = client.get_profile(user_id)
+        print("User profile:", json.dumps(profile, indent=2))
+        
+        time.sleep(1)
+
+if __name__ == "__main__":
+    test_basic_workflow()
+
+python       relationship_context = relational_core.get_context_vector(user_id)
+       
+       # Get analyst context
+       context = analyst.get_context_package(user_id, signature)
+       
+       # Extract and store beliefs
+       beliefs = analyst.extract_beliefs(transcript)
+       for belief_text in beliefs:
+           # Simple duplicate check
+           existing = db.query(BeliefGraphNode).filter(
+               BeliefGraphNode.user_id == user_id,
+               BeliefGraphNode.belief_text == belief_text
+           ).first()
+           
+           if not existing:
+               belief_node = BeliefGraphNode(
+                   user_id=user_id,
+                   belief_text=belief_text,
+                   belief_embedding=[0.0] * 768  # Placeholder for MVP
+               )
+               db.add(belief_node)
+       
+       # Generate response
+       ai_response = agentic_core.generate_response(
+           transcript, context, relationship_context
+       )
+       
+       # Log interaction
+       interaction = InteractionLog(
+           user_id=user_id,
+           user_input=transcript,
+           ai_response=ai_response,
+           prosody_features=prosody_features,
+           relationship_state=relationship_state.tolist(),
+           personality_snapshot=list(context['personality_scores'].values()),
+           lora_version=user.current_lora_version
+       )
+       db.add(interaction)
+       db.commit()
+       
+       return {
+           "response": ai_response,
+           "transcript": transcript,
+           "interaction_id": interaction.id
+       }
+       
+   except Exception as e:
+       print(f"Error in interact endpoint: {e}")
+       raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/feedback")
+async def submit_feedback(
+   interaction_id: int,
+   score: int,
+   db: Session = Depends(get_db)
+):
+   """Submit feedback for an interaction"""
+   if score < 1 or score > 5:
+       raise HTTPException(status_code=400, detail="Score must be between 1 and 5")
+   
+   interaction = db.query(InteractionLog).filter(
+       InteractionLog.id == interaction_id
+   ).first()
+   
+   if not interaction:
+       raise HTTPException(status_code=404, detail="Interaction not found")
+   
+   interaction.feedback_score = score
+   db.commit()
+   
+   return {"message": "Feedback recorded"}
+
+@app.get("/api/v1/user/{user_id}/profile")
+async def get_user_profile(user_id: str, db: Session = Depends(get_db)):
+   """Get user personality profile"""
+   user = db.query(User).filter(User.user_id == user_id).first()
+   if not user:
+       raise HTTPException(status_code=404, detail="User not found")
+   
+   # Get recent interactions for personality analysis
+   recent_interactions = db.query(InteractionLog).filter(
+       InteractionLog.user_id == user_id
+   ).order_by(InteractionLog.timestamp.desc()).limit(10).all()
+   
+   if not recent_interactions:
+       return {"message": "No interactions yet"}
+   
+   # Average personality scores
+   personality_scores = {}
+   for dimension in ["openness", "conscientiousness", "extraversion", "agreeableness", "neuroticism"]:
+       scores = []
+       for interaction in recent_interactions:
+           if interaction.personality_snapshot:
+               idx = ["openness", "conscientiousness", "extraversion", "agreeableness", "neuroticism"].index(dimension)
+               scores.append(interaction.personality_snapshot[idx])
+       
+       personality_scores[dimension] = sum(scores) / len(scores) if scores else 0.0
+   
+   return {
+       "user_id": user_id,
+       "personality_scores": personality_scores,
+       "total_interactions": len(recent_interactions),
+       "current_lora_version": user.current_lora_version
+   }
+
+@app.get("/health")
+async def health_check():
+   """Health check endpoint"""
+   return {"status": "healthy", "version": "1.0"}
+
+if __name__ == "__main__":
+   import uvicorn
+   uvicorn.run(app, host="0.0.0.0", port=8000)
+4.2 Training Script for Offline Evolution
+Create src/training/offline_trainer.py:
+pythonimport torch
+from torch.utils.data import Dataset, DataLoader
+from transformers import Trainer, TrainingArguments
+from peft import PeftModel
+import json
+import os
+from datetime import datetime, timedelta
+from typing import List, Dict, Tuple
+
+from src.db.database import SessionLocal, InteractionLog, LoRAVersion, User
+from src.core.agentic import AgenticCore
+from src.config import config
+
+class InteractionDataset(Dataset):
+    """Dataset for LoRA fine-tuning"""
+    
+    def __init__(self, interactions: List[InteractionLog], tokenizer):
+        self.interactions = interactions
+        self.tokenizer = tokenizer
+        
+    def __len__(self):
+        return len(self.interactions)
+    
+    def __getitem__(self, idx):
+        interaction = self.interactions[idx]
+        
+        # Create training example: user input -> AI response
+        text = f"User: {interaction.user_input}\nAI: {interaction.ai_response}"
+        
+        # Tokenize
+        encoding = self.tokenizer(
+            text,
+            truncation=True,
+            padding='max_length',
+            max_length=512,
+            return_tensors='pt'
+        )
+        
+        return {
+            'input_ids': encoding['input_ids'].flatten(),
+            'attention_mask': encoding['attention_mask'].flatten(),
+            'labels': encoding['input_ids'].flatten()
+        }
+
+class OfflineTrainer:
+    """Handles offline LoRA fine-tuning"""
+    
+    def __init__(self):
+        self.db = SessionLocal()
+        
+    def get_training_data(self, user_id: str, days_back: int = 7) -> List[InteractionLog]:
+        """Get high-quality interactions for training"""
+        cutoff_date = datetime.now() - timedelta(days=days_back)
+        
+        interactions = self.db.query(InteractionLog).filter(
+            InteractionLog.user_id == user_id,
+            InteractionLog.timestamp >= cutoff_date,
+            InteractionLog.feedback_score >= 4  # Only good interactions
+        ).all()
+        
+        return interactions
+    
+    def train_user_lora(self, user_id: str) -> bool:
+        """Train new LoRA version for user"""
+        try:
+            # Get training data
+            training_interactions = self.get_training_data(user_id)
+            
+            if len(training_interactions) < 5:
+                print(f"Not enough training data for user {user_id}")
+                return False
+            
+            # Load current LoRA
+            agentic_core = AgenticCore()
+            success = agentic_core.load_user_lora(user_id)
+            if not success:
+                return False
+            
+            # Create dataset
+            dataset = InteractionDataset(training_interactions, agentic_core.tokenizer)
+            
+            # Get current version
+            current_version = self.db.query(LoRAVersion).filter(
+                LoRAVersion.user_id == user_id,
+                LoRAVersion.is_active == True
+            ).first()
+            
+            if not current_version:
+                return False
+            
+            # Parse version number
+            version_num = float(current_version.version.replace('v', ''))
+            new_version = f"v{version_num + 0.1:.1f}"
+            
+            # Setup training
+            training_args = TrainingArguments(
+                output_dir=f"./tmp_training_{user_id}",
+                per_device_train_batch_size=config.BATCH_SIZE,
+                num_train_epochs=3,
+                learning_rate=config.LEARNING_RATE,
+                logging_steps=10,
+                save_strategy="no",  # Don't save intermediate checkpoints
+                remove_unused_columns=False,
+            )
+            
+            trainer = Trainer(
+                model=agentic_core.current_lora_model,
+                args=training_args,
+                train_dataset=dataset,
+                tokenizer=agentic_core.tokenizer,
+            )
+            
+            # Train
+            print(f"Training {new_version} for user {user_id}...")
+            trainer.train()
+            
+            # Save new LoRA version
+            new_lora_path = os.path.join(config.LORA_DIR, f"{user_id}_lora_{new_version}")
+            os.makedirs(new_lora_path, exist_ok=True)
+            agentic_core.current_lora_model.save_pretrained(new_lora_path)
+            
+            # Deactivate old version
+            current_version.is_active = False
+            
+            # Create new version record
+            new_lora_record = LoRAVersion(
+                user_id=user_id,
+                version=new_version,
+                parent_version=current_version.version,
+                storage_path=new_lora_path,
+                training_interaction_ids=[int_.id for int_ in training_interactions],
+                performance_metrics=json.dumps({"training_loss": trainer.state.log_history[-1].get("train_loss", 0.0)}),
+                is_active=True
+            )
+            
+            self.db.add(new_lora_record)
+            
+            # Update user's current version
+            user = self.db.query(User).filter(User.user_id == user_id).first()
+            user.current_lora_version = new_version
+            
+            self.db.commit()
+            
+            # Cleanup
+            import shutil
+            shutil.rmtree(f"./tmp_training_{user_id}", ignore_errors=True)
+            
+            print(f"Successfully trained {new_version} for user {user_id}")
+            return True
+            
+        except Exception as e:
+            print(f"Error training LoRA for user {user_id}: {e}")
+            self.db.rollback()
+            return False
+    
+    def train_all_users(self):
+        """Train LoRAs for all active users"""
+        users = self.db.query(User).all()
+        
+        for user in users:
+            print(f"Processing user {user.user_id}...")
+            self.train_user_lora(user.user_id)
+    
+    def __del__(self):
+        self.db.close()
+
+if __name__ == "__main__":
+    trainer = OfflineTrainer()
+    trainer.train_all_users()
+Phase 5: Deployment & Testing (Days 21-25)
+5.1 Deployment Scripts
+Create scripts/deploy.sh:
+bash#!/bin/bash
+
+# RunPod deployment script
+set -e
+
+echo "Starting Samantha Protocol deployment..."
+
+# Start services
+docker-compose up -d postgres redis
+
+# Wait for PostgreSQL to be ready
+echo "Waiting for PostgreSQL..."
+until docker-compose exec postgres pg_isready -U samantha; do
+    sleep 2
+done
+
+# Install Python dependencies
+pip install -r requirements.txt
+
+# Run database migrations
+python -c "
+from src.db.database import engine, Base
+Base.metadata.create_all(bind=engine)
+print('Database initialized')
+"
+
+# Start the API server
+echo "Starting API server..."
+python -m src.api.main &
+
+# Setup cron job for offline training
+(crontab -l 2>/dev/null; echo "0 3 * * * cd /workspace/samantha && python -m src.training.offline_trainer") | crontab -
+
+echo "Deployment complete!"
+echo "API available at: http://localhost:8000"
+echo "Health check: curl http://localhost:8000/health"
+Create requirements.txt:
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+torch==2.1.0
+transformers==4.35.0
+accelerate==0.24.0
+peft==0.6.0
+bitsandbytes==0.41.0
+psycopg2-binary==2.9.7
+sqlalchemy==2.0.23
+alembic==1.12.1
+pgvector==0.2.3
+redis==5.0.1
+librosa==0.10.1
+openai-whisper==20231117
+numpy==1.24.3
+pandas==2.1.3
+python-multipart==0.0.6
+5.2 Test Client
+Create test_client.py:
+pythonimport requests
+import json
+import time
+from pathlib import Path
+
+class SamanthaClient:
+    def __init__(self, base_url: str = "http://localhost:8000"):
+        self.base_url = base_url
+        
+    def health_check(self):
+        """Test if API is running"""
+        response = requests.get(f"{self.base_url}/health")
+        return response.json()
+    
+    def interact(self, user_id: str, audio_file_path: str):
+        """Send audio interaction"""
+        with open(audio_file_path, 'rb') as f:
+            files = {'audio_file': f}
+            data = {'user_id': user_id}
+            
+            response = requests.post(
+                f"{self.base_url}/api/v1/interact",
+                files=files,
+                data=data
+            )
+            
+        return response.json()
+    
+    def submit_feedback(self, interaction_id: int, score: int):
+        """Submit feedback for interaction"""
+        response = requests.post(
+            f"{self.base_url}/api/v1/feedback",
+            json={'interaction_id': interaction_id, 'score': score}
+        )
+        return response.json()
+    
+    def get_profile(self, user_id: str):
+        """Get user personality profile"""
+        response = requests.get(f"{self.base_url}/api/v1/user/{user_id}/profile")
+        return response.json()
+
+def test_basic_workflow():
+    """Test basic interaction workflow"""
+    client = SamanthaClient()
+    
+    # Health check
+    print("Health check:", client.health_check())
+    
+    # Test interaction (you'll need a test audio file)
+    # For testing, create a simple WAV file or use text-to-speech
+    
+    user_id = "test_user_001"
+    
+    # Simulate multiple interactions
+    for i in range(3):
+        print(f"\n--- Interaction {i+1} ---")
+        
+        # You would replace this with actual audio file
+        # For now, create a dummy interaction via direct API call
+        
+        # Get profile
+        profile = client.get_profile(user_id)
+        print("User profile:", json.dumps(profile, indent=2))
+        
+        time.sleep(1)
+
+if __name__ == "__main__":
+    test_basic_workflow()
+5.3 Monitoring Script
+Create scripts/monitor.py:
+pythonimport psutil
+import time
+import redis
+import psycopg2
+from datetime import datetime
+
+from src.config import config
+
+def check_system_resources():
+    """Monitor system resources"""
+    cpu_percent = psutil.cpu_percent(interval=1)
+    memory = psutil.virtual_memory()
+    disk = psutil.disk_usage('/')
+    
+    print(f"CPU: {cpu_percent}%")
+    print(f"Memory: {memory.percent}% ({memory.used / 1024**3:.1f}GB / {memory.total / 1024**3:.1f}GB)")
+    print(f"Disk: {disk.percent}% ({disk.used / 1024**3:.1f}GB / {disk.total / 1024**3:.1f}GB)")
+
+def check_redis():
+    """Check Redis connection and stats"""
+    try:
+        r = redis.Redis.from_url(config.REDIS_URL)
+        info = r.info()
+        print(f"Redis: Connected, {info['connected_clients']} clients, {info['used_memory_human']} memory")
+        return True
+    except Exception as e:
+        print(f"Redis: Error - {e}")
+        return False
+
+def check_postgres():
+    """Check PostgreSQL connection and stats"""
+    try:
+        conn = psycopg2.connect(config.DATABASE_URL)
+        cursor = conn.cursor()
+        
+        # Get interaction count
+        cursor.execute("SELECT COUNT(*) FROM interaction_log")
+        interaction_count = cursor.fetchone()[0]
+        
+        # Get user count
+        cursor.execute("SELECT COUNT(*) FROM users")
+        user_count = cursor.fetchone()[0]
+        
+        print(f"PostgreSQL: Connected, {user_count} users, {interaction_count} interactions")
+        
+        cursor.close()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"PostgreSQL: Error - {e}")
+        return False
+
+def monitor_loop():
+    """Main monitoring loop"""
+    while True:
+        print(f"\n=== System Status - {datetime.now()} ===")
+        
+        check_system_resources()
+        redis_ok = check_redis()
+        postgres_ok = check_postgres()
+        
+        if not redis_ok or not postgres_ok:
+            print("⚠️  Some services are down!")
+        else:
+            print("✅ All services running")
+        
+        time.sleep(30)  # Check every 30 seconds
+
+if __name__ == "__main__":
+    monitor_loop()
+Phase 6: Production Checklist
+6.1 Essential Commands
+bash# Start everything
+./scripts/deploy.sh
+
+# Monitor system
+python scripts/monitor.py
+
+# Manual LoRA training
+python -m src.training.offline_trainer
+
+# Test the API
+python test_client.py
+
+# Check logs
+docker-compose logs -f postgres
+docker-compose logs -f redis
+
+# Database backup
+pg_dump -h localhost -U samantha samantha > backup_$(date +%Y%m%d).sql
+6.2 Key Metrics to Track
+
+Latency: Sub-2 second response time
+Memory: LoRA models should use <8GB total
+Storage: Interaction log growth (~1MB per 1000 interactions)
+Training success: LoRA versions completing without errors
+User satisfaction: Average feedback scores >3.5
+
+6.3 Known Limitations & Next Steps
+
+Audio quality dependency: Poor audio = poor prosody features
+Simple personality model: MVP heuristics need improvement
+No TTS: Add speech synthesis for complete voice interface
+Single user: Scale to multi-user with proper isolation
+No authentication: Add user auth for production
+
+This gives you a complete, working MVP that demonstrates the core LinOSS + LoRA architecture. Start with this foundation and iterate based on real user feedback.
+
+
+
+
+
+Addressing The Hidden Challenges & Critical Dependencies
+1. SimpleAnalyst Technical Debt - Mitigation Strategy
+
+Immediate Action: Add telemetry to track when SimpleAnalyst predictions diverge from user feedback patterns
+Parallel Development: Start IPIP synthetic data generation pipeline immediately after MVP deployment
+Validation Pipeline: Create A/B testing framework to compare SimpleAnalyst vs IPIP-trained predictions
+Migration Path: Design SimpleAnalyst interface to be drop-in replaceable with trained IPIP model
+
+2. LinOSS Magic Numbers - Validation Approach
+
+Sanity Checks: Add logging to track if LinOSS state vectors are staying within reasonable bounds (-1 to 1)
+Manual Validation: Create visualization tools to plot relationship state evolution over conversations
+Baseline Metrics: Establish "random baseline" - does LinOSS perform better than random relationship context?
+Early Training: Use simple synthetic conversation patterns to pre-train LinOSS matrices before user data
+
+3. Training Data Bottleneck - Bootstrap Strategy
+
+Synthetic Pre-training: Generate 1000+ synthetic (user_input, ai_response, rating) pairs using GPT-4 role-playing different personality types
+Lower Threshold Initially: Start with feedback_score >= 3 until you have 50+ interactions
+Active Learning: Prompt user for feedback more aggressively in first 100 interactions
+Transfer Learning: Use personality-matched synthetic data to augment sparse real user data
+
+4. Hardware Scaling Plan
+
+Performance Benchmarks: Define clear metrics for when to upgrade (response time, coherence scores, user satisfaction)
+Staged Scaling: DialoGPT-small → DialoGPT-medium → Llama-7B → DeepSeek-8B
+Cost Management: Use smaller models during development/testing, larger models only for production interactions
+Optimization: Implement model quantization and efficient inference (vLLM) to maximize hardware utilization
+
+Additional Critical Dependencies:
+5. Audio Quality Sensitivity
+
+Mitigation: Add audio quality scoring using SNR and spectral analysis
+Fallback: Graceful degradation when prosody extraction fails
+User Education: Clear guidance on optimal recording conditions
+
+6. State Consistency Under Load
+
+Race Condition Prevention: Implement proper locking for Redis state updates
+Recovery Procedures: Automated state reconstruction from PostgreSQL when Redis fails
+Monitoring: Real-time alerts for state inconsistencies
+
+7. LoRA Version Management Complexity
+
+Rollback Testing: Automated testing of version rollbacks before deployment
+Storage Strategy: S3/object storage for LoRA files to prevent disk space issues
+Cleanup Policies: Automatic deletion of old LoRA versions after validation period
+
+The key insight: accept MVP limitations explicitly rather than pretending they don't exist. This enables proper planning for the technical debt paydown and ensures realistic expectations for initial performance.

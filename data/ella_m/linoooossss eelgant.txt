@@ -1,0 +1,129 @@
+import asyncio
+import numpy as np
+import time
+from dataclasses import dataclass
+
+@dataclass
+class LinOSSState:
+    # LinOSS requires state matrix A and input matrix B
+    state: np.ndarray = None
+    A: np.ndarray = None  # Diagonal state matrix
+    B: np.ndarray = None  # Input matrix
+    omega: float = 0.1    # Oscillation frequency
+    dt: float = 0.1       # Time step
+    threshold: float = 0.5
+
+class AutonomousLinOSS:
+    def __init__(self, state_dim=4):
+        self.state_dim = state_dim
+        self.linoss = LinOSSState()
+        
+        # Initialize LinOSS matrices
+        self.linoss.state = np.zeros(state_dim)
+        
+        # Diagonal state matrix (nonnegative as per LinOSS requirements)
+        self.linoss.A = np.diag(np.abs(np.random.normal(0, 0.1, state_dim)))
+        
+        # Input matrix 
+        self.linoss.B = np.random.normal(0, 0.1, (state_dim, 1))
+        
+        self.memory = []
+        self.last_interaction = time.time()
+        self.autonomous_interval = 30
+        
+    def step_linoss(self, input_force: float):
+        """
+        LinOSS dynamics: x(t+1) = A*x(t) + B*u(t)
+        With oscillatory behavior from complex eigenvalues
+        """
+        # Input as forcing function
+        u = np.array([[input_force]])
+        
+        # LinOSS update equation
+        self.linoss.state = self.linoss.A @ self.linoss.state + self.linoss.B @ u
+        
+        # Oscillatory component (forced harmonic oscillator)
+        oscillation = np.sin(self.linoss.omega * time.time()) * input_force
+        self.linoss.state[0] += oscillation
+        
+        # Return amplitude for threshold checking
+        return np.linalg.norm(self.linoss.state)
+    
+    def calculate_force(self, text: str) -> float:
+        # Vector comparison
+        current_vector = np.array([hash(word) % 1000 for word in text.split()[:10]])
+        if len(self.memory) > 0:
+            last_vector = self.memory[-1]
+            if len(current_vector) == len(last_vector):
+                contradiction = np.linalg.norm(current_vector - last_vector)
+                return contradiction / 1000
+        return np.random.uniform(0.1, 0.3)
+    
+    
+    async def autonomous_loop(self):
+        while True:
+            if time.time() - self.last_interaction > self.autonomous_interval:
+                # Generate output
+                output = self.generate_output()
+                
+                # Calculate forcing function
+                force = self.calculate_force(output)
+                
+                # Step LinOSS
+                amplitude = self.step_linoss(force)
+                
+                # Store if above threshold
+                if amplitude > self.linoss.threshold:
+                    self.memory.append(self.linoss.state.copy())
+                    print(f"Autonomous: {output} (amplitude: {amplitude:.2f})")
+                
+            await asyncio.sleep(5)
+    
+    def generate_output(self) -> str:
+        # Placeholder for LLM generation
+        words = ["thinking", "considering", "observing", "noticing", "wondering", "examining"]
+        return f"{np.random.choice(words)} about {len(self.memory)} previous states"
+    
+    def process_input(self, text: str) -> str:
+        self.last_interaction = time.time()
+        
+        # Calculate forcing function from input
+        force = self.calculate_force(text)
+        
+        # Step LinOSS
+        amplitude = self.step_linoss(force)
+        
+        # Store LinOSS state
+        self.memory.append(self.linoss.state.copy())
+        
+        # Generate response based on amplitude
+        response = self.generate_response(amplitude)
+        return response
+    
+    def generate_response(self, amplitude: float) -> str:
+        # Placeholder for LLM generation - amplitude affects response
+        return f"Response with amplitude {amplitude:.2f}"
+
+async def main():
+    system = AutonomousLinOSS()
+    
+    # Start autonomous loop
+    autonomous_task = asyncio.create_task(system.autonomous_loop())
+    
+    try:
+        while True:
+            user_input = input("Input: ")
+            if user_input.lower() == 'quit':
+                break
+            
+            response = system.process_input(user_input)
+            print(f"Output: {response}")
+            print(f"LinOSS state: {system.linoss.state[:2]}")  # Show first 2 dimensions
+            
+    except KeyboardInterrupt:
+        pass
+    finally:
+        autonomous_task.cancel()
+
+if __name__ == "__main__":
+    asyncio.run(main())

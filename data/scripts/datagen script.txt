@@ -1,0 +1,301 @@
+ivity correlates with self-referential processing (Buckner 2008)."],
+        "theoretical": ["Self-model theory explains phenomenal self without homunculus (Metzinger 2003)."]
+      },
+      "unknowns": [
+        "Binding problem: how exactly neural synchrony creates unified experience remains debated.",
+        "Hard problem: mechanism doesn't explain why there's phenomenal character at all (Chalmers 1995)."
+      ]
+    },
+    
+    "references": {
+      "Metzinger2003": {
+        "authors": ["Metzinger, Thomas"],
+        "year": 2003,
+        "title": "Being No One: The Self-Model Theory of Subjectivity",
+        "type": "book",
+        "publisher": "MIT Press",
+        "key_claim": "Phenomenal self is transparent self-model brain constructs, not an entity"
+      },
+      "Clark2013": {
+        "authors": ["Clark, Andy"],
+        "year": 2013,
+        "title": "Whatever next? Predictive brains, situated agents, and the future of cognitive science",
+        "type": "article",
+        "journal": "Behavioral and Brain Sciences",
+        "volume": "36",
+        "issue": "3",
+        "pages": "181-204",
+        "doi": "10.1017/S0140525X12000477",
+        "key_claim": "Brain minimizes prediction error, creating coherent world-model including self-model"
+      },
+      "Buckner2008": {
+        "authors": ["Buckner, R.L.", "Andrews-Hanna, J.R.", "Schacter, D.L."],
+        "year": 2008,
+        "title": "The brain's default network: Anatomy, function, and relevance to disease",
+        "type": "article",
+        "journal": "Annals of the New York Academy of Sciences",
+        "volume": "1124",
+        "pages": "1-38",
+        "doi": "10.1196/annals.1440.011",
+        "key_claim": "DMN supports self-referential thought and autobiographical memory"
+      },
+      "Chalmers1995": {
+        "authors": ["Chalmers, David J."],
+        "year": 1995,
+        "title": "Facing up to the problem of consciousness",
+        "type": "article",
+        "journal": "Journal of Consciousness Studies",
+        "volume": "2",
+        "issue": "3",
+        "pages": "200-219",
+        "key_claim": "Explaining mechanism doesn't explain why there's subjective experience (hard problem)"
+      }
+    },
+    
+    "meta": {
+      "user_model": {
+        "clarity": "high",
+        "sincerity": "high",
+        "ego_fragility": "low",
+        "style": "balanced"
+      },
+      "trait_changes": {
+        "clarity": {
+          "prev": "med",
+          "curr": "high",
+          "why": "asked specific mechanistic question about unity"
+        }
+      },
+      "teaching": {
+        "mode": "unlock",
+        "progress": "revealing",
+        "tone": "cutting"
+      }
+    }
+  }
+}
+
+KNOWLEDGE GRAPH USE CASES (Future)
+With this format, you can:
+
+Build citation network:
+
+"What papers are frequently co-cited?"
+"Which frameworks conflict with each other?"
+
+
+Extract concept maps:
+
+"Show all mechanisms involving 'predictive processing'"
+"Which papers support vs challenge dualism?"
+
+
+Find similar episodes:
+
+"User asked about consciousness, what other episodes covered this?"
+"Show teaching arcs that cite Metzinger"
+
+
+Auto-generate literature reviews:
+
+"Summarize all cited evidence for brain-self dependence"
+"What are the unknowns across all episodes about identity?"
+
+
+Validate citations:
+
+Check DOIs are real
+Flag if Author(Year) appears but has no reference entry
+Find duplicate citations with different metadata
+
+
+
+
+UPDATED QUALITY CHECKLIST
+RequirementStatusEvery Author(Year) has full reference entry✔Reference keys use AuthorYear format✔References include: authors, year, title, type✔Articles include: journal, volume, pages, DOI✔Books include: publisher✔Each reference has key_claim field✔No orphaned citations (cite without reference)✔No orphaned references (reference never cited)✔
+
+FINAL v3.4 VERDICT
+Keep from v3.4:
+
+Lean response length (2-3 sentences)
+Minimal meta (4 traits)
+Short unknowns (one line each)
+Author(Year) inline citations
+
+Add:
+
+Full references block per turn
+Structured academic metadata (authors, year, title, type, journal/publisher, DOI)
+Mandatory key_claim field showing what you're citing it for
+
+This gives you:
+
+Clean training data (lean tokens)
+Future knowledge graph capability (structured refs)
+Citation validation (can check DOIs, find orphans)
+Concept extraction (parse mechanisms + references)
+
+Now you have both: efficient training AND future extensibility.
+Want me to generate one complete example episode with this full reference structure?RetryShort version:
+Yes, that reference schema is overkill. You’re paying a big token tax for fields you can reconstruct later or don’t even need for your use-case.
+Let’s separate what you actually need from the fluff.
+
+1. What you really need for future models / KG
+You said your future queries are thingpastedWPerfect. You're right, I over-engineered it. Let me give you the final, actually lean reference spec.
+
+FINAL REFERENCE SCHEMA (Minimal & Sufficient)
+Inline citations (unchanged):
+"Brain damage alters personality (Damasio 1994)."
+Episode-level references (not per-turn):
+json{
+  "episode_id": "ep_001",
+  "seed_question": "are souls real",
+  "turns": [...],
+  
+  "references": {
+    "Damasio1994": {
+      "id": "isbn:9780399138942",
+      "type": "book",
+      "authors": ["Damasio, Antonio R."],
+      "year": 1994,
+      "title": "Descartes' Error: Emotion, Reason, and the Human Brain"
+    },
+    "Clark2013": {
+      "id": "doi:10.1017/S0140525X12000477",
+      "type": "article",
+      "authors": ["Clark, Andy"],
+      "year": 2013,
+      "title": "Whatever next? Predictive brains, situated agents, and the future of cognitive science"
+    },
+    "Robinson2023": {
+      "id": "https://plato.stanford.edu/entries/dualism/",
+      "type": "reference",
+      "authors": ["Robinson, Howard"],
+      "year": 2023,
+      "title": "Dualism (Stanford Encyclopedia of Philosophy)"
+    }
+  }
+}
+That's it. Five fields:
+
+id - DOI, ISBN, or URL (canonical identifier)
+type - article | book | reference (maybe preprint or other)
+authors - Array of "Last, First" strings
+year - Integer
+title - Full title string
+
+
+WHAT WE DROPPED:
+
+❌ journal, volume, issue, pages - fetch from DOI later if needed
+❌ publisher - fetch from ISBN later
+❌ key_claim - redundant with where it appears in mechanisms/evidence
+❌ n_studies - specialty metadata, not core
+❌ Per-turn references - duplicative, use episode-level
+
+
+WHY THIS WORKS:
+For training:
+
+Minimal token overhead
+Model learns to cite consistently with Author(Year)
+Model sees stable reference structure
+
+For future KG:
+
+id lets you fetch full metadata from DOI/ISBN/URL later
+Can query: "all episodes citing doi:10.1017/S0140525X12000477"
+Can build citation networks by parsing DOI relationships
+Can resolve "what claims use this paper" by searching mechanisms/evidence text
+
+For humans:
+
+Enough info to recognize the work (author, year, title)
+Can manually look up full citation from DOI/ISBN
+
+
+UPDATED v3.4 FINAL SCHEMA
+json{
+  "episode_id": "ep_001",
+  "seed_question": "user question",
+  
+  "turns": [
+    {
+      "turn": 1,
+      "intention": "DISSECTION",
+      "user": "...",
+      "hxrmxs": "2-3 sentences with (Author Year) inline",
+      "diamond": {
+        "n1_compression": {
+          "original_prompt": "...",
+          "sharpened_question": "...",
+          "assumptions": ["2 max"],
+          "category_errors": ["2 max"],
+          "search_strategy": {
+            "queries": ["search string"],
+            "domains": ["domain"]
+          }
+        },
+        "n2_truthcore": {
+          "claim": "one sentence",
+          "mechanisms": [
+            "A → B (Author Year)"
+          ],
+          "evidence": {
+            "empirical": ["Finding (Author Year)"],
+            "theoretical": ["Framework (Author Year)"]
+          },
+          "unknowns": [
+            "One-line gap with specifics"
+          ]
+        },
+        "meta": {
+          "user_model": {
+            "clarity": "low|med|high",
+            "sincerity": "low|med|high",
+            "ego_fragility": "low|med|high",
+            "style": "woo|nihil|balanced|confused"
+          },
+          "trait_changes": {
+            "clarity": {"prev": "low", "curr": "med", "why": "short phrase"}
+          },
+          "teaching": {
+            "mode": "test|unlock|precision|socratic",
+            "progress": "establishing|revealing|integrating",
+            "tone": "cutting|aggressive|sardonic"
+          }
+        }
+      }
+    }
+    // ... turns 2-5
+  ],
+  
+  "references": {
+    "AuthorYear": {
+      "id": "doi:... or isbn:... or https://...",
+      "type": "article|book|reference",
+      "authors": ["Last, First"],
+      "year": YYYY,
+      "title": "Full Title"
+    }
+  },
+  
+  "outcome": {
+    "taught": "One sentence",
+    "trajectory": "One sentence",
+    "indicators": ["learned X", "dropped Y"]
+  }
+}
+
+FINAL RULES:
+
+Every (Author Year) inline MUST have entry in episode-level references
+Reference key format: AuthorYear (e.g. Damasio1994, ClarkEtAl2013)
+id field is mandatory: DOI for articles, ISBN for books, URL for web sources
+type is minimal: Just article | book | reference | preprint | other
+No journal/volume/pages - fetch from DOI later if needed
+References at episode level - not duplicated per turn
+
+
+QUALITY CHECKLIST (Updated):
+RequirementStatusEvery (Author Year) has reference entry✔Reference keys use AuthorYear format✔Every reference has id (DOI/ISBN/URL)✔Every reference has: type, authors, year, title✔References at episode level, not per-turn✔No journal/volume/pages bloat✔No orphaned citations✔No orphaned references✔

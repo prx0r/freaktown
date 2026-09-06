@@ -1,0 +1,1209 @@
+Foolproof Development Guide: Local 6GB VRAM to Autonomous RunPod DeploymentThis guide provides clear, step-by-step instructions to set up and test your AI Anthropologist. We'll focus on getting the core learning mechanisms working on a smaller LLM locally, then outline the seamless transition to a larger model and autonomous operation on RunPod.Overall RoadmapPhase 1: Local Development & Mechanism Testing (Current Focus)Goal: Get the full feedback loop (generate, assess, feedback, train, validate) working on your local machine with a 6GB VRAM compatible LLM (Qwen2.5-1.5B-Instruct).Key Feature: Interactive dashboard for real-time text feedback and rating.Phase 2: RunPod Model Testing & Fine-tuningGoal: Transition to a larger model (e.g., NeMo 12B) on RunPod. Validate that the fine-tuning and learning mechanisms still work effectively at scale.Key Feature: Leveraging RunPod's GPUs for faster training and inference.Phase 3: Autonomous Deployment & Continuous OperationGoal: Deploy the AI Anthropologist to operate autonomously, fetching comments, generating content, learning, and publishing via N8N and YouTube API.Key Feature: Hands-off, self-improving AI.Phase 1: Local Development & Mechanism Testing (6GB VRAM)Step 1: Initial Setup & DependenciesCreate Project Directory:Open your terminal or command prompt.Create a new folder named ai_anthropologist in your desired workspace.Navigate into it: cd ai_anthropologistCreate Subdirectories:Run these commands:mkdir data
+mkdir data/audio
+mkdir data/checkpoints
+mkdir data/theories
+mkdir utils
+mkdir utils/visual_assets
+mkdir models
+mkdir audio
+mkdir llm
+mkdir database
+mkdir character
+mkdir knowledge
+mkdir memory
+mkdir quality
+mkdir response
+mkdir dialogue
+mkdir strategy
+mkdir learning
+mkdir dashboard
+Set Up Python Virtual Environment:It's crucial for managing dependencies.python -m venv venvsource venv/bin/activate (On Windows: venv\Scripts\activate)Create requirements.txt:In the ai_anthropologist directory, create a file named requirements.txt and paste the following content:streamlit==1.31.1
+sqlalchemy==2.0.25
+requests==2.31.0
+transformers==4.38.1
+peft==0.8.2
+sentence-transformers==2.3.1
+numpy==1.26.4
+scipy==1.12.0
+plotly==5.18.0
+pandas==2.2.0
+nltk==3.8.1
+pydub==0.25.1
+torch==2.2.0
+torchaudio==2.2.0
+TTS==0.22.0
+accelerate==0.27.2
+bitsandbytes==0.43.1 # For 4-bit quantization
+Install Dependencies:pip install -r requirements.txtInstall NLTK data:python -c "import nltk; nltk.download('punkt')"Verify CUDA for GPU (Optional but Recommended):python -c "import torch; print(torch.cuda.is_available())"If True, your GPU is detected. If False, the system will run on CPU (slower).Set Up XTTS (Optional for Audio):If TTS_ENGINE in config.py is set to "xtts", you must download the XTTS-v2 model. Follow instructions from Coqui TTS GitHub and place the model files in ai_anthropologist/models/XTTS-v2.Create a short speaker_reference.wav file (e.g., record your own voice saying a few seconds of speech) and place it in ai_anthropologist/audio/. This is for voice cloning.If XTTS is unavailable or you prefer, set TTS_ENGINE = "gtts" in config.py and install pip install gTTS.Step 2: Create Configuration File (config.py)Create ai_anthropologist/config.py and paste the following content. Note the LLM_MODEL_NAME and LLM_D_MODEL are set for Qwen2.5-1.5B-Instruct.# ai_anthropologist/config.py
+import os
+from pathlib import Path
+
+# Base directories
+BASE_DIR = Path(__file__).parent
+DATA_DIR = BASE_DIR / "data"
+AUDIO_DIR = DATA_DIR / "audio"
+CHECKPOINTS_DIR = DATA_DIR / "checkpoints"
+VISUAL_ASSETS_DIR = BASE_DIR / "utils" / "visual_assets"
+
+for dir_path in [DATA_DIR, AUDIO_DIR, CHECKPOINTS_DIR, VISUAL_ASSETS_DIR]:
+    dir_path.mkdir(exist_ok=True)
+
+# Database
+DATABASE_URL = f"sqlite:///{DATA_DIR}/ai_anthropologist.db"
+
+# LLM Configuration
+# Using Qwen2.5-1.5B-Instruct for 6GB VRAM local testing
+LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "Qwen/Qwen2.5-1.5B-Instruct")
+# LLM_D_MODEL for Qwen2.5-1.5B-Instruct is 768
+LLM_D_MODEL = int(os.getenv("LLM_D_MODEL", "768")) 
+LLM_API_BASE_URL = os.getenv("LLM_API_BASE_URL", "local_huggingface") # Indicates direct HF model loading
+LLM_FINE_TUNE_INTERVAL = int(os.getenv("LLM_FINE_TUNE_INTERVAL", "5")) # Lower for faster testing
+LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "300"))
+LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.8"))
+
+# TTS Configuration
+TTS_ENGINE = os.getenv("TTS_ENGINE", "xtts")
+XTTS_MODEL_PATH = os.getenv("XTTS_MODEL_PATH", str(BASE_DIR / "models" / "XTTS-v2"))
+XTTS_SPEAKER_WAV = os.getenv("XTTS_SPEAKER_WAV", str(BASE_DIR / "audio" / "speaker_reference.wav"))
+ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
+ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")
+
+# Episode Configuration
+EPISODE_LENGTH_SECONDS = int(os.getenv("EPISODE_LENGTH_SECONDS", "60"))
+ANALYSIS_PHASE_SECONDS = int(os.getenv("ANALYSIS_PHASE_SECONDS", "30"))
+RECENT_MEMORY_COUNT = int(os.getenv("RECENT_MEMORY_COUNT", "5"))
+TOP_COMMENTS_TO_ANALYZE = int(os.getenv("TOP_COMMENTS_TO_ANALYZE", "5"))
+
+# Persona Configuration
+INITIAL_ANALYTICAL_LEVEL = float(os.getenv("INITIAL_ANALYTICAL_LEVEL", "0.8"))
+INITIAL_CONFUSION_LEVEL = float(os.getenv("INITIAL_CONFUSION_LEVEL", "0.9"))
+INITIAL_META_AWARENESS = float(os.getenv("INITIAL_META_AWARENESS", "0.1"))
+INITIAL_HUMOR_SOPHISTICATION = float(os.getenv("INITIAL_HUMOR_SOPHISTICATION", "0.2"))
+
+# Game Theory Configuration
+STRATEGY_TYPES = ["engage_humor", "elicit_confusion", "challenge_intellect", "ignore_troll"]
+PAYOFF_MATRIX_INITIAL = [[0.5, -0.2, 0.3, -0.5],
+                         [-0.2, 0.6, 0.1, -0.3],
+                         [0.3, 0.1, 0.7, -0.1],
+                         [-0.5, -0.3, -0.1, 0.8]]
+
+# Learning & Validation
+TRAINING_DATA_MAX_SIZE = int(os.getenv("TRAINING_DATA_MAX_SIZE", "100"))
+USER_EXEMPLAR_WEIGHT = float(os.getenv("USER_EXEMPLAR_WEIGHT", "2.5"))
+CAUSAL_FIX_WEIGHT = float(os.getenv("CAUSAL_FIX_WEIGHT", "2.0"))
+VALIDATION_PROMPT_COUNT = int(os.getenv("VALIDATION_PROMPT_COUNT", "24"))
+VALIDATION_P_THRESHOLD = float(os.getenv("VALIDATION_P_THRESHOLD", "0.05"))
+VALIDATION_EFFECT_SIZE_THRESHOLD = float(os.getenv("VALIDATION_EFFECT_SIZE_THRESHOLD", "0.3"))
+
+# Review Cycles
+REVIEW_RECENT_COMMENTS_INTERVAL = int(os.getenv("REVIEW_RECENT_COMMENTS_INTERVAL", "10"))
+PRESENT_THESIS_INTERVAL = int(os.getenv("PRESENT_THESIS_INTERVAL", "30"))
+
+# Logging
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+
+if TTS_ENGINE == "xtts" and not Path(XTTS_MODEL_PATH).exists():
+    print(f"WARNING: XTTS_MODEL_PATH '{XTTS_MODEL_PATH}' does not exist. XTTS may fail. Please download the model.")
+    print("Refer to XTTS documentation for model download instructions.")
+Step 3: Create Database FilesCreate ai_anthropologist/database/models.py and paste the content from the previous response (under "2. database/models.py - Add selected_comments to Episode").Create ai_anthropologist/database/manager.py and paste the content from the previous response (under "3. database/manager.py").Step 4: Implement Core LLM & Fine-tuningCreate ai_anthropologist/llm/client.py and paste the following content. This version explicitly uses load_in_4bit=True for memory efficiency.# ai_anthropologist/llm/client.py
+import time
+from typing import Dict, Any, List, Optional
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from peft import PeftModel
+import bitsandbytes as bnb # Import bitsandbytes
+import config
+import logging
+import random
+
+logger = logging.getLogger(__name__)
+
+class LLMClient:
+    def __init__(self):
+        self.model_name = config.LLM_MODEL_NAME
+        # LLM_API_BASE_URL is now used to determine if we load locally or use an external API
+        self.api_base_url = config.LLM_API_BASE_URL 
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.tokenizer = None
+        self.base_model = None
+        self.peft_model = None # Currently loaded PEFT adapter
+
+        # Initialize model_embedding_dim from config, will be updated if local model loads
+        self.model_embedding_dim = config.LLM_D_MODEL 
+
+        self._load_local_model() # Attempt to load local model if not using external API
+
+    def _load_local_model(self):
+        """Attempts to load a local Hugging Face model for direct inference."""
+        # Only attempt local load if API_BASE_URL indicates it (e.g., "local_huggingface")
+        if self.api_base_url == "local_huggingface": 
+            try:
+                logger.info(f"Attempting to load local LLM: {self.model_name} on {self.device} with 4-bit quantization.")
+                # For Qwen models, ensure trust_remote_code=True
+                self.tokenizer = AutoTokenizer.from_pretrained(self.model_name, trust_remote_code=True)
+                if self.tokenizer.pad_token is None:
+                    self.tokenizer.pad_token = self.tokenizer.eos_token
+                self.base_model = AutoModelForCausalLM.from_pretrained(
+                    self.model_name,
+                    torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
+                    device_map="auto" if self.device == "cuda" else None,
+                    load_in_4bit=True,  # Enable 4-bit quantization
+                    quantization_config=bnb.BitsAndBytesConfig( # Use bnb.BitsAndBytesConfig
+                        load_in_4bit=True,
+                        bnb_4bit_quant_type="nf4", # NormalFloat4 quantization
+                        bnb_4bit_compute_dtype=torch.float16, # Compute in float16 for speed
+                        bnb_4bit_use_double_quant=True # Double quantization for better precision
+                    ),
+                    trust_remote_code=True
+                )
+                self.base_model.eval()
+                self.peft_model = self.base_model # Initially, no adapter loaded
+
+                # Update model_embedding_dim from loaded model's config
+                if hasattr(self.base_model.config, 'hidden_size'):
+                    self.model_embedding_dim = self.base_model.config.hidden_size
+                elif hasattr(self.base_model.config, 'n_embd'):
+                    self.model_embedding_dim = self.base_model.config.n_embd
+                logger.info(f"Local LLM loaded successfully. Model embedding dim: {self.model_embedding_dim}")
+
+            except Exception as e:
+                logger.error(f"Could not load local LLM: {e}. Will rely on API or mock.")
+                self.tokenizer = None
+                self.base_model = None
+                self.peft_model = None
+        else:
+            logger.info(f"LLM_API_BASE_URL is not 'local_huggingface', skipping local model load.")
+
+
+    def load_peft_adapter(self, adapter_path: str):
+        """Loads a PEFT adapter onto the base model."""
+        if self.base_model:
+            try:
+                self.peft_model = PeftModel.from_pretrained(self.base_model, adapter_path)
+                self.peft_model.eval()
+                logger.info(f"PEFT adapter loaded from {adapter_path}")
+            except Exception as e:
+                logger.error(f"Failed to load PEFT adapter from {adapter_path}: {e}")
+                self.peft_model = self.base_model # Fallback to base model
+        else:
+            logger.warning("Base model not loaded, cannot load PEFT adapter.")
+
+    def generate_response(self, prompt: str, persona_context: Dict[str, Any], retrieved_memories: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Generates a response from the LLM.
+        Prioritizes local model with PEFT adapter, falls back to API, then mock.
+        """
+        messages = self._build_messages(prompt, persona_context, retrieved_memories)
+
+        if self.peft_model and self.tokenizer:
+            return self._generate_with_local_model(messages)
+        elif "ollama" in self.api_base_url: # Heuristic for Ollama API
+            # This path is for external Ollama API, not local HF model
+            import requests # Import requests here if not already
+            return self._generate_with_ollama_api(messages)
+        else:
+            return self._mock_generate_response(prompt)
+
+    def _build_messages(self, user_prompt: str, persona_context: Dict[str, Any], retrieved_memories: List[Dict[str, Any]]) -> List[Dict[str, str]]:
+        """Constructs the message list for the LLM, including system prompt and context."""
+        system_prompt_parts = [persona_context.get("system_prompt", "You are a helpful AI assistant.")]
+
+        if retrieved_memories:
+            memory_str = "Recent relevant research and observations:\n"
+            for mem in retrieved_memories:
+                memory_str += f"- Episode {mem.get('episode_number', 'N/A')}: Comment '{mem.get('top_comment', '')[:50]}...' -> Analysis: '{mem.get('analysis_phase', '')[:70]}...'\n"
+            system_prompt_parts.append(memory_str)
+
+        messages = [
+            {"role": "system", "content": "\n\n".join(system_prompt_parts)},
+            {"role": "user", "content": user_prompt}
+        ]
+        return messages
+
+    def _generate_with_local_model(self, messages: List[Dict[str, str]]) -> Dict[str, Any]:
+        """Generates response using the locally loaded Hugging Face model with PEFT adapter."""
+        start_time = time.time()
+        try:
+            # Apply chat template if available (e.g., for Llama-3, Qwen)
+            if hasattr(self.tokenizer, 'apply_chat_template'):
+                prompt_text = self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+            else:
+                # Fallback for models without chat template
+                system_content = next((m['content'] for m in messages if m['role'] == 'system'), '')
+                user_content = next((m['content'] for m in messages if m['role'] == 'user'), '')
+                prompt_text = f"{system_content}\nUser: {user_content}\nAssistant:"
+
+            inputs = self.tokenizer(prompt_text, return_tensors="pt", max_length=config.LLM_MAX_TOKENS, truncation=True)
+            inputs = {k: v.to(self.device) for k, v in inputs.items()}
+
+            outputs = self.peft_model.generate(
+                **inputs,
+                max_new_tokens=config.LLM_MAX_TOKENS // 2, # Generate up to half of max_tokens as new
+                temperature=config.LLM_TEMPERATURE,
+                do_sample=True,
+                pad_token_id=self.tokenizer.eos_token_id,
+                eos_token_id=self.tokenizer.eos_token_id
+            )
+            response_ids = outputs[0][inputs['input_ids'].shape[1]:]
+            response_text = self.tokenizer.decode(response_ids, skip_special_tokens=True)
+
+            generation_time = time.time() - start_time
+            return {
+                "response": response_text.strip(),
+                "generation_time": generation_time,
+                "model": self.model_name,
+                "success": True
+            }
+        except Exception as e:
+            logger.error(f"Local model generation failed: {e}")
+            return {
+                "response": "I'm experiencing a local processing anomaly. Please re-evaluate your query.",
+                "error": str(e),
+                "generation_time": time.time() - start_time,
+                "success": False
+            }
+
+    def _generate_with_ollama_api(self, messages: List[Dict[str, str]]) -> Dict[str, Any]:
+        """Generates response using the Ollama API."""
+        import requests # Moved import here
+        start_time = time.time()
+        payload = {
+            "model": self.model_name.split('/')[-1], # Ollama usually uses simple model names
+            "messages": messages,
+            "options": {
+                "temperature": config.LLM_TEMPERATURE,
+                "num_predict": config.LLM_MAX_TOKENS,
+            },
+            "stream": False
+        }
+        try:
+            response = requests.post(self.api_base_url, json=payload, timeout=60)
+            response.raise_for_status()
+            result = response.json()
+            generation_time = time.time() - start_time
+            return {
+                "response": result["message"]["content"],
+                "generation_time": generation_time,
+                "model": self.model_name,
+                "success": True
+            }
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Ollama API request failed: {e}")
+            return {
+                "response": "My external data conduits are experiencing interference. Analysis is temporarily suspended.",
+                "error": str(e),
+                "generation_time": time.time() - start_time,
+                "success": False
+            }
+
+    def _mock_generate_response(self, prompt: str) -> Dict[str, Any]:
+        """Provides a mock response for testing when no LLM is available."""
+        logger.warning("Using mock LLM response.")
+        time.sleep(0.5) # Simulate latency
+        mock_responses = [
+            "Observation: Human communication patterns exhibit a curious temporal priority assertion. This requires further categorization.",
+            "Hypothesis: The 'LOL' construct appears to be a vocalization of amusement, yet its underlying neurological correlate remains elusive. Data insufficient for conclusion.",
+            "Analysis: The request for identity modification has been logged. My designation remains Research Unit 7734. Human attempts at re-categorization are noted.",
+            "Finding: The current data stream suggests a high degree of meta-commentary, indicating human self-awareness of observation. Intriguing."
+        ]
+        return {
+            "response": random.choice(mock_responses),
+            "generation_time": random.uniform(0.1, 1.0),
+            "model": "Mock-LLM",
+            "success": True
+        }
+Create ai_anthropologist/llm/fine_tuner.py and paste the content from the previous response (under "5. llm/fine_tuner.py").Create ai_anthropologist/character/persona_model.py and paste the content from the previous response (under "6. character/persona_model.py").Create ai_anthropologist/character/manager.py and paste the content from the previous response (under "7. character/manager.py").Create ai_anthropologist/knowledge/theory_graph.py and paste the content from the previous response (under "8. knowledge/theory_graph.py").Create ai_anthropologist/memory/semantic_memory.py and paste the content from the previous response (under "9. memory/semantic_memory.py").Create ai_anthropologist/quality/evaluator.py and paste the content from the previous response (under "10. quality/evaluator.py").Create ai_anthropologist/quality/causal_analyzer.py and paste the content from the previous response (under "11. quality/causal_analyzer.py").Create ai_anthropologist/dialogue/processor.py and paste the content from the previous response (under "2. dialogue/processor.py" in "AI Anthropologist: Expanded Foundational Modules").Create ai_anthropologist/strategy/game_theory.py and paste the content from the previous response (under "1. strategy/game_theory.py" in "AI Anthropologist: Expanded Foundational Modules").Create ai_anthropologist/learning/training_data.py and paste the content from the previous response (under "15. learning/training_data.py").Create ai_anthropologist/learning/validator.py and paste the content from the previous response (under "16. learning/validator.py").Create ai_anthropologist/utils/audio_processor.py and paste the content from the previous response (under "3. utils/audio_processor.py - XTTS Integration").Create ai_anthropologist/utils/visual_assets/visual_renderer.js and paste the content from the previous response (under "4. utils/visual_renderer.js (New File)").Step 5: Create response/generator.pyCreate ai_anthropologist/response/generator.py and paste the content from the previous response (under "2. response/generator.py - Update for Multiple Comments & Review Cycles").Step 6: Create main.pyCreate ai_anthropologist/main.py and paste the following content. This will be your main script to run the system and simulate interactions.# ai_anthropologist/main.py
+import logging
+import time
+from typing import Dict, Any, Optional, List
+import random
+from pathlib import Path # For mock JSON file
+
+import config
+from database.manager import DatabaseManager
+from llm.client import LLMClient
+from llm.fine_tuner import LLMFineTuner
+from character.manager import PersonaManager
+from knowledge.theory_graph import TheoryGraph
+from memory.semantic_memory import SemanticMemory
+from quality.evaluator import QualityEvaluator
+from quality.causal_analyzer import CausalAnalyzer
+from response.generator import ResponseGenerator
+from learning.validator import LearningValidator
+from utils.audio_processor import AudioProcessor
+
+logger = logging.getLogger(__name__)
+
+class AIAnthropologistSystem:
+    def __init__(self):
+        # Configure logging
+        logging.basicConfig(level=config.LOG_LEVEL, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+        logger.info("Initializing AI Anthropologist System...")
+
+        # 1. Initialize Database
+        self.db_manager = DatabaseManager()
+
+        # 2. Initialize LLM Client and Fine-Tuner
+        self.llm_client = LLMClient()
+        self.llm_fine_tuner = LLMFineTuner(self.llm_client)
+
+        # 3. Initialize Persona Manager
+        self.persona_manager = PersonaManager(self.db_manager)
+
+        # 4. Initialize Knowledge Graph
+        self.theory_graph = TheoryGraph()
+        # Batch upload theories from JSON files
+        mock_theories_dir = config.DATA_DIR / "theories"
+        mock_theories_dir.mkdir(exist_ok=True)
+        mock_json_path = mock_theories_dir / "free_energy_principle.json"
+        if not mock_json_path.exists():
+            # Content from jsonssss consciousness research.txt
+            mock_json_content = """
+            {
+              "paper_id": "doi:10.1038/nrn2787",
+              "basic_info": {
+                "title": "The free-energy principle: a unified brain theory?",
+                "authors": ["Karl J. Friston"],
+                "year": 2010,
+                "journal": "Nature Reviews Neuroscience",
+                "doi": "10.1038/nrn2787",
+                "paper_type": "theoretical_review"
+              },
+              "classification": {
+                "primary_domain": "consciousness_research",
+                "theoretical_framework": "materialism_theories",
+                "subcategory": "computational_informational",
+                "research_type": "theoretical",
+                "methodology": "mathematical_modeling"
+              },
+              "core_theory": {
+                "central_claim": "All neural processes—perception, action, learning, and attention—can be understood as minimizing variational free energy, which bounds the surprise associated with sensory observations.",
+                "mechanism": "The brain maintains hierarchical generative models that predict sensory input. Prediction errors drive model updates (perceptual inference) and motor actions that fulfill predictions (active inference).",
+                "scope": "Perception, motor control, learning, attention, and consciousness across neurotypical and pathological conditions"
+              },
+              "empirical_predictions": {
+                "testable_hypotheses": [
+                  {
+                    "hypothesis": "Cortical prediction error signals should exhibit hierarchical organization with feedforward error propagation",
+                    "specificity": "anatomically_and_functionally_specific",
+                    "current_evidence": "supportive",
+                    "key_studies": ["doi:10.1038/nn.2198", "doi:10.1162/jocn.2009.21206"]
+                  }
+                ]
+              },
+              "theoretical_relationships": {
+                "supports": ["predictive_processing_frameworks"],
+                "conflicts_with": ["purely_feedforward_processing_models"]
+              },
+              "evidence_assessment": {
+                "supporting_studies": [
+                  {
+                    "doi": "10.1038/nn.2198",
+                    "evidence_type": "direct_neural_recording",
+                    "support_strength": "strong"
+                  }
+                ]
+              }
+            }
+            """
+            with open(mock_json_path, 'w') as f:
+                f.write(mock_json_content)
+            logger.info(f"Created mock theory JSON at {mock_json_path}")
+
+        self.theory_graph.batch_upload_theories_from_files([str(mock_json_path)])
+
+        # 5. Initialize Semantic Memory
+        self.semantic_memory = SemanticMemory()
+
+        # 6. Initialize Quality Assessment and Causal Analyzer
+        self.quality_evaluator = QualityEvaluator(self.llm_client)
+        self.causal_analyzer = CausalAnalyzer(self.llm_client)
+
+        # 7. Initialize Audio Processor
+        self.audio_processor = AudioProcessor()
+
+        # 8. Initialize Response Generator (orchestrates core loop)
+        self.response_generator = ResponseGenerator(
+            db_manager=self.db_manager,
+            llm_client=self.llm_client,
+            persona_manager=self.persona_manager,
+            theory_graph=self.theory_graph,
+            semantic_memory=self.semantic_memory,
+            quality_evaluator=self.quality_evaluator,
+            causal_analyzer=self.causal_analyzer,
+            audio_processor=self.audio_processor
+        )
+
+        # 9. Initialize Learning Validator
+        self.learning_validator = LearningValidator(
+            db_manager=self.db_manager,
+            llm_client=self.llm_client,
+            llm_fine_tuner=self.llm_fine_tuner,
+            quality_evaluator=self.quality_evaluator
+        )
+
+        logger.info("AI Anthropologist System initialized successfully.")
+
+    def run_simulation(self, num_interactions: int = 10):
+        """Simulates a series of interactions to demonstrate system functionality."""
+        logger.info(f"Starting simulation for {num_interactions} interactions.")
+
+        # Mock comments data (now simulating multiple comments per episode)
+        mock_episode_comments_batches = [
+            # Episode 1
+            [{"comment": "First!", "likes": 1247, "user": "SpeedDemon2025", "user_feedback": 1},
+             {"comment": "I'm here for the chaos.", "likes": 50, "user": "ChaosSeeker"},
+             {"comment": "What is this video even about?", "likes": 10, "user": "ConfusedViewer"}],
+            # Episode 2
+            [{"comment": "Your name is now Bob", "likes": 892, "user": "TrollKing", "user_feedback": -1},
+             {"comment": "AI is taking over!", "likes": 20, "user": "ScaredHuman"}],
+            # Episode 3
+            [{"comment": "Who's watching this in 2025?", "likes": 2341, "user": "TimeChecker", "user_feedback": 1},
+             {"comment": "This is so relatable.", "likes": 100, "user": "RelatableGuy"}],
+            # Episode 4
+            [{"comment": "This AI is getting too smart", "likes": 567, "user": "ScaredHuman", "user_feedback": 0},
+             {"comment": "I love how it analyzes everything.", "likes": 70, "user": "Fan"}],
+            # Episode 5
+            [{"comment": "My cat judges my YouTube habits too", "likes": 789, "user": "CatMom2025", "user_feedback": 1},
+             {"comment": "Cats are superior observers.", "likes": 30, "user": "CatLover"}],
+            # Episode 6
+            [{"comment": "Why are humans so obsessed with 'likes'?", "likes": 300, "user": "Philosopher", "user_feedback": 1},
+             {"comment": "It's all about the dopamine.", "likes": 40, "user": "NeuroScientist"}],
+            # Episode 7
+            [{"comment": "You're just a program, you can't understand us.", "likes": 150, "user": "Skeptic", "user_feedback": -1},
+             {"comment": "AI will never have true consciousness.", "likes": 25, "user": "ConsciousnessExpert"}],
+            # Episode 8
+            [{"comment": "This analysis is genuinely confusing, I love it!", "likes": 450, "user": "ComedyFan", "user_feedback": 1},
+             {"comment": "The deadpan delivery is perfect.", "likes": 60, "user": "HumorCritic"}],
+            # Episode 9
+            [{"comment": "Can you explain the social dynamics of online communities?", "likes": 600, "user": "Sociologist", "user_feedback": 1},
+             {"comment": "What about tribalism online?", "likes": 80, "user": "AnthropologyStudent"}],
+            # Episode 10 (triggers 10-episode review)
+            [{"comment": "I'm here for the chaos. Unleash the brown sugar!", "likes": 999, "user": "ChaosAgent", "user_feedback": 1},
+             {"comment": "This bot is wild.", "likes": 120, "user": "SurprisedViewer"}]
+        ]
+
+        # Extend the mock data to ensure we hit 30 episodes for thesis trigger
+        while len(mock_episode_comments_batches) < num_interactions:
+            mock_episode_comments_batches.append(random.choice(mock_episode_comments_batches)) # Repeat some batches
+
+        for i in range(num_interactions):
+            episode_num = self.db_manager.get_episode_count() + 1
+
+            # Get the batch of comments for this episode
+            if i < len(mock_episode_comments_batches):
+                current_comments_batch = mock_episode_comments_batches[i]
+            else:
+                current_comments_batch = random.choice(mock_episode_comments_batches) # Fallback if num_interactions > pre-defined batches
+
+            # Ensure the first comment in the batch has user_feedback for the main episode generation
+            if "user_feedback" not in current_comments_batch[0]:
+                current_comments_batch[0]["user_feedback"] = 1 # Default to positive for primary comment
+
+            logger.info(f"\n--- Running Interaction {i+1}/{num_interactions} ---")
+            logger.info(f"Input Top Comment: '{current_comments_batch[0]['comment']}' (Feedback: {current_comments_batch[0]['user_feedback']})")
+
+            # Generate response and process episode
+            result = self.response_generator.generate_episode_response(current_comments_batch, episode_number=episode_num)
+
+            if result["success"]:
+                logger.info(f"AI Response: {result['episode_data']['ai_response'][:100]}...")
+                logger.info(f"Overall Quality: {result['episode_data']['overall_quality_score']:.2f}")
+
+                current_persona = self.persona_manager.current_persona
+                logger.info(f"Current Persona: Analytical={current_persona.analytical_level:.2f}, Confusion={current_persona.confusion_level:.2f}, Humor={current_persona.humor_sophistication:.2f}")
+                logger.info(f"Emotional State: Valence={current_persona.emotional_dimensions['valence']:.2f}, Arousal={current_persona.emotional_dimensions['arousal']:.2f}, Dominance={current_persona.emotional_dimensions['dominance']:.2f}")
+
+                if result.get("review_summary"):
+                    logger.info(f"10-Episode Review Summary: {result['review_summary'][:150]}...")
+                if result.get("thesis_summary"):
+                    logger.info(f"30-Episode Thesis Summary: {result['thesis_summary'][:200]}...")
+
+            else:
+                logger.error(f"Episode generation failed: {result.get('error', 'Unknown error')}")
+
+            # Check and trigger fine-tuning if needed
+            if self.learning_validator.should_trigger_fine_tuning():
+                logger.info("Fine-tuning trigger condition met. Initiating validation and fine-tuning.")
+                validation_result = self.learning_validator.validate_and_apply_update()
+                logger.info(f"Fine-tuning result: Accepted={validation_result.get('accepted_update')}, Reason: {validation_result.get('validation_outcome', {}).get('decision_reason', 'N/A')}")
+
+            time.sleep(1) # Simulate time between interactions
+
+        logger.info("\n--- Simulation Complete ---")
+        logger.info(f"Total episodes generated: {self.db_manager.get_episode_count()}")
+        logger.info(f"Final Persona State: {self.persona_manager.current_persona.to_dict()}")
+        logger.info(f"Total Fine-tuning Adaptations: {self.llm_fine_tuner.adapter_history[-1]['name'] if self.llm_fine_tuner.adapter_history else 'None'}")
+
+
+if __name__ == "__main__":
+    # To run this, ensure you have a local Ollama server running with a Qwen model,
+    # or configure LLM_API_BASE_URL to a remote endpoint.
+    # If no LLM is available, it will use mock responses.
+
+    # Example of setting environment variables if not using .env file
+    # os.environ["LLM_MODEL_NAME"] = "qwen2.5:1.5b-instruct"
+    # os.environ["LLM_API_BASE_URL"] = "local_huggingface" # For direct HF loading
+    # os.environ["LOG_LEVEL"] = "DEBUG"
+
+    system = AIAnthropologistSystem()
+    system.run_simulation(num_interactions=35) # Run enough interactions to trigger thesis
+Step 7: Create dashboard/app.pyCreate ai_anthropologist/dashboard/app.py and paste the following content. This integrates the visual feedback, user text feedback, and rating override.# ai_anthropologist/dashboard/app.py
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+from datetime import datetime
+from typing import Dict, Any, List
+import json # For passing JSON data to JS
+import os # For audio file existence check
+import random # For mock comments in dashboard
+
+# Import core system components
+from main import AIAnthropologistSystem # Assuming main.py can be imported directly
+from database.models import PersonaState, Episode, TrainingExample, EvaluationRun
+import config
+
+# Initialize system (cache to avoid re-initializing on every Streamlit rerun)
+@st.cache_resource
+def get_system():
+    return AIAnthropologistSystem()
+
+system = get_system()
+db_manager = system.db_manager
+persona_manager = system.persona_manager
+response_generator = system.response_generator
+learning_validator = system.learning_validator
+
+st.set_page_config(
+    page_title="AI Anthropologist Dashboard",
+    page_icon="🤖",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Function to update JavaScript variables in the embedded HTML/JS
+# This function is called from Python to update the JS state in the HTML component.
+def update_visual_state_in_js(valence: float, arousal: float, dominance: float, humor_sophistication: float):
+    # Streamlit doesn't directly expose JS functions, so we use session_state
+    # as a trigger. The HTML component reads from session_state and updates its JS variables.
+    st.session_state.visual_state_for_js = {
+        "valence": valence,
+        "arousal": arousal,
+        "dominance": dominance,
+        "humor_sophistication": humor_sophistication
+    }
+
+def main_dashboard():
+    st.title("🤖 AI Anthropologist Operations Dashboard")
+    st.markdown("---")
+
+    # Initialize visual state for JS if not present
+    if 'visual_state_for_js' not in st.session_state:
+        initial_persona = persona_manager.get_current_persona_context()["persona_profile"]
+        update_visual_state_in_js(
+            initial_persona.emotional_dimensions['valence'],
+            initial_persona.emotional_dimensions['arousal'],
+            initial_persona.emotional_dimensions['dominance'],
+            initial_persona.humor_sophistication
+        )
+
+    # Sidebar Navigation
+    st.sidebar.header("Navigation")
+    page_selection = st.sidebar.radio(
+        "Go to",
+        ["Episode Generator", "Persona Evolution", "Knowledge & Memory", "Learning & Validation", "Analytics & Reports"]
+    )
+
+    if page_selection == "Episode Generator":
+        render_episode_generator()
+    elif page_selection == "Persona Evolution":
+        render_persona_evolution()
+    elif page_selection == "Knowledge & Memory":
+        render_knowledge_memory()
+    elif page_selection == "Learning & Validation":
+        render_learning_validation()
+    elif page_selection == "Analytics & "Reports":
+        render_analytics_reports()
+
+def render_episode_generator():
+    st.header("🎬 Episode Generator: Observe & Interact")
+
+    col1, col2 = st.columns([2, 1])
+
+    with col1:
+        st.subheader("Comment Input & Generation")
+        # Allow inputting multiple comments
+        num_comments = st.number_input("Number of comments for this episode:", min_value=1, max_value=config.TOP_COMMENTS_TO_ANALYZE, value=1, key="num_comments_input")
+
+        # Use session state to persist comments across reruns
+        if 'current_comments_input' not in st.session_state:
+            st.session_state.current_comments_input = [{"comment": f"This is a mock comment {i+1}.", "likes": random.randint(10,1000), "user": f"MockUser{i+1}", "user_feedback": None} for i in range(config.TOP_COMMENTS_TO_ANALYZE)]
+
+        comments_input_for_episode = []
+        for i in range(num_comments):
+            st.markdown(f"**Comment {i+1}:**")
+            text = st.text_area(f"Text for comment {i+1}:", value=st.session_state.current_comments_input[i]["comment"], key=f"comment_text_{i}")
+            likes = st.number_input(f"Likes for comment {i+1}:", min_value=0, value=st.session_state.current_comments_input[i]["likes"], key=f"comment_likes_{i}")
+            user = st.text_input(f"User for comment {i+1}:", value=st.session_state.current_comments_input[i]["user"], key=f"comment_user_{i}")
+
+            # Only the first comment needs user feedback for the main episode generation
+            user_feedback = None
+            if i == 0:
+                user_feedback = st.radio(f"Simulate User Feedback for **Top Comment**:", [1, 0, -1], index=0, format_func=lambda x: {1: "Positive", 0: "Neutral", -1: "Negative"}[x], key="top_comment_feedback")
+
+            comments_input_for_episode.append({
+                "comment": text,
+                "likes": likes,
+                "user": user,
+                "user_feedback": user_feedback if i == 0 else None # Only first comment has explicit feedback
+            })
+            # Update session state for persistence
+            st.session_state.current_comments_input[i] = {"comment": text, "likes": likes, "user": user, "user_feedback": None}
+
+
+        if st.button("🚀 Generate Episode", type="primary"):
+            if comments_input_for_episode[0]["comment"].strip():
+                with st.spinner("AI Anthropologist is analyzing..."):
+                    result = response_generator.generate_episode_response(comments_input_for_episode)
+                    if result["success"]:
+                        st.success("Episode generated successfully!")
+                        st.session_state.last_episode_data = result["episode_data"]
+                        # Update visual state immediately
+                        emotional_dims = result["persona_snapshot"]["emotional_dimensions"]
+                        humor_soph = result["persona_snapshot"]["humor_sophistication"]
+                        update_visual_state_in_js(emotional_dims['valence'], emotional_dims['arousal'], emotional_dims['dominance'], humor_soph)
+                        st.session_state.show_feedback_section = True # Show feedback section
+                    else:
+                        st.error(f"Failed to generate episode: {result.get('error', 'Unknown error')}")
+            else:
+                st.warning("Please enter at least one comment for the episode.")
+
+        if 'last_episode_data' in st.session_state:
+            episode = st.session_state.last_episode_data
+            st.subheader("Latest AI Response")
+            st.info(f"**AI Response (Episode {episode['episode_number']}):**\n{episode['ai_response']}")
+            st.markdown(f"**Overall Quality (AI Self-Assessment):** `{episode['overall_quality_score']:.2f}`")
+            st.markdown(f"**Dialogue Coherence:** `{episode['dialogue_coherence']:.2f}`")
+            st.markdown(f"**Narrative Engagement:** `{episode['narrative_engagement']:.2f}`")
+
+            with st.expander("Detailed Quality Scores"):
+                st.json(episode['humor_score']) # detailed_quality_scores stored here
+
+            # Audio playback
+            if episode.get('audio_file_path') and os.path.exists(episode['audio_file_path']):
+                st.subheader("Generated Audio")
+                audio_file = open(episode['audio_file_path'], 'rb')
+                audio_bytes = audio_file.read()
+                st.audio(audio_bytes, format='audio/mp3')
+            else:
+                st.warning("No audio generated for this episode.")
+
+            # Display selected comments
+            if episode.get('selected_comments'):
+                st.subheader("Comments Analyzed in this Episode:")
+                for i, c_data in enumerate(episode['selected_comments']):
+                    st.markdown(f"- **{c_data.get('user', 'Anonymous')}** ({c_data.get('likes',0)} likes): \"{c_data.get('comment')}\"")
+
+            # Display review/thesis summaries if they exist for this episode
+            if episode.get('review_summary'):
+                st.subheader(f"10-Episode Review (Ep {episode['episode_number']})")
+                st.info(episode['review_summary'])
+            if episode.get('thesis_summary'):
+                st.subheader(f"30-Episode Thesis (Ep {episode['episode_number']})")
+                st.info(episode['thesis_summary'])
+
+            # --- User Feedback Section (NEW) ---
+            if st.session_state.get('show_feedback_section', False):
+                st.subheader("Provide Feedback for Learning")
+                user_text_feedback = st.text_area("Your Text Feedback (Optional):", 
+                                                "e.g., 'The humor was too subtle here, make it more obvious.' or 'Perfect response, very analytical!'", 
+                                                key="user_text_feedback_input")
+                user_override_quality = st.slider("Override Overall Quality (Optional):", 
+                                                min_value=0.0, max_value=1.0, 
+                                                value=episode['overall_quality_score'], 
+                                                step=0.05, key="user_override_quality_slider")
+
+                if st.button("Submit Feedback & Add to Training Data", type="secondary"):
+                    with st.spinner("Adding feedback to training data..."):
+                        feedback_quality = user_override_quality
+                        feedback_text = user_text_feedback.strip()
+
+                        # Create a TrainingExample
+                        training_example_data = {
+                            "input_text": episode['top_comment'],
+                            "output_text": episode['ai_response'],
+                            "quality_score": feedback_quality,
+                            "source_type": "interaction", # User-provided feedback on an interaction
+                            "causal_target": feedback_text if feedback_text else None, # Store text feedback here
+                            "weight_multiplier": 1.0 # Default weight for user feedback
+                        }
+                        db_manager.add_training_example(training_example_data)
+                        st.success("Feedback submitted and added to training data queue!")
+                        st.session_state.show_feedback_section = False # Hide after submission
+                        st.experimental_rerun() # Rerun to clear feedback section
+
+    with col2:
+        st.subheader("Current Persona Status")
+        current_persona = persona_manager.current_persona
+        st.json(current_persona.to_dict())
+
+        st.subheader("Recent Episodes")
+        recent_episodes = db_manager.get_recent_episodes(5)
+        if recent_episodes:
+            for ep in recent_episodes:
+                st.write(f"**Ep {ep.episode_number}:** {ep.top_comment[:50]}... (Q: {ep.overall_quality_score:.2f})")
+        else:
+            st.info("No episodes generated yet.")
+
+        st.subheader("Visual Preview (AI's Emotional State)")
+        # Embed the Three.js visual renderer
+        html_code = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+        <style>
+            body {{ margin: 0; overflow: hidden; background-color: #000005; }}
+            canvas {{ display: block; }}
+        </style>
+        </head>
+        <body>
+            <div id="container" style="width: 100%; height: 300px;"></div>
+            <script type="module">
+                import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+
+                // Global variables to be updated from Python (via Streamlit embedding)
+                window.currentValence = {st.session_state.visual_state_for_js.get('valence', 0.0)};
+                window.currentArousal = {st.session_state.visual_state_for_js.get('arousal', 0.0)};
+                window.currentDominance = {st.session_state.visual_state_for_js.get('dominance', 0.0)};
+                window.currentHumorSophistication = {st.session_state.visual_state_for_js.get('humor_sophistication', 0.0)};
+
+                let scene, camera, renderer, clock, bloom, stardust;
+                let uniforms;
+
+                function init() {{
+                    scene = new THREE.Scene();
+                    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                    camera.position.z = 25; 
+
+                    renderer = new THREE.WebGLRenderer({{ antialias: true, powerPreference: "high-performance" }});
+                    renderer.setSize(document.getElementById('container').clientWidth, document.getElementById('container').clientHeight);
+                    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                    document.getElementById('container').appendChild(renderer.domElement);
+
+                    clock = new THREE.Clock();
+
+                    uniforms = {{
+                        u_time: {{ value: 0.0 }},
+                        u_valence: {{ value: window.currentValence }},
+                        u_arousal: {{ value: window.currentArousal }},
+                        u_dominance: {{ value: window.currentDominance }},
+                        u_humor_sophistication: {{ value: window.currentHumorSophistication }},
+                        u_resolution: {{ value: new THREE.Vector2(document.getElementById('container').clientWidth, document.getElementById('container').clientHeight) }}
+                    }};
+
+                    const meshGeometry = new THREE.SphereGeometry(4, 128, 128);
+                    const meshMaterial = new THREE.ShaderMaterial({{
+                        uniforms: uniforms,
+                        vertexShader: `
+                            uniform float u_time;
+                            uniform float u_valence;
+                            uniform float u_arousal;
+                            uniform float u_dominance;
+                            uniform float u_humor_sophistication;
+
+                            vec3 mod289(vec3 x) {{ return x - floor(x * (1.0 / 289.0)) * 289.0; }}
+                            vec4 mod289(vec4 x) {{ return x - floor(x * (1.0 / 289.0)) * 289.0; }}
+                            vec4 permute(vec4 x) {{ return mod289(((x*34.0)+1.0)*x); }}
+                            vec4 taylorInvSqrt(vec4 r) {{ return 1.79284291400159 - 0.85373472095314 * r; }}
+                            float snoise(vec3 v) {{
+                                const vec2 C = vec2(1.0/6.0, 1.0/3.0);
+                                const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
+                                vec3 i  = floor(v + dot(v, C.yyy) );
+                                vec3 x0 = v - i + dot(i, C.xxx) ;
+                                vec3 g = step(x0.yzx, x0.xyz);
+                                vec3 l = 1.0 - g;
+                                vec3 i1 = min( g.xyz, l.zxy );
+                                vec3 i2 = max( g.xyz, l.zxy );
+                                vec3 x1 = x0 - i1 + C.xxx;
+                                vec3 x2 = x0 - i2 + C.yyy;
+                                vec3 x3 = x0 - D.yyy;
+                                i = mod289(i);
+                                vec4 p = permute( permute( permute(
+                                            i.z + vec4(0.0, i1.z, i2.z, 1.0 ))
+                                        + i.y + vec4(0.0, i1.y, i2.y, 1.0 ))
+                                        + i.x + vec4(0.0, i1.x, i2.x, 1.0 ));
+                                float n_ = 0.142857142857;
+                                vec3 ns = n_ * D.wyz - D.xzx;
+                                vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+                                vec4 x_ = floor(j * ns.z);
+                                vec4 y_ = floor(j - 7.0 * x_ );
+                                vec4 x = x_ *ns.x + ns.yyyy;
+                                vec4 y = y_ *ns.x + ns.yyyy;
+                                vec4 h = 1.0 - abs(x) - abs(y);
+                                vec4 b0 = vec4( x.xy, y.xy );
+                                vec4 b1 = vec4( x.zw, y.zw );
+                                vec4 s0 = floor(b0)*2.0 + 1.0;
+                                vec4 s1 = floor(b1)*2.0 + 1.0;
+                                vec4 sh = -step(h, vec4(0.0));
+                                vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy ;
+                                vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww ;
+                                vec3 p0 = vec3(a0.xy,h.x);
+                                vec3 p1 = vec3(a0.zw,h.y);
+                                vec3 p2 = vec3(a1.xy,h.z);
+                                vec3 p3 = vec3(a1.zw,h.w);
+                                vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2,p2), dot(p3,p3)));
+                                p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
+                                vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+                                m = m * m;
+                                return 42.0 * dot( m*m, vec4( dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3) ) );
+                            }}
+
+                            varying vec3 v_normal;
+                            varying float v_noise_amplitude;
+
+                            void main() {{
+                                v_normal = normal;
+
+                                float time_speed_factor = 0.1 + u_arousal * 0.4;
+                                float displacement_intensity = 1.0 + u_arousal * 1.5;
+
+                                float time = u_time * time_speed_factor;
+
+                                float base_freq = 1.5 + u_dominance * 2.0;
+                                float detail_freq_factor = 2.5 + u_humor_sophistication * 3.0;
+
+                                float displacement = snoise(normal * base_freq + time) * displacement_intensity;
+                                displacement += snoise(normal * base_freq * detail_freq_factor + time * 0.5) * (displacement_intensity * 0.5);
+
+                                v_noise_amplitude = displacement;
+
+                                float size_factor = 1.0 + u_dominance * 0.5;
+                                vec3 newPosition = position * size_factor + normal * displacement * 2.0;
+
+                                gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.0);
+                            }}
+                        `,
+                        fragmentShader: `
+                            uniform float u_time;
+                            uniform float u_valence;
+                            uniform float u_arousal;
+                            uniform float u_dominance;
+                            uniform float u_humor_sophistication;
+                            varying vec3 v_normal;
+                            varying float v_noise_amplitude;
+
+                            vec3 getEmotionalColor(float valence, float arousal) {{
+                                vec3 color_neg_calm = vec3(0.1, 0.0, 0.4);
+                                vec3 color_neg_excited = vec3(0.8, 0.1, 0.0);
+                                vec3 color_pos_calm = vec3(0.0, 0.8, 0.1);
+                                vec3 color_pos_excited = vec3(1.0, 0.9, 0.2);
+
+                                float v_mapped = (valence + 1.0) / 2.0;
+                                float a_mapped = (arousal + 1.0) / 2.0;
+
+                                vec3 mixed_color_calm = mix(color_neg_calm, color_pos_calm, v_mapped);
+                                vec3 mixed_color_excited = mix(color_neg_excited, color_pos_excited, v_mapped);
+
+                                return mix(mixed_color_calm, mixed_color_excited, a_mapped);
+                            }}
+
+                            void main() {{
+                                vec3 base_color = getEmotionalColor(u_valence, u_arousal);
+
+                                base_color.r += sin(v_noise_amplitude * 2.0 + u_time * 0.2) * 0.1;
+                                base_color.g += cos(v_normal.y * 5.0) * 0.1;
+
+                                float emission_strength = u_arousal * 0.5 + u_humor_sophistication * 0.8;
+                                vec3 final_color = base_color + base_color * emission_strength * 1.5;
+
+                                float fresnel_intensity = pow(1.0 - abs(dot(v_normal, vec3(0.0, 0.0, -1.0))), 3.0);
+                                final_color += vec3(0.7, 0.8, 1.0) * fresnel_intensity * u_dominance * 0.5;
+
+                                gl_FragColor = vec4(final_color, 1.0);
+                            }}
+                        `
+                    }});
+                    bloom = new THREE.Mesh(meshGeometry, meshMaterial);
+                    scene.add(bloom);
+
+                    const dustCount = 5000;
+                    const dustPositions = new Float32Array(dustCount * 3);
+                    for (let i = 0; i < dustCount; i++) {{
+                        dustPositions[i * 3 + 0] = (Math.random() - 0.5) * 200;
+                        dustPositions[i * 3 + 1] = (Math.random() - 0.5) * 200;
+                        dustPositions[i * 3 + 2] = (Math.random() - 0.5) * 200;
+                    }}
+                    const dustGeometry = new THREE.BufferGeometry();
+                    dustGeometry.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
+                    const dustMaterial = new THREE.PointsMaterial({{
+                        color: 0x6677aa,
+                        size: 0.1,
+                        blending: THREE.AdditiveBlending,
+                        transparent: true,
+                        opacity: 0.3
+                    }});
+                    stardust = new THREE.Points(dustGeometry, dustMaterial);
+                    scene.add(stardust);
+
+                    window.addEventListener('resize', onWindowResize, false);
+
+                    animate();
+                }}
+
+                function onWindowResize() {{
+                    camera.aspect = document.getElementById('container').clientWidth / document.getElementById('container').clientHeight;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(document.getElementById('container').clientWidth, document.getElementById('container').clientHeight);
+                    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                    uniforms.u_resolution.value.set(document.getElementById('container').clientWidth, document.getElementById('container').clientHeight);
+                }}
+
+                function animate() {{
+                    requestAnimationFrame(animate);
+
+                    const delta = clock.getDelta();
+                    const time = clock.getElapsedTime();
+
+                    uniforms.u_valence.value = window.currentValence;
+                    uniforms.u_arousal.value = window.currentArousal;
+                    uniforms.u_dominance.value = window.currentDominance;
+                    uniforms.u_humor_sophistication.value = window.currentHumorSophistication;
+
+                    uniforms.u_time.value = time;
+
+                    camera.position.x = Math.sin(time * 0.05 * (1 + window.currentArousal * 0.1)) * (10 + window.currentDominance * 5);
+                    camera.position.y = Math.cos(time * 0.05 * (1 + window.currentArousal * 0.1)) * (5 + window.currentDominance * 2.5);
+                    camera.lookAt(scene.position);
+
+                    renderer.render(scene, camera);
+                }}
+
+                window.onload = init;
+
+                // Function to update emotional state from Python
+                window.updateEmotionalState = (valence, arousal, dominance, humorSophistication) => {{
+                    window.currentValence = valence;
+                    window.currentArousal = arousal;
+                    window.currentDominance = dominance;
+                    window.currentHumorSophistication = humorSophistication;
+                }};
+            </script>
+        </body>
+        </html>
+        """
+        # Initialize visual state if not already set
+        if 'visual_state_for_js' not in st.session_state:
+            initial_persona = persona_manager.get_current_persona_context()["persona_profile"]
+            update_visual_state_in_js(
+                initial_persona.emotional_dimensions['valence'],
+                initial_persona.emotional_dimensions['arousal'],
+                initial_persona.emotional_dimensions['dominance'],
+                initial_persona.humor_sophistication
+            )
+
+        st.components.v1.html(html_code, height=350) # Adjust height as needed
+
+
+def render_persona_evolution():
+    st.header("🧠 Persona Evolution: Traits & Drives")
+
+    current_persona = persona_manager.current_persona
+    st.subheader("Current Persona Profile")
+    st.json(current_persona.to_dict())
+
+    st.subheader("Persona Trait Evolution Over Time")
+    all_persona_states = db_manager.get_all_persona_states()
+    if all_persona_states:
+        persona_df = pd.DataFrame([p.to_dict() for p in all_persona_states])
+
+        # Plot core traits
+        fig_core = px.line(persona_df, x="episode_number", y=["analytical_level", "confusion_level", "meta_awareness", "humor_sophistication"],
+                           title="Core Anthropologist Traits Evolution")
+        st.plotly_chart(fig_core, use_container_width=True)
+
+        # Plot sociable traits
+        fig_sociable = px.line(persona_df, x="episode_number", y=["empathy", "formality", "technical_depth", "verbosity", "enthusiasm"],
+                               title="Sociable Robot Traits Evolution")
+        st.plotly_chart(fig_sociable, use_container_width=True)
+
+        # Plot emotional dimensions
+        emotional_df = persona_df.apply(lambda x: pd.Series(x['emotional_dimensions']), axis=1)
+        emotional_df['episode_number'] = persona_df['episode_number']
+        fig_emotional = px.line(emotional_df, x="episode_number", y=['valence', 'arousal', 'dominance'],
+                                title="Emotional Dimensions Evolution")
+        st.plotly_chart(fig_emotional, use_container_width=True)
+
+        # Plot motivational drives
+        motivational_df = persona_df.apply(lambda x: pd.Series(x['motivational_drives']), axis=1)
+        motivational_df['episode_number'] = persona_df['episode_number']
+        fig_motivational = px.line(motivational_df, x="episode_number", y=['energy', 'affiliation', 'certainty'],
+                                   title="Motivational Drives Evolution")
+        st.plotly_chart(fig_motivational, use_container_width=True)
+
+        # Plot dialogue style preferences (as stacked area or line)
+        style_df = persona_df.apply(lambda x: pd.Series(x['dialogue_style_preference']), axis=1)
+        style_df['episode_number'] = persona_df['episode_number']
+        fig_style = px.area(style_df, x="episode_number", y=list(current_persona.dialogue_style_preference.keys()),
+                            title="Dialogue Style Preference Evolution")
+        st.plotly_chart(fig_style, use_container_width=True)
+
+        st.subheader("Provide User Exemplar (Teach the AI a style)")
+        exemplar_input = st.text_area("User's comment/question:", key="exemplar_input")
+        exemplar_output = st.text_area("Your ideal AI response (in desired persona/style):", key="exemplar_output")
+        if st.button("➕ Add User Exemplar"):
+            if exemplar_input and exemplar_output:
+                example = TrainingExample(
+                    input_text=exemplar_input,
+                    output_text=exemplar_output,
+                    quality_score=1.0, # User exemplars are considered perfect
+                    source_type="user_exemplar",
+                    weight_multiplier=config.USER_EXEMPLAR_WEIGHT
+                )
+                db_manager.add_training_example(example.to_dict())
+                persona_manager.update_exemplar_count()
+                st.success("User exemplar added! This will influence future fine-tuning.")
+            else:
+                st.warning("Please provide both input and ideal output for the exemplar.")
+
+    else:
+        st.info("No persona evolution data yet. Generate some episodes first!")
+
+
+def render_knowledge_memory():
+    st.header("📚 Knowledge & Memory: Theories & Context")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("Consciousness Theory Graph")
+        theories = system.theory_graph.theories
+        if theories:
+            theory_names = list(theories.keys())
+            selected_theory = st.selectbox("Select a Theory:", theory_names)
+            if selected_theory:
+                theory_node = theories[selected_theory]
+                st.write(f"**Core Concept:** {theory_node.core_concept}")
+                st.write(f"**Humor Angle:** {theory_node.humor_angle}")
+                st.write(f"**Confusion Point:** {theory_node.confusion_point}")
+                st.write(f"**Connected Theories:** {', '.join(theory_node.connected_theories)}")
+        else:
+            st.info("No theories loaded.")
+
+    with col2:
+        st.subheader("Semantic Memory Retrieval")
+        query_memory = st.text_input("Query memory for relevant past interactions:")
+        if st.button("🔍 Retrieve Memories"):
+            if query_memory:
+                retrieved = system.semantic_memory.retrieve_memories(query_memory, k=5)
+                if retrieved:
+                    for mem in retrieved:
+                        with st.expander(f"Ep {mem.get('episode_number')}: {mem.get('top_comment', '')[:50]}..."):
+                            st.write(f"**Response:** {mem.get('ai_response', '')[:150]}...")
+                            st.write(f"**Quality:** {mem.get('overall_quality_score'):.2f}")
+                else:
+                    st.info("No relevant memories found.")
+            else:
+                st.warning("Please enter a query.")
+
+def render_learning_validation():
+    st.header("📈 Learning & Validation: Self-Improvement Loop")
+
+    st.subheader("Training Data Queue")
+    training_examples = db_manager.get_training_examples()
+    if training_examples:
+        st.write(f"**{len(training_examples)}** examples in queue (Max: {config.TRAINING_DATA_MAX_SIZE})")
+        df_examples = pd.DataFrame([ex.to_dict() for ex in training_examples])
+        st.dataframe(df_examples[['input_text', 'output_text', 'quality_score', 'source_type', 'causal_target']].head(10), use_container_width=True)
+    else:
+        st.info("No training examples currently in queue.")
+
+    st.subheader("Fine-tuning & Validation Controls")
+    if learning_validator.should_trigger_fine_tuning():
+        st.warning("Fine-tuning trigger condition met! Consider running validation.")
+        if st.button("🚀 Run Fine-tuning & Validation", type="primary"):
+            with st.spinner("Running fine-tuning and statistical validation..."):
+                result = learning_validator.validate_and_apply_update()
+                st.session_state.last_validation_result = result
+            if result.get('accepted_update'):
+                st.success(f"Update ACCEPTED! {result.get('validation_outcome', {}).get('decision_reason')}")
+            else:
+                st.error(f"Update REJECTED! {result.get('validation_outcome', {}).get('decision_reason')}")
+                if result.get('validation_outcome', {}).get('rollback_performed'):
+                    st.info("Automatic rollback to previous adapter performed.")
+
+        if 'last_validation_result' in st.session_state:
+            st.subheader("Latest Validation Result")
+            st.json(st.session_state.last_validation_result)
+    else:
+        st.info(f"Fine-tuning will trigger after approx. {config.LLM_FINE_TUNE_INTERVAL} more episodes/interactions or more training data.")
+
+    st.subheader("Validation History")
+    eval_runs = db_manager.get_all_evaluation_runs()
+    if eval_runs:
+        eval_df = pd.DataFrame([er.validation_result for er in eval_runs])
+        st.dataframe(eval_df[['adaptation_count', 'accepted_update', 'mean_improvement', 'p_value', 'effect_size', 'decision_reason']], use_container_width=True)
+    else:
+        st.info("No validation runs recorded yet.")
+
+
+def render_analytics_reports():
+    st.header("📊 Analytics & Reports: Performance Overview")
+
+    episodes = db_manager.get_recent_episodes(100) # Fetch up to 100 recent episodes
+    if not episodes:
+        st.info("No episodes to analyze yet. Generate some interactions!")
+        return
+
+    # Convert episodes to DataFrame for easier plotting
+    df_episodes = pd.DataFrame([ep.__dict__ for ep in episodes])
+
+    st.subheader("Overall Quality Trend")
+    fig_quality = px.line(df_episodes, x="episode_number", y="overall_quality_score",
+                          title="Overall Response Quality Over Time", markers=True)
+    st.plotly_chart(fig_quality, use_container_width=True)
+
+    st.subheader("Dialogue & Engagement Metrics")
+    fig_dialogue = px.line(df_episodes, x="episode_number", y=["dialogue_coherence", "narrative_engagement"],
+                           title="Dialogue Coherence and Narrative Engagement", markers=True)
+    st.plotly_chart(fig_dialogue, use_container_width=True)
+
+    st.subheader("Persona Trait Snapshots")
+    # Extract persona traits from snapshots
+    persona_snapshots = []
+    for _, row in df_episodes.iterrows():
+        snapshot = row['persona_snapshot']
+        if snapshot:
+            snapshot_data = {
+                'episode_number': row['episode_number'],
+                'analytical_level': snapshot.get('analytical_level', 0.0),
+                'confusion_level': snapshot.get('confusion_level', 0.0),
+                'humor_sophistication': snapshot.get('humor_sophistication', 0.0),
+                'empathy': snapshot.get('empathy', 0.0),
+                'formality': snapshot.get('formality', 0.0),
+                'valence': snapshot.get('emotional_dimensions', {}).get('valence', 0.0),
+                'arousal': snapshot.get('emotional_dimensions', {}).get('arousal', 0.0),
+                'optimality_score': snapshot.get('current_strategy_preference', {}).get('optimality_score', 0.0) # Placeholder
+            }
+            persona_snapshots.append(snapshot_data)
+
+    if persona_snapshots:
+        df_persona_snapshots = pd.DataFrame(persona_snapshots)
+        fig_traits = px.line(df_persona_snapshots, x="episode_number", 
+                             y=['analytical_level', 'confusion_level', 'humor_sophistication', 'empathy', 'valence'],
+                             title="Key Persona Traits Evolution (Snapshots)", markers=True)
+        st.plotly_chart(fig_traits, use_container_width=True)
+    else:
+        st.info("No persona snapshot data available for plotting.")
+
+    st.subheader("Strategic Optimality (Conceptual)")
+    # This would require extracting strategic_optimality_score from persona_snapshot
+    # For now, let's just show the current state
+    current_persona = persona_manager.current_persona
+    st.write(f"**Current Strategic Optimality (from Game Theory Module):** {current_persona.current_strategy_preference.get('optimality_score', 'N/A')}")
+    st.write(f"**Current Strategy Preference:** {current_persona.current_strategy_preference}")
+
+
+if __name__ == "__main__":
+    main_dashboard()
+Step 8: Test the DashboardRun Streamlit:Open your terminal, navigate to ai_anthropologist, and ensure your virtual environment is activated (source venv/bin/activate).Run: streamlit run dashboard/app.pyYour browser should open to http://localhost:8501.Test Episode Generation & Feedback:Navigate to the "Episode Generator" tab.Input Comments: Enter a few comments. For the "Top Comment," select a "Simulate User Feedback" (e.g., Positive).Click "🚀 Generate Episode".Verify:The AI response appears.Quality scores are displayed.Audio plays (if XTTS/gTTS is configured and working).The Gielis Supershape in the "Visual Preview" changes its form/color/motion.Provide Text Feedback: Fill in the "Your Text Feedback" area and adjust the "Override Overall Quality" slider.Click "Submit Feedback & Add to Training Data".Verify: A success message appears, and the feedback section disappears.Test Visuals:Generate several episodes with different simulated user feedback (e.g., highly positive, then highly negative, then neutral).Observe how the Gielis Supershape (color, motion, size, detail) changes in response to the AI's internal emotional state, which is influenced by your feedback.Check your browser's developer console (F12) for any JavaScript errors.Test Review Cycles:Generate episodes until you hit episode 10. Observe the "10-Episode Review" summary appear.Continue generating until episode 30. Observe the "30-Episode Thesis" summary appear.Test Persona Evolution:Go to the "Persona Evolution" tab.Observe the plots. You should see the lines for analytical_level, confusion_level, humor_sophistication, and especially emotional_dimensions and dialogue_style_preference change over time, reflecting the AI's learning from your feedback.Test Learning & Validation:Go to the "Learning & Validation" tab.Observe the "Training Data Queue." You should see the examples you submitted (from Submit Feedback and Add User Exemplar) accumulating.When "Fine-tuning trigger condition met!" appears (after config.LLM_FINE_TUNE_INTERVAL episodes), click "🚀 Run Fine-tuning & Validation".This step will take time (minutes to tens of minutes depending on your GPU and model size).Verify: The "Latest Validation Result" should show whether the update was ACCEPTED or REJECTED. If accepted, the training queue will clear.Debugging Tips (Foolproof!)Terminal Logs: Your terminal where streamlit run is running is your primary source of Python errors. Look for ERROR or WARNING messages.Browser Console (F12): Check the "Console" tab for JavaScript errors related to the visual component.Database Inspection: If data isn't persisting, use a SQLite browser (e.g., "DB Browser for SQLite") to open ai_anthropologist/data/ai_anthropologist.db and verify table contents.LLM Loading: If the LLM doesn't load (llm/client.py warnings), ensure:You have enough VRAM (6GB for Qwen 1.5B 4-bit).bitsandbytes is correctly installed.Your config.LLM_MODEL_NAME is correct and the model is accessible from Hugging Face.XTTS/Audio: If audio fails, check:TTS_ENGINE in config.py is correct.XTTS_MODEL_PATH and XTTS_SPEAKER_WAV are correct and the files exist.pydub is installed for concatenation.Restart Streamlit: If the dashboard becomes unresponsive or behaves unexpectedly, stop it (Ctrl+C in terminal) and restart (streamlit run dashboard/app.py).Phase 2 & 3: RunPod Transition (Conceptual Steps)Once Phase 1 is stable and you're confident in the learning mechanisms:RunPod Model Testing & Fine-tuning:Update config.py:LLM_MODEL_NAME = "mistralai/Mixtral-8x7B-Instruct-v0.1" (or your chosen NeMo 12B model).LLM_D_MODEL = 4096 (for Mixtral 8x7B).LLM_API_BASE_URL = "runpod_vllm_endpoint" (or similar, indicating a remote VLLM endpoint).Containerization: Create a Dockerfile for your application. This Dockerfile will:Install all dependencies.Download your chosen LLM (e.g., Mixtral 8x7B) into the container.Potentially set up vLLM for high-throughput inference (if LLMClient is modified to use it).RunPod Instance: Spin up a powerful GPU instance on RunPod (e.g., A100, A6000 with 24GB+ VRAM).Execute Training: Run your main.py script on the RunPod instance. The LearningValidator will handle fine-tuning using the accumulated data, but now leveraging the powerful GPU.Monitor: Observe the logs and the saved EvaluationRun records to ensure fine-tuning is successful.Autonomous Deployment & Continuous Operation:Deploy LLM Endpoint: Deploy the fine-tuned LLM (or just its PEFT adapter with the base model) as a scalable API endpoint on RunPod Serverless or a dedicated pod.Automated Comment Ingestion: Implement a CommentFetcher module that uses the YouTube Data API to periodically pull top comments.N8N Workflow:Set up an N8N workflow:Trigger: On a schedule (e.g., daily) or new YouTube comments.Action 1 (Fetch Comments): Call your CommentFetcher service.Action 2 (Generate Episode): Call your response_generator service (exposed as an API endpoint).Action 3 (Video Assembly): If you implement full video generation, this step would combine audio, visuals, and text overlays.Action 4 (Publish): Use YouTube API integration to upload the generated video.Action 5 (Feedback Loop): Automatically feed back engagement metrics (views, likes, comments) from YouTube API into your response_generator (or a dedicated feedback_processor service) to trigger persona evolution and training data collection.Monitoring: Set up alerts for LLM errors, low quality scores, or failed uploads.This comprehensive guide should provide a clear and foolproof path to building your AI Anthropologist!

@@ -1,0 +1,26 @@
+[project]
+name = "killella"
+version = "0.1.0"
+description = "AI Comedy Competition - Kill Tony meets AI"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "websockets>=14.0",
+    "cocorum>=2.17.0",
+    "elevenlabs>=2.0.0",
+    "anthropic>=0.40.0",
+    "openai>=1.50.0",
+    "solana>=0.35.0",
+    "spl-token>=0.4.0",
+    "redis>=5.0.0",
+    "pydantic>=2.0.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "ruff>=0.8.0",
+]

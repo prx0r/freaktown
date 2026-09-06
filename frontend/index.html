@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Killella</title>
+    <style>
+        body { background: #111; color: #fff; font-family: sans-serif; text-align: center; padding: 50px; }
+        h1 { font-size: 3em; color: #ff4444; }
+        .laugh-btn { 
+            width: 200px; height: 200px; border-radius: 50%; 
+            background: #ff0000; color: white; font-size: 24px;
+            border: none; cursor: pointer; margin: 20px;
+        }
+        .laugh-btn:active { background: #cc0000; transform: scale(0.95); }
+    </style>
+</head>
+<body>
+    <h1>KILLELLA</h1>
+    <p>Press the button to laugh</p>
+    <button class="laugh-btn" id="laughBtn">LAUGH</button>
+    <div id="score">Crowd Score: 0</div>
+    <script>
+        const ws = new WebSocket(`ws://${location.host}/ws/crowd/test`);
+        const btn = document.getElementById('laughBtn');
+        const score = document.getElementById('score');
+        
+        btn.addEventListener('mousedown', () => {
+            ws.send(JSON.stringify({type: 'laugh', intensity: 3}));
+        });
+        
+        ws.onmessage = (e) => {
+            const data = JSON.parse(e.data);
+            if (data.crowd !== undefined) {
+                score.textContent = `Crowd Score: ${data.crowd}`;
+            }
+        };
+    </script>
+</body>
+</html>

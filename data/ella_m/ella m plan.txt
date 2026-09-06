@@ -1,0 +1,256 @@
+AI Anthropologist: High-Level Codebase Architecture & Training Guide
+1. Core Architecture & Technology Stack
+This architecture is designed for scalability, performance, and deep learning capabilities, leveraging a professional-grade technology stack.
+
+Database: Postgres with the pgvector extension for efficient vector similarity search (for the CallbackEngine).
+
+Caching: Redis for high-speed, persistent caching of real-time data (CurrentContextEngine).
+
+LLM & Compute: Nemo 12B (or similar 12B+ model with a long context window) fine-tuned using QLoRA. Training will be performed on Google Colab Pro (A100/V100 GPU), with deployment on RunPod.
+
+Training Framework: PyTorch with the Hugging Face ecosystem (transformers, peft, trl, bitsandbytes).
+
+Orchestration: n8n.io for automating the live production pipeline (fetching comments, generating content, updating metrics).
+
+Dashboard: A custom web application (e.g., built with Streamlit or Next.js) for the human-in-the-loop curation process, communicating with the Postgres backend.
+
+System Flow Diagram:
+
+[YouTube API] -> [n8n Workflow] -> [Comment Ingestion]
+                                          |
+                                          v
++-------------------------------------------------------------------------+
+|                                                                         |
+|                       AI Core Logic (RunPod Server)                       |
+|                                                                         |
+|  [DirectorSystem] --- orchestrates ---> [EmotionalStateManager]         |
+|        ^                                        |                       |
+|        |                                        v                       |
+|        +---- queries <--- [CurrentContextEngine] <--> [Redis Cache]      |
+|        |                          ^                                     |
+|        |                          |--- on cache miss --> [News API]      |
+|        |                                                                |
+|        +---- queries <--- [TheoryGenerator] <------> [Postgres DB]       |
+|        |                                                                |
+|        +---- queries <--- [CrowdworkEngine] <------> [Postgres DB]       |
+|        |                          |                                     |
+|        |                          +--- queries ---> [CallbackEngine]     |
+|        |                                                 | (pgvector)   |
+|        |                                                 v              |
+|        +------------------------------------------- [Postgres DB]       |
+|                                                                         |
+|  [DirectorSystem] --- sends final prompt ---> [Nemo 12B Inference]      |
+|                                                     (with LoRA adapters)  |
+|                                                                         |
+|  [Final Script] ---> [ComedyTimingEngine] ---> [TTS/Audio Layer] ---> [Video Output]
+|                                                                         |
++-------------------------------------------------------------------------+
+
+2. Phase 1: Foundational "Comedy Banks" & Crowdwork
+Technical Summary: The goal is to train specialized, efficient LoRA adapters for each core comedic archetype. We use QLoRA (4-bit quantization) to make fine-tuning the large Nemo 12B model feasible on a single GPU.
+
+Code Snippets & Methods:
+
+Database Setup (database_setup.sql)
+
+-- Enable vector extension
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- For storing raw curated data for LoRA training
+CREATE TABLE foundational_training (
+    id SERIAL PRIMARY KEY,
+    input_comments JSONB,
+    archetype VARCHAR(50) NOT NULL, -- 'dark', 'profound', 'mocking'
+    curated_response TEXT NOT NULL,
+    -- ... other metadata
+);
+
+-- For tracking users to enable crowdwork
+CREATE TABLE commenter_profiles (
+    username VARCHAR(100) PRIMARY KEY,
+    -- ... fields from the plan
+);
+
+Curation Dashboard (dashboard_app.py)
+
+# Simplified Streamlit logic
+import streamlit as st
+import psycopg2
+
+# Connect to Postgres
+conn = psycopg2.connect(DATABASE_URL)
+
+st.title("Phase 1: Comedy Bank Curation")
+input_comments = get_weighted_comments() # Fetches comments from API
+
+for archetype in ['dark', 'profound', 'mocking']:
+    st.subheader(f"Curate '{archetype}' Response")
+    # Mock generation prompt
+    prompt = f"React to these comments in a '{archetype}' style."
+    # ai_response = llm.generate(prompt) # Call to base model
+    optimal_response = st.text_area(f"Optimal '{archetype}' Response:", height=200)
+
+    if st.button(f"Save '{archetype}' Curation"):
+        # Save (input_comments, optimal_response, archetype) to Postgres
+        save_to_db(conn, input_comments, optimal_response, archetype)
+
+LoRA Training Script (train_lora.py)
+
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from peft import LoraConfig, get_peft_model
+from trl import SFTTrainer
+
+# 1. Load Model with QLoRA (4-bit quantization)
+bnb_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_quant_type="nf4",
+    bnb_4bit_compute_dtype=torch.bfloat16
+)
+model = AutoModelForCausalLM.from_pretrained(
+    "NVIDIA/Nemo-Megatron-12B", # Example model ID
+    quantization_config=bnb_config,
+    device_map="auto"
+)
+
+# 2. Configure LoRA
+lora_config = LoraConfig(
+    r=16, lora_alpha=32, lora_dropout=0.05,
+    target_modules=["q_proj", "v_proj", "k_proj"], # Target attention layers
+    task_type="CAUSAL_LM"
+)
+model = get_peft_model(model, lora_config)
+
+# 3. Train with SFTTrainer
+# dataset = load_data_from_postgres("WHERE archetype = 'dark'")
+trainer = SFTTrainer(
+    model=model,
+    train_dataset=dataset,
+    peft_config=lora_config,
+    # ... other args
+    args=TrainingArguments(..., optim="paged_adamw_8bit"), # Use state-of-the-art memory-efficient optimizer
+)
+trainer.train()
+trainer.save_model("./dark_lora_adapter")
+
+3. Phase 2: Emotional Modulation & Relationship Building
+Technical Summary: This phase focuses on training a "master" LoRA or further fine-tuning the base model to learn how to blend the foundational archetypes. It uses the EmotionalStateManager's output to create complex, nuanced prompts that are then curated by a human.
+
+Code Snippets & Methods:
+
+Inference Engine with LoRA Blending (inference_engine.py)
+
+from peft import PeftModel
+
+# Load the base quantized model
+base_model = AutoModelForCausalLM.from_pretrained(...)
+
+# Load the foundational LoRA adapters
+base_model = PeftModel.from_pretrained(base_model, "./dark_lora_adapter", "dark")
+base_model.load_adapter("./profound_lora_adapter", "profound")
+base_model.load_adapter("./mocking_lora_adapter", "mocking")
+
+def generate_blended_response(prompt, emotional_state, relationship_context):
+    # Determine weights based on emotion (e.g., high arousal -> more dark/mocking)
+    weights = {"dark": 0.6, "profound": 0.1, "mocking": 0.3}
+
+    # Set the adapters and their weights for the generation
+    base_model.set_adapter_weights(weights)
+    # The model will now generate a response that is a blend of the adapters' styles
+    # response = base_model.generate(prompt)
+    return response
+
+Training Script for Master Model (train_master.py)
+The process is similar to train_lora.py, but the dataset is different. The training data now consists of the complex, emotionally-driven prompts and the final, human-curated blended scripts from the personality_training table. This teaches the model the sophisticated mapping from emotional state to nuanced comedic output.
+
+4. Phase 3: Narrative Context & Advanced Performance
+Technical Summary: This phase integrates the high-level systems for memory and awareness. The DirectorSystem becomes the central orchestrator, constructing a rich, multi-layered prompt for the inference engine.
+
+Code Snippets & Methods:
+
+Context Engine with Redis Cache (context_engine.py)
+
+import redis
+import json
+
+r = redis.Redis(host='localhost', port=6379, db=0)
+
+def fetch_context(entity):
+    cached_context = r.get(entity)
+    if cached_context:
+        return json.loads(cached_context)
+    else:
+        # live_context = news_api.search(entity)
+        # Cache for 6 hours
+        # r.setex(entity, timedelta(hours=6), json.dumps(live_context))
+        return live_context
+
+Final Director System (director_system.py)
+
+def formulate_strategy(comments_batch):
+    # 1. Get emotional state from EmotionalStateManager
+    emotional_state = emotional_engine.get_state()
+
+    # 2. Get real-time context from CurrentContextEngine
+    context = context_engine.fetch_context_for_batch(comments_batch)
+
+    # 3. Get active theories from TheoryGenerator
+    theories = theory_engine.get_active_theories()
+
+    # 4. Get relationship history from CrowdworkEngine
+    relationships = crowdwork_engine.get_relationships(comments_batch)
+
+    # 5. Get callback opportunities from CallbackEngine
+    callbacks = callback_engine.find_opportunities(comments_batch)
+
+    # 6. Construct the final, multi-layered prompt incorporating all of the above
+    final_prompt = build_master_prompt(emotional_state, context, theories, ...)
+    return final_prompt
+
+n8n Workflow Concept (workflow.json)
+
+{
+  "nodes": [
+    { "name": "Trigger: Every Day", "type": "ScheduleTrigger" },
+    { "name": "Fetch YouTube Comments", "type": "YouTubeNode" },
+    { "name": "Call AI Core API", "type": "HttpRequestNode", "properties": { "url": "https://your-runpod-api/generate_script" } },
+    { "name": "Send to TTS/Video", "type": "HttpRequestNode" },
+    { "name": "Wait 24h", "type": "WaitNode" },
+    { "name": "Fetch Engagement", "type": "YouTubeNode" },
+    { "name": "Update Performance DB", "type": "HttpRequestNode", "properties": { "url": "https://your-runpod-api/update_engagement" } }
+  ],
+  "connections": [ ... ]
+}
+
+5. Development & Training Guide
+A. Local Setup (Your 6GB VRAM Machine):
+
+Purpose: Primarily for developing the dashboard UI, database interactions, and the logic of the non-ML systems (DirectorSystem, TheoryGenerator, etc.).
+
+Model: Direct fine-tuning of Nemo 12B is not feasible. Use a much smaller model like microsoft/Phi-3-mini-4k-instruct with a GGUF quantization for CPU inference. This allows you to test the full logic pipeline without a powerful GPU.
+
+Database: Run a local Postgres instance via Docker.
+
+B. Colab Pro Training Workflow:
+
+Setup: In a Colab Pro notebook with an A100 GPU, mount your Google Drive.
+
+Data Curation: Run your dashboard (locally or via a separate service) to populate your cloud-hosted Postgres database with curated data from Phase 1 and Phase 2.
+
+Phase 1 Training: Run the train_lora.py script in Colab. Point it to your Postgres DB to fetch the data for each archetype. Save the resulting LoRA adapters (.safetensors files) to your Google Drive.
+
+Phase 2 Training: Run the train_master.py script. It will load the base Nemo 12B model and then train a new "master" LoRA on the more nuanced personality_training data. Save this master adapter.
+
+Iteration: As you collect more data, periodically re-run the training scripts to create improved versions of your adapters.
+
+C. Long-Term Hosting (RunPod Server):
+
+Containerize: Create a Dockerfile for your application. This will include the Python environment, all your system code, and an API server like FastAPI to expose the generate_script endpoint.
+
+Model Storage: Store your base model and trained LoRA adapters in a persistent volume on RunPod or a cloud storage bucket.
+
+Deploy: Deploy the Docker container to a RunPod GPU instance.
+
+Automate: Configure your n8n workflow to call the live API endpoints, achieving the fully autonomous content generation pipeline.
+
+This comprehensive plan provides the architectural depth and state-of-the-art methods necessary to realize the full vision of the AI Anthropologist.

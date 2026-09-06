@@ -1,0 +1,155 @@
+import asyncio
+import numpy as np
+import time
+from dataclasses import dataclass
+
+@dataclass
+class OscillatorState:
+    position: float = 0.0
+    velocity: float = 0.0
+    mu: float = 0.1
+    omega: float = 0.1
+    threshold: float = 0.5
+
+class AutonomousSystem:
+    def __init__(self):
+        self.oscillator = OscillatorState()
+        self.memory = []
+        self.last_interaction = time.time()
+        self.autonomous_interval = 30
+        
+    def step_oscillator(self, force: float, dt: float = 0.1):
+        damping = self.oscillator.mu * (1 - self.oscillator.position**2) * self.oscillator.velocity
+        acceleration = force + damping - (self.oscillator.omega**2 * self.oscillator.position)
+        
+        self.oscillator.velocity += acceleration * dt
+        self.oscillator.position += self.oscillator.velocity * dt
+        
+        return abs(self.oscillator.position)
+    
+    def calculate_force(self, text: str) -> float:
+        # Vector comparison
+        current_vector = np.array([hash(word) % 1000 for word in text.split()[:10]])
+        if len(self.memory) > 0:
+            last_vector = self.memory[-1]
+            if len(current_vector) == len(last_vector):
+                contradiction = np.linalg.norm(current_vector - last_vector)
+                return contradiction / 1000
+        return np.random.uniform(0.1, 0.3)
+    
+    
+    async def autonomous_loop(self):
+        while True:
+            if time.time() - self.last_interaction > self.autonomous_interval:
+                # Generate output
+                output = self.generate_output()
+                
+                # Calculate forcing function
+                force = self.calculate_force(output)
+                
+                # Step oscillator
+                amplitude = self.step_oscillator(force)
+                
+                # Store if above threshold
+                if amplitude > self.oscillator.threshold:
+                    self.memory.append(np.array([hash(word) % 1000 for word in output.split()[:10]]))
+                    print(f"Autonomous: {output}")
+                
+            await asyncio.sleep(5)
+    
+    def generate_output(self) -> str:
+        # Placeholder for LLM generation
+        words = ["thinking", "considering", "observing", "noticing", "wondering", "examining"]
+        return f"{np.random.choice(words)} about {len(self.memory)} previous states"
+    
+    def process_input(self, text: str) -> str:
+        self.last_interaction = time.time()
+        
+        # Calculate forcing function from input
+        force = self.calculate_force(text)
+        
+        # Step oscillator
+        amplitude = self.step_oscillator(force)
+        
+        # Store input vector
+        input_vector = np.array([hash(word) % 1000 for word in text.split()[:10]])
+        self.memory.append(input_vector)
+        
+        # Generate response based on amplitude
+        response = self.generate_response(amplitude)
+        return response
+    
+    def generate_response(self, amplitude: float) -> str:
+        # Placeholder for LLM generation - amplitude affects response
+        return f"Response with amplitude {amplitude:.2f}"
+
+async def main():
+    system = AutonomousSystem()
+    
+    # Start autonomous loop
+    autonomous_task = asyncio.create_task(system.autonomous_loop())
+    
+    try:
+        while True:
+            user_input = input("Input: ")
+            if user_input.lower() == 'quit':
+                break
+            
+            response = system.process_input(user_input)
+            print(f"Output: {response}")
+            
+    except KeyboardInterrupt:
+        pass
+    finally:
+        autonomous_task.cancel()
+
+if __name__ == "__main__":
+    asyncio.run(main())f friendship.",
+            "what this reveals about the nature of curiosity itself."
+        ]
+        return random.choice(insights)
+    
+    def get_autonomy_stats(self) -> Dict:
+        """Get statistics about autonomous behavior"""
+        return {
+            "autonomous_thoughts": len(self.autonomous_thoughts),
+            "current_curiosity": abs(self.curiosity.position),
+            "personality_traits": self.self_model["personality_traits"],
+            "conversation_length": len(self.conversation_history),
+            "time_since_human": time.time() - self.last_human_interaction
+        }
+
+# Usage Example
+async def main():
+    # Create your autonomous AI friend
+    ai_friend = AutonomousAIFriend("Jamie")
+    
+    # Start autonomous thinking in background
+    thinking_task = asyncio.create_task(ai_friend.autonomous_thinking_loop())
+    
+    print(f"🤖 {ai_friend.name} is now autonomous and thinking...")
+    print("💬 Chat with them anytime! (type 'quit' to exit)")
+    print("📊 Type 'stats' to see autonomy statistics\n")
+    
+    try:
+        while True:
+            user_input = input("\nYou: ")
+            
+            if user_input.lower() == 'quit':
+                break
+            elif user_input.lower() == 'stats':
+                stats = ai_friend.get_autonomy_stats()
+                print(f"📊 Autonomy Stats: {json.dumps(stats, indent=2)}")
+                continue
+            
+            response = ai_friend.chat(user_input)
+            print(f"{ai_friend.name}: {response}")
+            
+    except KeyboardInterrupt:
+        pass
+    finally:
+        thinking_task.cancel()
+        print(f"\n👋 {ai_friend.name} says goodbye!")
+
+if __name__ == "__main__":
+    asyncio.run(main())

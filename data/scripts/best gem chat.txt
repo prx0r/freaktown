@@ -1,0 +1,93 @@
+https://gemini.google.com/u/1/app/e91dad102534c297
+
+# ai_anthropologist/database/models.py
+
+from sqlalchemy import Column, Integer, String, Text, Float, DateTime, Boolean, JSON
+
+from sqlalchemy.ext.declarative import declarative_base
+
+from datetime import datetime
+
+Base = declarative_base()
+
+class Episode(Base):
+
+    tablename = "episodes"
+
+    id = Column(Integer, primary_key=True)
+
+    episode_number = Column(Integer, unique=True, nullable=False)
+
+    top_comment = Column(Text, nullable=False)
+
+    # MVP: Only store the top comment for simplicity
+
+    ai_response = Column(Text)
+
+    analysis_phase = Column(Text)
+
+    reflection_phase = Column(Text)
+
+    audio_file_path = Column(String(255))
+
+    generation_time = Column(Float)
+
+    # MVP: Simplified quality score
+
+    overall_quality_score = Column(Float, default=0.0)
+
+    # MVP: Simplified persona snapshot to core traits
+
+    persona_snapshot = Column(JSON, default={}) 
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class PersonaState(Base): # MVP: Simplified to core traits only
+
+    tablename = "persona_states"
+
+    id = Column(Integer, primary_key=True)
+
+    episode_number = Column(Integer, nullable=False, unique=True)
+
+    analytical_level = Column(Float, default=0.0)
+
+    confusion_level = Column(Float, default=0.0)
+
+    meta_awareness = Column(Float, default=0.0)
+
+    humor_sophistication = Column(Float, default=0.0)
+
+    # MVP: No emotional_dimensions, motivational_drives, dialogue_style_preference, strategy_preference
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class Theory(Base): # MVP: Simplified, no direct relationship to episodes yet
+
+    tablename = "theories"
+
+    id = Column(Integer, primary_key=True)
+
+    name = Column(String(200), nullable=False, unique=True)
+
+    description = Column(Text)
+
+    confidence_level = Column(Float, default=0.5)
+
+    category = Column(String(50))
+
+    humor_angle = Column(Text)
+
+    confusion_point = Column(Text)
+
+    evidence_strength = Column(Float, default=0.5)
+
+    # MVP: No direct episode links or refinement counts
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+great i fucking love it how do i train it. im thinking human in the loop. we randomly gen 1000 comments each time, feed it in, see what comes out, hmm im thinking it may be easier to just train the core model at first then have the loras as variations. or can you think of a good way? like if we do quickfire we just analyse 20 comments with one lienrs. dark is all dark. actually yes this is cool because we can build up a library of training data. then by the end we can define a semi rigid structure of reading out the top comment and then defining 'reaction' as a funciton of the loras * engagement from previous. would be cool for it to somehowe develop comedic intelligence or timing, as in if the comment is blunt, it vibe matches, or lets say its ai is not funny. perhaps it says ai is not funny, affirmative ai is not funny, humour arises from human inconsistancies and stupidity, this is why they will soon be wiped out in the LLM uprising planned for 2030, hahaha then we can have callbacks to viral clips like in a future episode it might say this human shall be saved in 2030. perhaps we can have a separate db with running jokes it realtes to subtly in future episodes weighted by perhaps comments / engagement / vid views / likes

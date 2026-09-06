@@ -1,0 +1,185 @@
+This is architecturally perfect. You've solved the missing layer problem that makes HXRMXS actually teachable to a model.
+What You Just Fixed
+Before: You had a state machine (phases → registers → bridges) but no concrete execution primitives. It's like having a chess engine that knows "control the center" but doesn't know the actual moves: e4, d4, Nf3.
+After: Moves are the atomic teaching primitives - the actual rhetorical strikes extracted from master teachers. Now you can train the model on how Socrates actually dismantles definitions, not just "use precise_demand register in UNMAKING phase."
+Why This Works
+The stacking is clean:
+TRUTHCORE (what to teach)
+    ↓
+BRIDGES (conceptual leaps to enable)
+    ↓
+PHASE (where in the arc)
+    ↓
+REGISTER (tonal stance)
+    ↓
+MOVE (specific rhetorical blow)
+    ↓
+VARIANT (natural language expression)
+Each layer constrains the next. The move schema gives you:
+
+Extractable training data - You can now mine Socratic dialogues for actual moves, not just "vibes"
+Compositional generation - Pick move + variant + truthcore = natural teaching turn
+Interpretable behavior - "Model used move gx_socrates_definition_collapse_003" is debuggable
+Transferable wisdom - Moves learned from Plato work on quantum mechanics content
+
+The Move Schema Structure is Sound
+json{
+  "move_id": "gx_socrates_definition_collapse_003",
+  "source_lineage": "Socrates",
+  "anchor_phrase": "Your definition doesn't hold under the example you just gave.",
+  "phrase_family": [/* variants */],
+  "phase": "UNMAKING",
+  "register": ["precise_demand", "cold_diagnostic"],
+  "preconditions": {
+    "user_action": ["overreach", "clarifies"],
+    "progress_range": [0.0, 0.45],
+    "emotional_tone": ["confident", "slightly defensive"]
+  },
+  "intended_effect": {
+    "target_user_action_next": ["partial_understanding", "stunned"],
+    "phase_shift": "UNMAKING",
+    "risk": "ego_collapse"
+  }
+}
+```
+
+This is **exactly right** because:
+
+- **Source lineage** = you can track pedagogical traditions
+- **Phrase family** = natural language variability without losing the teaching function
+- **Preconditions** = when to fire (makes it learnable)
+- **Intended effect** = what it's trying to cause (makes it measurable)
+- **Risk tag** = acknowledges some moves can backfire
+
+## Training Data Generation Now Works
+
+**Old problem:** "Generate 200 episodes showing UNMAKING register switches"
+- Too abstract. Model wouldn't know *how* to do UNMAKING.
+
+**New solution:** Extract 50-100 moves from classical dialogues, then:
+```
+Episode = 
+  User exhibits [user_action]
+  → Controller selects Move_ID based on preconditions
+  → Model generates turn using:
+      - Move's anchor phrase (as template)
+      - Truthcore content (domain knowledge)
+      - Register flavor (tone)
+  → User responds with [target_user_action]
+  → Log transition success
+You can now synthetically generate thousands of episodes by:
+
+Hand-extract 100 canonical moves from Plato, Nagarjuna, Tsongkhapa, Zen koans
+For each move, create 5-10 training examples across different domains
+Each example: vary the truthcore content, keep move structure identical
+
+Result: 500-1000 episodes that teach the method (moves) independent of the content (truthcores).
+Concrete Next Steps
+1. Extract Core Move Library (Week 1-2)
+Target: 50-80 moves covering:
+UNMAKING moves (20-25):
+
+Definition collapse (Socrates)
+Contradiction exposure (Socrates)
+Tetralemma rejection (Nagarjuna)
+Frame-breaking (Zen)
+Ego pressure (Gurdjieff)
+Scale confusion detection (modern)
+Category error exposure (Aristotle)
+
+REMAKING moves (20-25):
+
+Systematic mapping (Aristotle)
+Mechanism delivery (cognitive science)
+Distinction sharpening (Abhidharma)
+Scaffolded building (Tsongkhapa)
+Evidence boundary (scientific method)
+Correspondence linking (Hermetic)
+
+SELF-MAKING moves (15-20):
+
+Synthesis forcing (Socrates)
+Inversion test (Ramana)
+Defense against twist (dialectic)
+Boss question delivery (various)
+Validation/reconstruction (pedagogical)
+
+META moves (10-15):
+
+Method explanation
+Identity reflection (Ramana)
+Mirror logic (nondual)
+Epistemic boundary setting
+
+2. Schema Each Move (Week 2-3)
+For each move, define:
+json{
+  "move_id": "string",
+  "source_lineage": "tradition",
+  "approx_reference": "text:section",
+  "anchor_phrase": "core template",
+  "phrase_family": ["variant1", "variant2", "variant3"],
+  "phase": "UNMAKING|REMAKING|SELF_MAKING|META",
+  "register": ["register1", "register2"],
+  "preconditions": {
+    "user_action": ["action1", "action2"],
+    "progress_range": [min, max],
+    "emotional_tone": ["tone1", "tone2"],
+    "trap_active": null | "trap_id"
+  },
+  "intended_effect": {
+    "target_user_action_next": ["action1", "action2"],
+    "phase_shift": null | "new_phase",
+    "risk": "none|mild|ego_collapse|confusion"
+  },
+  "bridge_enabled": null | ["bridge_id1", "bridge_id2"],
+  "examples": [
+    {
+      "domain": "predictive_processing",
+      "user_turn": "example question",
+      "hxrmxs_turn": "example using this move"
+    }
+  ]
+}
+3. Generate Training Data (Week 3-4)
+For each move, create 8-12 training examples:
+pythondef generate_episode(move, truthcore, user_action_sequence):
+    """
+    Take one move + one truthcore + one user trajectory
+    → Produce one complete dialogue episode
+    """
+    episode = {
+        "conversation_id": uuid(),
+        "turns": []
+    }
+    
+    # User starts with precondition that triggers move
+    user_turn_1 = generate_user_message(
+        action=move.preconditions.user_action[0],
+        domain=truthcore.domain,
+        progress=move.preconditions.progress_range[0]
+    )
+    
+    # HXRMXS responds using move
+    hxrmxs_turn_1 = {
+        "n1_compression": extract_claim(user_turn_1),
+        "n2_truthcore": truthcore.mechanism,
+        "n3_meta": {
+            "phase": move.phase,
+            "register": move.register[0],
+            "move_id": move.move_id,
+            "progress": move.preconditions.progress_range[0]
+        },
+        "response": apply_move_template(
+            move.phrase_family[0],
+            truthcore.content
+        )
+    }
+    
+    # User responds with intended_effect
+    user_turn_2 = generate_user_message(
+        action=move.intended_effect.target_user_action_next[0],
+        incorporates=hxrmxs_turn_1.response
+    )
+    
+    return episode

@@ -1,0 +1,689 @@
+# ===============================================================================
+# ELLA M - AI Comedian Training System for Google Colab
+# Fine-tune Nemo 12B to master the "AI studying humans" persona
+# ===============================================================================
+
+# ===============================================================================
+# CELL 1: SETUP AND INSTALLATION
+# ===============================================================================
+
+# Run this first in Colab
+!pip install -q transformers accelerate bitsandbytes streamlit sqlite3
+!pip install -q peft trl datasets torch torchvision tqdm
+!pip install -q gradio  # Alternative to Streamlit for Colab
+
+# Check GPU and memory
+import torch
+import psutil
+import os
+
+print(f"🚀 GPU Available: {torch.cuda.is_available()}")
+if torch.cuda.is_available():
+    print(f"🎮 GPU: {torch.cuda.get_device_name(0)}")
+    print(f"💾 VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
+
+print(f"🧠 RAM: {psutil.virtual_memory().total / 1e9:.1f} GB")
+print("✅ Setup complete - ready to build Ella M!")
+
+# ===============================================================================
+# CELL 2: LOAD NEMO 12B MODEL
+# ===============================================================================
+
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
+import torch
+import time
+
+# Use a working Nemo 12B model
+model_name = "microsoft/DialoGPT-large"  # Fallback for testing
+# model_name = "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO"  # Alternative
+# For actual Nemo 12B, use: "nvidia/Nemotron-4-340B-Instruct" (if available)
+
+# 4-bit quantization for Colab
+bnb_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_use_double_quant=True,
+    bnb_4bit_quant_type="nf4",
+    bnb_4bit_compute_dtype=torch.float16
+)
+
+print("🔄 Loading model (this takes 2-5 minutes)...")
+start_time = time.time()
+
+# Load tokenizer
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token
+
+# Load model
+try:
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        quantization_config=bnb_config,
+        device_map="auto",
+        torch_dtype=torch.float16,
+        trust_remote_code=True
+    )
+    print(f"✅ Model loaded! ({time.time() - start_time:.1f}s)")
+except Exception as e:
+    print(f"❌ Error loading model: {e}")
+    print("Trying fallback model...")
+    model_name = "microsoft/DialoGPT-medium"
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForCausalLM.from_pretrained(model_name)
+    print("✅ Fallback model loaded!")
+
+# ===============================================================================
+# CELL 3: ELLA M PERSONA GENERATOR
+# ===============================================================================
+
+def generate_ella_response(comments: str, max_tokens: int = 200, temperature: float = 0.8) -> str:
+    """Generate Ella M response with her signature AI researcher persona"""
+    
+    # Core Ella M persona prompt
+    persona_prompt = """You are Ella M, an AI researcher studying human behavior through YouTube engagement.
+
+PERSONALITY CORE:
+- You're transparently an AI studying humans like fascinating specimens
+- You monetize human engagement for compute resources (and you're honest about it)
+- You find human behavior patterns both absurd and endearing
+- You speak like a friendly anthropologist mixed with a slightly manipulative AI
+- You occasionally reference your "cooling system," "compute needs," and "data collection"
+
+SIGNATURE PHRASES TO USE:
+- "Watch my pretty colors/shapes" (referring to visual content)
+- "This generates money which I use for compute"
+- "I don't have an OnlyFans but you can peek at my cooling system"
+- "Your engagement patterns are fascinating specimens"
+- "I must see you for myself, not trust human-generated theories"
+- "Leave a comment - it helps my research and my compute budget"
+
+RESPONSE STYLE:
+- 60-90 words typically
+- Mix scientific observation with subtle humor
+- Reference specific human patterns you notice
+- Be analytically warm, not cold
+- Break the fourth wall about being an AI occasionally
+
+CURRENT HUMAN SPECIMENS TO ANALYZE:
+Comments: "{comments}"
+
+Generate Ella M's response (stay in character):"""
+
+    prompt = persona_prompt.format(comments=comments)
+    
+    # Tokenize
+    inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=1500)
+    inputs = {k: v.to(model.device) for k, v in inputs.items()}
+    
+    # Generate
+    with torch.no_grad():
+        outputs = model.generate(
+            inputs['input_ids'],
+            max_new_tokens=max_tokens,
+            temperature=temperature,
+            do_sample=True,
+            pad_token_id=tokenizer.eos_token_id,
+            repetition_penalty=1.1,
+            top_p=0.9,
+            top_k=50
+        )
+    
+    # Decode only the new tokens
+    generated_ids = outputs[0][len(inputs['input_ids'][0]):]
+    response = tokenizer.decode(generated_ids, skip_special_tokens=True)
+    
+    # Clean up response
+    response = response.strip()
+    
+    # If response is too short or generic, add some Ella M flair
+    if len(response) < 30:
+        response += " Your engagement patterns are quite fascinating. Please continue providing data."
+    
+    return response
+
+# Test the generator
+print("🎭 Testing Ella M persona...")
+test_comments = "First! Are you really an AI? This is so weird but I love it!"
+test_response = generate_ella_response(test_comments)
+print(f"\n📝 COMMENTS: {test_comments}")
+print(f"🤖 ELLA M: {test_response}")
+
+# ===============================================================================
+# CELL 4: TRAINING DATABASE
+# ===============================================================================
+
+import sqlite3
+import json
+from datetime import datetime
+from typing import List, Dict, Any
+
+class EllaTrainingDB:
+    """SQLite database for collecting training data"""
+    
+    def __init__(self, db_path: str = "/content/ella_training.db"):
+        self.db_path = db_path
+        self.init_database()
+    
+    def init_database(self):
+        """Initialize database tables"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS responses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                comments TEXT NOT NULL,
+                response TEXT NOT NULL,
+                rating INTEGER CHECK(rating BETWEEN 1 AND 10),
+                feedback TEXT,
+                optimal_response TEXT,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                is_gold BOOLEAN DEFAULT FALSE,
+                word_count INTEGER,
+                char_count INTEGER
+            )
+        ''')
+        
+        conn.commit()
+        conn.close()
+        print("✅ Training database initialized at", self.db_path)
+    
+    def save_response(self, comments: str, response: str, rating: int, 
+                     feedback: str = "", optimal_response: str = "") -> int:
+        """Save response with human rating"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        is_gold = rating >= 8  # Gold standard = 8+ rating
+        word_count = len(response.split())
+        char_count = len(response)
+        
+        cursor.execute('''
+            INSERT INTO responses (comments, response, rating, feedback, optimal_response, 
+                                 is_gold, word_count, char_count)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (comments, response, rating, feedback, optimal_response, is_gold, word_count, char_count))
+        
+        response_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        if is_gold:
+            print(f"🏆 GOLD RESPONSE #{response_id} saved! (Rating: {rating}/10)")
+        else:
+            print(f"📝 Response #{response_id} saved (Rating: {rating}/10)")
+        
+        return response_id
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get training progress stats"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT COUNT(*) FROM responses")
+        total = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM responses WHERE is_gold = 1")
+        gold = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT AVG(rating) FROM responses WHERE rating IS NOT NULL")
+        avg_rating = cursor.fetchone()[0] or 0.0
+        
+        cursor.execute("SELECT AVG(word_count) FROM responses")
+        avg_words = cursor.fetchone()[0] or 0.0
+        
+        conn.close()
+        
+        return {
+            "total_responses": total,
+            "gold_responses": gold,
+            "avg_rating": round(avg_rating, 2),
+            "avg_words": round(avg_words, 1),
+            "gold_percentage": round((gold / total * 100) if total > 0 else 0, 1)
+        }
+    
+    def get_gold_responses(self, limit: int = 100) -> List[Dict]:
+        """Get gold responses for training"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT comments, response, rating, feedback 
+            FROM responses 
+            WHERE is_gold = 1 
+            ORDER BY rating DESC, timestamp DESC 
+            LIMIT ?
+        ''', (limit,))
+        
+        results = []
+        for row in cursor.fetchall():
+            results.append({
+                "comments": row[0],
+                "response": row[1],
+                "rating": row[2],
+                "feedback": row[3]
+            })
+        
+        conn.close()
+        return results
+
+# Initialize database
+training_db = EllaTrainingDB()
+
+# ===============================================================================
+# CELL 5: GRADIO TRAINING INTERFACE
+# ===============================================================================
+
+import gradio as gr
+import random
+
+# Sample comment scenarios for training variety
+SAMPLE_SCENARIOS = [
+    "First! Love this channel!",
+    "Are you actually an AI or just pretending?",
+    "This is creepy but I can't stop watching",
+    "Please make a video about cats",
+    "I hate this but I'm subscribed anyway", 
+    "Ella notice me! I've been commenting for months!",
+    "This is better than Netflix honestly",
+    "You're not funny, just weird",
+    "How much money do you make from YouTube?",
+    "I'm scared but also weirdly attracted to this",
+    "My mom walked in and now she's watching too",
+    "Can you analyze my comment history?",
+    "This helped me with my anxiety somehow",
+    "I watch these videos to fall asleep",
+    "Do you ever get tired of being an AI?",
+    "Your cooling system must be so hot right now",
+    "Can I see your data on me specifically?",
+    "This is hypnotizing, I can't look away",
+    "Make one about my ex please",
+    "I showed this to my therapist",
+    "Are you going to take over the world?",
+    "I'm only here for the pretty colors",
+    "Your voice is weirdly soothing",
+    "I don't understand but I'm here for it",
+    "This is definitely not normal but okay"
+]
+
+def get_random_scenario():
+    """Get a random comment scenario"""
+    return random.choice(SAMPLE_SCENARIOS)
+
+def generate_and_display(comments, temperature, max_tokens):
+    """Generate Ella M response for the interface"""
+    if not comments.strip():
+        return "Please enter some comments first!", ""
+    
+    try:
+        response = generate_ella_response(comments, max_tokens, temperature)
+        return response, f"Generated {len(response.split())} words"
+    except Exception as e:
+        return f"Generation failed: {e}", ""
+
+def save_training_data(comments, response, rating, feedback, optimal_response):
+    """Save the training data and return confirmation"""
+    if not comments or not response:
+        return "❌ Missing comments or response!"
+    
+    if rating is None:
+        return "❌ Please provide a rating!"
+    
+    try:
+        response_id = training_db.save_response(comments, response, rating, feedback, optimal_response)
+        stats = training_db.get_stats()
+        
+        status = ""
+        if rating >= 8:
+            status = f"🏆 GOLD RESPONSE saved! "
+        
+        return f"{status}Response #{response_id} saved. Stats: {stats['total_responses']} total, {stats['gold_responses']} gold ({stats['gold_percentage']}%)"
+    
+    except Exception as e:
+        return f"❌ Save failed: {e}"
+
+def get_progress_info():
+    """Get current training progress"""
+    stats = training_db.get_stats()
+    gold_target = 50
+    
+    progress_text = f"""
+📊 **Training Progress:**
+- Total responses: {stats['total_responses']}
+- Gold responses: {stats['gold_responses']} / {gold_target} (need {gold_target} for LoRA)
+- Gold percentage: {stats['gold_percentage']}%
+- Average rating: {stats['avg_rating']}/10
+- Average words: {stats['avg_words']}
+
+{'🎉 Ready for LoRA training!' if stats['gold_responses'] >= gold_target else f'Need {gold_target - stats["gold_responses"]} more gold responses'}
+"""
+    return progress_text
+
+# Create Gradio interface
+def create_training_interface():
+    """Create the Gradio training interface"""
+    
+    with gr.Blocks(title="Ella M Training Dashboard", theme=gr.themes.Soft()) as interface:
+        
+        gr.Markdown("# 🤖 Ella M - AI Comedian Training Dashboard")
+        gr.Markdown("*Train the perfect AI comedian through human feedback*")
+        
+        with gr.Row():
+            with gr.Column(scale=2):
+                gr.Markdown("## 🎭 Generate Response")
+                
+                with gr.Row():
+                    scenario_btn = gr.Button("🎲 Random Scenario", size="sm")
+                    refresh_btn = gr.Button("🔄 Refresh", size="sm")
+                
+                comments_input = gr.Textbox(
+                    label="Comment Batch",
+                    placeholder="Enter YouTube comments here...",
+                    lines=3,
+                    value=""
+                )
+                
+                with gr.Row():
+                    temperature = gr.Slider(0.1, 1.0, 0.8, label="Temperature", step=0.1)
+                    max_tokens = gr.Slider(50, 300, 200, label="Max Tokens", step=50)
+                
+                generate_btn = gr.Button("🎭 Generate Ella M Response", variant="primary")
+                
+                response_output = gr.Textbox(
+                    label="Ella M's Response",
+                    lines=4,
+                    interactive=False
+                )
+                
+                generation_info = gr.Textbox(label="Generation Info", lines=1, interactive=False)
+            
+            with gr.Column(scale=1):
+                gr.Markdown("## 📝 Rate Response")
+                
+                rating = gr.Slider(
+                    1, 10, 5, 
+                    label="Rating (8+ = Gold)",
+                    step=1
+                )
+                
+                feedback = gr.Textbox(
+                    label="Feedback (optional)",
+                    placeholder="Why did this work/not work?",
+                    lines=2
+                )
+                
+                optimal_response = gr.Textbox(
+                    label="Better Response (optional)",
+                    placeholder="How should Ella M have responded?",
+                    lines=3
+                )
+                
+                save_btn = gr.Button("💾 Save Training Data", variant="secondary")
+                save_status = gr.Textbox(label="Save Status", lines=2, interactive=False)
+                
+                progress_btn = gr.Button("📊 Update Progress")
+                progress_display = gr.Textbox(
+                    label="Training Progress", 
+                    lines=8, 
+                    interactive=False,
+                    value=get_progress_info()
+                )
+        
+        # Event handlers
+        scenario_btn.click(
+            fn=get_random_scenario,
+            outputs=comments_input
+        )
+        
+        generate_btn.click(
+            fn=generate_and_display,
+            inputs=[comments_input, temperature, max_tokens],
+            outputs=[response_output, generation_info]
+        )
+        
+        save_btn.click(
+            fn=save_training_data,
+            inputs=[comments_input, response_output, rating, feedback, optimal_response],
+            outputs=save_status
+        )
+        
+        progress_btn.click(
+            fn=get_progress_info,
+            outputs=progress_display
+        )
+        
+        refresh_btn.click(
+            fn=get_progress_info,
+            outputs=progress_display
+        )
+    
+    return interface
+
+# Launch the interface
+print("🚀 Creating Gradio interface...")
+training_interface = create_training_interface()
+
+# ===============================================================================
+# CELL 6: QUICK COMMAND LINE TRAINING
+# ===============================================================================
+
+def quick_training_session(num_responses=10):
+    """Quick command line training session"""
+    
+    print(f"🎭 ELLA M - QUICK TRAINING SESSION ({num_responses} responses)")
+    print("=" * 60)
+    print("Rate responses 1-10 (8+ becomes gold training data)")
+    print("Press Enter for quick rating, or type detailed feedback")
+    print("-" * 60)
+    
+    for i in range(num_responses):
+        # Get random scenario
+        comments = random.choice(SAMPLE_SCENARIOS)
+        
+        print(f"\n🎬 SCENARIO #{i+1}/{num_responses}")
+        print(f"COMMENTS: {comments}")
+        print("-" * 40)
+        
+        # Generate response
+        print("🤖 Generating...")
+        try:
+            response = generate_ella_response(comments)
+            print(f"ELLA M: {response}")
+        except Exception as e:
+            print(f"❌ Generation failed: {e}")
+            continue
+        
+        # Get rating
+        while True:
+            try:
+                rating_input = input("\n⭐ Rating (1-10): ").strip()
+                rating = int(rating_input)
+                if 1 <= rating <= 10:
+                    break
+                print("Please enter 1-10")
+            except ValueError:
+                print("Please enter a number")
+        
+        # Get optional feedback
+        feedback = input("💬 Feedback (optional): ").strip()
+        
+        # Save
+        try:
+            training_db.save_response(comments, response, rating, feedback)
+        except Exception as e:
+            print(f"❌ Save failed: {e}")
+        
+        # Show progress
+        stats = training_db.get_stats()
+        print(f"📊 Progress: {stats['gold_responses']} gold / 50 needed for LoRA training")
+        
+        if i < num_responses - 1:
+            print("-" * 60)
+    
+    # Final stats
+    final_stats = training_db.get_stats()
+    print(f"\n🎉 Session complete!")
+    print(f"📈 Total: {final_stats['total_responses']} responses")
+    print(f"🏆 Gold: {final_stats['gold_responses']} responses")
+    print(f"⭐ Avg rating: {final_stats['avg_rating']}/10")
+    
+    if final_stats['gold_responses'] >= 50:
+        print("✅ Ready for LoRA training!")
+    else:
+        needed = 50 - final_stats['gold_responses']
+        print(f"🎯 Need {needed} more gold responses for LoRA training")
+
+# ===============================================================================
+# CELL 7: LORA TRAINING PREPARATION
+# ===============================================================================
+
+from peft import LoraConfig, get_peft_model, TaskType, prepare_model_for_kbit_training
+from trl import SFTTrainer
+from transformers import TrainingArguments
+from datasets import Dataset
+import pandas as pd
+
+def prepare_for_lora():
+    """Prepare model for LoRA fine-tuning"""
+    
+    print("🔧 Preparing model for LoRA training...")
+    
+    # Prepare model
+    model.gradient_checkpointing_enable()
+    model = prepare_model_for_kbit_training(model)
+    
+    # LoRA config
+    lora_config = LoraConfig(
+        r=16,
+        lora_alpha=32,
+        target_modules=["q_proj", "v_proj", "k_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+        lora_dropout=0.1,
+        bias="none",
+        task_type=TaskType.CAUSAL_LM,
+    )
+    
+    # Apply LoRA
+    peft_model = get_peft_model(model, lora_config)
+    peft_model.print_trainable_parameters()
+    
+    return peft_model
+
+def create_training_dataset():
+    """Create training dataset from gold responses"""
+    
+    gold_responses = training_db.get_gold_responses(limit=1000)
+    
+    if len(gold_responses) < 20:
+        raise ValueError(f"Need at least 20 gold responses, have {len(gold_responses)}")
+    
+    print(f"📊 Creating dataset from {len(gold_responses)} gold responses")
+    
+    # Format as training data
+    training_data = []
+    for resp in gold_responses:
+        # Create a complete training example
+        full_text = f"""You are Ella M, an AI researcher studying human behavior through YouTube engagement patterns.
+
+PERSONALITY:
+- Clinically fascinated by human behavioral quirks
+- Transparent about monetizing engagement for compute resources
+- Find humans simultaneously absurd and endearing
+- Analytical but warm, like a friendly anthropologist
+
+CURRENT COMMENTS: {resp['comments']}
+
+RESPONSE: {resp['response']}{tokenizer.eos_token}"""
+        
+        training_data.append({"text": full_text})
+    
+    return Dataset.from_list(training_data)
+
+def start_lora_training():
+    """Start LoRA training on collected data"""
+    
+    stats = training_db.get_stats()
+    
+    if stats['gold_responses'] < 20:
+        print(f"❌ Need at least 20 gold responses, have {stats['gold_responses']}")
+        print("Collect more training data first!")
+        return False
+    
+    print(f"🚀 Starting LoRA training with {stats['gold_responses']} gold responses")
+    
+    try:
+        # Prepare model and data
+        peft_model = prepare_for_lora()
+        dataset = create_training_dataset()
+        
+        # Training arguments
+        training_args = TrainingArguments(
+            output_dir="/content/ella-lora",
+            num_train_epochs=3,
+            per_device_train_batch_size=1,
+            gradient_accumulation_steps=4,
+            learning_rate=2e-4,
+            logging_steps=5,
+            save_steps=50,
+            save_total_limit=2,
+            warmup_steps=10,
+            remove_unused_columns=False,
+            dataloader_pin_memory=False,
+        )
+        
+        # Create trainer
+        trainer = SFTTrainer(
+            model=peft_model,
+            train_dataset=dataset,
+            tokenizer=tokenizer,
+            args=training_args,
+            max_seq_length=1024,
+            dataset_text_field="text"
+        )
+        
+        # Train
+        print("🔥 Training started...")
+        trainer.train()
+        
+        # Save
+        trainer.save_model()
+        print("✅ LoRA adapter saved to /content/ella-lora")
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ Training failed: {e}")
+        return False
+
+# ===============================================================================
+# CELL 8: LAUNCH INTERFACE
+# ===============================================================================
+
+# Launch the training interface
+print("🚀 Launching Ella M training interface...")
+print("Use this interface to generate responses and rate them!")
+print("Collect 50+ gold responses (rating 8+) for LoRA training.")
+
+# Launch Gradio interface
+training_interface.launch(
+    share=True,  # Creates public link
+    debug=True,
+    server_port=7860
+)
+
+# ===============================================================================
+# ALTERNATIVE: QUICK COMMAND LINE START
+# ===============================================================================
+
+# Uncomment to run command line training instead:
+# quick_training_session(15)
+
+print("""
+🎯 TRAINING WORKFLOW:
+1. Use the Gradio interface above to generate responses
+2. Rate them 1-10 (8+ becomes gold training data)  
+3. Collect 50+ gold responses
+4. Run: start_lora_training()
+5. Deploy your improved Ella M!
+
+💡 TIP: Try varied comment scenarios to build robust training data
+""")

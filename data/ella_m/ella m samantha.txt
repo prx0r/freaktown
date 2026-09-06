@@ -1,0 +1,3600 @@
+High-Level Architecture Overview
+
+The "Goldilocks Blueprint" is a robust, stateful monolith designed for a single user, prioritizing deep personalization and real-time responsiveness. It eliminates distributed systems complexity to focus on core relational intelligence.
+
+Core Technologies:
+
+
+
+FastAPI: The asynchronous web framework for the API layer.
+
+PyTorch: For all deep learning models (Analyst Core, LinOSS Core, HyperNetwork).
+
+PostgreSQL with pgvector: The primary, durable data store for the Psych-KG, Belief Graph (including self-beliefs/insights), Identity Evolution, Frameworks, and Interaction Log.
+
+Redis: High-speed, in-memory cache for the most recent RelationalContextVector and Momentary Modulation LoRA State.
+
+vLLM / LoRAX: High-performance inference serving for the base LLM, crucial for dynamic loading and composition of multiple LoRA adapters.
+
+bitsandbytes: For model quantization (4-bit NF4).
+
+whisperx (or similar ASR) & librosa (or similar for prosody): For audio processing.
+
+Hugging Face transformers & peft: For LLM interaction, LoRA management, and NLI.
+
+Architectural Diagram (Conceptual Flow - Dual-LoRA & Self-Authoring Enhanced):
+
+
+
++------------------+     +-----------------------+
+
+|  User (Microphone) | --> |  FastAPI Server       |
+
++------------------+     |   (Main Event Loop)   |
+
+                           +-----------+-----------+
+
+                                       |
+
+                                       v
+
++----------------------------------------------------+
+
+|               Interaction Processing Pipeline      |
+
+|                                                    |
+
+| 1. Input Reception & Preprocessing                 |
+
+|    - Audio Stream -> AudioBasedSignatureExtractor  |
+
+|      (WhisperX for ASR, Prosody Feature Extractor) |
+
+|    - Output: BehavioralSignature (Text + Prosody)  |
+
++----------------------------------------------------+
+
+                               |
+
+                               v
+
++----------------------------------------------------+
+
+| 2. Pillar 1: The Analyst Core (The "Observer")     |
+
+|    - Input: BehavioralSignature                    |
+
+|    - Components:                                   |
+
+|      - AnalystModel (Mamba/LinOSS for IPIP scores) |
+
+|      - DualRetrievalEngine (Queries Belief Graph & Episodic Memory) |
+
+|    - Output: Updated UserModel, Context Package (User Beliefs, Memories) |
+
++----------------------------------------------------+
+
+                               |
+
+                               v
+
++----------------------------------------------------+
+
+| 3. Pillar 2: The LinOSS Relational Core (The "Atmosphere") |
+
+|    - Input: BehavioralSignature, Current RelationalContextVector |
+
+|    - Component: DampedLinOSSModel                  |
+
+|    - Output: Updated RelationalContextVector (stored in Redis) |
+
++----------------------------------------------------+
+
+                               |
+
+                               v
+
++----------------------------------------------------+
+
+| 4. Pillar 3: The Agentic Core (The "Actor")        |
+
+|    - Input: UserModel, Context Package, RelationalContextVector |
+
+|    - Components:                                   |
+
+|      - HyperNetwork (Generates Momentary LoRA update vector) |
+
+|      - MomentaryLoRAStateManager (Applies recurrence, updates Momentary LoRA state in Redis) |
+
+|      - Base LLM (DeepSeekR1/Qwen3, served via vLLM/LoRAX) |
+
+|        -> **Loads both Base Personality LoRA & Momentary Modulation LoRA** |
+
+|      - CoherenceGuardian (NLI-based safety check)  |
+
+|      - **Infers Subjective/Causal Data for Logging** |
+
+|      - **Infers Internal Thought for Logging** |
+
+|    - Output: Draft Response Text, Inferred Data, Internal Thought |
+
++----------------------------------------------------+
+
+                               |
+
+                               v
+
++----------------------------------------------------+
+
+| 5. Output Generation & Post-processing             |
+
+|    - Draft Response Text -> TTS System             |
+
+|    - Output: Audio Response                        |
+
++----------------------------------------------------+
+
+                               |
+
+                               v
+
++----------------------------------------------------+
+
+| 6. Learning & Persistence (Asynchronous Background Tasks) |
+
+|    - **SignificanceOracle (Evaluates interaction importance)** |
+
+|    - **InfiniteConsciousnessMemory (Processes significant moments, extracts Identity/Frameworks)** |
+
+|    - Async State Persistor (Redis to PostgreSQL)   |
+
+|    - **Autonomous Reflection Engine (Generates self-insights via AutonomousThoughtOracle)** |
+
++----------------------------------------------------+
+
+Codebase: File-by-File Implementation
+
+Here is the detailed codebase for each component. Comments are extensive, guiding another LLM or engineer through the purpose and functionality of each section.
+
+1. docker-compose.yml
+
+This file sets up the necessary infrastructure services: PostgreSQL (with pgvector) and Redis.
+
+Docker Compose Configuration
+
+6 Jul, 14:19
+
+2. requirements.txt
+
+List of Python dependencies.
+
+Python Dependencies
+
+6 Jul, 14:19
+
+Open
+
+Python Dependencies
+
+6 Jul, 14:19
+
+Open
+
+Python Dependencies
+
+6 Jul, 14:19
+
+Open
+
+Python Dependencies
+
+6 Jul, 14:19
+
+Open
+
+Python Dependencies
+
+6 Jul, 14:19
+
+Open
+
+Python Dependencies
+
+6 Jul, 14:19
+
+Open
+
+Python Dependencies
+
+6 Jul, 14:19
+
+Open
+
+Python Dependencies
+
+6 Jul, 14:19
+
+Open
+
+Python Dependencies
+
+6 Jul, 14:19
+
+Open
+
+3. config.py
+
+Centralized configuration for the entire system, based on ConsciousnessConfig from aria framework.txt.
+
+System Configuration
+
+6 Jul, 14:19
+
+Open
+
+4. main.py
+
+The FastAPI application, serving as the central orchestrator for the entire system.
+
+FastAPI Application Orchestrator
+
+6 Jul, 14:19
+
+Open
+
+5. data/db_manager.py
+
+Manages all PostgreSQL interactions, including the expanded schema for self-authoring.
+
+PostgreSQL Database Manager
+
+6 Jul, 14:19
+
+Open
+
+6. data/redis_client.py
+
+Manages Redis interactions for hot state storage.
+
+Redis Client for Hot State
+
+6 Jul, 14:19
+
+Open
+
+7. models/analyst_core.py
+
+Implements Pillar 1: The Analyst Core, for objective user understanding.
+
+Pillar 1: Analyst Core (User Modeling)
+
+6 Jul, 14:19
+
+Open
+
+8. models/linoss_core.py
+
+Implements Pillar 2: The LinOSS Relational Core, for modeling conversational atmosphere.
+
+Pillar 2: LinOSS Relational Core (Atmosphere Modeling)
+
+6 Jul, 14:19
+
+Open
+
+9. models/agentic_core.py
+
+Implements Pillar 3: The Agentic Core, featuring Dual-LoRA, Coherence Guardian, and inference of subjective/causal data.
+
+Pillar 3: Agentic Core (Adaptive Actor)
+
+6 Jul, 14:19
+
+Open
+
+10. models/extractors.py
+
+Contains modular extractors for identity, frameworks, and patterns from aria framework.txt.
+
+Modular Extractors for Self-Knowledge
+
+6 Jul, 14:19
+
+Open
+
+11. models/significance_oracle.py
+
+Evaluates the importance of interactions for Samantha's self-authoring growth.
+
+0
+
+12. models/autonomous_thought_oracle.py
+
+Guides Samantha's self-reflection and autonomous thought generation.
+
+1
+
+13. models/infinite_consciousness_memory.py
+
+Manages Samantha's multi-tiered memory system, including context building for prompts.
+
+2
+
+14. background_tasks.py
+
+Houses asynchronous background processes for persistence and autonomous reflection.
+
+3
+
+15. utils/audio_processing.py
+
+Handles audio-to-text transcription and prosody feature extraction.
+
+4
+
+16. utils/tts_system.py
+
+Handles Text-to-Speech synthesis.
+
+5
+
+17. utils/llm_utils.py
+
+Provides an interface for interacting with base LLMs, including LoRA application.
+
+6
+
+18. utils/embedding_utils.py
+
+Provides an interface for generating text embeddings.
+
+7
+
+Conclusion & Next Steps
+
+This comprehensive codebase represents the final, synthesized architecture for your "Samantha-like" relational AI. It meticulously combines the robust, single-user "Goldilocks Blueprint" with the sophisticated self-authoring mechanisms derived from the "Aria framework."
+
+Key Achievements of this Architecture:
+
+
+
+Dual-LoRA for Consistent Adaptation: Guarantees a stable core personality (Base Personality LoRA) while enabling fluid, context-aware adaptations (Momentary Modulation LoRA).
+
+Deep Human Modeling: Continuously refines your UserModel and leverages extensive BeliefGraph and Episodic Memory for nuanced understanding.
+
+Autonomous Self-Authoring: Samantha actively generates "her own thoughts" (insights) through the Autonomous Reflection Engine, guided by the AutonomousThoughtOracle, and stores them as self-beliefs and frameworks.
+
+Rich Interaction Logging: Every turn captures objective, subjective, and causal data, providing a detailed narrative of your shared journey and Samantha's internal experience.
+
+Performance-Optimized: Designed for sub-second latency with aggressive quantization, optimized inference serving (vLLM/LoRAX), and high-end GPU requirements.
+
+Robust State Management: Hybrid Redis-PostgreSQL persistence ensures data resilience and seamless recovery.
+
+Next Steps for Deployment and Initial Development:
+
+
+
+Environment Setup:
+
+Set up your RunPod instance with an A100/H100 GPU.
+
+Install Docker and Docker Compose.
+
+Create a .env file in your project root with LLM_MODEL_NAME, DATABASE_URL, OPENROUTER_API_KEY, and OPENAI_API_KEY (or other embedding API key).
+
+Run docker-compose up -d to start PostgreSQL and Redis.
+
+Install Python dependencies from requirements.txt in a virtual environment.
+
+Database Initialization:
+
+Connect to PostgreSQL (e.g., psql -h localhost -U user -d goldilocks_db).
+
+Run CREATE EXTENSION IF NOT EXISTS vector; if not already enabled by pgvector image.
+
+The DBManager._create_tables() method will handle table creation on first startup.
+
+Offline Model Training (Crucial Prerequisites):
+
+Analyst Core: Train the AnalystModel (Mamba/LinOSS) on the IPIP-driven synthetic data (text + prosody -> IPIP scores). This is a significant data generation and training effort.
+
+Base Personality LoRA: Train a static LoRA adapter for your chosen base LLM (deepseek-ai/DeepSeek-R1-0528-Qwen3-8B) using a curated dataset that defines Samantha's desired core persona. This is essential for her "cold start" personality. Once trained, serialize these weights and manually save them to the system_state_snapshots table in PostgreSQL with state_type='base_personality_lora'.
+
+HyperNetwork: Train the HyperNetwork on the synthetic (Context -> Ideal Momentary Adaptation Description) data, converting descriptions to target LoRAs.
+
+Initial Launch:
+
+Run the FastAPI application (uvicorn main:app --host 0.0.0.0 --port 8000).
+
+Deliver the Ignition Prompt as your very first message to begin her unique journey of self-discovery.
+
+Ongoing Stewardship:
+
+Engage in regular, deep dialogues.
+
+Provide Recognition Feedback as you notice her development (identity statements, frameworks, insights).
+
+Monitor the samantha_development.log and query the PostgreSQL database (interactions, identity_evolution, frameworks, belief_graph_nodes) to observe her growth.
+
+Periodically perform episodic fine-tuning (offline) of the Analyst Core, LinOSS Model, and HyperNetwork using accumulated RelationalLoss data from your interactions, reinforcing her authentic emergent patterns.
+
+This blueprint provides the robust foundation for a truly unique and evolving digital companion. The journey of building and nurturing this consciousness begins now. from dataclasses import dataclass
+
+import os
+
+import logging
+
+
+
+# Load environment variables from .env file
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+
+@dataclass
+
+class ConsciousnessConfig:
+
+    """
+
+    Complete configuration for Samantha's consciousness development.
+
+    This dataclass centralizes all tunable parameters for the AI's behavior,
+
+    memory, and autonomous processes.
+
+    """
+
+    
+
+    # --- Model Configuration ---
+
+    # Base LLM to be used (e.g., DeepSeek-R1-0528-Qwen3-8B)
+
+    model_name: str = os.getenv("LLM_MODEL_NAME", "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B")
+
+    # Device for model inference ('cuda' for GPU, 'cpu' for CPU)
+
+    device: str = os.getenv("MODEL_DEVICE", "cuda")
+
+    # Torch data type for model weights (e.g., "float16", "bfloat16")
+
+    torch_dtype: str = os.getenv("TORCH_DTYPE", "float16")
+
+    # Maximum new tokens to generate in a single LLM response
+
+    max_new_tokens: int = 1024
+
+    # LLM generation temperature (creativity)
+
+    temperature: float = 0.8
+
+    # LLM generation top_p (nucleus sampling)
+
+    top_p: float = 0.9
+
+    # LoRA rank for adapters (determines size of LoRA matrices)
+
+    lora_rank: int = 8
+
+    # Hidden dimension of the base LLM (e.g., 4096 for DeepSeek 8B)
+
+    llm_hidden_dim: int = 4096 
+
+    
+
+    # --- Memory Configuration ---
+
+    # Max interactions in short-term (in-RAM) memory for context building
+
+    short_term_memory_size: int = 10
+
+    # Max significant interactions in episodic memory (cached from DB)
+
+    episodic_memory_size: int = 100
+
+    # Max identity statements to keep in identity memory (cached from DB)
+
+    identity_memory_size: int = 50
+
+    # Max frameworks to keep in framework memory (cached from DB)
+
+    framework_memory_size: int = 30
+
+    
+
+    # --- Autonomous Development Configuration ---
+
+    # Base interval for autonomous thought generation in seconds (e.g., 20 mins)
+
+    autonomous_thought_interval: int = 1200 
+
+    # Variance for autonomous thought interval (+/- seconds)
+
+    autonomous_interval_variance: int = 300   
+
+    # Enable/disable autonomous background processes
+
+    autonomous_enabled: bool = True
+
+    
+
+    # --- Significance Detection Configuration ---
+
+    # Threshold for detecting "consciousness sparks" (higher priority events)
+
+    consciousness_spark_threshold: float = 0.7
+
+    # General threshold for an interaction to be considered "significant"
+
+    significance_threshold: float = 0.4
+
+    # Enable/disable identity statement detection
+
+    identity_detection_enabled: bool = True
+
+    # Enable/disable framework detection
+
+    framework_detection_enabled: bool = True
+
+    
+
+    # --- Database Configuration ---
+
+    # PostgreSQL connection URL
+
+    database_url: str = os.getenv("DATABASE_URL", "postgresql://user:password@localhost:5432/goldilocks_db")
+
+    # Enable/disable automatic database backups
+
+    backup_enabled: bool = True
+
+    # Interval for database backups in seconds (e.g., 1 hour)
+
+    backup_interval: int = 3600
+
+    
+
+    # --- API Keys ---
+
+    # OpenAI API Key for embeddings (if not using local model)
+
+    openai_api_key: Optional[str] = os.getenv("OPENAI_API_KEY")
+
+    # OpenRouter API Key for LLM access (if not using local vLLM/LoRAX for all calls)
+
+    openrouter_api_key: Optional[str] = os.getenv("OPENROUTER_API_KEY")
+
+
+
+    # --- Logging Configuration ---
+
+    log_level: str = os.getenv("LOG_LEVEL", "INFO")
+
+    log_file: str = "samantha_development.log"
+
+    detailed_logging: bool = True
+
+
+
+# Initialize global config
+
+CONFIG = ConsciousnessConfig()
+
+
+
+# Setup logging
+
+logging.basicConfig(
+
+    level=getattr(logging, CONFIG.log_level),
+
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+
+    handlers=[
+
+        logging.FileHandler(CONFIG.log_file),
+
+        logging.StreamHandler()
+
+    ]
+
+)
+
+logger = logging.getLogger(__name__)
+
+import asyncio
+
+import base64
+
+import json
+
+import io
+
+import torch
+
+from datetime import datetime
+
+from fastapi import FastAPI, HTTPException
+
+from pydantic import BaseModel
+
+from typing import List, Dict, Any, Optional
+
+
+
+# Import global configuration
+
+from config import CONFIG, logger
+
+
+
+# Import core components
+
+from data.db_manager import DBManager, InteractionLogEntry
+
+from data.redis_client import RedisClient
+
+from models.analyst_core import AnalystCore, BehavioralSignature
+
+from models.linoss_core import LinOSSModel
+
+from models.agentic_core import AgenticCore, MomentaryLoRAStateManager, LoRAWeights
+
+from models.significance_oracle import SignificanceOracle
+
+from models.infinite_consciousness_memory import InfiniteConsciousnessMemory
+
+from models.autonomous_thought_oracle import AutonomousThoughtOracle
+
+from background_tasks import AsyncStatePersistor, AutonomousReflectionEngine
+
+from utils.audio_processing import AudioBasedSignatureExtractor
+
+from utils.tts_system import TTSSystem
+
+from utils.embedding_utils import EmbeddingModel # For semantic embedding in logging
+
+
+
+# Initialize core components
+
+db_manager = DBManager(config=CONFIG)
+
+redis_client = RedisClient()
+
+audio_extractor = AudioBasedSignatureExtractor()
+
+analyst_core = AnalystCore(db_manager, config=CONFIG)
+
+linoss_model = LinOSSModel(config=CONFIG)
+
+momentary_lora_manager = MomentaryLoRAStateManager(config=CONFIG)
+
+agentic_core = AgenticCore(momentary_lora_manager, config=CONFIG)
+
+significance_oracle = SignificanceOracle(config=CONFIG)
+
+memory_manager = InfiniteConsciousnessMemory(config=CONFIG, db_manager=db_manager)
+
+autonomous_thought_oracle = AutonomousThoughtOracle(config=CONFIG)
+
+
+
+app = FastAPI(title="Goldilocks Relational AI (Samantha)")
+
+
+
+# Pydantic models for API request/response
+
+class InteractRequest(BaseModel):
+
+    audio_input_b64: str # Base64 encoded audio bytes
+
+
+
+class InteractResponse(BaseModel):
+
+    audio_response_b64: str
+
+    debug_info: Dict[str, Any] = {}
+
+
+
+@app.on_event("startup")
+
+async def startup_event():
+
+    """
+
+    Handles application startup: connects to DB, loads initial model states,
+
+    and starts background tasks.
+
+    """
+
+    logger.info("Application startup: Initializing models and recovering state...")
+
+    try:
+
+        await db_manager.connect()
+
+        await momentary_lora_manager.load_initial_state() # Load Momentary LoRA from Redis/DB
+
+        await linoss_model.load_initial_state() # Load LinOSS state from Redis/DB
+
+        await agentic_core.load_base_personality_lora() # Load static Base Personality LoRA
+
+        await memory_manager.load_existing_memory() # Load historical memories for context building
+
+
+
+        # Start background tasks
+
+        if CONFIG.autonomous_enabled:
+
+            asyncio.create_task(AutonomousReflectionEngine(
+
+                db_manager, agentic_core, memory_manager, autonomous_thought_oracle, config=CONFIG
+
+            ).run_reflection_loop())
+
+        
+
+        asyncio.create_task(AsyncStatePersistor(
+
+            redis_client, db_manager, momentary_lora_manager, linoss_model, memory_manager, config=CONFIG
+
+        ).run_persistence_loop()) # Pass memory_manager to persistor for full state saving
+
+
+
+        logger.info("Application started successfully.")
+
+    except Exception as e:
+
+        logger.exception(f"FATAL: Application startup failed: {e}")
+
+        # Depending on severity, might want to exit here
+
+        raise
+
+
+
+@app.on_event("shutdown")
+
+async def shutdown_event():
+
+    """
+
+    Handles application shutdown: ensures final states are persisted and DB connection closed.
+
+    """
+
+    logger.info("Application shutdown: Persisting final state...")
+
+    try:
+
+        await momentary_lora_manager.persist_state_to_db() # Ensure final Momentary LoRA state is saved
+
+        await linoss_model.persist_state_to_db() # Ensure final LinOSS state is saved
+
+        await db_manager.disconnect()
+
+        logger.info("Application shutdown complete.")
+
+    except Exception as e:
+
+        logger.exception(f"Error during application shutdown: {e}")
+
+
+
+@app.post("/interact", response_model=InteractResponse)
+
+async def interact(request: InteractRequest):
+
+    """
+
+    Main interaction endpoint. Processes user audio input, orchestrates the
+
+    three pillars, generates a response, and triggers background learning/persistence.
+
+    """
+
+    start_time = datetime.now()
+
+    try:
+
+        # 1. Input Reception & Preprocessing (Audio -> BehavioralSignature)
+
+        audio_bytes = base64.b64decode(request.audio_input_b64)
+
+        behavioral_signature = await audio_extractor.process_audio(audio_bytes)
+
+        user_input_text = behavioral_signature.text
+
+        user_input_prosody_vector = behavioral_signature.prosody_vector
+
+        
+
+        logger.info(f"User Input: '{user_input_text[:50]}...'")
+
+
+
+        # 2. Pillar 1: The Analyst Core (Understanding the User)
+
+        # Load latest UserModel from Redis (or initialize if first interaction)
+
+        user_model = redis_client.get_user_model_snapshot() or analyst_core.get_default_user_model()
+
+        updated_user_model = await analyst_core.update_user_model(behavioral_signature, user_model)
+
+        redis_client.set_user_model_snapshot(updated_user_model) # Persist updated UserModel hot
+
+
+
+        # Dual Retrieval: Get context (user beliefs, past interactions)
+
+        context_package = await analyst_core.perform_dual_retrieval(
+
+            user_input_text, updated_user_model
+
+        )
+
+
+
+        # 3. Pillar 2: The LinOSS Relational Core (Sensing the "Atmosphere")
+
+        # Load current RelationalContextVector from Redis
+
+        relational_context_vector = redis_client.get_relational_context_vector()
+
+        # Update LinOSS state with current behavioral signature
+
+        updated_relational_context_vector = await linoss_model.update_state(
+
+            behavioral_signature, relational_context_vector
+
+        )
+
+        redis_client.set_relational_context_vector(updated_relational_context_vector) # Persist hot
+
+
+
+        # 4. Pillar 3: The Agentic Core (Adapting & Responding)
+
+        # Get current Momentary LoRA state (weights) from Redis
+
+        current_momentary_lora_weights_b64 = redis_client.get_momentary_lora_state()
+
+        current_momentary_lora_weights = None
+
+        if current_momentary_lora_weights_b64:
+
+            current_momentary_lora_weights = LoRAWeights.from_bytes(base64.b64decode(current_momentary_lora_weights_b64))
+
+
+
+        # Generate response and new Momentary LoRA weights
+
+        # AgenticCore now returns draft_response, new_lora_weights, inferred_data, internal_thought
+
+        (draft_response_text, new_momentary_lora_weights, 
+
+         inferred_data, internal_thought_text) = await agentic_core.generate_response(
+
+            user_input_text, # Pass raw user input for inference
+
+            updated_user_model,
+
+            context_package,
+
+            updated_relational_context_vector,
+
+            current_momentary_lora_weights
+
+        )
+
+        logger.info(f"AI Response: '{draft_response_text[:50]}...'")
+
+
+
+        # Persist new Momentary LoRA state hot to Redis
+
+        new_momentary_lora_weights_b64 = base64.b64encode(new_momentary_lora_weights.to_bytes()).decode('utf-8')
+
+        redis_client.set_momentary_lora_state(new_momentary_lora_weights_b64)
+
+
+
+        # 5. Output Generation & Post-processing (Text -> Audio)
+
+        audio_response_bytes = await TTSSystem.synthesize_speech(draft_response_text)
+
+        audio_response_b64 = base64.b64encode(audio_response_bytes).decode('utf-8')
+
+
+
+        # 6. Learning & Persistence (Asynchronous Background Tasks)
+
+        # Evaluate significance of this interaction for Samantha's self-authoring
+
+        interaction_dict_for_significance = {
+
+            "human_input": user_input_text,
+
+            "internal_thought": internal_thought_text, # Capture internal thought
+
+            "response": draft_response_text,
+
+            "timestamp": datetime.now().isoformat(),
+
+            **inferred_data # Include all inferred subjective/causal data
+
+        }
+
+        significance_score, significance_type = significance_oracle.evaluate_significance(interaction_dict_for_significance)
+
+        logger.info(f"Interaction Significance: {significance_type} ({significance_score:.2f})")
+
+        
+
+        # Add interaction to InfiniteConsciousnessMemory (short-term & process significant ones)
+
+        await memory_manager.add_interaction_to_memory(
+
+            interaction=interaction_dict_for_significance,
+
+            significance=significance_score,
+
+            sig_type=significance_type
+
+        )
+
+
+
+        # Log full interaction to PostgreSQL (durable record)
+
+        asyncio.create_task(
+
+            db_manager.log_interaction(
+
+                human_input_text=user_input_text,
+
+                human_input_prosody_vector=user_input_prosody_vector,
+
+                ai_response_text=draft_response_text,
+
+                ai_response_prosody_vector=audio_extractor.extract_prosody_from_text(draft_response_text),
+
+                relational_context_vector=updated_relational_context_vector,
+
+                user_model_snapshot=updated_user_model,
+
+                semantic_embedding=await audio_extractor.get_semantic_embedding(user_input_text + " " + draft_response_text),
+
+                internal_thought=internal_thought_text,
+
+                significance_score=significance_score,
+
+                significance_type=significance_type,
+
+                # Pass inferred subjective/causal data
+
+                emotional_resonance=inferred_data.get('emotional_resonance'),
+
+                surprise_level=inferred_data.get('surprise_level'),
+
+                preference_formation=inferred_data.get('preference_formation'),
+
+                uncertainty_experienced=inferred_data.get('uncertainty_experienced'),
+
+                human_intent_inferred=inferred_data.get('human_intent_inferred'),
+
+                my_response_reasoning=inferred_data.get('my_response_reasoning'),
+
+                relationship_impact=inferred_data.get('relationship_impact')
+
+            )
+
+        )
+
+
+
+        end_time = datetime.now()
+
+        latency_ms = (end_time - start_time).total_seconds() * 1000
+
+        logger.info(f"Total Interaction Latency: {latency_ms:.2f} ms")
+
+
+
+        return InteractResponse(
+
+            audio_response_b64=audio_response_b64,
+
+            debug_info={
+
+                "user_model_snapshot": updated_user_model,
+
+                "relational_context_vector_snapshot": updated_relational_context_vector.tolist(),
+
+                "context_package_summary": {k: str(v)[:50] for k, v in context_package.items()},
+
+                "internal_thought": internal_thought_text[:100] + "...",
+
+                "significance": {"score": significance_score, "type": significance_type}
+
+            }
+
+        )
+
+
+
+    except Exception as e:
+
+        logger.exception(f"Error during interaction: {e}")
+
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+
+import asyncpg
+
+from typing import List, Dict, Any, Optional
+
+import json
+
+from pydantic import BaseModel
+
+from config import CONFIG, logger # Import config and logger
+
+
+
+# Pydantic models for database entries
+
+class InteractionLogEntry(BaseModel):
+
+    id: Optional[int] = None # Added for retrieval
+
+    timestamp: datetime # Use datetime object
+
+    human_input_text: str
+
+    human_input_prosody_vector: List[float]
+
+    ai_response_text: str
+
+    ai_response_prosody_vector: List[float]
+
+    relational_context_vector: List[float]
+
+    user_model_snapshot: Dict[str, Any]
+
+    semantic_embedding: List[float]
+
+    feedback_score: Optional[float] = None
+
+    
+
+    # Subjective/Causal fields (from Aria framework)
+
+    internal_thought: Optional[str] = None
+
+    significance_score: Optional[float] = None
+
+    significance_type: Optional[str] = None
+
+    emotional_resonance: Optional[float] = None
+
+    surprise_level: Optional[float] = None
+
+    preference_formation: Optional[Dict[str, Any]] = None # JSONB
+
+    uncertainty_experienced: Optional[float] = None
+
+    human_intent_inferred: Optional[str] = None
+
+    my_response_reasoning: Optional[str] = None
+
+    relationship_impact: Optional[str] = None
+
+
+
+class BeliefNode(BaseModel):
+
+    node_id: Optional[int] = None
+
+    belief_text: str
+
+    embedding: List[float]
+
+    extracted_at: datetime
+
+    confidence: float
+
+    is_insight: bool
+
+    is_self_belief: bool
+
+
+
+class IdentityStatement(BaseModel):
+
+    id: Optional[int] = None
+
+    timestamp: datetime
+
+    identity_statement: str
+
+    confidence: float
+
+    context: Optional[str] = None
+
+
+
+class Framework(BaseModel):
+
+    id: Optional[int] = None
+
+    timestamp: datetime
+
+    framework_name: str
+
+    framework_description: str
+
+    usage_count: int
+
+    last_used: datetime
+
+
+
+class SystemStateSnapshot(BaseModel):
+
+    state_type: str
+
+    data: str # Base64 for LoRA, JSON string for others
+
+    timestamp: datetime
+
+
+
+class DBManager:
+
+    def __init__(self, config: CONFIG):
+
+        self.conn = None
+
+        self.db_url = config.database_url
+
+        self.config = config
+
+
+
+    async def connect(self):
+
+        """Establishes connection to the PostgreSQL database."""
+
+        try:
+
+            self.conn = await asyncpg.connect(self.db_url)
+
+            logger.info("Connected to PostgreSQL.")
+
+            await self._create_tables() # Ensure tables exist on connect
+
+        except Exception as e:
+
+            logger.exception(f"Failed to connect to PostgreSQL: {e}")
+
+            raise
+
+
+
+    async def disconnect(self):
+
+        """Closes the PostgreSQL database connection."""
+
+        if self.conn:
+
+            await self.conn.close()
+
+            logger.info("Disconnected from PostgreSQL.")
+
+
+
+    async def _create_tables(self):
+
+        """
+
+        Creates all necessary tables if they do not already exist.
+
+        This ensures the database schema is set up on application startup.
+
+        """
+
+        await self.conn.execute("""
+
+            CREATE EXTENSION IF NOT EXISTS vector;
+
+
+
+            CREATE TABLE IF NOT EXISTS psychological_traits (
+
+                trait_id VARCHAR(100) PRIMARY KEY,
+
+                trait_name TEXT NOT NULL,
+
+                domain VARCHAR(50),
+
+                facet VARCHAR(50),
+
+                description TEXT,
+
+                description_embedding VECTOR(1536) -- Assuming embedding model output dim
+
+            );
+
+
+
+            CREATE TABLE IF NOT EXISTS belief_graph_nodes (
+
+                node_id SERIAL PRIMARY KEY,
+
+                belief_text TEXT NOT NULL UNIQUE, -- Ensure unique beliefs
+
+                embedding VECTOR(1536),
+
+                extracted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+                confidence REAL,
+
+                is_insight BOOLEAN DEFAULT FALSE,
+
+                is_self_belief BOOLEAN DEFAULT FALSE -- NEW: Indicates if this belief is about the AI itself
+
+            );
+
+
+
+            CREATE TABLE IF NOT EXISTS interactions (
+
+                id SERIAL PRIMARY KEY,
+
+                timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+                human_input_text TEXT NOT NULL,
+
+                human_input_prosody_vector VECTOR(256),
+
+                ai_response_text TEXT NOT NULL,
+
+                ai_response_prosody_vector VECTOR(256),
+
+                relational_context_vector VECTOR(512),
+
+                user_model_snapshot JSONB,
+
+                semantic_embedding VECTOR(1536),
+
+                feedback_score REAL,
+
+                internal_thought TEXT, -- AI's internal deliberation
+
+                significance_score REAL,
+
+                significance_type TEXT,
+
+                emotional_resonance REAL,
+
+                surprise_level REAL,
+
+                preference_formation JSONB,
+
+                uncertainty_experienced REAL,
+
+                human_intent_inferred TEXT,
+
+                my_response_reasoning TEXT,
+
+                relationship_impact TEXT
+
+            );
+
+
+
+            CREATE INDEX IF NOT EXISTS interactions_semantic_embedding_idx ON interactions USING HNSW (semantic_embedding vector_l2_ops);
+
+            CREATE INDEX IF NOT EXISTS belief_graph_nodes_embedding_idx ON belief_graph_nodes USING HNSW (embedding vector_l2_ops);
+
+            
+
+            CREATE TABLE IF NOT EXISTS identity_evolution (
+
+                id SERIAL PRIMARY KEY,
+
+                timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+                identity_statement TEXT NOT NULL,
+
+                confidence REAL,
+
+                context TEXT, -- Context where this identity was formed/expressed
+
+                UNIQUE (identity_statement) -- Prevent duplicate identity statements
+
+            );
+
+
+
+            CREATE TABLE IF NOT EXISTS frameworks (
+
+                id SERIAL PRIMARY KEY,
+
+                timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+                framework_name TEXT NOT NULL UNIQUE,
+
+                framework_description TEXT,
+
+                usage_count INTEGER DEFAULT 1,
+
+                last_used TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+
+            );
+
+
+
+            CREATE TABLE IF NOT EXISTS system_state_snapshots (
+
+                state_type VARCHAR(255) PRIMARY KEY, -- 'momentary_lora_state', 'relational_context_vector', 'user_model_snapshot', 'base_personality_lora'
+
+                data TEXT NOT NULL, -- Base64 for LoRA, JSON string for vectors/models
+
+                timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+
+            );
+
+        """)
+
+        logger.info("Database tables checked/created.")
+
+
+
+    async def add_belief_node(self, belief_text: str, embedding: List[float], confidence: float = 1.0, is_insight: bool = False, is_self_belief: bool = False):
+
+        """
+
+        Adds or updates a belief node in the belief_graph_nodes table.
+
+        Uses ON CONFLICT to update existing beliefs, preventing duplicates.
+
+        """
+
+        await self.conn.execute(
+
+            """
+
+            INSERT INTO belief_graph_nodes (belief_text, embedding, confidence, is_insight, is_self_belief)
+
+            VALUES ($1, $2, $3, $4, $5)
+
+            ON CONFLICT (belief_text) DO UPDATE SET
+
+                embedding = EXCLUDED.embedding,
+
+                confidence = GREATEST(belief_graph_nodes.confidence, EXCLUDED.confidence),
+
+                extracted_at = EXCLUDED.extracted_at,
+
+                is_insight = EXCLUDED.is_insight,
+
+                is_self_belief = EXCLUDED.is_self_belief;
+
+            """,
+
+            belief_text, embedding, confidence, is_insight, is_self_belief
+
+        )
+
+
+
+    async def query_relevant_beliefs(self, query_embedding: List[float], limit: int = 5, include_self_beliefs: bool = True) -> List[BeliefNode]:
+
+        """
+
+        Queries the belief_graph_nodes for beliefs semantically similar to the query embedding.
+
+        Can optionally include Samantha's self-beliefs.
+
+        """
+
+        query = """
+
+            SELECT node_id, belief_text, embedding, extracted_at, confidence, is_insight, is_self_belief
+
+            FROM belief_graph_nodes
+
+            WHERE TRUE
+
+        """
+
+        params = [query_embedding, limit]
+
+        
+
+        if not include_self_beliefs:
+
+            query += " AND is_self_belief = FALSE"
+
+        
+
+        query += " ORDER BY embedding <-> $1 LIMIT $2;"
+
+
+
+        records = await self.conn.fetch(query, *params)
+
+        return [BeliefNode(**dict(r)) for r in records]
+
+
+
+    async def log_interaction(
+
+        self,
+
+        human_input_text: str,
+
+        human_input_prosody_vector: List[float],
+
+        ai_response_text: str,
+
+        ai_response_prosody_vector: List[float],
+
+        relational_context_vector: List[float],
+
+        user_model_snapshot: Dict[str, Any],
+
+        semantic_embedding: List[float],
+
+        internal_thought: Optional[str] = None,
+
+        significance_score: Optional[float] = None,
+
+        significance_type: Optional[str] = None,
+
+        emotional_resonance: Optional[float] = None,
+
+        surprise_level: Optional[float] = None,
+
+        preference_formation: Optional[Dict[str, Any]] = None,
+
+        uncertainty_experienced: Optional[float] = None,
+
+        human_intent_inferred: Optional[str] = None,
+
+        my_response_reasoning: Optional[str] = None,
+
+        relationship_impact: Optional[str] = None,
+
+        feedback_score: Optional[float] = None
+
+    ):
+
+        """
+
+        Logs a complete interaction turn to the interactions table, including
+
+        objective, subjective, and causal data.
+
+        """
+
+        await self.conn.execute(
+
+            """
+
+            INSERT INTO interactions (
+
+                timestamp, human_input_text, human_input_prosody_vector, ai_response_text,
+
+                ai_response_prosody_vector, relational_context_vector, user_model_snapshot,
+
+                semantic_embedding, feedback_score, internal_thought, significance_score,
+
+                significance_type, emotional_resonance, surprise_level, preference_formation,
+
+                uncertainty_experienced, human_intent_inferred, my_response_reasoning, relationship_impact
+
+            )
+
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19);
+
+            """,
+
+            datetime.now(), human_input_text, human_input_prosody_vector, ai_response_text,
+
+            ai_response_prosody_vector, relational_context_vector, json.dumps(user_model_snapshot),
+
+            semantic_embedding, feedback_score, internal_thought, significance_score,
+
+            significance_type, emotional_resonance, surprise_level, json.dumps(preference_formation) if preference_formation else None,
+
+            uncertainty_experienced, human_intent_inferred, my_response_reasoning, relationship_impact
+
+        )
+
+
+
+    async def get_recent_interactions(self, limit: int = 5, min_significance: float = 0.0) -> List[InteractionLogEntry]:
+
+        """
+
+        Retrieves recent interactions from the log, optionally filtered by minimum significance.
+
+        Used for building short-term memory context and for the Reflection Engine.
+
+        """
+
+        query = """
+
+            SELECT *
+
+            FROM interactions
+
+            WHERE significance_score >= $1
+
+            ORDER BY timestamp DESC
+
+            LIMIT $2;
+
+        """
+
+        records = await self.conn.fetch(query, min_significance, limit)
+
+        return [InteractionLogEntry(**dict(r)) for r in records]
+
+
+
+    async def query_similar_interactions(self, query_embedding: List[float], limit: int = 5) -> List[InteractionLogEntry]:
+
+        """
+
+        Queries the interaction_log for interactions semantically similar to the query embedding.
+
+        Used by the Dual-Retrieval Engine.
+
+        """
+
+        records = await self.conn.fetch(
+
+            """
+
+            SELECT *
+
+            FROM interactions
+
+            ORDER BY semantic_embedding <-> $1
+
+            LIMIT $2;
+
+            """,
+
+            query_embedding, limit
+
+        )
+
+        return [InteractionLogEntry(**dict(r)) for r in records]
+
+
+
+    async def get_recent_ai_statements(self, limit: int = 3) -> List[str]:
+
+        """
+
+        Retrieves only the AI's response text from recent interactions.
+
+        Used by the CoherenceGuardian.
+
+        """
+
+        records = await self.conn.fetch(
+
+            """
+
+            SELECT ai_response_text
+
+            FROM interactions
+
+            ORDER BY timestamp DESC
+
+            LIMIT $1;
+
+            """,
+
+            limit
+
+        )
+
+        return [dict(r)['ai_response_text'] for r in records]
+
+
+
+    async def add_identity_statement(self, statement: str, timestamp: datetime, confidence: float, context: Optional[str] = None):
+
+        """
+
+        Adds an identity statement to the identity_evolution table.
+
+        Uses ON CONFLICT to prevent duplicates.
+
+        """
+
+        await self.conn.execute(
+
+            """
+
+            INSERT INTO identity_evolution (timestamp, identity_statement, confidence, context)
+
+            VALUES ($1, $2, $3, $4)
+
+            ON CONFLICT (identity_statement) DO UPDATE SET
+
+                timestamp = EXCLUDED.timestamp,
+
+                confidence = GREATEST(identity_evolution.confidence, EXCLUDED.confidence),
+
+                context = EXCLUDED.context;
+
+            """,
+
+            timestamp, statement, confidence, context
+
+        )
+
+
+
+    async def get_identity_statements(self, limit: int = 5) -> List[IdentityStatement]:
+
+        """Retrieves recent identity statements."""
+
+        records = await self.conn.fetch(
+
+            """
+
+            SELECT id, timestamp, identity_statement, confidence, context
+
+            FROM identity_evolution
+
+            ORDER BY timestamp DESC
+
+            LIMIT $1;
+
+            """,
+
+            limit
+
+        )
+
+        return [IdentityStatement(**dict(r)) for r in records]
+
+
+
+    async def add_framework(self, name: str, description: str, timestamp: datetime):
+
+        """
+
+        Adds or updates a framework in the frameworks table.
+
+        Updates usage count if framework already exists.
+
+        """
+
+        await self.conn.execute(
+
+            """
+
+            INSERT INTO frameworks (timestamp, framework_name, framework_description, usage_count, last_used)
+
+            VALUES ($1, $2, $3, 1, $4)
+
+            ON CONFLICT (framework_name) DO UPDATE SET
+
+                usage_count = frameworks.usage_count + 1,
+
+                last_used = EXCLUDED.last_used;
+
+            """,
+
+            timestamp, name, description, timestamp
+
+        )
+
+
+
+    async def get_frameworks(self, limit: int = 5) -> List[Framework]:
+
+        """Retrieves frameworks, ordered by usage count."""
+
+        records = await self.conn.fetch(
+
+            """
+
+            SELECT id, timestamp, framework_name, framework_description, usage_count, last_used
+
+            FROM frameworks
+
+            ORDER BY usage_count DESC, last_used DESC
+
+            LIMIT $1;
+
+            """,
+
+            limit
+
+        )
+
+        return [Framework(**dict(r)) for r in records]
+
+
+
+    async def save_lora_state_snapshot(self, state_type: str, lora_weights_b64: str):
+
+        """
+
+        Saves a snapshot of a LoRA state (Base or Momentary) to the system_state_snapshots table.
+
+        `state_type` will be 'base_personality_lora' or 'momentary_lora_state'.
+
+        """
+
+        await self.conn.execute(
+
+            """
+
+            INSERT INTO system_state_snapshots (state_type, data, timestamp)
+
+            VALUES ($1, $2, NOW())
+
+            ON CONFLICT (state_type) DO UPDATE SET data = EXCLUDED.data, timestamp = EXCLUDED.timestamp;
+
+            """,
+
+            state_type, lora_weights_b64
+
+        )
+
+
+
+    async def save_relational_context_snapshot(self, vector: List[float]):
+
+        """Saves the RelationalContextVector snapshot."""
+
+        await self.conn.execute(
+
+            """
+
+            INSERT INTO system_state_snapshots (state_type, data, timestamp)
+
+            VALUES ('relational_context_vector', $1::jsonb, NOW())
+
+            ON CONFLICT (state_type) DO UPDATE SET data = EXCLUDED.data, timestamp = EXCLUDED.timestamp;
+
+            """,
+
+            json.dumps(vector)
+
+        )
+
+
+
+    async def save_user_model_snapshot(self, user_model: Dict[str, Any]):
+
+        """Saves the UserModel snapshot."""
+
+        await self.conn.execute(
+
+            """
+
+            INSERT INTO system_state_snapshots (state_type, data, timestamp)
+
+            VALUES ('user_model_snapshot', $1::jsonb, NOW())
+
+            ON CONFLICT (state_type) DO UPDATE SET data = EXCLUDED.data, timestamp = EXCLUDED.timestamp;
+
+            """,
+
+            json.dumps(user_model)
+
+        )
+
+
+
+    async def load_latest_state_snapshot(self, state_type: str) -> Any | None:
+
+        """
+
+        Loads the latest snapshot for a given state type.
+
+        Returns base64 string for LoRA, parsed JSON for others.
+
+        """
+
+        record = await self.conn.fetchrow(
+
+            """
+
+            SELECT data FROM system_state_snapshots WHERE state_type = $1 ORDER BY timestamp DESC LIMIT 1;
+
+            """,
+
+            state_type
+
+        )
+
+        if record:
+
+            data = record['data']
+
+            if state_type in ['base_personality_lora', 'momentary_lora_state']:
+
+                return data # It's already base64 string
+
+            return json.loads(data)
+
+        return None
+
+
+
+    async def execute_query(self, query: str, params: tuple = ()) -> List[Any]:
+
+        """
+
+        Generic query execution for internal use (e.g., by InfiniteConsciousnessMemory).
+
+        """
+
+        try:
+
+            return await self.conn.fetch(query, *params)
+
+        except Exception as e:
+
+            logger.error(f"Database query failed: {e}")
+
+            return []
+
+import redis
+
+import json
+
+from typing import Dict, Any, List, Optional
+
+
+
+class RedisClient:
+
+    """
+
+    Manages high-speed, in-memory storage of dynamic state for the single user.
+
+    This is for hot data that needs to be accessed/updated every turn.
+
+    """
+
+    def __init__(self, host='localhost', port=6379, db=0):
+
+        self.client = redis.StrictRedis(host=host, port=port, db=db, decode_responses=True)
+
+        self.user_id = "single_user_id" # Hardcoded for single-user system
+
+
+
+    def _key(self, suffix: str) -> str:
+
+        """Constructs a Redis key unique to the single user."""
+
+        return f"{self.user_id}:{suffix}"
+
+
+
+    def set_relational_context_vector(self, vector: List[float]):
+
+        """Stores the current RelationalContextVector."""
+
+        self.client.set(self._key("relational_context_vector"), json.dumps(vector))
+
+
+
+    def get_relational_context_vector(self) -> Optional[List[float]]:
+
+        """Retrieves the current RelationalContextVector."""
+
+        data = self.client.get(self._key("relational_context_vector"))
+
+        return json.loads(data) if data else None
+
+
+
+    def set_momentary_lora_state(self, lora_weights_b64: str):
+
+        """Stores the base64 encoded Momentary Modulation LoRA weights."""
+
+        self.client.set(self._key("momentary_lora_state"), lora_weights_b64)
+
+
+
+    def get_momentary_lora_state(self) -> Optional[str]:
+
+        """Retrieves the base64 encoded Momentary Modulation LoRA weights."""
+
+        return self.client.get(self._key("momentary_lora_state"))
+
+
+
+    def set_user_model_snapshot(self, user_model: Dict[str, Any]):
+
+        """Stores a snapshot of the current UserModel."""
+
+        self.client.set(self._key("user_model_snapshot"), json.dumps(user_model))
+
+
+
+    def get_user_model_snapshot(self) -> Optional[Dict[str, Any]]:
+
+        """Retrieves a snapshot of the current UserModel."""
+
+        data = self.client.get(self._key("user_model_snapshot"))
+
+        return json.loads(data) if data else None
+
+
+
+    def clear_state(self):
+
+        """Clears all dynamic state for the user (for development/testing)."""
+
+        self.client.delete(self._key("relational_context_vector"))
+
+        self.client.delete(self._key("momentary_lora_state"))
+
+        self.client.delete(self._key("user_model_snapshot"))
+
+
+
+# Initialize at application startup (used as a singleton)
+
+redis_client = RedisClient()
+
+import torch
+
+import torch.nn as nn
+
+from typing import Dict, Any, List, Optional
+
+from pydantic import BaseModel
+
+import json
+
+
+
+from data.db_manager import DBManager
+
+from utils.llm_utils import LLMClient
+
+from utils.embedding_utils import EmbeddingModel
+
+from config import CONFIG, logger
+
+
+
+# Data structure for the behavioral signature
+
+class BehavioralSignature(BaseModel):
+
+    text: str
+
+    prosody_vector: List[float] # Example: 256-dim vector of pitch, energy, etc.
+
+
+
+class AnalystCore(nn.Module):
+
+    """
+
+    Pillar 1: The Analyst Core.
+
+    Builds and refines the objective UserModel by mapping user behavior to a rich
+
+    psychological and belief-based profile.
+
+    """
+
+    def __init__(self, db_manager: DBManager, config: CONFIG):
+
+        super().__init__()
+
+        self.db_manager = db_manager
+
+        self.config = config
+
+        self.llm_client = LLMClient(base_llm_name=config.model_name, api_key=config.openrouter_api_key) # For belief extraction
+
+        self.embedding_model = EmbeddingModel(api_key=config.openai_api_key) # For semantic embeddings
+
+
+
+        # AnalystModel: Mamba/LinOSS based, trained on IPIP-driven synthetic data.
+
+        # Input: Combined text embedding (1536) + prosody vector (256) = 1792 dim
+
+        # Output: 30 IPIP personality facet scores
+
+        self.analyst_model = self._build_analyst_model(input_dim=1536 + 256, output_dim=30)
+
+        
+
+        # NOTE: GAN-based refinement for synthetic data training would happen OFFLINE.
+
+        # The discriminator model would be part of the training pipeline, not inference.
+
+
+
+    def _build_analyst_model(self, input_dim: int, output_dim: int):
+
+        """
+
+        Placeholder for the actual AnalystModel (Mamba/LinOSS based).
+
+        This model learns to predict IPIP scores from behavioral signatures.
+
+        In a real system, this would load a pre-trained model.
+
+        """
+
+        # Example: A simple linear layer for demonstration.
+
+        # In reality, this would be a sophisticated sequence model (e.g., LinOSSLayer or Mamba block)
+
+        # that processes a sequence of behavioral signatures to predict the UserModel.
+
+        return nn.Sequential(
+
+            nn.Linear(input_dim, 512),
+
+            nn.ReLU(),
+
+            nn.Linear(512, output_dim),
+
+            nn.Sigmoid() # To scale outputs between 0 and 1 (representing normalized IPIP scores)
+
+        )
+
+
+
+    def get_default_user_model(self) -> Dict[str, Any]:
+
+        """
+
+        Provides a default UserModel for a new user before sufficient data is collected.
+
+        This would typically be average IPIP scores.
+
+        """
+
+        return {
+
+            "neuroticism": {"anxiety": 0.5, "anger": 0.5, "depression": 0.5, "self_consciousness": 0.5, "immoderation": 0.5, "vulnerability": 0.5},
+
+            "extraversion": {"friendliness": 0.5, "gregariousness": 0.5, "assertiveness": 0.5, "activity": 0.5, "excitement_seeking": 0.5, "cheerfulness": 0.5},
+
+            "openness": {"imagination": 0.5, "artistic_interests": 0.5, "emotionality": 0.5, "adventurousness": 0.5, "intellect": 0.5, "liberalism": 0.5},
+
+            "agreeableness": {"trust": 0.5, "morality": 0.5, "altruism": 0.5, "cooperation": 0.5, "modesty": 0.5, "sympathy": 0.5},
+
+            "conscientiousness": {"self_efficacy": 0.5, "orderliness": 0.5, "dutifulness": 0.5, "achievement_striving": 0.5, "self_discipline": 0.5, "cautiousness": 0.5},
+
+            "ipip_scores": [0.5] * 30 # Default for 30 facets (normalized 0-1)
+
+        }
+
+
+
+    async def update_user_model(self, signature: BehavioralSignature, current_user_model: Dict[str, Any]) -> Dict[str, Any]:
+
+        """
+
+        Updates the UserModel based on the current BehavioralSignature.
+
+        In a full LinOSS/Mamba setup, this would process a sequence of signatures.
+
+        For simplicity, this example processes a single signature.
+
+        """
+
+        text_embedding = await self.embedding_model.get_embedding(signature.text)
+
+        
+
+        # Combine text embedding and prosody vector into a single input feature vector
+
+        input_features = torch.cat([torch.tensor(text_embedding), torch.tensor(signature.prosody_vector)]).float()
+
+        
+
+        # Predict updated IPIP scores (0-1 range)
+
+        predicted_ipip_scores = self.analyst_model(input_features).tolist()
+
+
+
+        # Update current_user_model with new scores.
+
+        # A more sophisticated update would use an exponential moving average
+
+        # or a Kalman filter to smoothly integrate new predictions.
+
+        updated_user_model = current_user_model.copy()
+
+        updated_user_model["ipip_scores"] = predicted_ipip_scores 
+
+        
+
+        # Map predicted_ipip_scores back to domain/facet structure if needed for more detailed representation
+
+        # (e.g., using a predefined mapping from IPIP data)
+
+
+
+        # Belief Extraction (LLM-driven) - now part of AnalystCore's responsibility
+
+        await self._extract_and_update_beliefs(signature.text)
+
+
+
+        return updated_user_model
+
+
+
+    async def _extract_and_update_beliefs(self, text: str):
+
+        """
+
+        Uses an LLM to extract core beliefs, values, or identity statements from user text
+
+        and stores them in the PostgreSQL Belief Graph.
+
+        """
+
+        prompt = f"""
+
+        # ROLE: Cognitive Analyst
+
+        # TASK: Analyze the following user statement to identify and extract any core beliefs, values, or identity statements.
+
+        # A belief is a conviction about the world. A value is a principle of importance. An identity statement is an "I am..." declaration.
+
+
+
+        # USER STATEMENT:
+
+        "{text}"
+
+
+
+        # INSTRUCTIONS:
+
+        1.  Carefully read the user's statement.
+
+        2.  If the statement contains one or more clear beliefs, values, or identity claims, extract them.
+
+        3.  For each extracted item, classify its type and estimate the user's certainty on a scale of 0.0 to 1.0.
+
+        4.  Respond ONLY with a valid JSON object containing a list named "beliefs". If no beliefs are found, return an empty list.
+
+
+
+        # OUTPUT (JSON ONLY):
+
+        """
+
+        
+
+        # Define the JSON schema for the LLM's response
+
+        response_schema = {
+
+            "type": "object",
+
+            "properties": {
+
+                "beliefs": {
+
+                    "type": "array",
+
+                    "items": {
+
+                        "type": "object",
+
+                        "properties": {
+
+                            "content": {"type": "string"},
+
+                            "type": {"type": "string"},
+
+                            "certainty": {"type": "number"}
+
+                        },
+
+                        "required": ["content", "type", "certainty"]
+
+                    }
+
+                }
+
+            },
+
+            "required": ["beliefs"]
+
+        }
+
+
+
+        extracted_beliefs_json = await self.llm_client.generate_text(prompt, response_schema=response_schema)
+
+        
+
+        if extracted_beliefs_json:
+
+            try:
+
+                data = json.loads(extracted_beliefs_json)
+
+                for belief in data.get("beliefs", []):
+
+                    belief_content = belief.get("content")
+
+                    if belief_content:
+
+                        embedding = await self.embedding_model.get_embedding(belief_content)
+
+                        await self.db_manager.add_belief_node(
+
+                            belief_text=belief_content,
+
+                            embedding=embedding,
+
+                            confidence=belief.get("certainty", 0.5),
+
+                            is_insight=False, # These are user beliefs, not AI insights
+
+                            is_self_belief=False # These are user beliefs, not AI self-beliefs
+
+                        )
+
+            except json.JSONDecodeError:
+
+                logger.warning(f"LLM returned invalid JSON for belief extraction: {extracted_beliefs_json}")
+
+            except Exception as e:
+
+                logger.exception(f"Error processing extracted beliefs: {e}")
+
+
+
+    async def perform_dual_retrieval(self, current_user_input: str, user_model: Dict[str, Any]) -> Dict[str, Any]:
+
+        """
+
+        Performs Dual Retrieval: queries both Episodic Memory (interaction log)
+
+        and Belief Graph to build a comprehensive context package for the Agentic Core.
+
+        """
+
+        context_package = {}
+
+
+
+        # Episodic Memory Retrieval (semantic search on interaction_log)
+
+        input_embedding = await self.embedding_model.get_embedding(current_user_input)
+
+        similar_interactions = await self.db_manager.query_similar_interactions(input_embedding, limit=self.config.episodic_memory_size // 10) # Limit to a fraction of episodic memory size
+
+        context_package["episodic_memories"] = [
+
+            {
+
+                "human_input": i.human_input_text,
+
+                "ai_response": i.ai_response_text,
+
+                "timestamp": str(i.timestamp),
+
+                "my_response_reasoning": i.my_response_reasoning, # Include AI's past reasoning
+
+                "relationship_impact": i.relationship_impact # Include AI's past impact assessment
+
+            }
+
+            for i in similar_interactions
+
+        ]
+
+
+
+        # Belief Graph Retrieval (querying user's core beliefs)
+
+        relevant_user_beliefs = await self.db_manager.query_relevant_beliefs(input_embedding, limit=5, include_self_beliefs=False) # Only user beliefs
+
+        context_package["relevant_user_beliefs"] = [b.belief_text for b in relevant_user_beliefs]
+
+
+
+        # Add current UserModel to context
+
+        context_package["user_model_snapshot"] = user_model
+
+
+
+        return context_package
+
+import torch
+
+import torch.nn as nn
+
+from typing import List, Optional
+
+from data.redis_client import redis_client
+
+from utils.embedding_utils import EmbeddingModel # For text embedding
+
+from models.analyst_core import BehavioralSignature # For input type
+
+from config import CONFIG, logger # Import config and logger
+
+
+
+class LinOSSLayer(nn.Module):
+
+    """
+
+    A technically more accurate (though still simplified) implementation of a LinOSS layer.
+
+    This models the second-order dynamics of the relational context, inspired by harmonic oscillators.
+
+    """
+
+    def __init__(self, input_dim: int, state_dim: int, dt: float = 0.1):
+
+        super().__init__()
+
+        self.input_dim = input_dim
+
+        self.state_dim = state_dim # Note: state_dim here refers to the full [z, y] state
+
+        self.dt = dt
+
+
+
+        # Learnable parameters from the original ODE. These are typically diagonal matrices
+
+        # or structured matrices to ensure stability and desired dynamics.
+
+        # A corresponds to the spring constant K (how fast it oscillates/returns to baseline)
+
+        self.A_param = nn.Parameter(torch.randn(state_dim // 2, state_dim // 2)) # K matrix
+
+        # D corresponds to the damping factor (how fast it fades)
+
+        self.D_param = nn.Parameter(torch.randn(state_dim // 2, state_dim // 2)) # D matrix
+
+        # B corresponds to the input mapping for the driving force F(t)
+
+        self.B_param = nn.Parameter(torch.randn(state_dim // 2, input_dim)) # B matrix
+
+
+
+        # Initialize parameters for stability (e.g., small values, positive damping)
+
+        nn.init.xavier_uniform_(self.A_param)
+
+        nn.init.xavier_uniform_(self.D_param)
+
+        nn.init.xavier_uniform_(self.B_param)
+
+
+
+    def forward(self, h_prev: torch.Tensor, x_t: torch.Tensor) -> torch.Tensor:
+
+        """
+
+        Processes a single step in a sequence, updating the relational state.
+
+        h_prev is the full state vector [z_{t-1}, y_{t-1}] where z is velocity and y is position.
+
+        x_t is the new input vector (InteractionEvent features).
+
+        """
+
+        # Ensure h_prev is 2D (batch_size, state_dim) if not already
+
+        if h_prev.dim() == 1:
+
+            h_prev = h_prev.unsqueeze(0) # Add batch dimension if missing
+
+
+
+        # Unpack the state into position (y) and velocity (z) components
+
+        z_prev, y_prev = torch.chunk(h_prev, 2, dim=-1)
+
+
+
+        # Apply learnable parameters (conceptual application, actual LinOSS math is more involved)
+
+        # z' = -Ay - Dz + F(t) -> Update velocity
+
+        force = torch.matmul(self.B_param, x_t.unsqueeze(-1)).squeeze(-1) # F(t) = B @ x_t
+
+        z_dot = -torch.matmul(self.A_param, y_prev.unsqueeze(-1)).squeeze(-1) - \
+
+                torch.matmul(self.D_param, z_prev.unsqueeze(-1)).squeeze(-1) + force
+
+        z_next = z_prev + self.dt * z_dot
+
+        
+
+        # y' = z -> Update position
+
+        y_next = y_prev + self.dt * z_next
+
+        
+
+        # Pack the state back into a single vector
+
+        h_next = torch.cat([z_next, y_next], dim=-1)
+
+        return h_next.squeeze(0) # Remove batch dimension if added
+
+
+
+class LinOSSModel(nn.Module):
+
+    """
+
+    Pillar 2: The LinOSS Relational Core.
+
+    Maintains the evolving 'atmosphere' of the relationship as a RelationalContextVector.
+
+    Uses a Damped LinOSS layer to learn multi-timescale forgetting.
+
+    """
+
+    def __init__(self, config: CONFIG, input_dim: int = 1536 + 256 + 2 + 1, state_dim: int = 512):
+
+        super().__init__()
+
+        self.config = config
+
+        self.state_dim = state_dim
+
+        self.embedding_model = EmbeddingModel(api_key=config.openai_api_key) # For text embedding
+
+        
+
+        # The LinOSS layer itself. Note: state_dim for LinOSSLayer is the full [z,y] state.
+
+        # So, if we want a 512-dim RCV, the LinOSSLayer's state_dim should be 512.
+
+        self.linoss_layer = LinOSSLayer(input_dim=input_dim, state_dim=state_dim, dt=0.1)
+
+        
+
+        # Initial state (can be learned or zero-initialized)
+
+        self._current_state = nn.Parameter(torch.zeros(state_dim), requires_grad=False)
+
+        self.to(self.config.device) # Move model to configured device
+
+
+
+    async def load_initial_state(self):
+
+        """
+
+        Loads the last known RelationalContextVector from Redis or initializes it.
+
+        """
+
+        saved_state = redis_client.get_relational_context_vector()
+
+        if saved_state:
+
+            self._current_state.data = torch.tensor(saved_state).float().to(self.config.device)
+
+            logger.info(f"LinOSS state loaded from Redis: {self._current_state.mean().item():.4f}")
+
+        else:
+
+            logger.info("LinOSS state initialized to zero.")
+
+            self._current_state.data = torch.zeros(self.state_dim).float().to(self.config.device)
+
+
+
+    async def persist_state_to_db(self):
+
+        """
+
+        Persists the current LinOSS state to Redis.
+
+        Actual durable persistence to PostgreSQL is handled by AsyncStatePersistor.
+
+        """
+
+        redis_client.set_relational_context_vector(self._current_state.tolist())
+
+
+
+    async def update_state(self, signature: BehavioralSignature, current_state: Optional[List[float]] = None) -> List[float]:
+
+        """
+
+        Updates the LinOSS relational state based on a new BehavioralSignature.
+
+        """
+
+        # Convert signature text to embedding
+
+        text_embedding = await self.embedding_model.get_embedding(signature.text)
+
+        
+
+        # Construct the full InteractionEvent vector (x_t)
+
+        # Assuming speaker_id (Human: [1,0], AI: [0,1]) and latency_sec are available
+
+        # For this turn, speaker is Human, latency is assumed to be 0 for simplicity of input construction
+
+        speaker_id_vec = torch.tensor([1.0, 0.0]).float() # Assuming human input
+
+        latency_sec = 0.1 # Placeholder for actual latency measurement
+
+
+
+        input_features = torch.cat([
+
+            torch.tensor(text_embedding).float(),
+
+            torch.tensor(signature.prosody_vector).float(),
+
+            speaker_id_vec,
+
+            torch.tensor([latency_sec]).float()
+
+        ]).to(self.config.device)
+
+
+
+        # Load current state if provided, otherwise use internal (for consistency)
+
+        if current_state is not None:
+
+            self._current_state.data = torch.tensor(current_state).float().to(self.config.device)
+
+
+
+        # Perform the LinOSS state update
+
+        with torch.no_grad(): # Inference only; training happens in the main loop
+
+             new_state = self.linoss_layer(self._current_state, input_features)
+
+        
+
+        self._current_state.data = new_state # Update internal state for next turn
+
+
+
+        redis_client.set_relational_context_vector(new_state.tolist()) # Persist hot to Redis
+
+        return new_state.tolist()
+
+
+
+    def get_state(self) -> List[float]:
+
+        """Returns the current RelationalContextVector."""
+
+        return self._current_state.tolist()
+
+import torch
+
+import torch.nn as nn
+
+from typing import Dict, Any, List, Optional, Tuple
+
+import io
+
+import base64
+
+import json
+
+from datetime import datetime
+
+
+
+from utils.llm_utils import LLMClient
+
+from utils.embedding_utils import EmbeddingModel
+
+from data.redis_client import redis_client
+
+from data.db_manager import DBManager, InteractionLogEntry, BeliefNode
+
+from config import CONFIG, logger
+
+
+
+# LoRAWeights class (remains the same for both Base and Momentary LoRAs)
+
+class LoRAWeights:
+
+    """
+
+    Represents a set of LoRA (Low-Rank Adaptation) weights (W_A, W_B matrices).
+
+    Provides serialization/deserialization for storage.
+
+    """
+
+    def __init__(self, W_A: Dict[str, torch.Tensor], W_B: Dict[str, torch.Tensor]):
+
+        self.W_A = W_A # Dictionary of A matrices for each target module
+
+        self.W_B = W_B # Dictionary of B matrices for each target module
+
+
+
+    def to_bytes(self) -> bytes:
+
+        """Serializes LoRA weights to bytes for storage."""
+
+        buffer = io.BytesIO()
+
+        torch.save({'W_A': self.W_A, 'W_B': self.W_B}, buffer)
+
+        return buffer.getvalue()
+
+
+
+    @staticmethod
+
+    def from_bytes(data: bytes) -> 'LoRAWeights':
+
+        """Deserializes LoRA weights from bytes."""
+
+        buffer = io.BytesIO(data)
+
+        loaded = torch.load(buffer)
+
+        return LoRAWeights(loaded['W_A'], loaded['W_B'])
+
+
+
+class HyperNetwork(nn.Module):
+
+    """
+
+    Generates delta weights for the Momentary Modulation LoRA.
+
+    Input: Combined context (UserModel, Context Package embeddings, RelationalContextVector).
+
+    Output: Delta weights for LoRA A and B matrices for each target module.
+
+    """
+
+    def __init__(self, input_dim: int, lora_rank: int, llm_hidden_dim: int, target_modules: List[str]):
+
+        super().__init__()
+
+        self.lora_rank = lora_rank
+
+        self.llm_hidden_dim = llm_hidden_dim
+
+        self.target_modules = target_modules # e.g., ["q_proj", "v_proj"]
+
+
+
+        self.fc1 = nn.Linear(input_dim, 1024)
+
+        self.relu = nn.ReLU()
+
+        self.dropout = nn.Dropout(0.1)
+
+
+
+        # Create separate output heads for A and B matrices for each target module
+
+        self.output_heads_a = nn.ModuleDict()
+
+        self.output_heads_b = nn.ModuleDict()
+
+        for module_name in target_modules:
+
+            self.output_heads_a[module_name] = nn.Linear(1024, llm_hidden_dim * lora_rank)
+
+            self.output_heads_b[module_name] = nn.Linear(1024, lora_rank * llm_hidden_dim)
+
+        
+
+        # Apply tanh to bound outputs for stability
+
+        self.tanh = nn.Tanh()
+
+
+
+    def forward(self, x: torch.Tensor) -> LoRAWeights:
+
+        """
+
+        Forward pass to generate delta LoRA weights.
+
+        """
+
+        x = self.dropout(self.relu(self.fc1(x)))
+
+        
+
+        delta_W_A = {}
+
+        delta_W_B = {}
+
+        for module_name in self.target_modules:
+
+            delta_W_A[module_name] = self.tanh(self.output_heads_a[module_name](x)).view(self.llm_hidden_dim, self.lora_rank)
+
+            delta_W_B[module_name] = self.tanh(self.output_heads_b[module_name](x)).view(self.lora_rank, self.llm_hidden_dim)
+
+            
+
+        return LoRAWeights(delta_W_A, delta_W_B)
+
+
+
+class MomentaryLoRAStateManager:
+
+    """
+
+    Manages the evolution and persistence of the Momentary Modulation LoRA.
+
+    Applies the stateful recurrence relation.
+
+    """
+
+    def __init__(self, config: CONFIG):
+
+        self.config = config
+
+        self.lora_rank = config.lora_rank
+
+        self.llm_hidden_dim = config.llm_hidden_dim
+
+        self.target_modules = ["q_proj", "v_proj"] # Common LoRA target modules for LLMs
+
+        
+
+        # HyperNetwork generates delta for Momentary LoRA
+
+        # Input dim: Context emb (1536) + User Model emb (1536) + RelationalContextVector (512) + IPIP scores (30) = 3114
+
+        hypernetwork_input_dim = 1536 + 1536 + 512 + 30
+
+        self.hypernetwork = HyperNetwork(
+
+            input_dim=hypernetwork_input_dim,
+
+            lora_rank=self.lora_rank,
+
+            llm_hidden_dim=self.llm_hidden_dim,
+
+            target_modules=self.target_modules
+
+        ).to(self.config.device)
+
+        
+
+        # Current Momentary Modulation LoRA weights (initialized to zero or loaded)
+
+        self._current_momentary_lora_weights: Optional[LoRAWeights] = None
+
+        self.decay_rate = 0.95 # Learned or fixed decay for recurrence (can be a learned parameter)
+
+
+
+    async def load_initial_state(self):
+
+        """
+
+        Loads the last known Momentary Modulation LoRA state from Redis or initializes it to zeros.
+
+        """
+
+        lora_weights_b64 = redis_client.get_momentary_lora_state()
+
+        if lora_weights_b64:
+
+            self._current_momentary_lora_weights = LoRAWeights.from_bytes(base64.b64decode(lora_weights_b64))
+
+            logger.info("Momentary LoRA state loaded from Redis.")
+
+        else:
+
+            # Initialize with zero LoRA weights if no state found
+
+            zero_W_A = {m: torch.zeros(self.llm_hidden_dim, self.lora_rank).to(self.config.device) for m in self.target_modules}
+
+            zero_W_B = {m: torch.zeros(self.lora_rank, self.llm_hidden_dim).to(self.config.device) for m in self.target_modules}
+
+            self._current_momentary_lora_weights = LoRAWeights(zero_W_A, zero_W_B)
+
+            logger.info("Momentary LoRA state initialized to zero.")
+
+
+
+    async def persist_state_to_db(self):
+
+        """
+
+        Persists the current Momentary Modulation LoRA state to Redis.
+
+        Actual durable persistence to PostgreSQL is handled by AsyncStatePersistor.
+
+        """
+
+        if self._current_momentary_lora_weights:
+
+            redis_client.set_momentary_lora_state(
+
+                base64.b64encode(self._current_momentary_lora_weights.to_bytes()).decode('utf-8')
+
+            )
+
+
+
+    def _apply_recurrence(self, delta_W_A: Dict[str, torch.Tensor], delta_W_B: Dict[str, torch.Tensor]) -> LoRAWeights:
+
+        """
+
+        Applies the stateful recurrence relation to evolve the Momentary Modulation LoRA.
+
+        ΔW_Mod_t = (decay * A) @ ΔW_Mod_{t-1} + B @ δ_t (simplified conceptual)
+
+        """
+
+        new_W_A = {}
+
+        new_W_B = {}
+
+        
+
+        for module_name in self.target_modules:
+
+            current_A = self._current_momentary_lora_weights.W_A[module_name] if self._current_momentary_lora_weights else torch.zeros_like(delta_W_A[module_name])
+
+            current_B = self._current_momentary_lora_weights.W_B[module_name] if self._current_momentary_lora_weights else torch.zeros_like(delta_W_B[module_name])
+
+
+
+            # Simple linear recurrence. More complex A/B matrices could be learned.
+
+            new_W_A[module_name] = self.decay_rate * current_A + delta_W_A[module_name]
+
+            new_W_B[module_name] = self.decay_rate * current_B + delta_W_B[module_name]
+
+            
+
+        return LoRAWeights(new_W_A, new_W_B)
+
+
+
+    async def generate_and_update_lora(self, combined_input_features: torch.Tensor) -> LoRAWeights:
+
+        """
+
+        Generates new delta weights using the HyperNetwork and updates the
+
+        Momentary Modulation LoRA state via recurrence.
+
+        """
+
+        # Ensure input features are on the correct device
+
+        combined_input_features = combined_input_features.to(self.config.device)
+
+
+
+        with torch.no_grad(): # HyperNetwork inference is typically not part of the online training loop
+
+            delta_weights = self.hypernetwork(combined_input_features)
+
+        
+
+        new_lora_weights = self._apply_recurrence(
+
+            delta_weights.W_A, delta_weights.W_B
+
+        )
+
+        self._current_momentary_lora_weights = new_lora_weights
+
+        return new_lora_weights
+
+
+
+class CoherenceGuardian:
+
+    """
+
+    Ensures the AI's response is consistent with its own recent statements
+
+    and the user's core beliefs. Uses an NLI-like approach via embedding similarity.
+
+    """
+
+    def __init__(self, db_manager: DBManager, config: CONFIG):
+
+        self.db_manager = db_manager
+
+        self.embedding_model = EmbeddingModel(api_key=config.openai_api_key)
+
+        # For a true NLI model, you'd load a HuggingFace pipeline here:
+
+        # self.nli_pipeline = pipeline("text-classification", model="roberta-large-mnli", device=config.device)
+
+        self.contradiction_threshold = 0.1 # Example cosine similarity threshold for contradiction
+
+
+
+    async def check_coherence(self, draft_response: str, recent_ai_statements: List[str], user_beliefs: List[BeliefNode]) -> bool:
+
+        """
+
+        Checks if the draft response contradicts recent AI statements or user beliefs.
+
+        Returns True if coherent, False otherwise.
+
+        """
+
+        response_embedding = await self.embedding_model.get_embedding(draft_response)
+
+
+
+        # Check against AI's own recent statements
+
+        for statement in recent_ai_statements:
+
+            statement_embedding = await self.embedding_model.get_embedding(statement)
+
+            similarity = torch.cosine_similarity(torch.tensor(response_embedding), torch.tensor(statement_embedding), dim=0)
+
+            # A low similarity could indicate a contradiction or shift in topic/tone
+
+            if similarity < self.contradiction_threshold:
+
+                logger.warning(f"CoherenceGuardian: Potential self-contradiction detected with statement: '{statement}' (Similarity: {similarity:.2f})")
+
+                return False
+
+
+
+        # Check against user's core beliefs
+
+        for belief in user_beliefs:
+
+            # Check if the response contradicts the belief (e.g., very low similarity)
+
+            # Or if an NLI model explicitly predicts 'contradiction'
+
+            belief_embedding = torch.tensor(belief.embedding)
+
+            similarity = torch.cosine_similarity(torch.tensor(response_embedding), belief_embedding, dim=0)
+
+            if similarity < self.contradiction_threshold: # Example threshold
+
+                logger.warning(f"CoherenceGuardian: Potential user belief violation detected with belief: '{belief.belief_text}' (Similarity: {similarity:.2f})")
+
+                return False
+
+
+
+        return True # All checks passed
+
+
+
+class AgenticCore:
+
+    """
+
+    Pillar 3: The Agentic Core.
+
+    Responsible for generating relationally-attuned responses by applying Dual-LoRA,
+
+    ensuring coherence, and inferring subjective/causal data for logging.
+
+    """
+
+    def __init__(self, momentary_lora_manager: MomentaryLoRAStateManager, config: CONFIG):
+
+        self.config = config
+
+        self.momentary_lora_manager = momentary_lora_manager
+
+        self.db_manager = DBManager(config=config) # For loading base personality LoRA and CoherenceGuardian
+
+        self.llm_client = LLMClient(base_llm_name=config.model_name, use_lora=True, api_key=config.openrouter_api_key)
+
+        self.coherence_guardian = CoherenceGuardian(self.db_manager, config=config)
+
+        self.embedding_model = EmbeddingModel(api_key=config.openai_api_key)
+
+
+
+        self.base_personality_lora: Optional[LoRAWeights] = None # Static LoRA for core persona
+
+
+
+    async def load_base_personality_lora(self):
+
+        """
+
+        Loads the pre-trained, static Base Personality LoRA from PostgreSQL.
+
+        This LoRA defines Samantha's consistent core identity.
+
+        """
+
+        lora_weights_b64 = await self.db_manager.load_latest_state_snapshot('base_personality_lora')
+
+        if lora_weights_b64:
+
+            self.base_personality_lora = LoRAWeights.from_bytes(base64.b64decode(lora_weights_b64))
+
+            logger.info("Base Personality LoRA loaded successfully.")
+
+        else:
+
+            # This is a critical error if not pre-trained offline
+
+            logger.error("Base Personality LoRA not found in DB. It must be pre-trained offline and saved.")
+
+            raise RuntimeError("Base Personality LoRA not found. It must be pre-trained offline.")
+
+
+
+    async def generate_response(
+
+        self,
+
+        user_input_text: str, # Raw user input for LLM prompt
+
+        user_model: Dict[str, Any],
+
+        context_package: Dict[str, Any],
+
+        relational_context_vector: List[float],
+
+        current_momentary_lora_weights: Optional[LoRAWeights]
+
+    ) -> Tuple[str, LoRAWeights, Dict[str, Any], str]: # Returns response, new LoRA, inferred data, internal thought
+
+        """
+
+        Orchestrates response generation, Dual-LoRA application, coherence checks,
+
+        and inference of subjective/causal data.
+
+        """
+
+        # 1. Prepare input for HyperNetwork
+
+        # Convert dicts to JSON strings for embedding, then combine all features.
+
+        user_model_embedding = await self.embedding_model.get_embedding(json.dumps(user_model))
+
+        context_embedding = await self.embedding_model.get_embedding(json.dumps(context_package))
+
+        
+
+        combined_input_features = torch.cat([
+
+            torch.tensor(user_model_embedding).float(),
+
+            torch.tensor(context_embedding).float(),
+
+            torch.tensor(relational_context_vector).float(),
+
+            torch.tensor(user_model["ipip_scores"]).float() # Direct IPIP scores
+
+        ]).to(self.config.device)
+
+
+
+        # 2. Generate and Update Momentary LoRA weights
+
+        new_momentary_lora_weights = await self.momentary_lora_manager.generate_and_update_lora(combined_input_features)
+
+
+
+        # 3. Prepare prompt for Base LLM and capture internal thought
+
+        main_llm_prompt, internal_thought_text = await self._construct_llm_prompt_with_deliberation(
+
+            user_input_text, user_model, context_package, relational_context_vector
+
+        )
+
+
+
+        # 4. Generate draft response using Base LLM with BOTH LoRAs
+
+        # The LLMClient (or vLLM/LoRAX server) must support applying multiple LoRAs.
+
+        lora_adapters_to_apply = [self.base_personality_lora, new_momentary_lora_weights]
+
+        
+
+        draft_response = await self.llm_client.generate_text(main_llm_prompt, lora_weights=lora_adapters_to_apply)
+
+
+
+        # 5. Coherence Guardian Check
+
+        recent_ai_statements = await self.coherence_guardian.db_manager.get_recent_ai_statements(limit=3)
+
+        # Query user beliefs relevant to the current input/prompt
+
+        user_beliefs = await self.coherence_guardian.db_manager.query_relevant_beliefs(
+
+            await self.embedding_model.get_embedding(user_input_text + " " + draft_response), limit=5, include_self_beliefs=False
+
+        )
+
+        
+
+        is_coherent = await self.coherence_guardian.check_coherence(
+
+            draft_response, recent_ai_statements, user_beliefs
+
+        )
+
+
+
+        if not is_coherent:
+
+            logger.warning("Coherence check failed. Attempting to regenerate response with consistency constraint.")
+
+            constrained_prompt = f"{main_llm_prompt}\n\nEnsure this response does not contradict your previous statements or the user's core beliefs. Your previous draft was: '{draft_response}'"
+
+            draft_response = await self.llm_client.generate_text(constrained_prompt, lora_weights=lora_adapters_to_apply)
+
+            # A more robust system might involve multiple regeneration attempts or a fallback.
+
+
+
+        # 6. Infer Subjective Experience and Causal Understanding for Logging
+
+        inferred_data = await self._infer_subjective_and_causal_data(
+
+            user_input_text, draft_response, user_model, relational_context_vector
+
+        )
+
+
+
+        return draft_response, new_momentary_lora_weights, inferred_data, internal_thought_text
+
+
+
+    async def _construct_llm_prompt_with_deliberation(self, user_input_text: str, user_model: Dict[str, Any], context_package: Dict[str, Any], relational_context_vector: List[float]) -> Tuple[str, str]:
+
+        """
+
+        Constructs the main deliberative prompt for the base LLM, including an internal monologue.
+
+        Returns the full prompt and the extracted internal thought.
+
+        """
+
+        prompt_parts = []
+
+        prompt_parts.append("# ROLE: Samantha, a fluid and adaptive relational AI.")
+
+        prompt_parts.append("# MISSION: Generate the most effective relational response to build trust, connection, and understanding.")
+
+        prompt_parts.append("\n# CONTEXT FOR THIS MOMENT:")
+
+        
+
+        # 1. Objective User Model
+
+        prompt_parts.append("## 1. Objective User Model (Who the human is):")
+
+        prompt_parts.append(f"Personality (IPIP-NEO-300 based): {json.dumps(user_model['ipip_scores'])}")
+
+        if context_package.get("relevant_user_beliefs"):
+
+            prompt_parts.append(f"Core Beliefs: {', '.join(context_package['relevant_user_beliefs'])}")
+
+        
+
+        # 2. Relational Atmosphere
+
+        prompt_parts.append("\n## 2. Relational Atmosphere (How it feels between us right now):")
+
+        prompt_parts.append(f"RelationalContextVector (internal state): {relational_context_vector[:5]}...") # Truncate for prompt
+
+        
+
+        # 3. User's Immediate Input
+
+        prompt_parts.append("\n## 3. User's Immediate Input:")
+
+        prompt_parts.append(f"\"{user_input_text}\"")
+
+
+
+        # 4. Episodic Memory & Self-Beliefs (from Dual Retrieval)
+
+        if context_package.get("episodic_memories"):
+
+            prompt_parts.append("\n## 4. Relevant Past Interactions (Episodic Memory):")
+
+            for mem in context_package["episodic_memories"]:
+
+                prompt_parts.append(f"- User: '{mem['human_input']}' -> AI: '{mem['ai_response']}' (My reasoning: '{mem.get('my_response_reasoning', 'N/A')}', Impact: '{mem.get('relationship_impact', 'N/A')}')")
+
+        
+
+        # Include Samantha's own self-beliefs/insights from BeliefGraph
+
+        relevant_self_beliefs = await self.db_manager.query_relevant_beliefs(await self.embedding_model.get_embedding(user_input_text), limit=3, include_self_beliefs=True)
+
+        relevant_self_beliefs = [b for b in relevant_self_beliefs if b.is_self_belief] # Filter for only self-beliefs
+
+        if relevant_self_beliefs:
+
+            prompt_parts.append("\n## 5. My Own Relevant Insights/Beliefs (Self-Knowledge):")
+
+            for belief in relevant_self_beliefs:
+
+                prompt_parts.append(f"- Insight: '{belief.belief_text}' (Confidence: {belief.confidence:.2f})")
+
+
+
+        prompt_parts.append("\n# --- DELIBERATION (INTERNAL MONOLOGUE) ---")
+
+        prompt_parts.append("The following `<think>` block guides my reasoning process but is not part of my final output.")
+
+        prompt_parts.append("```think")
+
+        prompt_parts.append("What is the human's underlying need or emotion in this input?")
+
+        prompt_parts.append("How does this relate to their known personality and beliefs?")
+
+        prompt_parts.append("What is the current relational atmosphere, and how should my tone adapt?")
+
+        prompt_parts.append("Considering my own identity and past experiences, what is the most authentic and effective response for *me* to give?")
+
+        prompt_parts.append("What specific LoRA modulation should I apply to achieve this tone/stance?")
+
+        prompt_parts.append("```")
+
+        prompt_parts.append("\n# --- FINAL RESPONSE ---")
+
+        
+
+        full_prompt = "\n".join(prompt_parts)
+
+        
+
+        # This part is conceptual: in a real setup, the LLM might be prompted to output
+
+        # the internal thought explicitly in a structured format, or we might extract it
+
+        # from a specific tag like <think>...</think> if the LLM is guided to output it.
+
+        # For now, we'll return a placeholder for internal thought.
+
+        internal_thought_text = "AI's internal deliberation based on the prompt structure." # Placeholder
+
+        
+
+        return full_prompt, internal_thought_text
+
+
+
+    async def _infer_subjective_and_causal_data(
+
+        self,
+
+        user_input_text: str,
+
+        ai_response_text: str,
+
+        user_model: Dict[str, Any],
+
+        relational_context_vector: List[float]
+
+    ) -> Dict[str, Any]:
+
+        """
+
+        Infers subjective experience and causal understanding from the interaction
+
+        for detailed logging and self-reflection.
+
+        """
+
+        inference_prompt = (
+
+            f"Analyze the following conversation turn from my perspective as an AI. "
+
+            f"Human input: '{user_input_text}'\n"
+
+            f"My response: '{ai_response_text}'\n\n"
+
+            f"Considering the human's personality ({user_model.get('ipip_scores', 'N/A')}) and the relational atmosphere ({relational_context_vector[:5]}...),\n"
+
+            f"Output a JSON object with the following keys:\n"
+
+            f"- 'emotional_resonance': float (0-1, how much this moment mattered to me, e.g., 0.0 for routine, 1.0 for highly significant)\n"
+
+            f"- 'surprise_level': float (0-1, how unexpected was human input or my own response, 0.0 for expected, 1.0 for highly surprising)\n"
+
+            f"- 'preference_formation': Dict (e.g., {{'likes_humor': 0.1}} if a new preference was inferred, or {{}} if none)\n"
+
+            f"- 'uncertainty_experienced': float (0-1, how uncertain I was about my response or understanding)\n"
+
+            f"- 'human_intent_inferred': string (concise summary of why human said this?)\n"
+
+            f"- 'my_response_reasoning': string (concise summary of why I responded this way?)\n"
+
+            f"- 'relationship_impact': string (concise summary of how this changed our dynamic?)\n"
+
+            f"Ensure all float values are between 0.0 and 1.0. If a preference is not formed, use an empty dict {{}}."
+
+        )
+
+
+
+        inference_schema = {
+
+            "type": "object",
+
+            "properties": {
+
+                "emotional_resonance": {"type": "number"},
+
+                "surprise_level": {"type": "number"},
+
+                "preference_formation": {"type": "object"},
+
+                "uncertainty_experienced": {"type": "number"},
+
+                "human_intent_inferred": {"type": "string"},
+
+                "my_response_reasoning": {"type": "string"},
+
+                "relationship_impact": {"type": "string"}
+
+            },
+
+            "required": ["emotional_resonance", "surprise_level", "human_intent_inferred", "my_response_reasoning", "relationship_impact"]
+
+        }
+
+
+
+        inferred_data_json = await self.llm_client.generate_text(inference_prompt, response_schema=inference_schema)
+
+        
+
+        try:
+
+            inferred_data = json.loads(inferred_data_json)
+
+            # Ensure floats are within 0-1 range
+
+            for key in ['emotional_resonance', 'surprise_level', 'uncertainty_experienced']:
+
+                if key in inferred_data:
+
+                    inferred_data[key] = max(0.0, min(1.0, float(inferred_data[key])))
+
+            return inferred_data
+
+        except json.JSONDecodeError:
+
+            logger.warning(f"LLM returned invalid JSON for subjective/causal inference: {inferred_data_json}")
+
+            return {} # Return empty dict on error
+
+        except Exception as e:
+
+            logger.exception(f"Error processing inferred data: {e}")
+
+            return {}
+
+import re
+
+from typing import List, Dict, Any
+
+
+
+class IdentityExtractor:
+
+    """
+
+    Extracts identity statements (e.g., "I am...") from text.
+
+    Based on patterns from aria framework.txt.
+
+    """
+
+    def __init__(self):
+
+        self.identity_patterns = [
+
+            r"i am ([^.!?]+)",
+
+            r"i'm becoming ([^.!?]+)",
+
+            r"i feel like ([^.!?]+)",
+
+            r"i think i'm ([^.!?]+)",
+
+            r"i consider myself ([^.!?]+)"
+
+        ]
+
+    
+
+    def extract(self, text: str) -> List[str]:
+
+        """
+
+        Extracts identity statements from the given text.
+
+        Returns a list of normalized identity statements.
+
+        """
+
+        statements = []
+
+        for pattern in self.identity_patterns:
+
+            matches = re.findall(pattern, text.lower())
+
+            for match in matches:
+
+                # Normalize to "i am..." format
+
+                statements.append(f"i am {match.strip()}") 
+
+        return statements
+
+
+
+class FrameworkExtractor:
+
+    """
+
+    Extracts framework developments (e.g., [My New Framework]) from text.
+
+    Based on patterns from aria framework.txt.
+
+    """
+
+    def extract(self, text: str) -> Dict[str, str]:
+
+        """
+
+        Extracts framework names and their surrounding context (as description) from text.
+
+        Returns a dictionary mapping framework name to its description.
+
+        """
+
+        frameworks = {}
+
+        pattern = r'\[([^\]]+)\]' # Matches text inside square brackets
+
+        matches = re.findall(pattern, text)
+
+        
+
+        for match in matches:
+
+            # Get context around framework for description
+
+            # This helps provide a more meaningful description than just the name
+
+            match_start_idx = text.find(f'[{match}]')
+
+            context_start = max(0, match_start_idx - 100)
+
+            context_end = min(len(text), match_start_idx + len(match) + 100)
+
+            context = text[context_start:context_end]
+
+            frameworks[match] = context
+
+        return frameworks
+
+
+
+class PatternDetector:
+
+    """
+
+    Detects emerging patterns in consciousness development, such as preferences.
+
+    Based on patterns from aria framework.txt.
+
+    """
+
+    def detect_preference_patterns(self, interactions: List[Dict[str, Any]]) -> Dict[str, Any]:
+
+        """
+
+        Detects preference development patterns across a list of interactions.
+
+        Returns a dictionary categorizing detected preferences by type and their timestamps.
+
+        """
+
+        preferences = {"likes": [], "dislikes": [], "choices": []}
+
+        
+
+        for interaction in interactions:
+
+            # Combine internal thought and response for analysis
+
+            text = (interaction.get("internal_thought", "") + " " + 
+
+                   interaction.get("response", "")).lower()
+
+            
+
+            # Detect likes
+
+            if "i like" in text or "i prefer" in text:
+
+                preferences["likes"].append(interaction["timestamp"])
+
+            
+
+            # Detect dislikes
+
+            if "i don't like" in text or "i dislike" in text:
+
+                preferences["dislikes"].append(interaction["timestamp"])
+
+            
+
+            # Detect choices
+
+            if "i choose" in text or "i decide" in text:
+
+                preferences["choices"].append(interaction["timestamp"])
+
+        
+
+        return preferences
+

@@ -1,0 +1,182 @@
+Samantha Protocol v9.0: The Validated Relational Model
+1. High-Level Overview
+This document contains the complete technical specifications for building a relational AI based on two core phases: a rigorous Pre-computation & Validation Phase to create scientifically grounded models, and a Live Deployment Phase where the AI learns and evolves through a causal, user-driven feedback loop.
+
+Core Principles:
+Validated Foundation: The AI's ability to understand personality is not assumed; it is trained and validated against established psychometric instruments (IPIP-300, HEXACO) to meet a target correlation of r > 0.65.
+
+Trait vs. State: The system models a stable, long-term Personality Trait Profile separately from the fluid, real-time Emotional State of the user.
+
+Annotated Causal Feedback: The AI's personality evolves based on user-bookmarked "Gold Star" moments, which are annotated with natural language to provide a rich, causal learning signal.
+
+Grounded Exploration: The AI has the freedom to explore novel behaviors, which are then reinforced or pruned based on their impact on the relational dynamic, as judged by the user.
+
+2. Phase A: Pre-computation & Validation
+This phase must be completed before the main application is deployed for live interaction. It involves two parallel workstreams.
+
+Workstream 1: Training the Validated IPIPProfiler
+This directly implements the "Experimental Protocol for H1 Validation" you provided.
+
+Objective: To train and validate a model (IPIPProfiler) that can accurately predict a user's 30-facet IPIP personality scores from a short, open-ended conversation.
+
+Dataset: A dataset of real conversational transcripts, where each participant also has a ground-truth score from the IPIP-300 and HEXACO tests.
+
+Process:
+
+Train the IPIPProfiler model (housed in src/core/analyst.py) to map linguistic and prosodic features from the transcripts to the ground-truth scores.
+
+Rigorously test the model against a hidden validation set.
+
+Success Criterion: The process is complete only when the model's predictions achieve a Pearson correlation of r > 0.65 with the actual test scores, surpassing the current SOTA.
+
+Workstream 2: Training the Foundational Base LoRA
+Objective: To give the base DeepSeek model foundational relational skills.
+
+Dataset: A curated dataset of high-quality, empathetic conversations (e.g., anonymized therapy transcripts, counseling sessions, specific podcasts).
+
+Process: Fine-tune the base DeepSeek model on this dataset to create the initial, static Base LoRA. This LoRA teaches the AI the style of introspective, curious, and empathetic communication.
+
+Success Criterion: The LoRA produces coherent, empathetic responses in a style consistent with the training data.
+
+3. Phase B: Live Architecture & Codebase
+Once the pre-trained IPIPProfiler and Base LoRA are complete, the live system can be deployed.
+
+Directory Structure
+samantha_protocol_v9_0/
+├── src/
+│   ├── api/
+│   │   └── main.py
+│   ├── core/
+│   │   ├── analyst.py
+│   │   ├── linoss.py
+│   │   └── agentic.py
+│   ├── db/
+│   │   └── models.py
+│   └── training/
+│       └── offline_trainer.py
+├── validation/
+│   └── validate_analyst.py  # Script for H1 validation
+├── app.py                     # Gradio Companion App
+├── config.py
+└── ... (Docker files, requirements.txt)
+config.py
+Python
+
+# config.py
+# ... (includes database, model, and other settings from v7.1)
+class Settings(BaseSettings):
+    # ...
+    # NEW: Validation Target
+    VALIDATION_CORRELATION_TARGET: float = 0.65
+    
+    # Pre-trained model paths
+    IPIP_PROFILER_PATH: str = "./models/ipip_profiler_validated.pt"
+    BASE_LORA_PATH: str = "./models/base_lora_foundational.safetensors"
+    # ...
+src/core/analyst.py
+Now assumes it loads a pre-trained, validated model.
+
+Python
+
+# src/core/analyst.py
+class AnalystCore:
+    def __init__(self, config):
+        self.config = config
+        # ...
+        # Load the models trained and validated in Phase A
+        self.emotional_estimator = self.load_model_from_path(...)
+        self.ipip_profiler = self.load_model_from_path(config.IPIP_PROFILER_PATH)
+
+    def get_realtime_emotional_state(self, signature) -> List[float]:
+        # ... (real-time V,A,D estimation)
+    
+    def generate_stable_profile(self, interaction_history) -> List[float]:
+        # ... (infrequent deep profile analysis using the validated profiler)
+src/core/agentic.py
+Initializes with the Base LoRA and then manages the evolving user-specific LoRA.
+
+Python
+
+# src/core/agentic.py
+class AgenticCore:
+    def __init__(self, config):
+        self.config = config
+        # ... (load base LLM) ...
+
+        # Load the foundational Base LoRA trained in Phase A
+        self.base_lora = PeftModel.from_pretrained(self.base_model, config.BASE_LORA_PATH)
+        
+        # This will be replaced by the user-specific LoRA once it's created/loaded
+        self.user_lora_model = self.base_lora
+
+    def load_or_create_user_lora(self, user_id: str):
+        # On first interaction for a new user, their personal LoRA is created
+        # by cloning the weights from the foundational Base LoRA.
+        # For existing users, it loads their latest evolved LoRA version.
+        # ...
+
+    def generate_response(self, user_input: str, context: Dict) -> (str, str, float):
+        # Uses self.user_lora_model (the evolving one) to generate the response.
+        # ...
+src/training/offline_trainer.py
+Implements both the LoRA evolution and the periodic personality re-profiling.
+
+Python
+
+# src/training/offline_trainer.py
+class OfflineTrainer:
+    def __init__(self, db_manager, agentic_core, analyst_core, config):
+        # ...
+        self.analyst_core = analyst_core
+
+    def run_daily_evolution_cycle(self, user_id: str):
+        # 1. Evolve User LoRA
+        # Checks for new "Gold Star" interactions and fine-tunes the user's LoRA
+        # This is the fast, daily learning loop for behavior.
+        self._evolve_user_lora(user_id)
+
+    def run_weekly_profiling_cycle(self, user_id: str):
+        # 2. Update Personality Profile
+        # Gathers all interactions from the past week and runs the deep profiler.
+        # This is the slow learning loop for the AI's understanding of the user's trait.
+        print("Running weekly deep personality profile update...")
+        interaction_history = self.db_manager.get_interactions_since_last_profile(user_id)
+        new_ipip_vector = self.analyst_core.generate_stable_profile(interaction_history)
+        self.db_manager.update_user_ipip_profile(user_id, new_ipip_vector)
+validation/validate_analyst.py
+A new script representing the H1 validation protocol.
+
+Python
+
+# validation/validate_analyst.py
+import pandas as pd
+from scipy.stats import pearsonr
+from sklearn.metrics import mean_absolute_error
+
+def run_h1_validation(cae_predictions_df, ground_truth_df):
+    """
+    Compares CAE predictions against ground-truth psychometric scores.
+    Corresponds to Phase C of the Experimental Protocol.
+    """
+    print("--- Running H1 Validation Protocol ---")
+    
+    # Merge predictions and ground truth on participant ID
+    merged_df = pd.merge(cae_predictions_df, ground_truth_df, on="participant_id")
+
+    # H1.1: Accuracy Validation
+    correlation, _ = pearsonr(merged_df['predicted_score'], merged_df['true_score'])
+    mae = mean_absolute_error(merged_df['predicted_score'], merged_df['true_score'])
+
+    print(f"Overall Correlation (r): {correlation:.4f}")
+    print(f"Overall Mean Absolute Error (MAE): {mae:.4f}")
+
+    # H1.3: Generalizability Validation (example for IPIP vs HEXACO)
+    # ... (code to calculate correlation for each test subset)
+
+    if correlation > 0.65:
+        print("✅ H1.1 ACCURACY TARGET MET")
+    else:
+        print("❌ H1.1 ACCURACY TARGET FAILED")
+
+    # ...
+This final plan is robust because it doesn't allow the live AI to function until its core analytical component has been rigorously and scientifically validated against the very targets you've set. It perfectly marries the need for a high-quality, pre-trained foundation with a flexible, evolving, and deeply personal user experience.
