@@ -20,11 +20,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db import get_db
 from backend.models import (
-    ActLinkageStatus,
+    SubmissionStatus,
     ActVersion,
     Comedian,
     Episode,
-    EpisodeContestant,
+    Appearance,
     EpisodeStatus,
     ShowEvent,
     ShowEventType,
@@ -141,7 +141,7 @@ async def get_episode(episode_id: uuid.UUID, db: AsyncSession = Depends(get_db))
             "comedian_name": c.comedian.name if c.comedian else "?",
             "draw_position": c.draw_position,
             "is_resident": c.is_resident,
-            "status": c.linkage_status.value,
+            "status": c.qualification_status.value,
             "act_version": c.act_version.version if c.act_version else 0,
             "peak_laugh_share": c.peak_laugh_share,
             "ella_verdict": c.ella_verdict,
@@ -182,9 +182,9 @@ async def enter_contestant(
 
     # Check not already entered
     existing = await db.execute(
-        select(EpisodeContestant).where(
-            EpisodeContestant.episode_id == episode_id,
-            EpisodeContestant.comedian_id == req.comedian_id,
+        select(Appearance).where(
+            Appearance.episode_id == episode_id,
+            Appearance.comedian_id == req.comedian_id,
         )
     )
     if existing.scalar_one_or_none():
@@ -211,17 +211,17 @@ async def enter_contestant(
 
     # Check capacity
     count_result = await db.execute(
-        select(func.count()).select_from(EpisodeContestant).where(EpisodeContestant.episode_id == episode_id)
+        select(func.count()).select_from(Appearance).where(Appearance.episode_id == episode_id)
     )
     count = count_result.scalar()
     if count >= episode.max_contestants:
         raise HTTPException(400, f"Episode full ({episode.max_contestants} max)")
 
-    link = EpisodeContestant(
+    link = Appearance(
         episode_id=episode_id,
         comedian_id=req.comedian_id,
         act_version_id=act_version.id,
-        linkage_status=ActLinkageStatus.ELIGIBLE,
+        qualification_status=SubmissionStatus.ELIGIBLE,
     )
     db.add(link)
     await db.flush()
@@ -241,9 +241,9 @@ async def draw_contestants(episode_id: uuid.UUID, db: AsyncSession = Depends(get
 
     # Get all eligible
     eligible_result = await db.execute(
-        select(EpisodeContestant).where(
-            EpisodeContestant.episode_id == episode_id,
-            EpisodeContestant.linkage_status == ActLinkageStatus.ELIGIBLE,
+        select(Appearance).where(
+            Appearance.episode_id == episode_id,
+            Appearance.qualification_status == SubmissionStatus.ELIGIBLE,
         )
     )
     eligible = list(eligible_result.scalars().all())
@@ -257,7 +257,7 @@ async def draw_contestants(episode_id: uuid.UUID, db: AsyncSession = Depends(get
     results = []
     for i, contestant in enumerate(eligible):
         contestant.draw_position = i + 1
-        contestant.linkage_status = ActLinkageStatus.SELECTED
+        contestant.qualification_status = SubmissionStatus.SELECTED
         db.add(contestant)
 
         await db.refresh(contestant, ["comedian", "act_version"])

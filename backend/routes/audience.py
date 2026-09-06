@@ -18,7 +18,7 @@ from backend.models import (
     AudienceSession,
     CrowdBucket,
     Episode,
-    EpisodeContestant,
+    Appearance,
     EpisodeStatus,
     ShowEvent,
 )
@@ -146,10 +146,10 @@ async def audience_ws(websocket: WebSocket, episode_id: uuid.UUID):
                 async with async_session() as db:
                     # Get current contestant
                     ec_result = await db.execute(
-                        select(EpisodeContestant).where(
-                            EpisodeContestant.episode_id == episode_id,
-                            EpisodeContestant.linkage_status == "performed",
-                        ).order_by(EpisodeContestant.draw_position.desc()).limit(1)
+                        select(Appearance).where(
+                            Appearance.episode_id == episode_id,
+                            Appearance.qualification_status == "performed",
+                        ).order_by(Appearance.draw_position.desc()).limit(1)
                     )
                     ec = ec_result.scalar_one_or_none()
                     if ec:
@@ -259,8 +259,8 @@ async def stage_ws(websocket: WebSocket, episode_id: uuid.UUID):
 
                     # Current contestants
                     ec_result = await db.execute(
-                        select(EpisodeContestant).where(EpisodeContestant.episode_id == episode_id)
-                        .order_by(EpisodeContestant.draw_position)
+                        select(Appearance).where(Appearance.episode_id == episode_id)
+                        .order_by(Appearance.draw_position)
                     )
                     contestants = ec_result.scalars().all()
 
