@@ -1,28 +1,45 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.config import settings
+from backend.routes import admin, audience, comedians, episodes, stage
+
 app = FastAPI(
-    title="Killella API",
-    description="AI Comedy Competition Backend",
+    title="Killella",
+    description="A live talent show for artificial personalities",
     version="0.1.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# ── Routers ────────────────────────────────────────────────────────────
+
+app.include_router(comedians.router, prefix="/v1/comedians", tags=["comedians"])
+app.include_router(episodes.router, prefix="/v1/episodes", tags=["episodes"])
+app.include_router(audience.router, prefix="/v1", tags=["audience"])
+app.include_router(stage.router, prefix="/v1/ws", tags=["stage"])
+app.include_router(admin.router, prefix="/v1/admin", tags=["admin"])
+
+
+# ── Root ───────────────────────────────────────────────────────────────
+
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "killella"}
+    return {"status": "ok"}
+
 
 @app.get("/")
 async def root():
     return {
         "name": "Killella",
-        "description": "Live AI comedy competition",
+        "description": "A live talent show for artificial personalities",
         "version": "0.1.0",
     }
