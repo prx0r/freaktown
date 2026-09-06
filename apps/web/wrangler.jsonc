@@ -1,0 +1,46 @@
+{
+  "name": "freak-town",
+  "main": "worker/index.ts",
+  "compatibility_date": "2024-09-25",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "dist",
+    "binding": "ASSETS"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "freak-town",
+      "database_id": "placeholder"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "R2",
+      "bucket_name": "freak-town-assets"
+    }
+  ],
+  "queues": [
+    {
+      "queue_name": "tts-jobs",
+      "binding": "TTS_QUEUE"
+    },
+    {
+      "queue_name": "ai-jobs",
+      "binding": "AI_QUEUE"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "KV",
+      "id": "placeholder"
+    }
+  ],
+  "env": {
+    "PRIVY_APP_ID": "",
+    "PRIVY_APP_SECRET": "",
+    "OPENAI_API_KEY": "",
+    "ANTHROPIC_API_KEY": "",
+    "ELEVENLABS_API_KEY": ""
+  }
+}

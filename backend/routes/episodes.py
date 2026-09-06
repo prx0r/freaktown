@@ -30,6 +30,7 @@ from backend.models import (
     ShowEventType,
     ShowPhase,
 )
+from backend.services.events import emit_event, get_next_seq
 
 router = APIRouter()
 
@@ -202,7 +203,7 @@ async def enter_contestant(
         av_result = await db.execute(
             select(ActVersion)
             .where(ActVersion.comedian_id == req.comedian_id)
-            .order_by(ActVersion.version.desc())
+            .order_by(ActVersion.revision.desc())
             .limit(1)
         )
     act_version = av_result.scalar_one_or_none()
@@ -221,7 +222,6 @@ async def enter_contestant(
         episode_id=episode_id,
         comedian_id=req.comedian_id,
         act_version_id=act_version.id,
-        qualification_status=SubmissionStatus.ELIGIBLE,
     )
     db.add(link)
     await db.flush()
@@ -243,7 +243,6 @@ async def draw_contestants(episode_id: uuid.UUID, db: AsyncSession = Depends(get
     eligible_result = await db.execute(
         select(Appearance).where(
             Appearance.episode_id == episode_id,
-            Appearance.qualification_status == SubmissionStatus.ELIGIBLE,
         )
     )
     eligible = list(eligible_result.scalars().all())
@@ -257,7 +256,6 @@ async def draw_contestants(episode_id: uuid.UUID, db: AsyncSession = Depends(get
     results = []
     for i, contestant in enumerate(eligible):
         contestant.draw_position = i + 1
-        contestant.qualification_status = SubmissionStatus.SELECTED
         db.add(contestant)
 
         await db.refresh(contestant, ["comedian", "act_version"])
@@ -265,19 +263,17 @@ async def draw_contestants(episode_id: uuid.UUID, db: AsyncSession = Depends(get
             contestant_id=contestant.id,
             comedian_name=contestant.comedian.name,
             draw_position=i + 1,
-            act_version=contestant.act_version.version,
-            is_resident=contestant.is_resident,
+            act_version=contestant.act_version.revision,
+            is_resident=contestant.draw_position == 1,  # first position is resident
         ))
 
-    # Emit draw event
-    event = ShowEvent(
-        episode_id=episode_id,
-        seq=0,
-        type=ShowEventType.SHOW_PHASE,
-        actor="system",
-        payload={"phase": "draw", "drawn": [str(r.contestant_id) for r in results]},
+    # Emit draw event with auto-assigned seq
+    await emit_event(
+        db, episode_id,
+        ShowEventType.SHOW_PHASE,
+        "system",
+        {"phase": "draw", "drawn": [str(r.contestant_id) for r in results]},
     )
-    db.add(event)
 
     await db.flush()
     return results
@@ -295,6 +291,14 @@ async def lock_episode(episode_id: uuid.UUID, db: AsyncSession = Depends(get_db)
 
     episode.status = EpisodeStatus.LOCKED
     episode.version += 1
+
+    await emit_event(
+        db, episode_id,
+        ShowEventType.SHOW_PHASE,
+        "system",
+        {"phase": "locked"},
+    )
+
     await db.flush()
 
     return {"status": "locked", "version": episode.version}
@@ -315,16 +319,15 @@ async def start_episode(episode_id: uuid.UUID, db: AsyncSession = Depends(get_db
     episode.started_at = datetime.now(timezone.utc)
     episode.version += 1
 
-    # Emit show start event
-    event = ShowEvent(
-        episode_id=episode_id,
-        seq=1,
-        type=ShowEventType.SHOW_PHASE,
-        actor="system",
-        payload={"phase": "intro", "title": episode.title},
+    # Emit show start event with auto-assigned seq
+    await emit_event(
+        db, episode_id,
+        ShowEventType.SHOW_PHASE,
+        "system",
+        {"phase": "intro", "title": episode.title},
         effective_at=datetime.now(timezone.utc),
     )
-    db.add(event)
+
     await db.flush()
 
     return {"status": "live", "phase": "intro", "version": episode.version}

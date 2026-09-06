@@ -23,6 +23,7 @@ from backend.models import (
     ShowEventType,
     ShowPhase,
 )
+from backend.services.events import emit_event
 
 router = APIRouter()
 
@@ -61,34 +62,6 @@ async def _get_episode(episode_id: uuid.UUID, db: AsyncSession) -> Episode:
     return episode
 
 
-async def _emit_event(
-    db: AsyncSession,
-    episode_id: uuid.UUID,
-    seq: int,
-    event_type: ShowEventType,
-    actor: str,
-    payload: dict,
-) -> ShowEvent:
-    event = ShowEvent(
-        episode_id=episode_id,
-        seq=seq,
-        type=event_type,
-        actor=actor,
-        payload=payload,
-        effective_at=datetime.now(timezone.utc),
-    )
-    db.add(event)
-    return event
-
-
-async def _get_next_seq(db: AsyncSession, episode_id: uuid.UUID) -> int:
-    from sqlalchemy import func
-    result = await db.execute(
-        select(func.coalesce(func.max(ShowEvent.seq), 0)).where(ShowEvent.episode_id == episode_id)
-    )
-    return result.scalar() + 1
-
-
 @router.post("/episodes/{episode_id}/next-phase")
 async def next_phase(episode_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     """Advance to the next show phase."""
@@ -104,8 +77,7 @@ async def next_phase(episode_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     episode.current_phase = next_phase
     episode.version += 1
 
-    seq = await _get_next_seq(db, episode_id)
-    await _emit_event(db, episode_id, seq, ShowEventType.SHOW_PHASE, "system", {
+    await emit_event(db, episode_id, ShowEventType.SHOW_PHASE, "system", {
         "phase": next_phase.value,
         "previous": episode.current_phase.value if episode.current_phase else None,
     })
@@ -120,8 +92,7 @@ async def pause_episode(episode_id: uuid.UUID, db: AsyncSession = Depends(get_db
     if episode.status != EpisodeStatus.LIVE:
         raise HTTPException(400, "Episode is not live")
 
-    seq = await _get_next_seq(db, episode_id)
-    await _emit_event(db, episode_id, seq, ShowEventType.SHOW_PAUSE, "admin", {})
+    await emit_event(db, episode_id, ShowEventType.SHOW_PAUSE, "admin", {})
     episode.version += 1
 
     return {"status": "paused", "version": episode.version}
@@ -134,8 +105,7 @@ async def resume_episode(episode_id: uuid.UUID, db: AsyncSession = Depends(get_d
     if episode.status != EpisodeStatus.LIVE:
         raise HTTPException(400, "Episode is not live")
 
-    seq = await _get_next_seq(db, episode_id)
-    await _emit_event(db, episode_id, seq, ShowEventType.SHOW_RESUME, "admin", {})
+    await emit_event(db, episode_id, ShowEventType.SHOW_RESUME, "admin", {})
     episode.version += 1
 
     return {"status": "resumed", "version": episode.version}
@@ -148,8 +118,7 @@ async def skip_contestant(episode_id: uuid.UUID, db: AsyncSession = Depends(get_
     if episode.status != EpisodeStatus.LIVE:
         raise HTTPException(400, "Episode is not live")
 
-    seq = await _get_next_seq(db, episode_id)
-    await _emit_event(db, episode_id, seq, ShowEventType.SHOW_PHASE, "admin", {
+    await emit_event(db, episode_id, ShowEventType.SHOW_PHASE, "admin", {
         "phase": "skip",
         "current_phase": episode.current_phase.value if episode.current_phase else None,
     })
@@ -162,7 +131,7 @@ async def skip_contestant(episode_id: uuid.UUID, db: AsyncSession = Depends(get_
 async def end_episode(episode_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     """End the live show."""
     episode = await _get_episode(episode_id, db)
-    if episode.status not in (EpisodeStatus.LIVE, EpisodeStatus.PAUSED if hasattr(EpisodeStatus, 'PAUSED') else EpisodeStatus.LIVE):
+    if episode.status != EpisodeStatus.LIVE:
         raise HTTPException(400, "Episode is not live")
 
     episode.status = EpisodeStatus.COMPLETED
@@ -170,8 +139,7 @@ async def end_episode(episode_id: uuid.UUID, db: AsyncSession = Depends(get_db))
     episode.ended_at = datetime.now(timezone.utc)
     episode.version += 1
 
-    seq = await _get_next_seq(db, episode_id)
-    await _emit_event(db, episode_id, seq, ShowEventType.SHOW_END, "admin", {
+    await emit_event(db, episode_id, ShowEventType.SHOW_END, "admin", {
         "reason": "ended",
     })
 
