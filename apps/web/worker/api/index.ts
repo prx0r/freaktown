@@ -3,7 +3,7 @@
  */
 
 import { Hono } from 'hono';
-import { authMiddleware, requireAuth } from '../auth/middleware';
+import { authMiddleware, requireAdmin } from '../auth/middleware';
 import type { Env } from '../index';
 
 const app = new Hono<{ Bindings: Env }>();
