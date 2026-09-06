@@ -71,16 +71,26 @@ def _generate_cues_from_text(text: str, duration_ms: int) -> list[Cue]:
     Later this can be LLM-driven or use prosody analysis.
     """
     cues = []
-    sentences = [s.strip() for s in text.replace("!", ".").replace("?", ".").split(".") if s.strip()]
 
-    if not sentences:
+    # Split into sentences, preserving punctuation for detection
+    # First split on sentence boundaries, then strip
+    raw_sentences = []
+    for part in text.replace("!", "!|").replace("?", "?|").split("|"):
+        stripped = part.strip()
+        if stripped:
+            raw_sentences.append(stripped)
+
+    if not raw_sentences:
         return [Cue(at_ms=0, type="gesture", value="idle")]
 
-    ms_per_sentence = duration_ms // max(len(sentences), 1)
+    ms_per_sentence = duration_ms // max(len(raw_sentences), 1)
 
-    for i, sentence in enumerate(sentences):
+    for i, sentence in enumerate(raw_sentences):
         at_ms = i * ms_per_sentence
         lower = sentence.lower()
+
+        # Check for question BEFORE stripping punctuation
+        is_question = "?" in sentence
 
         # Emotion/gesture heuristics
         if any(w in lower for w in ["kill", "die", "dead", "murder", "destroy"]):
@@ -92,7 +102,7 @@ def _generate_cues_from_text(text: str, duration_ms: int) -> list[Cue]:
         elif any(w in lower for w in ["fuck", "shit", "damn", "ass", "hell"]):
             cues.append(Cue(at_ms=at_ms, type="emote", value="angry"))
             cues.append(Cue(at_ms=at_ms, type="gesture", value="fist"))
-        elif "?" in sentence:
+        elif is_question:
             cues.append(Cue(at_ms=at_ms, type="gesture", value="shrug"))
             cues.append(Cue(at_ms=at_ms, type="emote", value="confused"))
         elif any(w in lower for w in ["so", "listen", "look", "okay"]):
@@ -100,7 +110,7 @@ def _generate_cues_from_text(text: str, duration_ms: int) -> list[Cue]:
         elif i == 0:
             cues.append(Cue(at_ms=at_ms, type="gesture", value="wave"))
             cues.append(Cue(at_ms=at_ms, type="emote", value="confident"))
-        elif i == len(sentences) - 1:
+        elif i == len(raw_sentences) - 1:
             cues.append(Cue(at_ms=at_ms, type="gesture", value="bow"))
 
     # Add opening and closing

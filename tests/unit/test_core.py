@@ -226,9 +226,9 @@ class TestEventSequencing:
 
     def test_get_next_seq_empty(self):
         # This would need a database mock, but we can test the logic
-        from backend.services.events import get_next_seq
+        from backend.services.events import get_next_seq_safe, emit_event
         # In production, test with a real or mocked database
-        assert callable(get_next_seq)
+        assert callable(get_next_seq_safe)
 
     def test_emit_event_callable(self):
         from backend.services.events import emit_event

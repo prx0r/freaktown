@@ -1,5 +1,8 @@
 """External agent interview controller — BYO-agent protocol.
 
+SECURITY: FEATURE FLAGGED OFF for Episode Zero.
+Per peer review: "Do not enable until SSRF tests exist."
+
 Allows external agents to control a contestant during the interview.
 The agent receives Ella's questions and responds on behalf of the character.
 
@@ -13,16 +16,78 @@ Security:
   - Short-lived tokens scoped to one appearance
   - Rate limited
   - Cannot modify character or issue stage events
+  - FEATURE FLAG: EXTERNAL_AGENT_ENABLED must be true
+  - SSRF protection: validates URLs, blocks private IPs
 """
 
 import json
+import os
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
+from urllib.parse import urlparse
 
 import httpx
 
 from backend.config import settings
+
+# FEATURE FLAG — disabled by default for Episode Zero
+EXTERNAL_AGENT_ENABLED = os.getenv("EXTERNAL_AGENT_ENABLED", "false").lower() == "true"
+
+# SSRF protection: blocked networks
+BLOCKED_NETWORKS = [
+    "127.0.0.0/8",
+    "10.0.0.0/8",
+    "172.16.0.0/12",
+    "192.168.0.0/16",
+    "169.254.0.0/16",
+    "0.0.0.0/8",
+    "::1/128",
+    "fc00::/7",
+    "fe80::/10",
+]
+
+
+def _validate_agent_url(url: str) -> bool:
+    """Validate agent endpoint URL for SSRF protection."""
+    try:
+        parsed = urlparse(url)
+
+        # Only HTTPS allowed
+        if parsed.scheme != "https":
+            return False
+
+        hostname = parsed.hostname
+        if not hostname:
+            return False
+
+        # Block private IPs
+        import ipaddress
+        try:
+            ip = ipaddress.ip_address(hostname)
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+                return False
+        except ValueError:
+            # hostname is a domain, not IP — check for dangerous patterns
+            blocked_patterns = [
+                "localhost", "127.0.0.1", "0.0.0.0", "::1",
+                "metadata.google.internal", "169.254.169.254",
+            ]
+            if hostname.lower() in blocked_patterns:
+                return False
+
+        # Block non-HTTP schemes
+        if parsed.scheme not in ("https",):
+            return False
+
+        # Block file://, ftp://, etc.
+        if "://" in url and not url.startswith("https://"):
+            return False
+
+        return True
+
+    except Exception:
+        return False
 
 
 @dataclass
@@ -65,6 +130,9 @@ class ExternalAgentController:
 
     def issue_token(self, appearance_id: str, episode_id: str) -> str:
         """Issue a short-lived token for an external agent."""
+        if not EXTERNAL_AGENT_ENABLED:
+            raise RuntimeError("External agent feature is disabled. Set EXTERNAL_AGENT_ENABLED=true to enable.")
+
         token = f"agent_{uuid.uuid4().hex}"
         self._tokens[token] = {
             "appearance_id": appearance_id,

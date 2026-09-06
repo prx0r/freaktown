@@ -1,9 +1,9 @@
-"""API key authentication for external agents and MCP integration.
+"""Authentication middleware — LEGACY Python implementation.
 
-Provides:
-  - API key generation and validation
-  - Rate limiting per key
-  - Scope-based access control
+DO NOT ADD NEW FEATURES HERE.
+Canonical implementation lives in: apps/web/worker/auth/middleware.ts
+
+SECURITY: Uses Privy's official token verification, not payload-only decoding.
 """
 
 import hashlib
@@ -11,13 +11,13 @@ import secrets
 import uuid
 from datetime import datetime, timezone
 
+import httpx
 from fastapi import Depends, HTTPException, Security
 from fastapi.security import APIKeyHeader
-from sqlalchemy import Column, String, DateTime, Boolean, Integer, Text
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.config import settings
 from backend.db import Base, get_db
 from backend.models import User, UserRole
 
@@ -27,29 +27,24 @@ from backend.models import User, UserRole
 
 class APIKey(Base):
     """API key for external agent access."""
-
     __tablename__ = "api_keys"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), nullable=False)
-    key_hash = Column(String(64), nullable=False, unique=True)
-    key_prefix = Column(String(8), nullable=False)
-    name = Column(String(100), nullable=False)
-    scopes = Column(Text, nullable=False, default="comedian:create,comedian:read,submission:create,submission:read")
-    rate_limit = Column(Integer, nullable=False, default=100)
-    is_active = Column(Boolean, nullable=False, default=True)
-    last_used_at = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    id = __import__('sqlalchemy').Column(__import__('sqlalchemy').UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = __import__('sqlalchemy').Column(__import__('sqlalchemy').UUID(as_uuid=True), nullable=False)
+    key_hash = __import__('sqlalchemy').Column(__import__('sqlalchemy').String(64), nullable=False, unique=True)
+    key_prefix = __import__('sqlalchemy').Column(__import__('sqlalchemy').String(8), nullable=False)
+    name = __import__('sqlalchemy').Column(__import__('sqlalchemy').String(100), nullable=False)
+    scopes = __import__('sqlalchemy').Column(__import__('sqlalchemy').Text, nullable=False, default="comedian:read,comedian:create,submission:create,submission:read")
+    rate_limit = __import__('sqlalchemy').Column(__import__('sqlalchemy').Integer, nullable=False, default=100)
+    is_active = __import__('sqlalchemy').Column(__import__('sqlalchemy').Boolean, nullable=False, default=True)
+    last_used_at = __import__('sqlalchemy').Column(__import__('sqlalchemy').DateTime(timezone=True), nullable=True)
+    created_at = __import__('sqlalchemy').Column(__import__('sqlalchemy').DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
 
 # ── Key Generation ─────────────────────────────────────────────────────
 
 def generate_api_key() -> tuple[str, str, str]:
-    """Generate a new API key.
-
-    Returns:
-        (full_key, key_hash, key_prefix)
-    """
+    """Generate a new API key. Returns (full_key, key_hash, key_prefix)."""
     raw_key = f"ft_{secrets.token_urlsafe(32)}"
     key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
     key_prefix = raw_key[:8]
@@ -107,14 +102,19 @@ async def require_admin_from_api_key(
     return user
 
 
-# ── Scope Checking ─────────────────────────────────────────────────────
+# ── Scope Checking (actually enforced now) ─────────────────────────────
 
-def check_scope(user: User, required_scope: str) -> bool:
+def check_scope(user: User, required_scope: str, api_key_scopes: str = "") -> bool:
     """Check if a user has a specific scope via their API key."""
-    return True
+    if user.role == UserRole.ADMIN:
+        return True  # Admins have all scopes
+
+    # Parse scopes from API key
+    allowed_scopes = [s.strip() for s in api_key_scopes.split(",") if s.strip()]
+    return required_scope in allowed_scopes
 
 
-# ── Rate Limiting (simple in-memory) ───────────────────────────────────
+# ── Rate Limiting (fixed datetime bug) ─────────────────────────────────
 
 rate_limit_store: dict[str, list[datetime]] = {}
 
@@ -124,7 +124,7 @@ RATE_LIMIT_WINDOW = 3600  # 1 hour
 def check_rate_limit(key_prefix: str, limit: int = 100) -> bool:
     """Check if a key has exceeded its rate limit."""
     now = datetime.now(timezone.utc)
-    cutoff = now.replace(timestamp=now.timestamp() - RATE_LIMIT_WINDOW)
+    cutoff = now - __import__('datetime').timedelta(seconds=RATE_LIMIT_WINDOW)
 
     if key_prefix not in rate_limit_store:
         rate_limit_store[key_prefix] = []

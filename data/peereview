@@ -1,0 +1,2267 @@
+I reviewed the new head as well, including the just-pushed `fbd8d071…`. The direction is right, but I would **block Episode Zero until the core invariants below are proven by tests**.
+
+The newest commit fixes `max_contestants → max_appearances` and removes global comedian-name uniqueness, but those are surface fixes.  The bigger problem is that the codebase currently contains **multiple generations of the architecture at once**.
+
+### Peer-review verdict
+
+**P0 — The Python HTTP routes do not match the canonical domain model.** The canonical model correctly says `User → Comedian → ActVersion → Submission → Appearance`: `Comedian` requires `owner_user_id`; `ActVersion` uses `revision`, `manifest`, `created_by_user_id`, `content_sha256`; and `Appearance` is created only from a selected `Submission`.  But the current comedian route still creates `Comedian` without an owner, accepts `creator_id` from the browser, creates `ActVersion(version=..., minute_text=..., content_hash=...)`, and truncates hashes to 16 hex characters. Those fields no longer correspond to the canonical model.
+
+The episode route has the same problem. It still creates an `Appearance` when someone merely enters the show, queries `Appearance.comedian_id`, passes `comedian_id` and `act_version_id` into `Appearance`, and then uses `random.shuffle()` over appearances. The canonical `Appearance` has none of those ownership fields and should exist **only after a Submission has won the draw**.
+
+So `Submission → deterministic draw → Appearance` exists conceptually, but **the actual public route bypasses it**.
+
+**P0 — the migration describes an older application.** `001_initial_schema.py` creates the old `episode_contestants` model, old ActVersion columns, globally unique comedian names, `max_contestants`, and no canonical `users → submissions → appearances` structure.  Running `alembic upgrade head` therefore does not prove the current application works; it creates a database for a previous version of it.
+
+**P0 — authentication is not safe yet.** The Cloudflare authentication middleware explicitly *decodes* a Privy JWT without verifying its cryptographic signature. A forged token with a chosen `sub` can therefore be treated as authenticated.  On the Python side, the admin routes themselves contain no auth dependency at all.  The current integration test obscures this by accepting either `401` **or** `422`, so an invalid UUID can make the “admin requires auth” test pass without auth ever running.
+
+**P0 — the live Worker is not yet durable or access-controlled.** `EpisodeRoom` determines whether a socket is `stage`, `puppeteer`, or `audience` solely from a query parameter. It doesn't validate a scoped token. Its in-memory `episodeState` isn't restored from storage after object recreation, missed events aren't replayed, puppeteer speech increments the event sequence without persisting the event, and the crowd's “unique laughers” set uses `clientSeq`, meaning one user can generate unlimited “unique” laughers simply by incrementing their counter.
+
+**P0 — payments must remain disabled.** The crypto `confirm_tip()` marks a transaction confirmed from caller-supplied `tx_hash` and amount without verifying the chain transaction, mint, destinations or amount.  The Stripe service similarly has a `confirm_tip()` that trusts supplied values, and its webhook handler explicitly does not verify Stripe signatures.  These are useful interfaces/scaffolds, but they are not payment implementations yet.
+
+**P0 — the Cloudflare runtime isn't buildable from a clean checkout yet.** The latest tree has the Worker source and `wrangler.jsonc`, but no `package.json`, lockfile, `tsconfig`, Vite configuration or React application.  The Worker API also imports `requireAuth` even though the auth module doesn't export it and uses `requireAdmin` without importing it.  `wrangler.jsonc` also lacks a Durable Object binding/migration despite `EpisodeRoom` existing.
+
+There are some important P1s too. `get_next_seq()` uses `MAX(seq)+1`; that is **not concurrency-safe** despite the docstring saying it guarantees uniqueness. Two transactions can read the same maximum.  API-key `check_scope()` simply returns `True`, so scopes currently do nothing, while its in-memory rate limiter calls `datetime.replace(timestamp=...)`, which isn't a valid `datetime.replace` argument.
+
+The BYO-agent implementation is premature and creates an SSRF surface because it will POST to arbitrary user-controlled URLs. Tokens are also only stored in process memory.  I would feature-flag this completely off until after Episode Zero.
+
+There are also correctness bugs in media. The performance compiler replaces `?` with `.` before checking whether a sentence contains `?`, so its question branch can never fire; `max_segment_ms` is unused; timing is spread evenly across sentences rather than using actual speech alignment; and short audio can yield a negative exit cue.  The TTS implementation writes local files, permits arbitrary raw voice names, guesses MP3 duration from file size, and doesn't actually reuse an existing cached file.
+
+Finally, the new problem registry is useful, but **do not treat it as ground truth yet**. It marks truncated Act hashes as resolved, while the current comedian route still returns `hexdigest()[:16]`. It marks event sequencing resolved despite `MAX(seq)+1` remaining race-prone, and it does not include the unverified JWT, payment verification, SSRF, migration/model incompatibility or unauthenticated Python admin routes.
+
+And the current “tests passing” number is misleading. The suite includes assertions such as “201 or 401 or 422,” “200 or 404,” and “101 or 400 or 404,” while event sequencing tests merely check that functions are callable.   Those tests prevent almost no regressions.
+
+Here is what I would give the coding agent verbatim.
+
+# KILLELLA TEST-DRIVEN STABILIZATION MANDATE
+
+## Objective
+
+Do not add product features until the repository can prove one complete Killella lifecycle:
+
+```text
+authenticated creator
+→ creates comedian
+→ creates immutable ActVersion
+→ submits ActVersion to episode
+→ Submission becomes eligible
+→ deterministic draw selects it
+→ Appearance is created
+→ EpisodeRoom runs it
+→ audience receives stage state
+→ reactions are aggregated safely
+→ interview happens
+→ episode completes
+→ canonical event archive replays
+```
+
+The goal is not “more tests passing.”
+
+The goal is:
+
+> A test suite strong enough that an implementation incompatible with the domain model cannot appear green.
+
+---
+
+# 1. Establish one production runtime contract
+
+The repository currently has:
+
+```text
+Python/FastAPI API
+PostgreSQL/Alembic
+
+AND
+
+Cloudflare/Hono API
+D1
+Durable Objects
+```
+
+Do not maintain two implementations of creator/submission/episode semantics.
+
+Canonical decision:
+
+```text
+Cloudflare Worker / Hono = production HTTP + realtime runtime
+PostgreSQL = long-term relational truth
+Durable Object SQLite = live episode truth
+Python = research/evaluation/offline tooling
+```
+
+If Python endpoints are retained temporarily during migration, label them LEGACY and exclude them from new product work.
+
+Never implement the same domain mutation independently in Python and TypeScript.
+
+Move shared protocol/domain definitions to TypeScript packages.
+
+---
+
+# 2. Before any tests: make TypeScript buildable
+
+Create:
+
+```text
+package.json
+pnpm-workspace.yaml
+pnpm-lock.yaml
+tsconfig.base.json
+
+apps/web/
+  package.json
+  tsconfig.json
+  vite.config.ts
+  wrangler.jsonc
+
+packages/
+  domain/
+  protocol/
+  test-utils/
+```
+
+Required scripts:
+
+```bash
+pnpm lint
+pnpm typecheck
+pnpm build
+pnpm test
+pnpm test:worker
+pnpm test:e2e
+pnpm test:a11y
+```
+
+First CI test:
+
+```text
+fresh checkout
+→ pnpm install --frozen-lockfile
+→ pnpm typecheck
+→ pnpm build
+```
+
+This test alone must catch:
+
+```text
+undefined requireAdmin
+nonexistent requireAuth export
+missing Worker bindings
+wrong Cloudflare types
+broken imports
+```
+
+A commit that does not compile cannot merge.
+
+---
+
+# 3. Fix the database before application tests
+
+Generate a new canonical migration from the actual domain.
+
+Do not patch old migration `001` piecemeal.
+
+For pre-production, it is acceptable to squash back to a clean initial migration.
+
+Canonical relational graph:
+
+```text
+users
+  ↓
+comedians
+  ↓
+act_versions
+  ↓
+submissions
+  ↓
+appearances
+
+episodes
+  ├── submissions
+  └── appearances
+```
+
+Required constraints:
+
+```text
+users.privy_user_id UNIQUE
+
+comedians.owner_user_id NOT NULL
+comedians.slug UNIQUE
+comedians.name NOT UNIQUE
+
+act_versions UNIQUE(comedian_id, revision)
+act_versions.created_by_user_id NOT NULL
+act_versions.content_sha256 CHAR(64) NOT NULL
+
+submissions UNIQUE(episode_id, comedian_id)
+submissions.act_version_id NOT NULL
+
+appearances.submission_id UNIQUE NOT NULL
+appearances UNIQUE(episode_id, draw_position)
+
+show_events UNIQUE(episode_id, seq)
+```
+
+ActVersion must never contain parallel legacy columns such as:
+
+```text
+minute_text
+character_name
+voice_profile
+content_hash
+version
+creator_id
+```
+
+if those values are canonicalized inside `manifest`.
+
+One representation only.
+
+---
+
+# 4. Migration test suite
+
+Create `tests/db/migrations.test.ts`.
+
+Every PR must boot an empty disposable database.
+
+Test:
+
+```text
+empty database
+→ migrate to head
+→ schema introspection
+→ all expected tables exist
+→ all expected columns exist
+→ all expected FKs exist
+→ all expected unique constraints exist
+```
+
+Then instantiate every production repository against that migrated database.
+
+Do NOT allow:
+
+```text
+skip if database unavailable
+```
+
+in CI.
+
+CI owns the database and must start it.
+
+Add:
+
+### `migration_matches_domain`
+
+Compare migration schema against ORM/schema definitions.
+
+### `migration_from_zero`
+
+Drop database, run all migrations, run representative CRUD.
+
+### `migration_is_repeatable`
+
+Second `migrate head` changes nothing.
+
+### `migration_downgrade_smoke`
+
+Until first public production data exists, prove rollback works.
+
+---
+
+# 5. Authentication tests — P0
+
+No product tests matter until this is correct.
+
+Use the official Privy server verification mechanism.
+
+Delete JWT payload-only decoding.
+
+Create test keys/JWKS fixtures or mock the verifier at its boundary.
+
+Tests:
+
+### `valid_privy_token_authenticates`
+
+Signed token with:
+
+```text
+correct signature
+correct issuer
+correct audience/app
+future expiry
+valid subject
+```
+
+returns current user.
+
+### `unsigned_token_rejected`
+
+`alg:none` / unsigned token → 401.
+
+### `forged_signature_rejected`
+
+Modify payload but retain original signature → 401.
+
+### `wrong_issuer_rejected`
+
+→ 401.
+
+### `wrong_audience_rejected`
+
+→ 401.
+
+### `expired_token_rejected`
+
+→ 401.
+
+### `future_nbf_rejected`
+
+→ 401 where applicable.
+
+### `malformed_token_rejected`
+
+→ 401.
+
+### `duplicate_handle_autocreation_safe`
+
+Two new accounts whose email prefixes both map to `john` must both authenticate successfully and receive collision-safe handles.
+
+### `browser_cannot_set_role`
+
+Body fields like:
+
+```json
+{"role":"admin"}
+```
+
+have no effect.
+
+### `browser_cannot_set_owner`
+
+Body fields:
+
+```json
+{"creator_id":"someone_else"}
+{"owner_user_id":"someone_else"}
+```
+
+are rejected or ignored.
+
+Server derives ownership from verified auth only.
+
+---
+
+# 6. Authorization matrix tests
+
+Create a reusable fixture:
+
+```text
+Alice = normal creator
+Bob = normal creator
+Admin = admin
+Anonymous = no identity
+Stage = scoped machine identity
+PuppeteerAlice = scoped appearance token
+```
+
+Create a table-driven test for every mutation.
+
+Must prove:
+
+```text
+Alice can create Alice comedian.
+Bob cannot edit Alice comedian.
+Bob cannot create Alice ActVersion.
+Bob cannot submit Alice comedian.
+Bob cannot select Alice ActVersion in his own Submission.
+Alice cannot call admin episode commands.
+Anonymous cannot create comedians.
+Stage cannot call admin endpoints.
+Audience cannot call admin endpoints.
+Puppeteer token cannot control another Appearance.
+Expired puppeteer token fails.
+```
+
+Do not use assertions such as:
+
+```python
+assert status in (401, 403, 422)
+```
+
+Specify the exact expected behavior.
+
+---
+
+# 7. API-key security tests
+
+API keys are high-entropy random credentials.
+
+SHA-256 storage is acceptable for this kind of randomly generated key; do not spend time bcrypting a 256-bit random token while authorization is bypassed.
+
+Fix and test what matters:
+
+### Scope enforcement
+
+```text
+comedian:read key
+```
+
+must fail:
+
+```text
+comedian:create
+submission:create
+admin:*
+```
+
+`check_scope()` must never default to true.
+
+### Revocation
+
+Revoked key immediately fails.
+
+### Rate limiting
+
+Test exact limit:
+
+```text
+100 allowed
+101st blocked
+window expiry restores access
+```
+
+Do not use process-local lists in production.
+
+### Prefix collision
+
+Rate limiting and authorization must be tied to key ID/hash, never an 8-character display prefix.
+
+### Secret handling
+
+Full API key is returned only once at creation.
+
+Logs never contain full keys.
+
+---
+
+# 8. Canonical ActVersion tests
+
+Implement ONE canonical serializer.
+
+Example:
+
+```ts
+canonicalize(manifest)
+```
+
+must recursively sort object keys while preserving array order.
+
+Use a standard implementation or rigorously test the custom one.
+
+Hash:
+
+```text
+SHA256(UTF8(canonical JSON))
+```
+
+64 hex characters.
+
+Test fixture:
+
+```json
+{
+  "schemaVersion": 1,
+  "character": {...},
+  "body": {...},
+  "voice": {...},
+  "minute": {...},
+  "interview": {...}
+}
+```
+
+Tests:
+
+### Property-order invariant
+
+Two semantically identical objects with different object key order produce identical hash.
+
+### Array-order sensitive
+
+Changing ordered facts/cues where order is meaningful changes hash.
+
+### Every immutable field changes hash
+
+Parameterized test individually modifies:
+
+```text
+character.name
+character.deal
+character.facts
+body.family
+body.variant
+body.outfit
+voice.voiceId
+minute.text
+minute.authorship
+minute.assistance
+interview.controller
+interview.facts
+schemaVersion
+revision
+```
+
+Every modification must alter hash.
+
+This test would catch the current shallow `JSON.stringify(...topLevelKeys)` problem.
+
+### Sealed means sealed
+
+Once `sealed_at != NULL`:
+
+```text
+UPDATE manifest
+UPDATE content hash
+UPDATE revision
+```
+
+must fail at domain layer.
+
+Prefer an additional database trigger or immutable repository API if practical.
+
+---
+
+# 9. Concurrent ActVersion creation
+
+This is essential.
+
+Create Act revision 6.
+
+Fire 20 concurrent “create next act” requests.
+
+Valid outcome:
+
+```text
+revisions 7–26
+```
+
+exactly once each.
+
+Invalid:
+
+```text
+two revision 7s
+409 races leaking to user
+missing parent chain
+```
+
+Use transaction + locking / retry around unique constraint.
+
+Check every child points to its correct parent.
+
+---
+
+# 10. Comedian API golden tests
+
+### Create
+
+Authenticated Alice submits:
+
+```text
+name
+premise
+body
+minute
+authorship
+interview mode
+```
+
+Assert:
+
+```text
+owner == Alice
+slug created
+ActVersion revision == 1
+manifest complete
+hash valid
+sealed
+```
+
+### Duplicate names
+
+Alice and Bob can both create:
+
+```text
+No-Nose Nolan
+```
+
+but slugs differ.
+
+### Slug races
+
+20 simultaneous creators using same name still produce unique slugs.
+
+### Validation
+
+Reject:
+
+```text
+blank names
+oversize fields
+invalid body family
+unknown voice
+invalid interview controller
+mass-assignment fields
+```
+
+Use Zod shared schema.
+
+---
+
+# 11. Submission tests
+
+Submission, not Appearance, represents joining The Line.
+
+Tests:
+
+```text
+Alice owns Nolan.
+Nolan Act #3 sealed.
+Episode OPEN.
+```
+
+POST submit.
+
+Assert:
+
+```text
+1 Submission
+0 Appearances
+```
+
+This is the single most important regression test for the current architecture.
+
+Also test:
+
+### Submission references own Act
+
+User cannot send:
+
+```text
+comedian_id = Alice/Nolan
+act_version_id = Bob/Robot
+```
+
+### Episode closed
+
+LOCKED / LIVE / COMPLETED episode rejects submission.
+
+### Unsealed Act
+
+Cannot submit.
+
+### Duplicate
+
+Same comedian cannot enter same episode twice unless explicitly designed otherwise.
+
+### Scale
+
+Create 10,000 eligible submissions.
+
+No episode-capacity failure occurs.
+
+---
+
+# 12. Qualification pipeline tests
+
+State machine:
+
+```text
+SUBMITTED
+→ VALIDATING
+→ ELIGIBLE
+```
+
+or:
+
+```text
+→ REJECTED
+```
+
+Validate separately:
+
+```text
+technical_status
+moderation_status
+qualification_status
+```
+
+Test idempotent retry.
+
+Running qualification twice cannot duplicate work or corrupt status.
+
+Store rejection reason.
+
+---
+
+# 13. Deterministic draw tests
+
+The isolated draw tests are a useful start, but add route/service integration.
+
+Use permanent fixture:
+
+```text
+algorithm: KILLELLA_DRAW_V1
+seed: fixed 32 bytes
+eligible IDs: fixed sorted list
+resident IDs: fixed list
+expected selection: committed literal fixture
+```
+
+Tests:
+
+### Cross-run determinism
+
+100 executions → identical selection.
+
+### Ordering independence
+
+Provide eligible IDs in random orders → same result after canonical sorting.
+
+### Commitment
+
+```text
+SHA256(seed)
+```
+
+must equal published commitment.
+
+### Eligible-set commitment
+
+Changing any eligible ID changes eligible-set hash.
+
+### Resident behavior
+
+```text
+5 slots
+1 resident
+```
+
+means exactly:
+
+```text
+1 resident
+4 random
+```
+
+### No duplicates
+
+Never select one Submission twice.
+
+### Not all entrants selected
+
+With 10,000 eligible submissions and five slots:
+
+```text
+5 Appearances
+9,995 still unselected Submissions
+```
+
+### Appearance provenance
+
+Each selected Appearance points to exactly the Submission selected by the verified draw.
+
+### Route-level enforcement
+
+The production `/draw` endpoint MUST invoke canonical draw service.
+
+Delete every `random.shuffle()` from production draw paths.
+
+---
+
+# 14. Episode state-machine tests
+
+Define transitions explicitly.
+
+Example:
+
+```text
+DRAFT → OPEN
+OPEN → LOCKED
+LOCKED → PREPARING
+PREPARING → READY
+READY → LIVE
+LIVE → COMPLETED
+```
+
+Plus cancellation/failure transitions.
+
+Use table-driven tests for every `(from, to)` combination.
+
+Invalid transition returns deterministic `409`.
+
+Do not derive lifecycle from arbitrary strings.
+
+For live phase progression, test:
+
+```text
+INTRO
+LINEUP
+CONTESTANT_ENTER
+SET_ACTIVE
+POST_SET
+INTERVIEW
+LIVE_TEST optional
+MODEL_REVEAL
+TRANSITION
+...
+```
+
+Also fix/test current `next_phase` event:
+
+```text
+previous
+```
+
+must contain the phase BEFORE mutation, not the new phase.
+
+Pause must have actual pause state, not merely an emitted event.
+
+`resume` when not paused must fail.
+
+---
+
+# 15. Event sequencing tests
+
+Do not accept `SELECT MAX(seq)+1`.
+
+The owner of live sequence is `EpisodeRoom`.
+
+Tests:
+
+### Sequential
+
+100 commands produce:
+
+```text
+1..100
+```
+
+### Concurrent
+
+Fire 100 commands concurrently.
+
+Assert:
+
+```text
+100 unique seq values
+strictly monotonic event log
+no database uniqueness failure
+```
+
+### Idempotency
+
+Repeat identical `commandId` 20 times.
+
+Assert:
+
+```text
+one event
+same response/event ID
+```
+
+### Different command IDs
+
+Same semantic command with different IDs should be handled according to state-machine rules, not idempotency coincidence.
+
+### Version control
+
+Wrong `expectedVersion` → 409.
+
+---
+
+# 16. Durable Object tests
+
+Use Cloudflare's Vitest Workers pool.
+
+Do not mock EpisodeRoom as an ordinary class.
+
+Test the real Durable Object runtime semantics.
+
+## Hydration
+
+1. Start EpisodeRoom.
+2. Execute 25 events.
+3. Persist state.
+4. Simulate object eviction/recreation.
+5. Reconnect.
+6. Assert state resumes at `seq=25`, correct phase and Appearance.
+
+Constructor must hydrate durable state.
+
+## Hibernation
+
+Use socket tags/attachments.
+
+After hibernation/recreation:
+
+```text
+stage
+audience
+puppeteer
+```
+
+connections must retain identity/role.
+
+Do not rely solely on in-memory `Set<WebSocket>`.
+
+## Socket authorization
+
+These must fail:
+
+```text
+/ws?type=stage
+```
+
+without valid stage credential.
+
+Likewise puppeteer.
+
+Audience role may be anonymous but gets only audience capability.
+
+## Command authorization
+
+Direct `/command` request without server/admin capability → 401/403.
+
+## Message size
+
+Frames above configured size terminate/reject connection.
+
+## Schema validation
+
+Unknown event/message shape rejected.
+
+No arbitrary `type` reaches command executor.
+
+---
+
+# 17. Reconnect and replay tests
+
+Stage receives:
+
+```text
+1..100
+```
+
+Disconnect after 40.
+
+Events 41–100 occur.
+
+Reconnect with:
+
+```text
+lastSeq=40
+```
+
+Assert:
+
+```text
+snapshot represents current state
+events 41..100 replay exactly once
+final client state == uninterrupted client state
+```
+
+Repeat at:
+
+```text
+disconnect before audio
+during audio
+during interview
+during live test
+after show end
+```
+
+A stage reload must never restart the show.
+
+---
+
+# 18. Puppeteer security tests
+
+A puppeteer credential contains:
+
+```text
+episodeId
+appearanceId
+userId
+expiry
+capability=dialogue
+```
+
+Tests:
+
+```text
+Alice controls Alice selected character → works.
+Bob's token → denied.
+Token for previous Appearance → denied.
+Expired token → denied.
+Token cannot issue admin command.
+Token cannot alter character manifest.
+Token cannot choose actor ID.
+```
+
+Persist every accepted dialogue as a canonical ShowEvent.
+
+After replay, human-puppeteered dialogue must still exist.
+
+Input limits:
+
+```text
+max chars
+rate/sec
+UTF-8 validation
+moderation where needed
+```
+
+---
+
+# 19. Crowd tests
+
+Use stable audience session ID.
+
+Never use `clientSeq` as identity.
+
+### One user spam
+
+One session sends:
+
+```text
+5,000 laugh events
+```
+
+during one second.
+
+Its unique-laugher contribution must remain:
+
+```text
+1
+```
+
+and raw reaction influence must be capped.
+
+### 100 real users
+
+100 separate sessions laugh once.
+
+Unique laughers:
+
+```text
+100
+```
+
+### Duplicate client sequence
+
+Same:
+
+```text
+sessionId + clientSeq
+```
+
+processed once.
+
+### Out-of-order sequence
+
+Handle/reject according to protocol.
+
+### Wrong phase
+
+Laugh during INTRO/TRANSITION → ignored for scoring.
+
+### Wrong Appearance supplied by client
+
+Server ignores caller-provided Appearance and attaches reaction to authoritative active Appearance.
+
+### Denominator
+
+With:
+
+```text
+100 active viewers
+40 unique laughers
+```
+
+laugh share:
+
+```text
+0.40
+```
+
+### Disconnect
+
+Viewer denominator adjusts according to documented activity window.
+
+### Persistence
+
+One-second aggregate buckets survive room restart/archive.
+
+Do not clear a bucket before persistence succeeds.
+
+---
+
+# 20. Audience WebSocket E2E
+
+Use actual WebSocket clients.
+
+Test 100 audience connections plus stage.
+
+Stage triggers performer.
+
+Audience clients receive authoritative state.
+
+40 clients laugh.
+
+All clients eventually observe:
+
+```text
+uniqueLaughers = 40
+activeViewers ≈ 100
+laughShare ≈ .40
+```
+
+depending documented active-window semantics.
+
+Measure reaction-to-aggregate latency.
+
+Initial targets:
+
+```text
+local/staging p95 < 250 ms
+wide-region p95 < 500 ms
+```
+
+---
+
+# 21. Stage protocol contract tests
+
+Create shared Zod schemas under:
+
+```text
+packages/protocol
+```
+
+Every event has:
+
+```text
+schemaVersion
+eventId
+episodeId
+seq
+type
+actor
+payload
+createdAt
+effectiveAt?
+correlationId?
+```
+
+Generate fixture for every event type.
+
+Tests run each fixture through:
+
+```text
+server encoder
+schema parser
+stage reducer
+replay reducer
+```
+
+Unknown future event versions fail/degrade explicitly.
+
+No Python and TypeScript duplicate enums.
+
+---
+
+# 22. PerformancePlan tests
+
+Fix compiler before visual work.
+
+Use actual TTS timing data where available.
+
+Test:
+
+```text
+segments sorted by start
+segment start >= 0
+segment end <= duration
+end >= start
+cues sorted
+cue at >= 0
+cue at <= duration
+```
+
+Property-test random scripts.
+
+Test:
+
+```text
+short 200ms audio
+empty punctuation
+questions
+exclamation
+unicode
+emoji
+abbreviations
+decimal numbers
+very long sentence
+```
+
+Explicit regression:
+
+> `"Why are you doing that?"`
+
+must trigger question semantics.
+
+The current punctuation-stripping bug must have a test.
+
+`max_segment_ms` must either be enforced or removed.
+
+---
+
+# 23. TTS contract
+
+Create provider interface:
+
+```ts
+interface TTSProvider {
+  synthesize(...)
+}
+```
+
+Implement:
+
+```text
+FakeTTSProvider
+ElevenLabsTTSProvider
+```
+
+Normal CI uses Fake.
+
+Fake emits deterministic:
+
+```text
+audio fixture
+duration
+word/character timings
+```
+
+Tests:
+
+### Cache
+
+Identical:
+
+```text
+text + voice + settings + model
+```
+
+calls provider once.
+
+### Changed input
+
+Any relevant input change produces new asset/cache key.
+
+### Duration
+
+Read actual encoded audio metadata or provider timings.
+
+Never estimate duration from arbitrary file size.
+
+### Failure
+
+Simulate:
+
+```text
+timeout
+429
+500
+malformed response
+zero-byte audio
+```
+
+Job becomes failed/retriable rather than eternal pending.
+
+### Provider contract
+
+Nightly test performs one tiny real ElevenLabs generation.
+
+Do not depend on external TTS for every PR.
+
+---
+
+# 24. R2 media tests
+
+Generated asset:
+
+```text
+upload
+→ SHA-256 stored
+→ metadata stored
+→ retrieve
+→ hash matches
+```
+
+Use immutable object keys based on asset IDs/content hash.
+
+No local path such as:
+
+```text
+data/generated/audio/foo.mp3
+```
+
+may appear in a production PerformancePlan.
+
+Test content type.
+
+Test missing object handling.
+
+Test signed/private URL expiry where relevant.
+
+---
+
+# 25. AI/Interview tests
+
+Normal tests use deterministic fake model.
+
+Input:
+
+```text
+character facts
+history
+audience response
+interview state
+```
+
+Output must parse structured decision:
+
+```json
+{
+  "action": "PROBE",
+  "utterance": "...",
+  "target": "...",
+  "shouldEnd": false
+}
+```
+
+Reject/repair invalid model output.
+
+Tests:
+
+```text
+GROUND opens interview
+PROBE records thread
+contradiction becomes available target
+callback persists
+LIVE_TEST emits typed challenge
+END terminates
+max turn guard terminates
+provider timeout invokes graceful fallback
+```
+
+No hidden chain-of-thought needs storage.
+
+Store structured state and spoken output.
+
+---
+
+# 26. External-agent protocol
+
+FEATURE FLAG OFF for Episode Zero.
+
+Test:
+
+```text
+EXTERNAL_AGENT_ENABLED=false
+```
+
+means public requests cannot register arbitrary endpoint URLs.
+
+Before enabling, create dedicated SSRF test suite.
+
+Reject:
+
+```text
+127.0.0.1
+localhost
+0.0.0.0
+::1
+10.0.0.0/8
+172.16.0.0/12
+192.168.0.0/16
+169.254.0.0/16
+cloud metadata hosts
+file://
+ftp://
+gopher://
+non-HTTPS URLs
+```
+
+Revalidate destination after DNS resolution and redirects.
+
+Set:
+
+```text
+connect timeout
+total timeout
+max response bytes
+max redirects
+allowed content type
+```
+
+Validate agent response with schema.
+
+Do not enable until these tests exist.
+
+---
+
+# 27. Stripe tests
+
+Do not call a method `confirm_tip` unless it actually confirms provider state.
+
+Use Stripe's official SDK.
+
+A tip is considered succeeded only from verified Stripe provider state/webhook.
+
+Tests with Stripe mocks/test fixtures:
+
+### Signature
+
+Valid webhook signature accepted.
+
+Invalid signature → 400.
+
+Missing signature → 400.
+
+### Replay
+
+Same webhook event ID sent five times:
+
+```text
+one ledger event
+one tip.confirmed
+```
+
+### Amount
+
+Expected:
+
+```text
+$10.00
+```
+
+Provider says:
+
+```text
+$1.00
+```
+
+→ reject.
+
+### Currency
+
+Expected USD; wrong currency → reject.
+
+### Destination
+
+Connect account must match stored creator payout account.
+
+### Platform fee
+
+Compute in integer minor units.
+
+Never floats.
+
+### Browser trust
+
+Calling:
+
+```text
+POST /tip/confirm
+{"payment_intent":"pi_fake"}
+```
+
+must never mark payment successful.
+
+### Refund/dispute
+
+Ledger transitions appropriately.
+
+---
+
+# 28. Crypto payment tests
+
+Keep crypto tipping feature disabled until verification exists.
+
+When enabled, verify on-chain:
+
+```text
+transaction signature
+finalized/confirmed status
+expected USDC mint
+sender
+creator destination
+platform destination
+exact amounts
+one transaction not previously credited
+```
+
+Money represented as integer base units.
+
+Never floats.
+
+Never trust caller-provided amount as proof of settlement.
+
+---
+
+# 29. Sponsor tests
+
+Sponsor input is structured data only.
+
+Test creative containing:
+
+```html
+<script>alert(1)</script>
+<img onerror=...>
+javascript:
+data:
+```
+
+never executes.
+
+Validate destination URLs.
+
+Freeze approved sponsor script by content hash.
+
+Once approved:
+
+```text
+brand
+claims
+required phrase
+CTA
+script
+```
+
+cannot change without new approval/version.
+
+Episode replay must use the exact approved sponsor creative, not regenerate it.
+
+---
+
+# 30. Accessibility E2E
+
+Use:
+
+```text
+Playwright
+@axe-core/playwright
+```
+
+But automated axe is not enough.
+
+Golden creator path must work keyboard-only.
+
+Test:
+
+```text
+homepage
+body choice
+name
+deal
+minute mode
+minute editor
+voice
+preview
+interview mode
+submission confirmation
+watch page
+character page
+```
+
+Requirements:
+
+```text
+logical tab order
+visible focus
+semantic controls
+accessible labels
+no state expressed only via color
+captions for all spoken content
+reduced-motion mode
+```
+
+Force WebGL unavailable.
+
+Creator must still be able to:
+
+```text
+create
+write
+hear audio
+submit
+```
+
+3D cannot be a submission dependency.
+
+---
+
+# 31. Browser E2E suite
+
+Create real Playwright tests.
+
+The current ASGI tests are integration tests, not E2E.
+
+## `creator-human.spec.ts`
+
+```text
+new Alice
+→ select Dog
+→ No-Nose Nolan
+→ premise
+→ human-written minute
+→ choose voice
+→ preview
+→ submit
+→ see ELIGIBLE
+```
+
+Assert backend/database state.
+
+## `creator-assisted.spec.ts`
+
+```text
+Robot
+→ Help Me Write
+→ deterministic mocked AI suggestion
+→ user accepts/edits
+→ provenance ASSISTED
+→ submit
+```
+
+## `creator-ai.spec.ts`
+
+```text
+Creature
+→ Write It For Me
+→ generated minute
+→ provenance AI
+```
+
+## `duplicate-name.spec.ts`
+
+Two creators both create:
+
+```text
+No-Nose Nolan
+```
+
+Both succeed with distinct slugs.
+
+## `ownership.spec.ts`
+
+Bob manipulates network request to submit Alice's IDs.
+
+Exact 403.
+
+---
+
+# 32. Episode Zero E2E — main acceptance test
+
+This is the canonical release gate.
+
+Seed:
+
+```text
+Alice / No-Nose Nolan / HUMAN minute
+Bob / Corporate Robot / ASSISTED minute
+98 fixture contestants
+```
+
+Create episode:
+
+```text
+max appearances = 5
+resident slots = 1
+```
+
+Submit all 100.
+
+Assert:
+
+```text
+100 Submissions
+0 Appearances
+```
+
+Qualify them.
+
+Freeze pool.
+
+Publish:
+
+```text
+eligible-set hash
+seed commitment
+```
+
+Reveal seed.
+
+Execute deterministic draw.
+
+Assert:
+
+```text
+100 Submissions remain
+5 Appearances created
+exactly 1 resident
+exactly 4 random selections
+draw independently verifies
+```
+
+Connect:
+
+```text
+1 stage client
+100 audience clients
+```
+
+Start show.
+
+Assert event sequence.
+
+Selected character enters.
+
+Prepared audio loads.
+
+Timer begins.
+
+Audience laughs.
+
+Crowd updates.
+
+Timer ends.
+
+Ella interview starts.
+
+Character answers.
+
+Run one live test.
+
+Reveal creator/authorship.
+
+Finish Appearance.
+
+Advance through all five.
+
+End episode.
+
+Archive.
+
+Kill live runtime.
+
+Replay only from canonical archive and immutable media.
+
+Assert reconstructed sequence and dialogue exactly match original.
+
+**Episode Zero is not complete until this passes unattended.**
+
+---
+
+# 33. Replay tests
+
+Replay cannot call:
+
+```text
+LLM
+TTS
+Stripe
+Privy
+external agent
+live database mutations
+```
+
+Fixture contains:
+
+```text
+episode snapshot
+draw proof
+ShowEvents
+PerformancePlans
+media references
+```
+
+Run reducer twice.
+
+Output hashes identical.
+
+Replay after code upgrade must remain supported by `schemaVersion`, or migration adapter must exist.
+
+---
+
+# 34. Chaos tests
+
+Inject:
+
+```text
+EpisodeRoom restart
+stage disconnect
+audience disconnect
+database 2s latency
+R2 temporary failure
+Queue retry
+TTS timeout
+LLM timeout
+duplicate command
+duplicate webhook
+out-of-order WebSocket message
+```
+
+Invariant:
+
+> The show may degrade, but it may not silently corrupt canonical state or become permanently stuck.
+
+Test recovery path for every injected failure.
+
+---
+
+# 35. Load tests
+
+Do not run full load suite on every PR.
+
+Staging/nightly:
+
+```text
+1,000 WebSockets
+5,000 WebSockets
+10,000 WebSockets
+```
+
+Simulate realistic comedy traffic:
+
+```text
+low baseline reactions
+huge 2-second punchline burst
+silence
+another burst
+```
+
+Measure:
+
+```text
+connect success
+event broadcast p50/p95/p99
+reaction aggregate p50/p95/p99
+CPU
+DO duration
+memory
+dropped connections
+queue backlog
+storage writes
+```
+
+Initial targets:
+
+```text
+show-event p95 < 200 ms
+reaction aggregate p95 < 250 ms same-region
+reconnect snapshot/replay < 1 s target
+zero canonical event loss
+```
+
+Load-test bottlenecks before inventing sharding.
+
+---
+
+# 36. Property/fuzz tests
+
+Use `fast-check` for TypeScript domain primitives.
+
+Generate random:
+
+```text
+Act manifests
+eligible sets
+episode command sequences
+reaction sequences
+reconnect points
+```
+
+Properties:
+
+```text
+canonicalization is deterministic
+draw never duplicates
+draw selects <= available
+seq always strictly increases
+invalid state transitions never succeed
+sealed Act never changes
+one session never becomes >1 unique laugher/window
+replay(final events) == live reducer state
+```
+
+These are more valuable than hundreds of example-only tests.
+
+---
+
+# 37. Security regression suite
+
+Add explicit tests for every vulnerability found in this review:
+
+```text
+SEC-JWT-001 forged Privy JWT rejected
+SEC-ADM-001 normal user cannot use admin routes
+SEC-OWN-001 user cannot create act for another comedian
+SEC-ACT-001 cross-comedian act_version_id rejected
+SEC-WS-001 audience cannot impersonate stage via ?type=stage
+SEC-WS-002 audience cannot impersonate puppeteer
+SEC-CMD-001 unauthenticated /command rejected
+SEC-KEY-001 API scope enforced
+SEC-KEY-002 revoked API key rejected
+SEC-SSRF-001 localhost external agent blocked
+SEC-SSRF-002 cloud metadata target blocked
+SEC-PAY-001 unverified Stripe event rejected
+SEC-PAY-002 duplicate payment event idempotent
+SEC-PAY-003 fake chain tx not credited
+SEC-SPONSOR-001 HTML/script creative not executable
+```
+
+Give every fixed security bug a permanent regression test ID.
+
+Never delete these tests.
+
+---
+
+# 38. Remove meaningless tests
+
+Delete tests whose only assertion is effectively:
+
+```text
+function exists
+response may be almost anything
+endpoint may exist or not exist
+database unavailable → skip
+```
+
+Examples of prohibited PR assertions:
+
+```python
+assert callable(foo)
+
+assert response.status_code in (200, 401)
+
+assert response.status_code in (201, 401, 422)
+
+assert response.status_code in (101, 400, 404)
+
+assert response.status_code in (200, 404)
+```
+
+Tests must specify behavior.
+
+If behavior isn't decided, decide it first.
+
+---
+
+# 39. Test naming rule
+
+Tests describe invariants:
+
+GOOD:
+
+```text
+test_bob_cannot_submit_alices_act
+test_sealed_act_manifest_cannot_change
+test_5000_clicks_from_one_session_count_as_one_unique_laugher
+test_room_restart_preserves_event_seq
+test_invalid_privy_signature_returns_401
+```
+
+BAD:
+
+```text
+test_auth
+test_api
+test_service
+test_function_exists
+```
+
+---
+
+# 40. CI gates
+
+## Every PR
+
+Required:
+
+```bash
+pnpm install --frozen-lockfile
+pnpm lint
+pnpm typecheck
+pnpm build
+
+pnpm test:domain
+pnpm test:worker
+pnpm test:db
+pnpm test:integration
+
+pnpm playwright test --project=chromium --grep @smoke
+pnpm test:a11y
+```
+
+Security:
+
+```text
+secret scanning
+dependency audit
+CodeQL/SAST
+large-file check
+```
+
+Database is mandatory.
+
+No database-related skips.
+
+Worker environment is mandatory.
+
+No TypeScript source may exist that CI never compiles.
+
+## Main branch
+
+Also run:
+
+```text
+full Chromium
+Firefox
+WebKit
+full Episode Zero
+replay
+visual snapshots
+payment integration mocks
+chaos smoke
+```
+
+## Nightly
+
+Run:
+
+```text
+real ElevenLabs contract test
+real LLM contract test
+Stripe test-mode contract
+staging load test
+larger chaos suite
+dependency/security scan
+```
+
+Real provider tests must use tiny bounded requests.
+
+---
+
+# 41. Repository hygiene gate
+
+Reject commits containing files above a sensible source threshold, e.g. 10 MB, unless explicitly allowlisted.
+
+Research assets must not be under application Git:
+
+```text
+*.mp3
+*.wav
+*.mp4
+large transcript corpora
+datasets
+```
+
+Store them in research R2.
+
+Git stores manifest:
+
+```text
+storage key
+SHA-256
+source
+provenance
+license/status
+```
+
+Production and research buckets remain separate.
+
+---
+
+# 42. Problem Registry rules
+
+`PROBLEM_REGISTRY.md` must be derived from evidence, not optimism.
+
+An issue can be marked RESOLVED only when:
+
+```text
+fix merged
++
+regression test added
++
+test fails on old behavior
++
+test passes on new behavior
+```
+
+Immediately reopen current entries for:
+
+```text
+ActVersion hash
+event sequencing
+```
+
+until behavioral tests prove them.
+
+Add newly discovered blockers:
+
+```text
+unverified Privy JWT
+Python routes/domain mismatch
+migration/domain mismatch
+unauthenticated admin routes
+Worker compile/toolchain missing
+Durable Object binding missing
+Durable Object hydration/replay missing
+WebSocket role impersonation
+crowd unique-laugher spoofing
+payment confirmation not verified
+Stripe webhook signature not verified
+external-agent SSRF
+```
+
+Do not classify these as medium.
+
+Most are P0/P1.
+
+---
+
+# 43. Definition of "implemented"
+
+A service is not implemented because a Python/TS class exists.
+
+Use:
+
+```text
+SCAFFOLDED
+IMPLEMENTED
+VERIFIED
+```
+
+Definitions:
+
+```text
+SCAFFOLDED
+interface/type exists; placeholders allowed
+
+IMPLEMENTED
+real persistence/provider/runtime behavior exists
+
+VERIFIED
+implemented + integration/E2E regression tests pass
+```
+
+Current examples:
+
+```text
+ProfileService → SCAFFOLDED
+Sponsor persistence → SCAFFOLDED
+Stripe tipping → SCAFFOLDED
+Privy crypto tipping → SCAFFOLDED
+External agent → EXPERIMENTAL/DISABLED
+EpisodeRoom → SCAFFOLDED
+```
+
+Do not describe them as shipped integrations.
+
+---
+
+# 44. Build order from this point
+
+Do not continue horizontally adding services.
+
+Work vertically:
+
+```text
+1. Toolchain + CI
+2. Canonical schema/migration
+3. Verified auth
+4. Comedian creator
+5. ActVersion immutability
+6. Submission
+7. Qualification
+8. Deterministic draw
+9. Appearance creation
+10. Durable EpisodeRoom
+11. Stage protocol
+12. Crowd interaction
+13. PerformancePlan/TTS
+14. Ella interview
+15. Episode Zero E2E
+```
+
+Only after Episode Zero is green:
+
+```text
+16. public profiles/following
+17. tips
+18. sponsors
+19. external agents
+20. richer live tests
+```
+
+---
+
+# 45. Final acceptance criteria
+
+Do not call the MVP operational until all statements below are true:
+
+```text
+Fresh clone builds without undocumented local state.
+
+Fresh database migrates successfully.
+
+Forged auth tokens fail.
+
+Ownership cannot be spoofed.
+
+An ActVersion is immutable and fully hash-bound.
+
+10,000 Submissions can enter a five-slot show.
+
+The deterministic draw is independently replayable.
+
+Only selected Submissions create Appearances.
+
+One audience user cannot manufacture unique crowd size.
+
+EpisodeRoom survives recreation without resetting state.
+
+Stage reconnect receives every missed canonical event.
+
+Human-puppeteered dialogue survives replay.
+
+Prepared minute playback requires no live TTS request.
+
+Episode Zero completes without manual DB edits.
+
+Completed Episode Zero replays without LLM/TTS calls.
+
+No client can fake a payment confirmation.
+
+All above invariants are enforced by CI.
+```
+
+Until then, prioritize correctness over feature count.
+
+One especially important correction to the coding agent's new `PROBLEM_REGISTRY`: **API-key SHA-256 is not the security problem worth focusing on**. These keys are generated from high-entropy random bytes, so offline rainbow-table attacks are not analogous to password hashing. The serious issues are that scope checking currently always returns `True`, rate limiting is broken/process-local, and privileged HTTP/WebSocket authorization isn't enforced consistently.
+
+Likewise, the registry says ActVersion hashing is resolved, but the latest `comedians.py` still uses `hexdigest()[:16]` and constructs records using the previous ActVersion schema.  It says the `Submission → Appearance` split is resolved, yet the current episode entry endpoint still creates `Appearance` directly.  Those are good examples of why the project now needs **tests as executable truth**, not more prose saying something is fixed.
+
+I could inspect the repository through the connected GitHub source, but couldn't independently execute a clean checkout in the shell because outbound GitHub DNS is unavailable in this runtime. So I would not treat the commit's “18/18 + 9/11” report as independently verified; more importantly, even if those numbers are accurate, the existing tests do not exercise the critical paths above.
