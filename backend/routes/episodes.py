@@ -39,7 +39,7 @@ router = APIRouter()
 
 class EpisodeCreateRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
-    max_contestants: int = Field(default=5, ge=3, le=12)
+    max_appearances: int = Field(default=5, ge=3, le=12)
     scheduled_at: datetime | None = None
 
 
@@ -61,7 +61,7 @@ class EpisodeResponse(BaseModel):
     title: str
     status: str
     current_phase: str | None
-    max_contestants: int
+    max_appearances: int
     scheduled_at: str | None
     started_at: str | None
     ended_at: str | None
@@ -80,7 +80,7 @@ async def create_episode(req: EpisodeCreateRequest, db: AsyncSession = Depends(g
         title=req.title,
         status=EpisodeStatus.OPEN,
         current_phase=ShowPhase.PRE_SHOW,
-        max_contestants=req.max_contestants,
+        max_appearances=req.max_appearances,
         scheduled_at=req.scheduled_at,
     )
     db.add(episode)
@@ -91,7 +91,7 @@ async def create_episode(req: EpisodeCreateRequest, db: AsyncSession = Depends(g
         "title": episode.title,
         "status": episode.status.value,
         "current_phase": episode.current_phase.value if episode.current_phase else None,
-        "max_contestants": episode.max_contestants,
+        "max_appearances": episode.max_appearances,
         "scheduled_at": str(episode.scheduled_at) if episode.scheduled_at else None,
         "started_at": str(episode.started_at) if episode.started_at else None,
         "ended_at": str(episode.ended_at) if episode.ended_at else None,
@@ -154,7 +154,7 @@ async def get_episode(episode_id: uuid.UUID, db: AsyncSession = Depends(get_db))
         "title": episode.title,
         "status": episode.status.value,
         "current_phase": episode.current_phase.value if episode.current_phase else None,
-        "max_contestants": episode.max_contestants,
+        "max_appearances": episode.max_appearances,
         "contestants": contestants,
         "created_at": str(episode.created_at),
     }
@@ -215,8 +215,8 @@ async def enter_contestant(
         select(func.count()).select_from(Appearance).where(Appearance.episode_id == episode_id)
     )
     count = count_result.scalar()
-    if count >= episode.max_contestants:
-        raise HTTPException(400, f"Episode full ({episode.max_contestants} max)")
+    if count >= episode.max_appearances:
+        raise HTTPException(400, f"Episode full ({episode.max_appearances} max)")
 
     link = Appearance(
         episode_id=episode_id,

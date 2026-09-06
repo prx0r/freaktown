@@ -283,11 +283,7 @@ async def _create_comedian(user: User, args: dict, db: AsyncSession) -> dict:
     name = args["name"]
     slug = slugify(name)
 
-    # Check uniqueness
-    existing = await db.execute(select(Comedian).where(Comedian.name == name))
-    if existing.scalar_one_or_none():
-        raise HTTPException(409, f"Comedian '{name}' already exists")
-
+    # Names NOT globally unique per BUILD_BRIEF.md — only slugs must be unique
     existing_slug = await db.execute(select(Comedian).where(Comedian.slug == slug))
     if existing_slug.scalar_one_or_none():
         slug = f"{slug}-{uuid.uuid4().hex[:6]}"

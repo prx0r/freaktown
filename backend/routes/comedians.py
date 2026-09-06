@@ -117,11 +117,8 @@ def compute_hash(data: dict) -> str:
 async def create_comedian(req: ComedianCreateRequest, db: AsyncSession = Depends(get_db)):
     """Create a comedian with their first act version. The 2-minute entry point."""
 
-    # Check uniqueness
-    existing = await db.execute(select(Comedian).where(Comedian.name == req.name))
-    if existing.scalar_one_or_none():
-        raise HTTPException(409, f"Comedian '{req.name}' already exists")
-
+    # Names are NOT globally unique per BUILD_BRIEF.md
+    # Only slugs need to be unique
     slug = slugify(req.name)
     existing_slug = await db.execute(select(Comedian).where(Comedian.slug == slug))
     if existing_slug.scalar_one_or_none():
