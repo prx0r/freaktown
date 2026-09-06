@@ -1,38 +1,313 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Killella</title>
-    <style>
-        body { background: #111; color: #fff; font-family: sans-serif; text-align: center; padding: 50px; }
-        h1 { font-size: 3em; color: #ff4444; }
-        .laugh-btn { 
-            width: 200px; height: 200px; border-radius: 50%; 
-            background: #ff0000; color: white; font-size: 24px;
-            border: none; cursor: pointer; margin: 20px;
-        }
-        .laugh-btn:active { background: #cc0000; transform: scale(0.95); }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Freak Town — Green Room</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0a0f; color: #e0e0e0; font-family: 'Inter', -apple-system, sans-serif; }
+    .app { min-height: 100vh; }
+    header { padding: 1.5rem 2rem; border-bottom: 1px solid #1a1a2e; display: flex; align-items: center; justify-content: space-between; }
+    header h1 { font-size: 1.5rem; color: #ff4444; }
+    header nav { display: flex; gap: 1rem; }
+    header nav button { background: none; border: none; color: #888; cursor: pointer; font-size: 0.9rem; padding: 0.5rem 1rem; border-radius: 6px; }
+    header nav button:hover, header nav button.active { background: #1a1a2e; color: #fff; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+
+    /* Character Shelf */
+    .shelf { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1.5rem; margin-top: 1.5rem; }
+    .card { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 12px; padding: 1.5rem; cursor: pointer; transition: all 0.2s; }
+    .card:hover { border-color: #ff4444; transform: translateY(-2px); }
+    .card.new { border-style: dashed; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 180px; }
+    .card .avatar { font-size: 3rem; text-align: center; margin-bottom: 0.5rem; }
+    .card h3 { font-size: 1.1rem; margin-bottom: 0.3rem; }
+    .card p { font-size: 0.8rem; color: #888; line-height: 1.4; }
+    .tag { display: inline-block; margin-top: 0.5rem; padding: 2px 8px; background: #2a2a4a; border-radius: 4px; font-size: 0.7rem; color: #aaa; }
+
+    /* Editor */
+    .editor { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 1.5rem; }
+    .editor textarea { width: 100%; background: #12121a; border: 1px solid #2a2a4a; border-radius: 8px; color: #e0e0e0; font-size: 1rem; padding: 1rem; resize: vertical; font-family: inherit; line-height: 1.6; min-height: 200px; }
+    .editor textarea:focus { outline: none; border-color: #ff4444; }
+    .stats { display: flex; gap: 1rem; margin-top: 0.5rem; font-size: 0.8rem; color: #888; }
+    .badge { padding: 3px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
+    .badge.green { background: #1a3a1a; color: #4ade80; }
+    .badge.amber { background: #3a3a1a; color: #fbbf24; }
+    .badge.red { background: #3a1a1a; color: #f87171; }
+    .words { display: flex; flex-wrap: wrap; gap: 5px; line-height: 2; }
+    .word { padding: 2px 6px; border-radius: 4px; cursor: pointer; transition: all 0.1s; font-size: 0.9rem; }
+    .word:hover { background: #2a2a4a; }
+    .word.dir { background: #2a4a2a; border-bottom: 2px solid #4ade80; }
+    .word.hl { background: #ff4444; color: white; }
+    .dir-bar { margin-top: 1rem; padding: 0.75rem; background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 8px; display: flex; gap: 0.5rem; align-items: center; }
+    .dir-bar input { flex: 1; background: #12121a; border: 1px solid #2a2a4a; border-radius: 4px; color: #e0e0e0; padding: 0.5rem; }
+    .dir-bar input:focus { outline: none; border-color: #ff4444; }
+
+    /* Buttons */
+    .btn { padding: 0.7rem 1.5rem; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; }
+    .btn-primary { background: #ff4444; color: white; }
+    .btn-primary:hover { background: #cc3333; }
+    .btn-primary:disabled { background: #4a4a4a; cursor: not-allowed; }
+    .btn-secondary { background: #2a2a4a; color: #e0e0e0; border: 1px solid #3a3a5a; }
+    .btn-secondary:hover { background: #3a3a5a; }
+    .actions { display: flex; gap: 1rem; margin-top: 1.5rem; justify-content: flex-end; }
+
+    /* Show */
+    .show-card { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; }
+    .show-card h3 { margin-bottom: 0.5rem; }
+    .act-row { display: flex; align-items: center; gap: 1rem; padding: 0.5rem 0; border-bottom: 1px solid #1a1a2e; }
+    .act-row:last-child { border: none; }
+    .act-pos { width: 30px; text-align: center; color: #ff4444; font-weight: 700; }
+    .act-name { flex: 1; }
+    .act-stat { width: 80px; text-align: right; font-size: 0.85rem; }
+    .act-stat.good { color: #4ade80; }
+    .act-stat.bad { color: #f87171; }
+
+    /* Plan viewer */
+    .plan { background: #12121a; border-radius: 8px; padding: 1rem; margin-top: 1rem; font-family: monospace; font-size: 0.85rem; max-height: 300px; overflow-y: auto; }
+    .cue { padding: 2px 0; display: flex; gap: 1rem; }
+    .cue-time { color: #ff4444; min-width: 60px; }
+    .cue-action { color: #4ade80; }
+    .cue-layer { color: #888; }
+
+    .section-title { font-size: 1.2rem; margin-bottom: 1rem; color: #ff4444; }
+    .loading { color: #666; text-align: center; padding: 2rem; }
+  </style>
 </head>
 <body>
-    <h1>KILLELLA</h1>
-    <p>Press the button to laugh</p>
-    <button class="laugh-btn" id="laughBtn">LAUGH</button>
-    <div id="score">Crowd Score: 0</div>
-    <script>
-        const ws = new WebSocket(`ws://${location.host}/ws/crowd/test`);
-        const btn = document.getElementById('laughBtn');
-        const score = document.getElementById('score');
-        
-        btn.addEventListener('mousedown', () => {
-            ws.send(JSON.stringify({type: 'laugh', intensity: 3}));
-        });
-        
-        ws.onmessage = (e) => {
-            const data = JSON.parse(e.data);
-            if (data.crowd !== undefined) {
-                score.textContent = `Crowd Score: ${data.crowd}`;
-            }
+  <div class="app" id="app"></div>
+  <script>
+    const API = '';
+    let state = { view: 'shelf', chars: [], draft: null, plan: null, show: null };
+
+    async function api(path, opts = {}) {
+      const r = await fetch(API + path, {
+        ...opts,
+        headers: { 'Content-Type': 'application/json', ...opts.headers },
+        body: opts.body ? JSON.stringify(opts.body) : undefined,
+      });
+      return r.json();
+    }
+
+    function render() {
+      const app = document.getElementById('app');
+      if (state.view === 'shelf') app.innerHTML = renderShelf();
+      else if (state.view === 'editor') app.innerHTML = renderEditor();
+      else if (state.view === 'watch') app.innerHTML = renderWatch();
+      else if (state.view === 'show') app.innerHTML = renderShow();
+      bindEvents();
+    }
+
+    function renderShelf() {
+      const cards = state.chars.map(c => `
+        <div class="card" onclick="selectChar('${c.id}')">
+          <div class="avatar">${c.body_class === 'quadruped-v1' ? '🐕' : c.body_class === 'rigid-object-v1' ? '🔧' : '🎭'}</div>
+          <h3>${c.name}</h3>
+          <p>${c.premise}</p>
+          <span class="tag">${c.engine_preset}</span>
+          <span class="tag">${c.body_class}</span>
+        </div>
+      `).join('');
+      return `
+        <header>
+          <h1>🎬 Freak Town</h1>
+          <nav>
+            <button class="active">Green Room</button>
+            <button onclick="state.view='show';showList();render()">Shows</button>
+          </nav>
+        </header>
+        <div class="container">
+          <div class="section-title">The Green Room</div>
+          <div class="shelf">
+            ${cards}
+            <div class="card new" onclick="luckyDip()">
+              <div class="avatar">🎲</div>
+              <h3>Lucky Dip</h3>
+              <p>Random character</p>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    function renderEditor() {
+      const d = state.draft;
+      if (!d) return '<div class="loading">Loading...</div>';
+      const words = d.script.split(/\s+/);
+      const wordHtml = words.map((w, i) => {
+        const hasDir = d.stage_directions?.some(x => x.at_word === i);
+        return `<span class="word ${hasDir ? 'dir' : ''}" data-idx="${i}">${w}</span>`;
+      }).join(' ');
+      const dur = d.audio_duration_ms || d.estimated_duration_ms;
+      return `
+        <header>
+          <h1>🎬 Freak Town</h1>
+          <nav>
+            <button onclick="state.view='shelf';render()">← Shelf</button>
+            <button class="active">Editor</button>
+            <button onclick="compileAndWatch()">▶ Watch</button>
+          </nav>
+        </header>
+        <div class="container">
+          <div class="section-title">${state.chars.find(c => c.id === d.comedian_id)?.name || 'Character'}</div>
+          <div class="editor">
+            <div>
+              <textarea id="script" oninput="updateScript(this.value)">${d.script}</textarea>
+              <div class="stats">
+                <span>${d.word_count} words</span>
+                <span>~${(d.estimated_duration_ms/1000).toFixed(1)}s est</span>
+                ${d.audio_duration_ms ? `<span>${(d.audio_duration_ms/1000).toFixed(1)}s actual</span>` : ''}
+                <span class="badge ${d.duration_status}">${d.duration_status}</span>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:0.85rem;color:#888;margin-bottom:0.5rem">Click a word to add a direction:</div>
+              <div class="words" id="wordGrid">${wordHtml}</div>
+              <div id="dirBar"></div>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="btn btn-secondary" onclick="synthesize()">🔊 Synthesize</button>
+            <button class="btn btn-primary" onclick="compileAndWatch()" ${!d.audio_duration_ms ? 'disabled' : ''}>▶ WATCH</button>
+          </div>
+          ${state.plan ? `<div class="plan"><div style="color:#888;margin-bottom:0.5rem">Performance Plan — ${state.plan.cue_count} cues</div>${state.plan.cues.map(c => `<div class="cue"><span class="cue-time">${(c.at_ms/1000).toFixed(1)}s</span><span class="cue-action">${c.action}</span><span class="cue-layer">${c.layer}</span></div>`).join('')}</div>` : ''}
+        </div>`;
+    }
+
+    function renderWatch() {
+      const p = state.plan;
+      if (!p) return '<div class="loading">No plan compiled yet</div>';
+      return `
+        <header>
+          <h1>🎬 Freak Town</h1>
+          <nav>
+            <button onclick="state.view='editor';render()">← Edit</button>
+            <button class="active">Watch</button>
+          </nav>
+        </header>
+        <div class="container">
+          <div class="section-title">Rehearsal — ${state.chars.find(c => c.id === state.draft?.comedian_id)?.name || ''}</div>
+          <div style="background:#12121a;border-radius:12px;height:300px;display:flex;align-items:center;justify-content:center;margin-bottom:1rem">
+            <div style="text-align:center;color:#666">
+              <div style="font-size:4rem">🎭</div>
+              <p>Stage renders here with three-vrm avatar</p>
+              <p style="font-size:0.85rem">${p.cue_count} motion cues · ${p.duration_ms/1000}s</p>
+            </div>
+          </div>
+          <div style="background:#1a1a2e;border-radius:8px;padding:1rem;font-size:0.9rem;max-height:100px;overflow-y:auto">${state.draft?.script || ''}</div>
+          <div class="actions">
+            <button class="btn btn-primary" onclick="enterShow()">🎬 ENTER TONIGHT'S SHOW</button>
+          </div>
+          <div class="plan"><div style="color:#888;margin-bottom:0.5rem">Cue Timeline</div>${p.cues.map(c => `<div class="cue"><span class="cue-time">${(c.at_ms/1000).toFixed(1)}s</span><span class="cue-action">${c.action}</span><span class="cue-layer">${c.layer}</span></div>`).join('')}</div>
+        </div>`;
+    }
+
+    function renderShow() {
+      const s = state.show;
+      if (!s) return '<div class="loading">Loading shows...</div>';
+      const acts = (s.acts || []).map(a => `
+        <div class="act-row">
+          <span class="act-pos">#${a.position}</span>
+          <span class="act-name">${a.character_name}</span>
+          <span class="act-stat">${a.laugh_count} laughs</span>
+          <span class="act-stat ${a.return_rate > 50 ? 'good' : 'bad'}">${a.return_rate}% return</span>
+        </div>
+      `).join('');
+      return `
+        <header>
+          <h1>🎬 Freak Town</h1>
+          <nav>
+            <button onclick="state.view='shelf';render()">← Green Room</button>
+            <button class="active">Shows</button>
+          </nav>
+        </header>
+        <div class="container">
+          <div class="show-card">
+            <h3>Show — ${s.date || 'Today'}</h3>
+            <p style="color:#888;font-size:0.85rem">${s.total_duration_sec}s · ${s.total_laughs} total laughs</p>
+            ${acts}
+          </div>
+        </div>`;
+    }
+
+    // Actions
+    async function luckyDip() {
+      const d = await api('/v1/green-room/lucky-dip', { method: 'POST', body: {} });
+      state.chars.push(d.character);
+      render();
+    }
+
+    async function selectChar(id) {
+      const c = state.chars.find(x => x.id === id);
+      const d = await api('/v1/green-room/drafts', { method: 'POST', body: { character_id: id } });
+      state.draft = d.draft;
+      state.view = 'editor';
+      render();
+    }
+
+    let scriptTimeout;
+    function updateScript(v) {
+      clearTimeout(scriptTimeout);
+      scriptTimeout = setTimeout(async () => {
+        await api(`/v1/green-room/drafts/${state.draft.id}/script`, { method: 'PATCH', body: { script: v } });
+        const d = await api(`/v1/green-room/drafts/${state.draft.id}`);
+        state.draft = d.draft;
+        render();
+      }, 500);
+    }
+
+    async function synthesize() {
+      const r = await api(`/v1/green-room/drafts/${state.draft.id}/synthesize`, { method: 'POST' });
+      state.draft = r.draft;
+      render();
+    }
+
+    async function compileAndWatch() {
+      const r = await api('/v1/green-room/compile', { method: 'POST', body: { draft_id: state.draft.id } });
+      state.plan = r.plan;
+      state.view = 'watch';
+      render();
+    }
+
+    async function enterShow() {
+      await api('/v1/green-room/enter-show', { method: 'POST', body: { draft_id: state.draft.id, episode_id: 'live' } });
+      alert('Performance sealed and entered into tonight\'s show!');
+    }
+
+    async function showList() {
+      const r = await api('/v1/shows');
+      state.show = r.shows?.[0] || { acts: [], total_duration_sec: 0, total_laughs: 0 };
+      render();
+    }
+
+    function bindEvents() {
+      document.querySelectorAll('.word').forEach(el => {
+        el.onclick = () => {
+          const idx = parseInt(el.dataset.idx);
+          const words = state.draft.script.split(/\s+/);
+          const bar = document.getElementById('dirBar');
+          if (bar) bar.innerHTML = `<div class="dir-bar"><span style="color:#888">Word ${idx}: "${words[idx]}"</span><input id="dirInput" placeholder="stare at Ella, shrug, freeze..."><button class="btn btn-primary" style="padding:0.4rem 1rem" onclick="addDir(${idx})">Add</button></div>`;
         };
-    </script>
+      });
+    }
+
+    async function addDir(idx) {
+      const input = document.getElementById('dirInput');
+      if (!input?.value) return;
+      await api(`/v1/green-room/drafts/${state.draft.id}/directions`, {
+        method: 'POST',
+        body: { at_word: idx, description: input.value }
+      });
+      const d = await api(`/v1/green-room/drafts/${state.draft.id}`);
+      state.draft = d.draft;
+      render();
+    }
+
+    // Init
+    (async () => {
+      const r = await api('/v1/green-room/characters');
+      state.chars = r.characters || [];
+      render();
+    })();
+  </script>
 </body>
 </html>

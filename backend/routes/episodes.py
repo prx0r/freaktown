@@ -91,9 +91,8 @@ async def create_episode(
 async def get_live_episode(db: AsyncSession = Depends(get_db)):
     """Get current live episode."""
     result = await db.execute(
-        select(Episode).where(Episode.status.in_([
-            EpisodeStatus.LIVE, EpisodeStatus.READY, EpisodeStatus.OPEN
-        ])).order_by(Episode.created_at.desc()).limit(1)
+        select(Episode).where(Episode.status.in_(["live", "ready", "open"]))
+        .order_by(Episode.created_at.desc()).limit(1)
     )
     episode = result.scalar_one_or_none()
     if not episode:

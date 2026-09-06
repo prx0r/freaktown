@@ -16,7 +16,6 @@ from datetime import datetime
 from sqlalchemy import (
     Boolean,
     DateTime,
-    Enum,
     Float,
     ForeignKey,
     Integer,
@@ -165,7 +164,7 @@ class User(Base):
     privy_user_id: Mapped[str | None] = mapped_column(String(200), unique=True, nullable=True)
     handle: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     display_name: Mapped[str] = mapped_column(String(100), nullable=False)
-    role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.USER)
+    role: Mapped[str] = mapped_column(String(20), default="user")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
@@ -184,8 +183,8 @@ class Comedian(Base):
     name: Mapped[str] = mapped_column(String(120), nullable=False)  # NOT globally unique
     slug: Mapped[str] = mapped_column(String(140), nullable=False, unique=True)
     premise: Mapped[str] = mapped_column(Text, nullable=False)
-    body_archetype: Mapped[BodyArchetype] = mapped_column(Enum(BodyArchetype), nullable=False)
-    status: Mapped[ComedianStatus] = mapped_column(Enum(ComedianStatus), default=ComedianStatus.ACTIVE)
+    body_archetype: Mapped[str] = mapped_column(String(20), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="active")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
@@ -214,6 +213,9 @@ class ActVersion(Base):
     manifest: Mapped[dict] = mapped_column(JSONB, nullable=False)
     content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)  # full 64 hex chars
 
+    # Performance Engine config (Killella Motion Language)
+    performance_engine_json: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     sealed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
@@ -238,8 +240,8 @@ class Submission(Base):
     act_version_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("act_versions.id"), nullable=False)
     submitted_by_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
 
-    qualification_status: Mapped[SubmissionStatus] = mapped_column(
-        Enum(SubmissionStatus), default=SubmissionStatus.SUBMITTED
+    qualification_status: Mapped[str] = mapped_column(
+        String(20), default="submitted"
     )
     moderation_status: Mapped[str] = mapped_column(String(20), default="pending")
     technical_status: Mapped[str] = mapped_column(String(20), default="pending")
@@ -265,8 +267,8 @@ class Episode(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
-    status: Mapped[EpisodeStatus] = mapped_column(Enum(EpisodeStatus), default=EpisodeStatus.DRAFT)
-    current_phase: Mapped[ShowPhase | None] = mapped_column(Enum(ShowPhase), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="draft")
+    current_phase: Mapped[str | None] = mapped_column(String(30), nullable=True)
     version: Mapped[int] = mapped_column(Integer, default=1)
 
     # Scheduling
@@ -337,7 +339,7 @@ class ShowEvent(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     episode_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("episodes.id"), nullable=False)
     seq: Mapped[int] = mapped_column(Integer, nullable=False)
-    type: Mapped[ShowEventType] = mapped_column(Enum(ShowEventType), nullable=False)
+    type: Mapped[str] = mapped_column(String(40), nullable=False)
     actor: Mapped[str | None] = mapped_column(String(100), nullable=True)
     payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     effective_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

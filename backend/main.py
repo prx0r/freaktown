@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.config import settings
-from backend.routes import admin, audience, comedians, episodes, mcp, stage
+from backend.routes import admin, audience, comedians, episodes, mcp, stage, motions, dressing_room, green_room, shows
 
 app = FastAPI(
     title="Freak Town",
@@ -28,6 +28,10 @@ app.include_router(audience.router, prefix="/v1", tags=["audience"])
 app.include_router(stage.router, prefix="/v1/ws", tags=["stage"])
 app.include_router(admin.router, prefix="/v1/admin", tags=["admin"])
 app.include_router(mcp.router, prefix="/v1", tags=["mcp"])
+app.include_router(motions.router, prefix="/v1", tags=["motions"])
+app.include_router(dressing_room.router, prefix="/v1", tags=["dressing-room"])
+app.include_router(green_room.router, prefix="/v1", tags=["green-room"])
+app.include_router(shows.router, prefix="/v1", tags=["shows"])
 
 
 # ── Root ───────────────────────────────────────────────────────────────

@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379"
     secret_key: str = "change-me-in-production"
 
+    domain: str = "kill.town"
+
     anthropic_api_key: str = ""
     openai_api_key: str = ""
 
@@ -15,6 +17,13 @@ class Settings(BaseSettings):
 
     rumble_live_stream_url: str = ""
     base_rpc_url: str = "https://mainnet.base.org"
+
+    # Cloudflare R2
+    r2_account_id: str = ""
+    r2_access_key_id: str = ""
+    r2_secret_access_key: str = ""
+    r2_s3_endpoint: str = ""
+    r2_bucket: str = "freak-town"
 
     allowed_origins: list[str] = ["http://localhost:8000", "http://localhost:3000"]
 

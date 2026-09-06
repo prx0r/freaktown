@@ -1,0 +1,283 @@
+/* Green Room — creator's studio styles */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: #0a0a0f;
+  color: #e0e0e0;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.green-room {
+  min-height: 100vh;
+  padding: 2rem;
+}
+
+/* ── Character Shelf ─────────────────────────────────────── */
+
+.character-shelf {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1.5rem;
+  margin-top: 2rem;
+}
+
+.character-card {
+  background: #1a1a2e;
+  border: 1px solid #2a2a4a;
+  border-radius: 12px;
+  padding: 1.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.character-card:hover {
+  border-color: #ff4444;
+  transform: translateY(-2px);
+}
+
+.character-card.new {
+  border-style: dashed;
+  border-color: #4a4a6a;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.character-avatar {
+  font-size: 3rem;
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+
+.character-card h3 {
+  font-size: 1.1rem;
+  margin-bottom: 0.3rem;
+}
+
+.character-card p {
+  font-size: 0.85rem;
+  color: #888;
+  line-height: 1.4;
+}
+
+.engine-tag {
+  display: inline-block;
+  margin-top: 0.5rem;
+  padding: 2px 8px;
+  background: #2a2a4a;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  color: #aaa;
+}
+
+/* ── Script Editor ───────────────────────────────────────── */
+
+.editor-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.editor-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-bottom: 1.5rem;
+}
+
+.script-panel textarea {
+  width: 100%;
+  background: #12121a;
+  border: 1px solid #2a2a4a;
+  border-radius: 8px;
+  color: #e0e0e0;
+  font-size: 1rem;
+  padding: 1rem;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.6;
+}
+
+.script-panel textarea:focus {
+  outline: none;
+  border-color: #ff4444;
+}
+
+.script-stats {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: #888;
+}
+
+.duration-badge {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.duration-badge.green { background: #1a3a1a; color: #4ade80; }
+.duration-badge.amber { background: #3a3a1a; color: #fbbf24; }
+.duration-badge.red { background: #3a1a1a; color: #f87171; }
+
+/* ── Word Grid ───────────────────────────────────────────── */
+
+.word-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  line-height: 2;
+}
+
+.word {
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.1s;
+  font-size: 0.95rem;
+}
+
+.word:hover {
+  background: #2a2a4a;
+}
+
+.word.highlighted {
+  background: #ff4444;
+  color: white;
+}
+
+.word.has-direction {
+  background: #2a4a2a;
+  border-bottom: 2px solid #4ade80;
+}
+
+.direction-bar {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: #1a1a2e;
+  border: 1px solid #2a2a4a;
+  border-radius: 8px;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.direction-bar input {
+  flex: 1;
+  background: #12121a;
+  border: 1px solid #2a2a4a;
+  border-radius: 4px;
+  color: #e0e0e0;
+  padding: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.direction-bar input:focus {
+  outline: none;
+  border-color: #ff4444;
+}
+
+/* ── Actions ─────────────────────────────────────────────── */
+
+.editor-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.btn-primary {
+  background: #ff4444;
+  color: white;
+  border: none;
+  padding: 0.75rem 2rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-primary:hover { background: #cc3333; }
+.btn-primary:disabled { background: #4a4a4a; cursor: not-allowed; }
+
+.btn-secondary {
+  background: #2a2a4a;
+  color: #e0e0e0;
+  border: 1px solid #3a3a5a;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.btn-secondary:hover { background: #3a3a5a; }
+
+/* ── Watch Mode ──────────────────────────────────────────── */
+
+.watch-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.stage-container {
+  width: 100%;
+  height: 50vh;
+  background: #12121a;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+}
+
+.stage-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #666;
+}
+
+.script-overlay {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #1a1a2e;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  line-height: 1.8;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.watch-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.cue-timeline {
+  position: relative;
+  height: 8px;
+  background: #1a1a2e;
+  border-radius: 4px;
+  margin-top: 1rem;
+}
+
+.cue-marker {
+  position: absolute;
+  width: 3px;
+  height: 100%;
+  background: #ff4444;
+  border-radius: 2px;
+  transform: translateX(-50%);
+}

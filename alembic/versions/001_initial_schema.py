@@ -7,7 +7,8 @@ Create Date: 2026-09-06
 This migration matches the canonical domain model per BUILD_BRIEF.md:
   User → Comedian → ActVersion → Submission → Appearance
 
-Do NOT use legacy field names.
+Enum columns use sa.String with application-level validation via Pydantic.
+PostgreSQL native enums are created separately for type safety.
 """
 
 from alembic import op
@@ -20,38 +21,30 @@ branch_labels = None
 depends_on = None
 
 
+def _create_enum(name, values):
+    """Create a PostgreSQL enum type, ignoring if it already exists."""
+    op.execute(
+        f"DO $$ BEGIN "
+        f"CREATE TYPE {name} AS ENUM ({', '.join(repr(v) for v in values)}); "
+        f"EXCEPTION WHEN duplicate_object THEN null; END $$"
+    )
+
+
 def upgrade() -> None:
-    # ── Enums ──────────────────────────────────────────────────────
-    userrole = sa.Enum("user", "admin", name="userrole")
-    userrole.create(op.get_bind(), checkfirst=True)
-
-    comedianstatus = sa.Enum("active", "retired", name="comedianstatus")
-    comedianstatus.create(op.get_bind(), checkfirst=True)
-
-    bodyarchetype = sa.Enum("human", "dog", "robot", "creature", "object", "monster", "animal", "mystery", name="bodyarchetype")
-    bodyarchetype.create(op.get_bind(), checkfirst=True)
-
-    authorship = sa.Enum("human", "assisted", "ai", name="authorship")
-    authorship.create(op.get_bind(), checkfirst=True)
-
-    interviewcontroller = sa.Enum("freak_town_ai", "human", "external_agent", name="interviewcontroller")
-    interviewcontroller.create(op.get_bind(), checkfirst=True)
-
-    submissionstatus = sa.Enum("draft", "submitted", "validating", "eligible", "rejected", name="submissionstatus")
-    submissionstatus.create(op.get_bind(), checkfirst=True)
-
-    episodestatus = sa.Enum("draft", "open", "locked", "preparing", "ready", "live", "completed", "cancelled", "failed", name="episodestatus")
-    episodestatus.create(op.get_bind(), checkfirst=True)
-
-    showphase = sa.Enum(
+    # ── PostgreSQL enum types (created for type safety, not used as column types) ──
+    _create_enum("userrole", ["user", "admin"])
+    _create_enum("comedianstatus", ["active", "retired"])
+    _create_enum("bodyarchetype", ["human", "dog", "robot", "creature", "object", "monster", "animal", "mystery"])
+    _create_enum("authorship", ["human", "assisted", "ai"])
+    _create_enum("interviewcontroller", ["freak_town_ai", "human", "external_agent"])
+    _create_enum("submissionstatus", ["draft", "submitted", "validating", "eligible", "rejected"])
+    _create_enum("episodestatus", ["draft", "open", "locked", "preparing", "ready", "live", "completed", "cancelled", "failed"])
+    _create_enum("showphase", [
         "pre_show", "intro", "lineup", "contestant_enter", "set_active", "post_set",
         "judging", "roast", "transition", "live_test", "model_reveal", "elimination",
         "finale", "winner", "outro", "ended",
-        name="showphase",
-    )
-    showphase.create(op.get_bind(), checkfirst=True)
-
-    showeventtype = sa.Enum(
+    ])
+    _create_enum("showeventtype", [
         "show.snapshot", "show.phase", "show.pause", "show.resume", "show.end",
         "stage.avatar.enter", "stage.avatar.exit", "stage.avatar.look_at",
         "stage.avatar.gesture", "stage.avatar.emote",
@@ -61,9 +54,7 @@ def upgrade() -> None:
         "model.reveal", "live_test.issue", "live_test.response",
         "ella.mute", "ella.unmute", "ella.model_swap", "ella.context_cut", "ella.temperature",
         "tip.confirmed",
-        name="showeventtype",
-    )
-    showeventtype.create(op.get_bind(), checkfirst=True)
+    ])
 
     # ── Users ──────────────────────────────────────────────────────
     op.create_table(
@@ -72,7 +63,7 @@ def upgrade() -> None:
         sa.Column("privy_user_id", sa.String(200), unique=True, nullable=True),
         sa.Column("handle", sa.String(50), unique=True, nullable=False),
         sa.Column("display_name", sa.String(100), nullable=False),
-        sa.Column("role", userrole, server_default="user"),
+        sa.Column("role", sa.String(20), server_default="user"),  # userrole enum
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
     )
 
@@ -81,11 +72,11 @@ def upgrade() -> None:
         "comedians",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("owner_user_id", UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
-        sa.Column("name", sa.String(120), nullable=False),  # NOT globally unique
+        sa.Column("name", sa.String(120), nullable=False),
         sa.Column("slug", sa.String(140), nullable=False, unique=True),
         sa.Column("premise", sa.Text, nullable=False),
-        sa.Column("body_archetype", bodyarchetype, nullable=False),
-        sa.Column("status", comedianstatus, server_default="active"),
+        sa.Column("body_archetype", sa.String(20), nullable=False),  # bodyarchetype enum
+        sa.Column("status", sa.String(20), server_default="active"),  # comedianstatus enum
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
     )
 
@@ -97,8 +88,8 @@ def upgrade() -> None:
         sa.Column("revision", sa.Integer, nullable=False),
         sa.Column("parent_act_version_id", UUID(as_uuid=True), sa.ForeignKey("act_versions.id"), nullable=True),
         sa.Column("created_by_user_id", UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
-        sa.Column("manifest", JSONB, nullable=False),  # Full canonical manifest
-        sa.Column("content_sha256", sa.String(64), nullable=False),  # Full 64-char hash
+        sa.Column("manifest", JSONB, nullable=False),
+        sa.Column("content_sha256", sa.String(64), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("sealed_at", sa.DateTime(timezone=True), nullable=True),
         sa.UniqueConstraint("comedian_id", "revision", name="uq_act_version"),
@@ -109,8 +100,8 @@ def upgrade() -> None:
         "episodes",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("title", sa.String(200), nullable=False),
-        sa.Column("status", episodestatus, server_default="draft"),
-        sa.Column("current_phase", showphase, nullable=True),
+        sa.Column("status", sa.String(20), server_default="draft"),  # episodestatus enum
+        sa.Column("current_phase", sa.String(30), nullable=True),  # showphase enum
         sa.Column("version", sa.Integer, server_default="1"),
         sa.Column("registration_opens_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("registration_closes_at", sa.DateTime(timezone=True), nullable=True),
@@ -135,7 +126,7 @@ def upgrade() -> None:
         sa.Column("comedian_id", UUID(as_uuid=True), sa.ForeignKey("comedians.id"), nullable=False),
         sa.Column("act_version_id", UUID(as_uuid=True), sa.ForeignKey("act_versions.id"), nullable=False),
         sa.Column("submitted_by_user_id", UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
-        sa.Column("qualification_status", submissionstatus, server_default="submitted"),
+        sa.Column("qualification_status", sa.String(20), server_default="submitted"),  # submissionstatus
         sa.Column("moderation_status", sa.String(20), server_default="pending"),
         sa.Column("technical_status", sa.String(20), server_default="pending"),
         sa.Column("submitted_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
@@ -169,7 +160,7 @@ def upgrade() -> None:
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("episode_id", UUID(as_uuid=True), sa.ForeignKey("episodes.id"), nullable=False),
         sa.Column("seq", sa.Integer, nullable=False),
-        sa.Column("type", showeventtype, nullable=False),
+        sa.Column("type", sa.String(40), nullable=False),  # showeventtype enum
         sa.Column("actor", sa.String(100), nullable=True),
         sa.Column("payload", JSONB, nullable=True),
         sa.Column("effective_at", sa.DateTime(timezone=True), nullable=True),
@@ -310,12 +301,8 @@ def downgrade() -> None:
     op.drop_table("comedians")
     op.drop_table("users")
 
-    sa.Enum(name="showeventtype").drop(op.get_bind(), checkfirst=True)
-    sa.Enum(name="showphase").drop(op.get_bind(), checkfirst=True)
-    sa.Enum(name="episodestatus").drop(op.get_bind(), checkfirst=True)
-    sa.Enum(name="submissionstatus").drop(op.get_bind(), checkfirst=True)
-    sa.Enum(name="interviewcontroller").drop(op.get_bind(), checkfirst=True)
-    sa.Enum(name="authorship").drop(op.get_bind(), checkfirst=True)
-    sa.Enum(name="bodyarchetype").drop(op.get_bind(), checkfirst=True)
-    sa.Enum(name="comedianstatus").drop(op.get_bind(), checkfirst=True)
-    sa.Enum(name="userrole").drop(op.get_bind(), checkfirst=True)
+    for enum_name in [
+        "showeventtype", "showphase", "episodestatus", "submissionstatus",
+        "interviewcontroller", "authorship", "bodyarchetype", "comedianstatus", "userrole",
+    ]:
+        op.execute(f"DROP TYPE IF EXISTS {enum_name}")

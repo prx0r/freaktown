@@ -38,6 +38,9 @@ from backend.models import (
     SubmissionStatus,
     User,
 )
+from backend.models.motion import BODY_MANIFESTS, SEMANTIC_ACTIONS
+from backend.models.performance import PRESET_ENGINES, PerformanceEngine
+from backend.services.motion_compiler import MotionCompiler
 
 router = APIRouter()
 
@@ -219,6 +222,84 @@ MCP_TOOLS = {
             "required": ["appearance_id", "agent_token", "text"],
         },
     },
+
+    # ── Motion System ────────────────────────────────────────────────
+    "get_character_capabilities": {
+        "description": "Get the semantic capability manifest for a body class. Shows what movements, gestures, and reactions a body type can perform.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "body_class": {
+                    "type": "string",
+                    "description": "Body class: humanoid-v1, quadruped-v1, rigid-object-v1",
+                    "enum": ["humanoid-v1", "quadruped-v1", "rigid-object-v1"],
+                },
+            },
+            "required": ["body_class"],
+        },
+    },
+    "get_motion_catalog": {
+        "description": "Search the motion bank for animation clips matching semantic criteria.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "semantic": {
+                    "type": "string",
+                    "description": "Semantic action to search for (e.g. gesture.beat, reaction.dead_stare)",
+                },
+                "body_class": {
+                    "type": "string",
+                    "description": "Filter by body class",
+                    "default": "humanoid-v1",
+                },
+                "style": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Style tags to match (e.g. deadpan, nervous, confident)",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Max results",
+                    "default": 5,
+                },
+            },
+            "required": ["semantic"],
+        },
+    },
+    "list_preset_engines": {
+        "description": "List available preset Performance Engines (deadpan, nervous, confident, chaotic, awkward, low_energy).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+    "compile_performance": {
+        "description": "Compile a PerformanceEngine into a concrete PerformancePlan with timestamped motion cues.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "body_class": {
+                    "type": "string",
+                    "description": "Body class: humanoid-v1, quadruped-v1, rigid-object-v1",
+                    "default": "humanoid-v1",
+                },
+                "preset": {
+                    "type": "string",
+                    "description": "Preset engine name (deadpan, nervous, confident, chaotic, awkward, low_energy)",
+                },
+                "duration_ms": {
+                    "type": "integer",
+                    "description": "Performance duration in milliseconds",
+                    "default": 60000,
+                },
+                "appearance_id": {
+                    "type": "string",
+                    "description": "Appearance ID for this plan",
+                },
+            },
+            "required": ["body_class", "preset"],
+        },
+    },
 }
 
 
@@ -267,6 +348,14 @@ async def call_mcp_tool(
             return await _get_interview_context(args, db)
         elif tool_name == "submit_agent_response":
             return await _submit_agent_response(args, db)
+        elif tool_name == "get_character_capabilities":
+            return await _get_character_capabilities(args)
+        elif tool_name == "get_motion_catalog":
+            return await _get_motion_catalog(args)
+        elif tool_name == "list_preset_engines":
+            return await _list_preset_engines()
+        elif tool_name == "compile_performance":
+            return await _compile_performance(args)
     except Exception as e:
         return MCPToolResult(
             content=[{"type": "text", "text": f"Error: {str(e)}"}],
@@ -811,6 +900,99 @@ async def _submit_agent_response(args: dict, db: AsyncSession) -> dict:
                 "status": "submitted",
                 "appearance_id": appearance_id,
                 "text": text,
+            }),
+        }],
+    }
+
+
+# ── Motion System Handlers ──────────────────────────────────────────
+
+async def _get_character_capabilities(args: dict) -> dict:
+    """Get capability manifest for a body class."""
+    body_class = args.get("body_class", "humanoid-v1")
+    manifest = BODY_MANIFESTS.get(body_class)
+    if not manifest:
+        raise HTTPException(404, f"Unknown body class: {body_class}")
+
+    return {
+        "content": [{
+            "type": "text",
+            "text": json.dumps({
+                "body_class": manifest.body_class,
+                "capabilities": manifest.capabilities,
+                "fallbacks": manifest.fallbacks,
+                "max_gesture_amplitude": manifest.max_gesture_amplitude,
+                "supports_additive": manifest.supports_additive,
+                "supports_face_expressions": manifest.supports_face_expressions,
+                "supports_root_motion": manifest.supports_root_motion,
+                "capability_count": len(manifest.capabilities),
+            }),
+        }],
+    }
+
+
+async def _get_motion_catalog(args: dict) -> dict:
+    """Search the motion bank."""
+    from backend.models.motion_assets import SEED_MOTIONS
+    from backend.services.motion_compiler import MotionSearch
+
+    search = MotionSearch(SEED_MOTIONS)
+    results = search.search(
+        semantic=args.get("semantic"),
+        style=args.get("style"),
+        body_class=args.get("body_class", "humanoid-v1"),
+        limit=args.get("limit", 5),
+    )
+
+    return {
+        "content": [{
+            "type": "text",
+            "text": json.dumps({
+                "query": args,
+                "results": [m.to_dict() for m in results],
+                "total": len(results),
+            }),
+        }],
+    }
+
+
+async def _list_preset_engines() -> dict:
+    """List available preset Performance Engines."""
+    return {
+        "content": [{
+            "type": "text",
+            "text": json.dumps({
+                "presets": {
+                    name: engine.to_dict()
+                    for name, engine in PRESET_ENGINES.items()
+                },
+            }),
+        }],
+    }
+
+
+async def _compile_performance(args: dict) -> dict:
+    """Compile a PerformanceEngine into a PerformancePlan."""
+    preset_name = args.get("preset")
+    if preset_name not in PRESET_ENGINES:
+        raise HTTPException(404, f"Unknown preset: {preset_name}. Available: {list(PRESET_ENGINES.keys())}")
+
+    engine = PRESET_ENGINES[preset_name]
+    compiler = MotionCompiler()
+
+    plan = compiler.compile(
+        engine=engine,
+        body_class=args.get("body_class", "humanoid-v1"),
+        duration_ms=args.get("duration_ms", 60000),
+        appearance_id=args.get("appearance_id", ""),
+    )
+
+    return {
+        "content": [{
+            "type": "text",
+            "text": json.dumps({
+                "engine": engine.to_dict(),
+                "plan": plan.to_dict(),
             }),
         }],
     }

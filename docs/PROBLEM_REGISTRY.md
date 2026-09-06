@@ -101,6 +101,12 @@ Track of all issues, blockers, and technical debt discovered during development.
 **Impact:** Cannot verify deterministic draw is truly deterministic across runs
 **Fix:** Create test fixture with fixed seed and expected output
 
+### 🟡 #19 — test_list_comedians event loop mismatch
+**Discovered:** 2026-09-06
+**Impact:** asyncpg connection pool gets connections from wrong event loop when db.refresh triggers lazy loads
+**Fix:** Add conftest.py with proper async session fixture bound to test event loop
+**Note:** Pre-existing issue, previously hidden because test skipped without DB
+
 ---
 
 ## Security Concerns
@@ -192,13 +198,31 @@ Track of all issues, blockers, and technical debt discovered during development.
 
 | Metric | Value |
 |--------|-------|
-| Python files | 27 |
+| Python files | 28 |
 | Python lines | 4,537 |
 | TypeScript files | 4 |
 | Domain models | 14 |
 | API endpoints | 25+ |
 | MCP tools | 11 |
 | Unit tests | 18 (all passing) |
-| Integration tests | 11 (9 passing, 2 skipping) |
+| Integration tests | 11 (10 passing, 1 event loop infra issue) |
 | Services | 12 |
 | Seed comedians | 5 |
+| DB tables | 16 |
+| DB enums | 9 |
+
+---
+
+## Migration Fixes (2026-09-06)
+
+### ✅ Migration enum creation bug
+**Fixed:** SQLAlchemy `sa.Enum(..., create_type=False)` doesn't prevent `_on_table_create` from re-creating the type. Changed migration to create enums via raw SQL `DO $$ BEGIN ... EXCEPTION WHEN duplicate_object THEN null; END $$` and use `sa.String` columns in `create_table`.
+
+### ✅ ORM enum type mismatch
+**Fixed:** ORM models used `Enum(UserRole)` etc. as column types, generating `CAST($1 AS episodestatus)` against VARCHAR columns. Changed all enum columns in ORM to `String(N)` while keeping Python enum classes for validation.
+
+### ✅ Alembic async engine enum conflict
+**Fixed:** `alembic/env.py` now detects sync PostgreSQL URLs and uses sync engine for migrations, avoiding asyncpg enum creation issues.
+
+### ✅ .env.example stale credentials
+**Fixed:** Updated from `killella:killella` to `freak_town:freak_town` to match docker-compose.
