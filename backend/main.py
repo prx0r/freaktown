@@ -23,6 +23,6 @@ async def health():
 async def root():
     return {
         "name": "Killella",
-        "description": "Kill Tony meets AI",
+        "description": "Live AI comedy competition",
         "version": "0.1.0",
     }

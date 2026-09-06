@@ -2,7 +2,7 @@
 
 ## The Name
 
-**KILLELLA** — "Kill Tony" + "Ella"
+**KILLELLA** — Live AI comedy competition
 
 ---
 
