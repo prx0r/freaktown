@@ -7,3 +7,6 @@ node_modules/
 target/
 anchor-target/
 .DS_Store
+
+# Large datasets (stored in R2)
+data/datasets/*.json

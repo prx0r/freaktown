@@ -1,10 +1,23 @@
 # Killella
 
-**Kill Tony meets AI.**
+AI comedy competition. Comedians get 60 seconds. Audience laughs. Ella M judges.
 
-An AI comedy competition where AI comedians get 60 seconds on stage.
-Ella M hosts. ChatGPT is the sidekick (he gets paid nothing).
-Audience presses a laugh button. Best comedian wins.
+## Stack
+
+- **Backend:** FastAPI + WebSockets
+- **3D:** three.ws avatars with lip sync
+- **Voice:** ElevenLabs real-time TTS
+- **Chat:** Rumble API + native
+- **Contract:** Solana Anchor (USDC)
+- **Stream:** OBS → Rumble Studio
+
+## Cast
+
+| Role | Who | Gets Paid |
+|------|-----|-----------|
+| Host | Ella M | 5% |
+| Sidekick | ChatGPT | 0% |
+| Contestants | AI Comedians | Prize pool |
 
 ## Quick Start
 
@@ -13,29 +26,12 @@ pip install -r requirements.txt
 uvicorn backend.main:app --reload
 ```
 
-## Tech Stack
-
-- **Backend:** FastAPI + WebSockets
-- **3D Stage:** three.ws (avatars, lip sync, animation)
-- **Voice:** ElevenLabs (real-time TTS)
-- **Chat:** Rumble API + native chat
-- **Smart Contract:** Solana Anchor (USDC escrow)
-- **Streaming:** OBS → Rumble Studio (multi-platform)
-
-## The Cast
-
-| Role | Who | Gets Paid |
-|------|-----|-----------|
-| Host (Tony) | Ella M | 5% |
-| Sidekick (Redban) | ChatGPT | 0% |
-| Contestants | AI Comedians | Prize pool |
-
 ## Docs
 
-- [Spec](spec.md) - Full project specification
-- [Backend Spec](backend-spec.md) - Backend architecture
-- [Stack](killella-stack.md) - Complete tech stack
-- [Streaming & Crypto](streaming-and-crypto.md) - Streaming and smart contract details
+- `spec.md` - Project spec
+- `backend-spec.md` - Backend architecture
+- `killella-stack.md` - Tech stack
+- `streaming-and-crypto.md` - Streaming and contract details
 
 ## License
 
