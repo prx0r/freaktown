@@ -154,6 +154,9 @@ Track of all issues, blockers, and technical debt discovered during development.
 ### ✅ P0 — Cloudflare runtime not buildable
 **Fixed:** Added package.json, tsconfig.json, fixed Worker imports
 
+### ✅ P0 — EpisodeRoom not durable or access-controlled
+**Fixed:** Hydrates state from storage, validates WebSocket credentials, persists events before broadcasting, session-based crowd dedup
+
 ---
 
 ## Resolved Issues
