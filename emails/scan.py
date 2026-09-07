@@ -23,7 +23,7 @@ import httpx
 HERE = Path(__file__).resolve().parent
 STATE = HERE / ".state.json"
 BASE = "https://mail.zoho.eu/api"
-ACCOUNT_HINT = 20106757905  # tom@egoic.ai zuid; also the messages accountId
+ACCOUNT_ID = 6851483000000002002  # messages accountId (NOT the org zuid)
 
 
 def load_tokens() -> dict:
@@ -65,7 +65,7 @@ def api(method: str, path: str, token: str, **kw):
 
 
 def get_inbox_id(token: str) -> str:
-    data = api("GET", f"/accounts/{ACCOUNT_HINT}/folders", token)
+    data = api("GET", f"/accounts/{ACCOUNT_ID}/folders", token)
     folders = data if isinstance(data, list) else data.get("folders", [])
     for f in folders:
         if (f.get("folderName") or "").upper() == "INBOX":
@@ -74,14 +74,16 @@ def get_inbox_id(token: str) -> str:
 
 
 def list_messages(token: str, folder_id: str, limit: int = 10):
-    data = api("GET", f"/accounts/{ACCOUNT_HINT}/messages/view",
-               token, params={"folderId": folder_id, "limit": limit,
-                              "sort": "desc", "sortby": "date"})
+    data = api("GET", f"/accounts/{ACCOUNT_ID}/messages/view",
+               token, params={"folderId": folder_id, "limit": limit})
     return data if isinstance(data, list) else data.get("messages", [])
 
 
 def message_info(token: str, msg_id: str):
-    return api("GET", f"/accounts/{ACCOUNT_HINT}/messages/{msg_id}/info", token)
+    # NOTE: per-message content endpoints 404 on this plan/scope set.
+    # The list view already carries a `summary` preview, which is what
+    # brief() surfaces. Full MIME fetch is a future upgrade, not a blocker.
+    raise SystemExit("full-body fetch unavailable; see summary in list view")
 
 
 def load_state() -> dict:
@@ -98,7 +100,13 @@ def save_state(state: dict) -> None:
 def brief(m: dict) -> str:
     subj = (m.get("subject") or "(no subject)")[:70]
     frm = (m.get("fromAddress") or m.get("sender") or "?")[:40]
-    date = str(m.get("receivedTime") or m.get("date") or "?")[:16]
+    ts = m.get("receivedTime") or m.get("sentDateInGMT") or ""
+    try:
+        import datetime
+        date = datetime.datetime.fromtimestamp(int(str(ts)[:10]),
+                                               datetime.timezone.utc).strftime("%Y-%m-%d %H:%M")
+    except Exception:
+        date = str(ts)[:16]
     return f"{m.get('messageId', m.get('id', '?'))} | {date} | {frm} | {subj}"
 
 
@@ -110,8 +118,8 @@ def main() -> None:
     seen = set(state.get("seen", []))
 
     if args[:1] == ["--show"] and len(args) > 1:
-        info = message_info(token, args[1])
-        print(json.dumps(info, indent=2)[:3000])
+        print("Full-body fetch is unavailable on current scopes; "
+              "use --all for sender/subject/summary.")
         return
 
     msgs = list_messages(token, folder_id, limit=10)
@@ -127,13 +135,10 @@ def main() -> None:
     for m in show:
         mid = str(m.get("messageId", m.get("id")))
         print("  " + brief(m))
-        try:
-            info = message_info(token, mid)
-            content = info.get("summary") or info.get("snippet") or ""
-            if content:
-                print("    " + str(content)[:300].replace("\n", " "))
-        except SystemExit as e:
-            print(f"    (detail fetch failed: {e})")
+        summary = (m.get("summary") or "").replace("\n", " ").strip()
+        if summary:
+            import html as _html
+            print("    " + _html.unescape(summary)[:280])
         seen.add(mid)
     save_state({"seen": sorted(seen)[-200:], "updated": time.time()})
     print(f"\nState saved ({len(seen)} seen tracked).")
