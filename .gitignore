@@ -4,3 +4,5 @@ __pycache__/
 audio_output/
 transcript_*.json
 .venv/
+training_data/
+*.jsonl
