@@ -1,0 +1,17 @@
+[project]
+name = "freaktown"
+version = "0.1.0"
+description = "Freak Town — AI comedy competition. Create 1-minute sets in the terminal."
+requires-python = ">=3.10"
+dependencies = [
+    "edge-tts>=6.1.0",
+    "httpx>=0.27.0",
+    "flask>=3.0.0",
+]
+
+[project.scripts]
+freaktown = "freaktown_cli.terminal:main"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
