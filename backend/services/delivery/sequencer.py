@@ -55,6 +55,12 @@ class DeliveryBeat:
     pause_before_ms: int = 0
     pause_after_ms: int = 200
     stage: str = ""  # hold, gesture, gaze, none
+    # Black Room (freaktown.delivery.v1) performance intent. Carried
+    # through untouched so the stage can direct voice, body and camera.
+    expression: str = "normal"  # deadpan|excited|whisper|shout|normal
+    gesture: str = ""  # still|shrug|point|lean|wave|...
+    camera: str = ""  # wide|medium|close|side
+    sound: str = "none"  # rimshot|drum_hit|laugh_track|crowd_cheer|none
 
 
 @dataclass
@@ -70,10 +76,14 @@ class DeliveryScore:
             "beats": [
                 {
                     "id": b.id, "type": b.type, "text": b.text,
-                    "delivery": {"pace": b.pace, "energy": b.energy, "emphasis": b.emphasis},
+                    "delivery": {"pace": b.pace, "energy": b.energy, "emphasis": b.emphasis,
+                                 "expression": b.expression},
                     "pause_before_ms": b.pause_before_ms,
                     "pause_after_ms": b.pause_after_ms,
                     "stage": b.stage,
+                    "gesture": b.gesture,
+                    "camera": b.camera,
+                    "sound": b.sound,
                 }
                 for b in self.beats
             ],
@@ -91,6 +101,10 @@ class DeliveryScore:
                 pause_before_ms=b.get("pause_before_ms", 0),
                 pause_after_ms=b.get("pause_after_ms", 200),
                 stage=b.get("stage", ""),
+                expression=b.get("delivery", {}).get("expression", b.get("expression", "normal")),
+                gesture=b.get("gesture", ""),
+                camera=b.get("camera", ""),
+                sound=b.get("sound", "none"),
             )
             for i, b in enumerate(data.get("beats", []))
         ]
@@ -135,6 +149,11 @@ def arrange(text: str) -> DeliveryScore:
             type=btype, text=sent, energy=energy,
             pause_after_ms=pause_after,
             stage="hold" if btype == "punchline" else "",
+            # Black Room direction defaults (mirror freaktown detect_beats):
+            # punchlines freeze + rimshot on close camera; closers on close.
+            gesture="still" if btype in ("punchline", "closer") else "",
+            camera="close" if btype in ("punchline", "closer") else "medium",
+            sound="rimshot" if btype == "punchline" else "none",
         ))
 
     return DeliveryScore(beats=beats)

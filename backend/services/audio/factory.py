@@ -60,6 +60,30 @@ SFX_DEFS = {
     "boo": {"duration": 2.0, "source": "arena crowd", "action": "crowd booing, disapproval", "production": "live room ambience, natural decay"},
     "laugh": {"duration": 2.0, "source": "studio audience", "action": "warm sitcom laughter", "production": "close-miked crowd, natural decay"},
     "drum_hit": {"duration": 1.0, "source": "snare drum", "action": "single sharp comedy punctuation hit", "production": "dry studio, immediate attack"},
+    # ── Imported from freaktown sound_bank.py (Black Room band/crowd) ──
+    # Prompts preserved verbatim as the action; durations match theirs.
+    "rimshot_long": {"duration": 3.0, "source": "drum kit and crash cymbal", "action": "Extended comedy rimshot, ba-dum-tss-crash, triumphant drum sting", "production": "tight studio recording, decisive ending"},
+    "ba_dum_tss": {"duration": 2.0, "source": "snare, kick and cymbal", "action": "Classic ba-dum-tss comedy drums, two hits and a cymbal", "production": "dry studio recording, immediate attack"},
+    "sting": {"duration": 2.0, "source": "orchestra hit", "action": "Dramatic orchestral sting, tension hit, surprise reveal sound", "production": "wide cinematic production, fast decay"},
+    "laugh_big": {"duration": 4.0, "source": "large club audience", "action": "Large audience roaring with laughter, comedy club crowd going wild, 4 seconds", "production": "live room ambience, natural decay"},
+    "clap": {"duration": 3.0, "source": "theater audience", "action": "Audience applause, clapping, appreciation, 3 seconds", "production": "live room ambience, natural decay"},
+    "crickets": {"duration": 3.0, "source": "night field recording", "action": "Crickets chirping, awkward silence, comedy failure sound, 3 seconds", "production": "dry minimal production, fades out"},
+    "gasp": {"duration": 2.0, "source": "studio audience", "action": "Audience gasping, shocked reaction, collective surprise, 2 seconds", "production": "close-miked crowd, natural decay"},
+    "ohhhh": {"duration": 2.0, "source": "comedy club crowd", "action": "Audience saying ohhhh, shocked disapproval, comedy club reaction, 2 seconds", "production": "live room ambience, natural decay"},
+    "fanfare": {"duration": 3.0, "source": "bright brass section", "action": "Triumphant fanfare, victory sting, celebration, bright brass, 3 seconds", "production": "punchy production, hard ending"},
+    "sad_trombone": {"duration": 3.0, "source": "solo trombone", "action": "Comedy failure sound, sad trombone, wah-wah-wah, deflating, 3 seconds", "production": "dry cartoon production, descending pitch"},
+    "suspense": {"duration": 3.0, "source": "low strings and pulse", "action": "Suspenseful build, tension rising, dramatic pause music, 3 seconds", "production": "tense minimal production, builds throughout"},
+}
+
+# ── Character walkouts, imported from freaktown sound_bank.py ──────────
+# Full prompts (too specific for the genre/mood recipe grid). Used when
+# a walkout recipe has genre == "character"; flavor selects the entry.
+CHARACTER_WALKOUTS = {
+    "conspiracy-pigeon": "Paranoid military snare drum with pigeon coos, nervous energy, absurdly heroic",
+    "corporate-robot": "Horrible corporate hold music that drops into heavy bass, robot entrance",
+    "oldest-roomba": "Grand orchestral entrance that ends with vacuum cleaner noise, absurdly epic",
+    "medieval-linkedin": "Gregorian chant that transitions into motivational EDM, medieval knight entrance",
+    "no-nose-nolan": "Sleazy detective show theme, police dog entrance, bouncy bass, confident",
 }
 
 
@@ -99,6 +123,12 @@ class SoundRecipe:
 
 def build_walkout_prompt(recipe: SoundRecipe) -> str:
     """Compile structured intent → Stable Audio prompt."""
+    # Character walkouts bypass the recipe grid: their prompts are
+    # hand-written per freak (imported from freaktown sound_bank.py).
+    if recipe.genre == "character":
+        base = CHARACTER_WALKOUTS.get(recipe.flavor, "")
+        if base:
+            return f"TrackType: Music, {base}, instrumental only, clean decisive ending"
     g = GENRES.get(recipe.genre, GENRES["funk"])
     shape_text = SHAPES.get(recipe.shape, SHAPES["hit"])
     parts = [

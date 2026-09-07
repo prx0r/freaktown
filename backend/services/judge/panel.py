@@ -7,6 +7,7 @@ ChatGPT = diplomatically wrong, vaguely helpful, accidentally hilarious
 Stream  = raw audience chaos, brutally empirical
 """
 
+import hashlib
 import json
 import logging
 import os
@@ -137,6 +138,34 @@ OUTPUT STRICT JSON:
 
 # ── Panel Judge ──────────────────────────────────────────────────────
 
+# ── Judge voices (imported from freaktown docs/JUDGE_VOICES.md) ─────────
+# Each judge gets a voice + information access level. The comedy is
+# information asymmetry + personality mismatch. Guest judges rotate;
+# Ella always hosts.
+
+JUDGE_VOICES = {
+    "ella": "en-US-AriaNeural",          # custom voice (ElevenLabs in production)
+    "chatgpt": "en-US-GuyNeural",        # generic male
+    "siri": "en-US-SamanthaNeural",      # stats robot
+    "alexa": "en-US-JoannaNeural",       # accidentally helpful
+    "claude": "en-US-ChristopherNeural", # overthinks
+    "stream": None,                      # text only
+}
+
+GUEST_JUDGES = ["chatgpt", "siri", "alexa", "claude"]
+
+
+def pick_guest_judge(seed: str = "") -> str:
+    """Deterministic guest rotation (seeded) or random guest.
+
+    Ella always hosts; one guest joins per episode.
+    """
+    if seed:
+        digest = hashlib.sha256(f"freak-town-guest:{seed}".encode()).hexdigest()
+        return GUEST_JUDGES[int(digest, 16) % len(GUEST_JUDGES)]
+    return random.choice(GUEST_JUDGES)
+
+
 class JudgePanel:
     """Three-judge panel: Ella (real) + ChatGPT (wrong) + Stream (audience)."""
 
@@ -151,11 +180,17 @@ class JudgePanel:
                 pass
         self.model = os.getenv("ELLA_MODEL", "gpt-4o-mini")
 
-    def judge_set(self, set_text: str, audience_events: list[dict] | None = None) -> PanelResult:
-        """Run all three judges on a set."""
+    def judge_set(self, set_text: str, audience_events: list[dict] | None = None,
+                  name: str = "", premise: str = "") -> PanelResult:
+        """Run all three judges on a set.
+
+        ChatGPT intentionally receives name + premise ONLY (never the
+        transcript) — its bizarre 6.8-7.4 verdict on vibes alone is the
+        joke, and its score is a stored hallucination baseline.
+        """
         result = PanelResult()
         result.ella = self._judge_ella(set_text)
-        result.chatgpt = self._judge_chatgpt(set_text)
+        result.chatgpt = self._judge_chatgpt(name=name, premise=premise)
         stream_data = aggregate_stream(audience_events or [])
         result.stream = JudgeScore(
             name="Stream",
@@ -189,15 +224,16 @@ class JudgePanel:
         except Exception:
             return _ella_fallback(set_text)
 
-    def _judge_chatgpt(self, set_text: str) -> JudgeScore:
+    def _judge_chatgpt(self, name: str = "", premise: str = "") -> JudgeScore:
         if not self.client:
             return _chatgpt_fallback()
         try:
+            context = f"Performer: {name or 'Unknown'}\nPremise: {premise or 'stand-up comedy'}"
             resp = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": CHATGPT_SCORING},
-                    {"role": "user", "content": f"Score this comedy set:\n\n\"{set_text}\""},
+                    {"role": "user", "content": f"Score this comedy set:\n\n{context}"},
                 ],
                 temperature=0.9, max_tokens=300,
             )

@@ -5,6 +5,7 @@ from backend.services.audio.factory import (
     StableAudioOpenSmall, RemoteAudioWorker,
     build_walkout_prompt, build_sfx_prompt,
     GENRES, MOODS, ENERGIES, SHAPES, FLAVORS, SFX_DEFS,
+    CHARACTER_WALKOUTS,
     sound_factory, MODEL_ID,
 )
 
@@ -13,5 +14,6 @@ __all__ = [
     "StableAudioOpenSmall", "RemoteAudioWorker",
     "build_walkout_prompt", "build_sfx_prompt",
     "GENRES", "MOODS", "ENERGIES", "SHAPES", "FLAVORS", "SFX_DEFS",
+    "CHARACTER_WALKOUTS",
     "sound_factory", "MODEL_ID",
 ]

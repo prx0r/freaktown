@@ -85,6 +85,30 @@ class MediaStore:
         key = f"acts/{act_version_id}/timings/{sha256[:16]}.json"
         return self.put_bytes(key, timings_json, "application/json")
 
+    def put_manifest(self, act_version_id: str, manifest_json: bytes) -> dict:
+        """Upload a sealed freaktown.performance.v1 manifest.
+
+        Fixed key (acts/{id}/manifest.json): acts are immutable, so the
+        manifest is written once and served back by GET /v1/performances.
+        """
+        key = f"acts/{act_version_id}/manifest.json"
+        return self.put_bytes(key, manifest_json, "application/json")
+
+    def put_set_audio(self, act_version_id: str, audio_bytes: bytes, format: str = "wav") -> dict:
+        """Upload a sealed set recording under a fixed, servable key."""
+        content_type = {
+            "wav": "audio/wav", "mp3": "audio/mpeg", "ogg": "audio/ogg",
+        }.get(format, "application/octet-stream")
+        key = f"acts/{act_version_id}/set.{format}"
+        return self.put_bytes(key, audio_bytes, content_type)
+
+    def get_bytes(self, key: str) -> bytes:
+        """Download an object. Raises RuntimeError when unconfigured."""
+        if not self.configured:
+            raise RuntimeError("R2 media store not configured")
+        response = self.client.get_object(Bucket=self.bucket, Key=key)
+        return response["Body"].read()
+
     def get_signed_url(self, key: str, expires_in: int = 3600) -> str:
         """Get a signed URL for reading an object."""
         return self.client.generate_presigned_url(
