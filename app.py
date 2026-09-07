@@ -286,15 +286,53 @@ def beat_cache_key(text: str, voice: str, pace: str) -> str:
     return hashlib.sha256(f"{voice}|{pace}|{text}".encode()).hexdigest()[:16]
 
 
+def espeak_wav(text: str, voice: str = "") -> bytes:
+    """Offline fallback TTS (espeak). Robotic but instant, unthrottled.
+    Used only when edge-tts fails; re-render later for the real voice."""
+    import subprocess as _sp
+    import tempfile as _tf
+    feminine = any(k in (voice or "") for k in
+                   ["Aria", "Jenny", "Jane", "Samantha", "Joanna", "Michelle", "Emma", "Ava"])
+    espeak_voice = "en+f3" if feminine else "en+m3"
+    with _tf.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+        out = tmp.name
+    try:
+        _sp.run(["espeak", "-v", espeak_voice, "-s", "175", "--stdout", text],
+                stdout=open(out, "wb"), timeout=30, check=False)
+        conv = out + ".c.wav"
+        _sp.run(["ffmpeg", "-y", "-i", out, "-ar", "24000", "-ac", "1",
+                 "-f", "wav", conv], capture_output=True, timeout=20)
+        data = Path(conv).read_bytes() if Path(conv).exists() else b""
+        Path(conv).unlink(missing_ok=True)
+        return data
+    finally:
+        Path(out).unlink(missing_ok=True)
+
+
 def beat_wav(text: str, voice: str, pace: str = "normal") -> tuple[bytes, str, bool]:
-    """TTS for one beat with cache. Returns (wav, key, cached)."""
+    """TTS for one beat with cache. Returns (wav, key, cached).
+    Falls back to offline espeak when edge-tts is throttled, so audio
+    ALWAYS produces. Re-render later for the real voice."""
     key = beat_cache_key(text, voice, pace)
     path = BEAT_CACHE / f"{key}.wav"
     if path.exists():
         return path.read_bytes(), key, True
-    audio = asyncio.run(tts_generate(text, voice, pace))
-    if audio:
-        path.write_bytes(audio)
+    robot = BEAT_CACHE / f"{key}.robot.wav"
+    if robot.exists():
+        return robot.read_bytes(), key, True
+    try:
+        audio = asyncio.run(tts_generate(text, voice, pace))
+    except Exception:
+        audio = b""
+    if not audio:
+        audio = espeak_wav(text, voice)
+        if audio:
+            # mark fallback provenance in cache key namespace
+            path = BEAT_CACHE / f"{key}.robot.wav"
+            path.write_bytes(audio)
+            return audio, key, False
+        raise RuntimeError("all TTS failed")
+    path.write_bytes(audio)
     return audio, key, False
 
 
