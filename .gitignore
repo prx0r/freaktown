@@ -11,3 +11,4 @@ training_data/
 HF_TOKEN
 sounds/*.wav
 sounds/*.mp3
+freaks/

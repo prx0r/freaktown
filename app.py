@@ -9,6 +9,7 @@ Audio compositor owns silence. TTS just speaks.
 """
 
 import asyncio
+import hashlib
 import json
 import os
 import re
@@ -205,6 +206,185 @@ def compose():
 @app.route("/audio/<path:filename>")
 def serve_audio(filename):
     return send_from_directory(str(AUDIO_DIR), filename)
+
+
+@app.route("/freaks/<path:filename>")
+def serve_freak(filename):
+    return send_from_directory(str(FREAK_DIR), filename)
+
+
+# ── Freak Bundles: saved sets ─────────────────────────────────────────
+
+FREAK_DIR = Path(__file__).parent / "freaks"
+FREAK_DIR.mkdir(exist_ok=True)
+
+
+def _slug(name: str, text: str) -> str:
+    base = re.sub(r"[^a-z0-9]+", "-", (name or "freak").lower()).strip("-")[:32] or "freak"
+    digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:6]
+    return f"{base}-{digest}"
+
+
+def _bundle_meta(slug: str) -> dict | None:
+    meta_path = FREAK_DIR / slug / "meta.json"
+    if not meta_path.exists():
+        return None
+    try:
+        return json.loads(meta_path.read_text())
+    except Exception:
+        return None
+
+
+@app.route("/api/sets", methods=["GET"])
+def list_sets():
+    """Your Sets library: every saved freak bundle with status."""
+    out = []
+    for d in sorted(FREAK_DIR.iterdir()):
+        if not d.is_dir():
+            continue
+        meta = _bundle_meta(d.name)
+        if not meta:
+            continue
+        char = meta.get("character", {})
+        out.append({
+            "slug": d.name,
+            "name": char.get("name", d.name),
+            "premise": char.get("premise", ""),
+            "beats": meta.get("beat_count", 0),
+            "words": meta.get("word_count", 0),
+            "duration_s": meta.get("duration_s", 0),
+            "voice": meta.get("voice", ""),
+            "style": meta.get("style", ""),
+            "status": meta.get("status", "draft"),
+            "created_at": meta.get("created_at", ""),
+            "audio": f"/freaks/{d.name}/set.wav" if (d / "set.wav").exists() else None,
+        })
+    return jsonify({"sets": out})
+
+
+@app.route("/api/sets", methods=["POST"])
+def save_set():
+    """Save character + beats + timings + composed clip as one freak bundle.
+    Body: {"character": {name,species,premise,vibe}, "beats": [...],
+           "voice": "...", "style": "deadpan", "walkout": "funk/absurd/high" }"""
+    import datetime
+    data = request.json or {}
+    character = data.get("character") or {}
+    beats = data.get("beats") or []
+    voice = data.get("voice", "en-US-AriaNeural")
+    if not beats:
+        return jsonify({"ok": False, "error": "no beats to save"}), 400
+
+    name = (character.get("name") or "Guest Freak")[:80]
+    full_text = " ".join(b.get("text", "") for b in beats)
+    slug = _slug(name, full_text + voice)
+    bdir = FREAK_DIR / slug
+    bdir.mkdir(exist_ok=True)
+
+    # 1. character.json
+    (bdir / "character.json").write_text(json.dumps({
+        "name": name,
+        "species": (character.get("species") or "")[:60],
+        "premise": (character.get("premise") or "")[:300],
+        "vibe": (character.get("vibe") or "")[:40],
+        "voice": voice,
+    }, indent=2))
+
+    # 2. delivery.json (freaktown.delivery.v1, timings included)
+    (bdir / "delivery.json").write_text(json.dumps({
+        "version": "freaktown.delivery.v1",
+        "voice": {"provider": "edge-tts", "voice_id": voice},
+        "beats": [{"id": b.get("id"), "type": b.get("type", "setup"),
+                   "text": b.get("text", ""),
+                   "pause_after_ms": int(b.get("pause_after_ms", 300))}
+                  for b in beats],
+    }, indent=2))
+
+    # 3. set.wav (composed clip with exact silence)
+    beat_audios = []
+    for b in beats:
+        audio = asyncio.run(tts_generate(b.get("text", ""), voice))
+        beat_audios.append({"id": b.get("id"), "audio": audio,
+                            "pause_ms": int(b.get("pause_after_ms", 300))})
+    wav_bytes, offsets = compose_beats(beat_audios)
+    (bdir / "set.wav").write_bytes(wav_bytes)
+
+    # 4. walkout.json (recipe for later generation; audio when available)
+    walkout = data.get("walkout") or {}
+    (bdir / "walkout.json").write_text(json.dumps({
+        "genre": walkout.get("genre", ""), "mood": walkout.get("mood", ""),
+        "energy": walkout.get("energy", ""), "shape": walkout.get("shape", "hit"),
+        "duration": 8, "audio": None,
+    }, indent=2))
+
+    words = sum(len(b.get("text", "").split()) for b in beats)
+    meta = {"slug": slug,
+            "character": {"name": name,
+                          "species": (character.get("species") or "")[:60],
+                          "premise": (character.get("premise") or "")[:300],
+                          "vibe": (character.get("vibe") or "")[:40]},
+            "voice": voice,
+            "style": (data.get("style") or "")[:40],
+            "beat_count": len(beats),
+            "word_count": words,
+            "duration_s": round(len(wav_bytes) / (24000 * 2), 1),
+            "status": "draft",
+            "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat()}
+    (bdir / "meta.json").write_text(json.dumps(meta, indent=2))
+    return jsonify({"ok": True, "slug": slug, "meta": meta,
+                    "audio": f"/freaks/{slug}/set.wav"})
+
+
+@app.route("/api/sets/<slug>", methods=["GET"])
+def get_set(slug):
+    """Full bundle: character + beats + audio url."""
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    bdir = FREAK_DIR / slug
+    if not bdir.is_dir():
+        return jsonify({"ok": False, "error": "unknown set"}), 404
+    try:
+        character = json.loads((bdir / "character.json").read_text())
+        delivery = json.loads((bdir / "delivery.json").read_text())
+        meta = json.loads((bdir / "meta.json").read_text())
+    except Exception:
+        return jsonify({"ok": False, "error": "corrupt bundle"}), 500
+    return jsonify({"ok": True, "slug": slug, "character": character,
+                    "beats": delivery.get("beats", []), "voice": meta.get("voice", ""),
+                    "style": meta.get("style", ""), "status": meta.get("status", "draft"),
+                    "audio": f"/freaks/{slug}/set.wav" if (bdir / "set.wav").exists() else None})
+
+
+@app.route("/api/sets/<slug>/submit", methods=["POST"])
+def submit_set(slug):
+    """Submit a saved set for the live show. Status: draft -> queued."""
+    import datetime
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    bdir = FREAK_DIR / slug
+    meta = _bundle_meta(slug)
+    if meta is None:
+        return jsonify({"ok": False, "error": "unknown set"}), 404
+    if not (bdir / "set.wav").exists():
+        return jsonify({"ok": False, "error": "no composed clip yet"}), 400
+    meta["status"] = "queued"
+    meta["submitted_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    (bdir / "meta.json").write_text(json.dumps(meta, indent=2))
+    return jsonify({"ok": True, "slug": slug, "status": "queued"})
+
+
+@app.route("/api/submissions", methods=["GET"])
+def list_submissions():
+    """Everything queued for the live show."""
+    out = []
+    for d in sorted(FREAK_DIR.iterdir()):
+        if not d.is_dir():
+            continue
+        meta = _bundle_meta(d.name)
+        if meta and meta.get("status") == "queued":
+            out.append({"slug": d.name, "name": meta.get("character", {}).get("name", d.name),
+                        "submitted_at": meta.get("submitted_at", ""),
+                        "duration_s": meta.get("duration_s", 0),
+                        "audio": f"/freaks/{d.name}/set.wav"})
+    return jsonify({"submissions": out})
 
 
 # ── Generate (CF free-tier writer) ────────────────────────────────────

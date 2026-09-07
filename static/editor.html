@@ -71,6 +71,10 @@ input[type=range] { flex: 1; accent-color: #ff00aa; cursor: pointer; }
       <div style="font-size:10px;color:#555;margin-top:6px;" id="templateDesc"></div>
     </div>
     <div class="tempo-box">
+      <h4>YOUR SETS</h4>
+      <div id="setsList" style="font-size:11px;color:#555;">nothing saved yet</div>
+    </div>
+    <div class="tempo-box">
       <h4>VOICE</h4>
       <select id="voice">
         <option value="en-US-AriaNeural">Ella (Aria)</option>
@@ -98,6 +102,7 @@ input[type=range] { flex: 1; accent-color: #ff00aa; cursor: pointer; }
   <input id="chat" placeholder="come on then funny bones — describe the character + minute…" autocomplete="off">
   <button class="btn btn-primary" onclick="sendChat()">WRITE ▶</button>
   <button class="btn" onclick="composePlay()">PLAY FULL SET</button>
+  <button class="btn" onclick="saveSet()">SAVE SET</button>
   <button class="btn" onclick="stopAudio()">⏹</button>
 </div>
 
@@ -176,12 +181,14 @@ async function sendChat() {
   });
   const data = await res.json();
   if (!data.ok) return status(data.error || 'Generation failed');
-  document.getElementById('performerName').textContent = data.name || 'Guest Freak';
-  document.getElementById('premiseLine').textContent = data.premise || '';
+  window._char = {name: data.name || 'Guest Freak', species: data.species || '',
+                  premise: data.premise || '', vibe: data.vibe || ''};
+  document.getElementById('performerName').textContent = window._char.name;
+  document.getElementById('premiseLine').textContent = window._char.premise;
   document.getElementById('charLine').textContent =
-    `${data.name || ''} · ${data.species || ''} · ${data.vibe || ''} · via ${data.engine || 'ai'}`;
+    `${window._char.name} · ${window._char.species} · ${window._char.vibe} · via ${data.engine || 'ai'}`;
   parseText(data.minute);
-  status(`Wrote ${data.name || 'a freak'} — hit PLAY FULL SET`);
+  status(`Wrote ${window._char.name} — hit PLAY FULL SET`);
 }
 document.getElementById('chat').addEventListener('keydown', e => {
   if (e.key === 'Enter') sendChat();
@@ -428,7 +435,68 @@ document.addEventListener('keydown', e => {
   }
 });
 
+// ── Your Sets: save / load / submit ──
+async function saveSet() {
+  if (!beats.length) return status('Nothing to save — write something first');
+  const res = await fetch('/api/sets', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      character: window._char || {name: document.getElementById('performerName').textContent || 'Guest Freak'},
+      beats, voice: document.getElementById('voice').value,
+      style: document.getElementById('templateSel').value || ''
+    })
+  });
+  const data = await res.json();
+  if (!data.ok) return status(data.error || 'Save failed');
+  status(`Saved "${data.meta.character.name}" (${data.meta.duration_s}s)`);
+  loadSets();
+}
+
+async function loadSets() {
+  const res = await fetch('/api/sets');
+  const data = await res.json();
+  const box = document.getElementById('setsList');
+  const sets = data.sets || [];
+  if (!sets.length) { box.textContent = 'nothing saved yet'; return; }
+  box.innerHTML = '';
+  sets.forEach(s => {
+    const el = document.createElement('div');
+    el.style.cssText = 'margin-bottom:8px;padding:6px;border:1px solid #222;border-radius:4px;';
+    const badge = s.status === 'queued'
+      ? '<span style="color:#00d4ff;">QUEUED FOR LIVE SHOW</span>'
+      : `<button class="btn btn-small" onclick="submitSet('${s.slug}')">SUBMIT</button>`;
+    el.innerHTML = `
+      <div style="color:#e0e0e0;cursor:pointer;" onclick="loadSet('${s.slug}')">▶ ${s.name}</div>
+      <div style="margin-top:2px;">${s.beats} beats · ${s.duration_s}s${s.style ? ' · ' + s.style : ''}</div>
+      <div style="margin-top:4px;">${badge}</div>`;
+    box.appendChild(el);
+  });
+}
+
+async function loadSet(slug) {
+  const res = await fetch(`/api/sets/${slug}`);
+  const data = await res.json();
+  if (!data.ok) return status('Load failed');
+  window._char = data.character;
+  document.getElementById('performerName').textContent = data.character.name;
+  document.getElementById('premiseLine').textContent = data.character.premise || '';
+  document.getElementById('charLine').textContent =
+    `${data.character.name} · ${data.character.species || ''} · saved set`;
+  beats = data.beats;
+  renderBeats();
+  status(`Loaded "${data.character.name}" — hit PLAY FULL SET`);
+}
+
+async function submitSet(slug) {
+  const res = await fetch(`/api/sets/${slug}/submit`, {method: 'POST'});
+  const data = await res.json();
+  if (!data.ok) return status(data.error || 'Submit failed');
+  status('Queued for the live show');
+  loadSets();
+}
+
 loadTemplates();
+loadSets();
 </script>
 
 </body>
