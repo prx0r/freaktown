@@ -559,6 +559,39 @@ def save_set():
     if not beats:
         return jsonify({"ok": False, "error": "no beats to save"}), 400
 
+    try:
+        slug, meta, _ = _save_bundle(data)
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    return jsonify({"ok": True, "slug": slug, "meta": meta,
+                    "audio": f"/freaks/{slug}/set.wav",
+                    "url": canonical_url(slug)})
+
+
+def _lineage(parent_slug: str | None) -> dict:
+    """Reply lineage: {relation, parent, root, depth}. Root walks parents (cap 20)."""
+    if not parent_slug:
+        return {"relation": "original", "parent": None, "root": None, "depth": 0}
+    parent_slug = re.sub(r"[^a-z0-9_-]", "", parent_slug)[:45]
+    pmeta = _bundle_meta(parent_slug)
+    if not pmeta:
+        return {"relation": "reply", "parent": parent_slug, "root": parent_slug, "depth": 1}
+    plin = pmeta.get("lineage") or {}
+    root = plin.get("root") or parent_slug
+    depth = min(int(plin.get("depth", 0)) + 1, 99)
+    return {"relation": "reply", "parent": parent_slug, "root": root, "depth": depth}
+
+
+def _save_bundle(data: dict):
+    """Persist a freak bundle. Shared by /api/sets and /api/respond.
+    Returns (slug, meta). Accepts optional relation/parent_slug for replies."""
+    import datetime
+    character = data.get("character") or {}
+    beats = data.get("beats") or []
+    voice = data.get("voice", "en-US-AriaNeural")
+    if not beats:
+        raise ValueError("no beats to save")
+
     name = (character.get("name") or "Guest Freak")[:80]
     full_text = " ".join(b.get("text", "") for b in beats)
     slug = _slug(name, full_text + voice)
@@ -677,10 +710,14 @@ def save_set():
             "word_count": words,
             "duration_s": round(len(wav_bytes) / (24000 * 2), 1),
             "status": "draft",
+            "creator": str(data.get("creator") or "")[:64],
+            "lineage": _lineage(data.get("parent_slug")),
+            "response_seeds": data.get("response_seeds") or [],
             "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat()}
     (bdir / "meta.json").write_text(json.dumps(meta, indent=2))
-    return jsonify({"ok": True, "slug": slug, "meta": meta,
-                    "audio": f"/freaks/{slug}/set.wav"})
+    # seed response ideas in background so YOUR TURN never spins
+    _seed_responses_async(slug)
+    return slug, meta, offsets
 
 
 @app.route("/api/sets/<slug>", methods=["GET"])
@@ -904,26 +941,174 @@ FREAK_NAMES = ["Martin", "Bartholomew", "Nolan", "Gerald", "Priscilla",
                "Doug", "Kevin", "Brenda", "Sal", "Margaret", "Todd", "Linda"]
 
 
+def _roll_character(locks: dict | None = None):
+    """Roll a complete freak. Shared by /api/randomize and /api/respond."""
+    import random as _r
+    locks = locks or {}
+    species = locks.get("species") or _r.choice(FREAK_SPECIES)
+    job = locks.get("job") or _r.choice(FREAK_JOBS)
+    vibe = locks.get("vibe") or _r.choice(FREAK_VIBES)
+    name = locks.get("name") or f"{_r.choice(FREAK_NAMES)}"
+    genre, mood = FREAK_WALKOUT.get(species, ("comedy", "absurd"))
+    voice = FREAK_VOICES.get(vibe, "en-US-AriaNeural")
+    premise = f"{vibe} {species} working as a {job}"
+    return (
+        {"name": name, "species": species, "job": job,
+         "premise": premise, "vibe": vibe, "voice": voice},
+        {"genre": genre, "mood": mood, "energy": "high",
+         "shape": "hit", "duration": 8, "seed": _r.randint(0, 99999)},
+    )
+
+
+def _cf_chat(system: str, user: str, max_tokens: int = 500,
+             temperature: float = 0.9) -> tuple[str | None, str | None]:
+    """One CF Workers AI chat call. Returns (text, engine) or (None, None)."""
+    import httpx
+    tok, acct = _cf_creds()
+    if not (tok and acct):
+        return None, None
+    for model in CF_MODELS:
+        try:
+            r = httpx.post(
+                f"https://api.cloudflare.com/client/v4/accounts/{acct}/ai/run/{model}",
+                headers={"Authorization": f"Bearer {tok}", "Content-Type": "application/json"},
+                json={"messages": [{"role": "system", "content": system},
+                                   {"role": "user", "content": user}],
+                      "max_tokens": max_tokens, "temperature": temperature},
+                timeout=90)
+            if r.status_code != 200:
+                continue
+            return r.json()["result"]["response"], model.split("/")[-1]
+        except Exception:
+            continue
+    return None, None
+
+
+RESPONSE_MODES = {
+    "roast": "roast them: attack the original freak, their premise, their closer. Mean but playful.",
+    "yes_and": "yes-and them: extend their universe, add a worse character from the same world.",
+    "random": "ignore their premise and come at a wild sideways angle that still answers the vibe.",
+    "challenge": "challenge them: dare them on the weakest part of their set.",
+}
+
+
+def _seed_responses_async(slug: str):
+    """Background-fill response_seeds so YOUR TURN never spins. Best effort."""
+    import threading
+
+    def _run():
+        try:
+            meta = _bundle_meta(slug)
+            if not meta or meta.get("response_seeds"):
+                return
+            char = meta.get("character", {})
+            context = f"{char.get('name', 'A comedian')} ({char.get('premise', '')})"
+            try:
+                delivery = json.loads((FREAK_DIR / slug / "delivery.json").read_text())
+                beats = delivery.get("beats", [])
+                closer = next((b.get("text", "") for b in reversed(beats)
+                               if b.get("type") in ("punchline", "closer")), "")
+            except Exception:
+                closer = ""
+            seeds = []
+            for mode in ("roast", "yes_and", "random"):
+                idea, _ = _cf_chat(
+                    "You write one-line comedy premises for response sets. "
+                    "One sentence, under 20 words, specific and roasty but playful. "
+                    "No quotes, no explanation, just the premise.",
+                    f"{RESPONSE_MODES[mode]} The act to answer: {context}. "
+                    f"Their closer was: {closer}",
+                    max_tokens=60, temperature=1.0)
+                if idea:
+                    seeds.append({"type": mode,
+                                  "text": idea.strip().strip('"')[:200]})
+            if seeds:
+                meta = _bundle_meta(slug) or {}
+                meta["response_seeds"] = seeds
+                (FREAK_DIR / slug / "meta.json").write_text(json.dumps(meta, indent=2))
+        except Exception:
+            pass
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
 @app.route("/api/randomize", methods=["POST"])
 def randomize():
     """Roll a complete freak: species, job, personality, voice, walkout.
     Body (all optional locks): {"species": "pigeon", "vibe": "paranoid"}"""
-    import random as _r
     data = request.json or {}
-    species = data.get("species") or _r.choice(FREAK_SPECIES)
-    job = data.get("job") or _r.choice(FREAK_JOBS)
-    vibe = data.get("vibe") or _r.choice(FREAK_VIBES)
-    name = data.get("name") or f"{_r.choice(FREAK_NAMES)}"
-    genre, mood = FREAK_WALKOUT.get(species, ("comedy", "absurd"))
-    voice = FREAK_VOICES.get(vibe, "en-US-AriaNeural")
-    premise = f"{vibe} {species} working as a {job}"
-    return jsonify({"ok": True,
-                    "character": {"name": name, "species": species, "job": job,
-                                  "premise": premise, "vibe": vibe, "voice": voice},
-                    "walkout": {"genre": genre, "mood": mood, "energy": "high",
-                                "shape": "hit", "duration": 8, "seed": _r.randint(0, 99999)},
-                    "prompt": f"Write a 60-second standup minute. The comedian is {name}, "
-                              f"a {vibe} {species} working as a {job}."})
+    character, walkout = _roll_character(data)
+    return jsonify({"ok": True, "character": character, "walkout": walkout,
+                    "prompt": f"Write a 60-second standup minute. The comedian is "
+                              f"{character['name']}, a {character['vibe']} "
+                              f"{character['species']} working as a {character['job']}."})
+
+
+@app.route("/api/respond", methods=["POST"])
+def respond():
+    """One-shot response generation: roll freak + write minute + compose + save.
+    Body: {"parent_slug": "...", "mode": "roast|yes_and|random|challenge",
+           "idea": "optional premise override", "creator": "anon token"}.
+    Returns the reply bundle ready to play in the same viewer."""
+    import datetime
+    data = request.json or {}
+    parent_slug = re.sub(r"[^a-z0-9_-]", "", str(data.get("parent_slug", "")))[:45]
+    mode = str(data.get("mode", "roast")).lower()
+    if mode not in RESPONSE_MODES:
+        mode = "roast"
+    pmeta = _bundle_meta(parent_slug)
+    if not pmeta:
+        return jsonify({"ok": False, "error": "unknown parent set"}), 404
+    pchar = pmeta.get("character", {})
+    try:
+        pdelivery = json.loads((FREAK_DIR / parent_slug / "delivery.json").read_text())
+        pbeats = pdelivery.get("beats", [])
+        pcloser = next((b.get("text", "") for b in reversed(pbeats)
+                        if b.get("type") in ("punchline", "closer")), "")
+        ptext = " ".join(b.get("text", "") for b in pbeats)[:1200]
+    except Exception:
+        pcloser, ptext = "", ""
+
+    character, walkout = _roll_character()
+    idea = (data.get("idea") or "").strip()[:300]
+    if not idea:
+        idea, _ = _cf_chat(
+            "You write one-line comedy premises for response sets. "
+            "One sentence, under 20 words. No quotes, no explanation.",
+            f"{RESPONSE_MODES[mode]} Answer this act: {pchar.get('name')} "
+            f"({pchar.get('premise', '')}). Their closer: {pcloser}.",
+            max_tokens=60, temperature=1.0)
+        idea = (idea or f"Answer {pchar.get('name', 'them')} back, but meaner").strip().strip('"')
+
+    minute, _ = _cf_chat(
+        "You are a comedy writer for Freak Town. Write a 60-second standup minute. "
+        "80-150 words. First line IS the joke. Escalating absurdity. Specific details. "
+        "Killer closer under 10 words. Direct audience address. Stay in character voice. "
+        "Reply ONLY with the set text, no title, no quotes.",
+        f"You are {character['name']}, a {character['vibe']} {character['species']} "
+        f"working as a {character['job']}. Answer back to this act with a {mode}: "
+        f"{pchar.get('name')} said: {ptext}. Your angle: {idea}.",
+        max_tokens=400, temperature=0.95)
+    if not minute:
+        return jsonify({"ok": False, "error": "minute generation failed, retry"}), 502
+
+    beats = detect_beats(minute.strip().strip('"'))
+    for b in beats:
+        b.setdefault("pace", "normal")
+        b.setdefault("performance", {"expression": "neutral", "gesture": "normal",
+                                     "look": "audience"})
+    try:
+        slug, meta, offsets = _save_bundle({
+            "character": character, "beats": beats, "voice": character["voice"],
+            "walkout": walkout, "creator": str(data.get("creator") or "")[:64],
+            "parent_slug": parent_slug,
+        })
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    return jsonify({"ok": True, "slug": slug, "url": canonical_url(slug),
+                    "audio": f"/freaks/{slug}/set.wav",
+                    "character": character, "idea": idea, "mode": mode,
+                    "parent": parent_slug, "meta": meta, "beats": offsets})
 
 
 @app.route("/f/<slug>")
@@ -942,6 +1127,150 @@ def watch_character_set(char, set):
     return _render_watch(slug)
 
 
+def _char_bundles(char_slug: str) -> list[dict]:
+    """All bundles whose character slug matches, newest first."""
+    out = []
+    for d in sorted(FREAK_DIR.iterdir()):
+        if not d.is_dir():
+            continue
+        meta = _bundle_meta(d.name)
+        if not meta:
+            continue
+        if _char_slug((meta.get("character", {}) or {}).get("name", "")) != char_slug:
+            continue
+        out.append((d.name, meta))
+    out.sort(key=lambda x: x[1].get("created_at", ""), reverse=True)
+    return out
+
+
+@app.route("/@<char>")
+def character_page(char):
+    """Character page: sets, history, rivals. Links never die (see /f/ alias)."""
+    import html as _html
+    char_slug = re.sub(r"[^a-z0-9-]", "", char)[:32]
+    bundles = _char_bundles(char_slug)
+    if not bundles:
+        return "No freak by that name yet. Make one in the Black Room.", 404
+    first_char = (bundles[0][1].get("character", {}) or {})
+    name = _html.escape(first_char.get("name", char_slug))
+    premise = _html.escape(first_char.get("premise", ""))
+    # rivals: characters who replied to (or were replied by) this char's sets
+    my_slugs = {s for s, _ in bundles}
+    rivals: dict[str, int] = {}
+    for _, m in bundles:
+        lin = m.get("lineage") or {}
+        if lin.get("parent"):
+            try:
+                pm = _bundle_meta(lin["parent"]) or {}
+                rn = (pm.get("character", {}) or {}).get("name")
+                if rn and rn != first_char.get("name"):
+                    rivals[rn] = rivals.get(rn, 0) + 1
+            except Exception:
+                pass
+    for d in sorted(FREAK_DIR.iterdir()):
+        if not d.is_dir():
+            continue
+        m = _bundle_meta(d.name) or {}
+        lin = m.get("lineage") or {}
+        if lin.get("parent") in my_slugs:
+            rn = (m.get("character", {}) or {}).get("name")
+            if rn:
+                rivals[rn] = rivals.get(rn, 0) + 1
+    cards = []
+    for slug, m in bundles:
+        set_name = m.get("set_name") or slug
+        url = canonical_url(slug).replace("https://freak.town", "")
+        nreplies = sum(
+            1 for d in FREAK_DIR.iterdir() if d.is_dir() and
+            ((_bundle_meta(d.name) or {}).get("lineage") or {}).get("parent") == slug)
+        cards.append(
+            f"<a style='display:block;margin:8px auto;max-width:420px;padding:12px;"
+            f"border:1px solid #282833;border-radius:12px;color:#eee;text-decoration:none' "
+            f"href='{url}'><b>{_html.escape(set_name)}</b>"
+            f"<div style='color:#888;font-size:12px;'>{m.get('duration_s', 0)}s · "
+            f"{m.get('word_count', 0)} words · {nreplies} repl{'y' if nreplies == 1 else 'ies'}"
+            f"</div></a>")
+    rival_line = ("<p style='color:#888;'>RIVALS: " +
+                  _html.escape(", ".join(sorted(rivals))) + "</p>") if rivals else ""
+    return f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{name} — Freak Town</title>
+<style>body{{background:#0a0a0f;color:#eee;font-family:monospace;text-align:center;padding:32px 16px}}
+a{{color:#ff2fa8}}</style></head><body>
+<div style="font-size:12px;letter-spacing:2px;color:#ff2fa8;">🎪 FREAK TOWN</div>
+<h1>{name}</h1><p style="color:#888;">{premise}</p>
+<p style="color:#555;">{len(bundles)} performance{'s' if len(bundles) != 1 else ''}</p>
+{''.join(cards)}{rival_line}
+<p><a href="/">＋ make your own freak</a></p>
+</body></html>""", 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
+@app.route("/@<char>/<set>")
+def watch_character_set_canonical(char, set):
+    """Canonical performance URL. /<char>/<set> and /f/<slug> keep working."""
+    char_slug = re.sub(r"[^a-z0-9-]", "", char)[:32]
+    slug = resolve_bundle(char_slug, set)
+    if not slug:
+        return "No such set (yet). Make one in the Black Room.", 404
+    return _render_watch(slug)
+
+
+@app.route("/api/card/<slug>.png")
+def og_card(slug):
+    """Purpose-built 1200x630 share card: portrait/name/premise/duration."""
+    from PIL import Image, ImageDraw
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    meta = _bundle_meta(slug)
+    if not meta:
+        return jsonify({"ok": False, "error": "unknown set"}), 404
+    out = AUDIO_DIR / "cards"
+    out.mkdir(exist_ok=True)
+    path = out / f"{slug}.png"
+    char = meta.get("character", {})
+    if not path.exists():
+        img = Image.new("RGB", (1200, 630), (10, 10, 15))
+        d = ImageDraw.Draw(img)
+        d.rectangle([0, 0, 1200, 630], outline=(255, 47, 168), width=6)
+        d.text((60, 40), "FREAK TOWN", fill=(255, 47, 168))
+        d.text((60, 120), (char.get("name") or slug)[:28].upper(), fill=(255, 255, 255))
+        d.text((60, 220), (char.get("premise") or "")[:90], fill=(150, 150, 160))
+        d.text((60, 340), f"{meta.get('duration_s', 0)} seconds · watch it, then answer back",
+               fill=(0, 217, 255))
+        portrait = FREAK_DIR / slug / "portrait.png"
+        if portrait.exists():
+            try:
+                p = Image.open(portrait).convert("RGB").resize((380, 380))
+                img.paste(p, (770, 125))
+            except Exception:
+                pass
+        img.save(path)
+    return send_from_directory(str(out), f"{slug}.png")
+
+
+@app.route("/api/funnel", methods=["POST"])
+def funnel():
+    """Share->watch->respond funnel events. Body: {event, slug, ...}.
+    Events: opened, play, p25, p50, p75, complete, tray_seen, respond_started,
+    generated, shared. Drives the K (responses per performance) metric."""
+    import time as _time
+    data = request.json or {}
+    event = re.sub(r"[^a-z0-9_]", "", str(data.get("event", "")))[:32]
+    if not event:
+        return jsonify({"ok": False, "error": "event required"}), 400
+    row = {"t": _time.time(), "event": event,
+           "slug": re.sub(r"[^a-z0-9_-]", "", str(data.get("slug", "")))[:45],
+           "creator": str(data.get("creator", ""))[:64]}
+    for k in ("mode", "depth", "value"):
+        if data.get(k) is not None:
+            row[k] = data[k]
+    try:
+        with open(Path(__file__).parent / "funnel.jsonl", "a") as f:
+            f.write(json.dumps(row) + "\n")
+    except Exception:
+        pass
+    return jsonify({"ok": True})
+
+
 @app.route("/api/respond_idea", methods=["POST"])
 def respond_idea():
     """Preloaded funny response angle for a set. Body: {"slug": "..."}.
@@ -954,6 +1283,12 @@ def respond_idea():
         return jsonify({"ok": False, "error": "unknown set"}), 404
     char = meta.get("character", {})
     context = f"{char.get('name', 'A comedian')} ({char.get('premise', '')})"
+    # stored seeds first (generated at publish; zero spinner). Optional ?mode=.
+    mode = str((request.json or {}).get("mode", "")).lower()
+    for _s in meta.get("response_seeds", []) or []:
+        if not mode or _s.get("type") == mode:
+            return jsonify({"ok": True, "idea": _s.get("text", ""),
+                            "engine": "stored", "mode": _s.get("type", "")})
     try:
         delivery = json.loads((FREAK_DIR / slug / "delivery.json").read_text())
         beats = delivery.get("beats", [])
@@ -1027,11 +1362,19 @@ def _render_watch(slug):
             t += speech + pause
     except Exception:
         pass
+    lin = meta.get("lineage") or {}
+    parent = lin.get("parent")
     page = WATCH_TEMPLATE
     for key, val in {
         "__SLUG__": slug, "__NAME__": name, "__PREMISE__": premise,
         "__IMG__": img, "__DUR__": str(dur),
         "__BEATS__": json.dumps(beats),
+        "__CARD__": f"/api/card/{slug}.png",
+        "__CANON__": canonical_url(slug),
+        "__REPLYBANNER__": (
+            f"<div id='replybanner'>↩ replying to "
+            f"<a href='/f/{parent}'>{_html.escape(parent)}</a></div>"
+            if parent else ""),
     }.items():
         page = page.replace(key, val)
     return page, 200, {"Content-Type": "text/html; charset=utf-8"}
@@ -1041,10 +1384,17 @@ WATCH_TEMPLATE = """<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>__NAME__ — Freak Town</title>
+<link rel="canonical" href="__CANON__">
 <meta property="og:title" content="__NAME__ — Freak Town">
-<meta property="og:description" content="__PREMISE__ (__DUR__s set)">
-<meta property="og:image" content="__IMG__">
-<meta property="og:type" content="music.song">
+<meta property="og:description" content="__PREMISE__ (__DUR__s set). Watch it, then answer back.">
+<meta property="og:image" content="__CARD__">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="__NAME__ trading card">
+<meta property="og:url" content="__CANON__">
+<meta property="og:site_name" content="Freak Town">
+<meta property="og:type" content="video.other">
+<meta property="video:duration" content="__DUR__">
 <meta name="theme-color" content="#ff2fa8">
 <script type="importmap">
 {"imports": {
@@ -1065,8 +1415,23 @@ body{background:#0a0a0f;color:#eee;font-family:monospace;text-align:center;min-h
 #popcard h1{font-size:19px;margin:0}
 #popcard .premise{color:#888;font-size:12px;margin-top:2px}
 #clock{font-size:13px;color:#555;font-variant-numeric:tabular-nums}
-#seekrow{display:flex;align-items:center;gap:8px;max-width:560px;margin:2px auto 0;padding:0 16px;font-size:11px;color:#555}
-#seek{flex:1;accent-color:#ff2fa8;cursor:pointer}
+#seekrow{display:flex;align-items:center;gap:8px;max-width:560px;margin:4px auto 0;padding:0 16px;font-size:11px;color:#555}
+#seek{flex:1;accent-color:#ff2fa8;cursor:pointer;height:3px}
+#seek::-webkit-slider-thumb{width:14px;height:14px}
+#caption{min-height:52px;max-width:560px;margin:6px auto 0;padding:0 16px;font-size:17px;line-height:1.5;color:#eee}
+#caption:empty{display:none}
+#txToggle{font-size:11px;color:#555;background:none;border:none;padding:4px;cursor:pointer}
+#transcript{display:none;flex:none;overflow-y:auto;text-align:left;max-width:560px;margin:4px auto;max-height:30vh;padding:0 16px;font-size:14px;line-height:1.8;color:#555}
+#transcript.open{display:block}
+#replybox{display:none;padding:16px;max-width:560px;margin:0 auto;width:100%;border-top:1px solid #282833}
+#replybox.show{display:block;animation:trayup .3s ease-out}
+@keyframes trayup{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
+.modrow{display:flex;gap:8px;margin:8px 0}
+.modrow .btn{flex:1;padding:8px 4px;font-size:12px}
+.modrow .btn.on{border-color:#ff2fa8;color:#ff2fa8}
+#respline{font-size:12px;color:#555;margin-top:6px}
+#replybanner{font-size:12px;color:#00d4ff;margin-bottom:6px}
+#replybanner a{color:#00d4ff}
 #replybox{display:none;padding:16px;max-width:560px;margin:0 auto;width:100%}
 #replybox.show{display:block}
 #replybox textarea{width:100%;background:#111;border:1px solid #333;color:#eee;border-radius:10px;padding:10px;font-family:inherit;font-size:14px;min-height:64px;resize:vertical}
@@ -1074,7 +1439,6 @@ body{background:#0a0a0f;color:#eee;font-family:monospace;text-align:center;min-h
 #idea{font-size:13px;color:#00d4ff;margin:8px 0;min-height:20px}
 .replyrow{display:flex;gap:8px;margin-top:8px}
 .replyrow .btn{flex:1}
-#transcript{flex:1;overflow-y:auto;text-align:left;max-width:560px;margin:8px auto;padding:0 16px;font-size:15px;line-height:1.9;color:#555}
 .seg.spoken{color:#bbb}
 .seg.active{color:#ff2fa8}
 .controls{padding:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;border-top:1px solid #1a1a2e;background:#0c0c12;padding-bottom:calc(12px + env(safe-area-inset-bottom))}
@@ -1099,31 +1463,35 @@ a.cta{color:#fff}
   <div class="premise">__PREMISE__</div>
 </div>
 <div id="clock">00:00 / __DUR__s</div>
-<div id="seekrow"><span>▶</span><input type="range" id="seek" min="0" max="1000" value="0"><span id="left">__DUR__s left</span></div>
+<div id="seekrow"><input type="range" id="seek" min="0" max="1000" value="0" aria-label="seek"><span id="left">__DUR__s</span></div>
+<div id="caption"></div>
+<div><button id="txToggle" onclick="document.getElementById('transcript').classList.toggle('open')">••• transcript</button></div>
 <div id="transcript"></div>
 <div class="controls" id="liveControls">
-  <button class="big" id="playBtn">▶ PLAY</button>
+  <button class="big" id="playBtn">▶ TAP TO WATCH</button>
   <button id="laughBtn" disabled>😂 <span id="laughCount">0</span></button>
-  <button id="clapBtn" disabled>👏 <span id="clapCount">0</span></button>
 </div>
 <div id="endscreen">
-  <div id="stats"></div>
-  <div>
-    <button class="vote" onclick="vote('keep')">👍 KEEP</button>
-    <button class="vote" onclick="vote('cut')">👎 CUT</button>
-  </div>
-  <div id="voteMsg" style="color:#00d4ff;margin:8px;"></div>
   <div id="replybox">
-    <div style="font-size:13px;margin-bottom:4px;">🎤 Your turn — answer back:</div>
+    <div style="font-size:15px;font-weight:bold;margin-bottom:2px;">YOUR TURN</div>
     <div id="idea">thinking of an angle…</div>
-    <textarea id="replyText" placeholder="Write your response set…"></textarea>
-    <div class="replyrow">
-      <button class="btn" onclick="rerollIdea()">🎲 REROLL IDEA</button>
-      <button class="btn btn-primary" onclick="sendResponse()">SEND RESPONSE ▶</button>
+    <textarea id="replyText" rows="3"></textarea>
+    <div class="modrow" id="modeRow">
+      <button class="btn on" data-mode="roast" onclick="setMode('roast')">🔥 ROAST</button>
+      <button class="btn" data-mode="yes_and" onclick="setMode('yes_and')">➕ YES-AND</button>
+      <button class="btn" data-mode="random" onclick="setMode('random')">🎲 RANDOM</button>
     </div>
     <div class="replyrow">
-      <button class="btn ghost" style="flex:1;" onclick="location.href='/edit?remix=__SLUG__'">OPEN FULL STUDIO INSTEAD</button>
+      <button class="btn btn-primary" style="flex:2;" onclick="sendResponse()">RESPOND ▶</button>
     </div>
+    <div id="respline"><a href="#" onclick="document.getElementById('replyText').focus();return false;" style="color:#888;">edit the idea</a> · <a href="/edit?remix=__SLUG__" style="color:#555;">full studio</a></div>
+    <div id="genline" style="display:none;font-size:13px;color:#888;"></div>
+  </div>
+  <div id="stats"></div>
+  <div style="font-size:12px;color:#555;">Did it cook?
+    <button class="btn btn-small" onclick="vote('keep')">KEEP</button>
+    <button class="btn btn-small" onclick="vote('cut')">CUT</button>
+    <span id="voteMsg" style="color:#00d4ff;"></span>
   </div>
   <a class="cta" href="/"><button style="width:100%;">＋ MAKE YOUR OWN FREAK</button></a>
   <button class="ghost cta" style="width:100%;" onclick="passItOn()">📤 PASS IT ON</button>
@@ -1131,9 +1499,30 @@ a.cta{color:#fff}
 <audio id="a" src="/freaks/__SLUG__/set.wav" preload="auto"></audio>
 <script>
 const BEATS = __BEATS__;
-const SLUG = "__SLUG__";
+let SLUG = "__SLUG__";
 const Aud = document.getElementById('a');
 let timer = null, myLaughs = 0, myClaps = 0, voted = false;
+let respMode = 'roast', respIdea = '', respMs = {}, respondedSlug = null;
+
+// anonymous creator identity: own your freaks later, no account now
+function creatorId() {
+  try {
+    let id = localStorage.getItem('freaktown_id');
+    if (!id) {
+      id = 'anon_' + Math.random().toString(36).slice(2, 10);
+      localStorage.setItem('freaktown_id', id);
+    }
+    return id;
+  } catch (e) { return 'anon_unknown'; }
+}
+
+function funnel(event, extra) {
+  try {
+    fetch('/api/funnel', {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(Object.assign({event, slug: SLUG, creator: creatorId()}, extra || {}))});
+  } catch (e) {}
+}
+funnel('opened');
 
 // transcript
 const tx = document.getElementById('transcript');
@@ -1156,7 +1545,9 @@ async function play() {
   }
   document.getElementById('playBtn').style.display = 'none';
   document.getElementById('laughBtn').disabled = false;
-  document.getElementById('clapBtn').disabled = false;
+  const _cb = document.getElementById('clapBtn');
+  if (_cb) _cb.disabled = false;
+  funnel('play');
   timer = setInterval(tick, 150);
 }
 document.getElementById('playBtn').onclick = play;
@@ -1170,26 +1561,34 @@ seekEl.addEventListener('input', () => {
   if (!Aud.duration || !isFinite(Aud.duration)) return;
   Aud.currentTime = (parseFloat(seekEl.value) / 1000) * Aud.duration;
 });
+const marksFired = {};
 function tick() {
   const t = Aud.currentTime * 1000;
+  const dur = (Aud.duration && isFinite(Aud.duration)) ? Aud.duration : parseFloat('__DUR__');
   document.getElementById('clock').textContent = fmt(Aud.currentTime) + ' / __DUR__s';
-  if (Aud.duration && isFinite(Aud.duration)) {
+  if (dur) {
     if (document.activeElement !== seekEl) {
-      seekEl.value = Math.round((Aud.currentTime / Aud.duration) * 1000);
+      seekEl.value = Math.round((Aud.currentTime / dur) * 1000);
     }
     document.getElementById('left').textContent = fmtLeft(Aud.currentTime);
+    [25, 50, 75].forEach(p => {
+      if (!marksFired[p] && Aud.currentTime / dur >= p / 100) {
+        marksFired[p] = true;
+        funnel('p' + p);
+      }
+    });
   }
-  let cur = -1;
+  let cur = -1, capText = '';
   BEATS.forEach((b, i) => {
     const el = document.getElementById('seg' + i);
-    if (!el) return;
-    el.classList.toggle('spoken', t >= b.start);
     const on = t >= b.start && t < b.end + 1200;
-    el.classList.toggle('active', on);
-    if (on) cur = i;
+    if (el) {
+      el.classList.toggle('spoken', t >= b.start);
+      el.classList.toggle('active', on);
+    }
+    if (on) { cur = i; capText = b.text; }
   });
-  const act = cur >= 0 && document.getElementById('seg' + cur);
-  if (act) act.scrollIntoView({block: 'nearest'});
+  document.getElementById('caption').textContent = capText;
   if (window.__vrmFace && cur >= 0) window.__vrmFace(BEATS[cur].face || 'neutral');
   if (Aud.ended) endShow();
 }
@@ -1200,19 +1599,21 @@ async function react(type) {
   else { myClaps++; document.getElementById('clapCount').textContent = myClaps; }
   try {
     await fetch('/api/react', {method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({slug: SLUG, type, set_time_ms: Math.round(Aud.currentTime * 1000)})});
+      body: JSON.stringify({slug: SLUG, type, set_time_ms: Math.round(Aud.currentTime * 1000),
+                            creator: creatorId()})});
   } catch (e) {}
 }
 
 document.getElementById('laughBtn').onclick = () => react('laugh');
-document.getElementById('clapBtn').onclick = () => react('clap');
+const _clap = document.getElementById('clapBtn');
+if (_clap) _clap.onclick = () => react('clap');
 
 async function vote(v) {
   if (voted) return;
   voted = true;
   try {
     await fetch('/api/vote', {method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({slug: SLUG, vote: v})});
+      body: JSON.stringify({slug: SLUG, vote: v, creator: creatorId()})});
   } catch (e) {}
   document.getElementById('voteMsg').textContent =
     v === 'keep' ? 'Counted. They live to perform another night.' : 'Counted. Brutal. Ella approves.';
@@ -1220,30 +1621,39 @@ async function vote(v) {
 
 function endShow() {
   clearInterval(timer);
+  funnel('complete');
   document.getElementById('liveControls').style.display = 'none';
   document.getElementById('endscreen').classList.add('show');
   document.getElementById('stats').textContent =
     `You laughed ${myLaughs}× and clapped ${myClaps}× · did they earn another night?`;
   if (window.__vrmIdle) window.__vrmIdle();
-  // straight into the reply box: keyboard up, idea preloaded, zero friction
+  // YOUR TURN tray rises immediately; idea prefills below (stored seeds = instant)
   document.getElementById('replybox').classList.add('show');
+  funnel('tray_seen');
   loadIdea();
-  setTimeout(() => {
-    const box = document.getElementById('replyText');
-    if (box) box.focus({preventScroll: false});
-  }, 600);
+}
+
+let ideaMode = 'roast';
+function setMode(m) {
+  ideaMode = m;
+  document.querySelectorAll('#modeRow .btn').forEach(b =>
+    b.classList.toggle('on', b.dataset.mode === m));
+  loadIdea();
 }
 
 async function loadIdea() {
   const el = document.getElementById('idea');
+  const box = document.getElementById('replyText');
   el.textContent = 'thinking of an angle…';
   try {
     const res = await fetch('/api/respond_idea', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({slug: SLUG})});
+      body: JSON.stringify({slug: SLUG, mode: ideaMode})});
     const data = await res.json();
     if (data.ok && data.idea) {
       el.textContent = '💡 ' + data.idea;
+      box.value = data.idea; // prefilled: tap RESPOND with zero writing
+      box.focus({preventScroll: true});
       window._idea = data.idea;
       return;
     }
@@ -1256,16 +1666,98 @@ function rerollIdea() {
   loadIdea();
 }
 
-function sendResponse() {
-  const text = document.getElementById('replyText').value.trim();
-  const q = new URLSearchParams({respond_to: SLUG});
-  if (text) q.set('premise', text);
-  else if (window._idea) q.set('premise', window._idea);
-  location.href = '/edit?' + q.toString();
+async function sendResponse() {
+  // One tap: generate the counter-freak server-side, play it in THIS viewer.
+  const custom = document.getElementById('replyText').value.trim();
+  const line = document.getElementById('genline');
+  line.style.display = 'block';
+  line.textContent = 'Your response is entering Freak Town…';
+  funnel('respond_started', {mode: ideaMode, edited: !!custom});
+  try {
+    const res = await fetch('/api/respond', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({parent_slug: SLUG, mode: ideaMode,
+                            idea: custom || undefined, creator: creatorId()})});
+    const data = await res.json();
+    if (!data.ok) {
+      line.textContent = 'Generation stumbled — ' + (data.error || 'retry') +
+        ' · or open full studio';
+      return;
+    }
+    funnel('generated', {child: data.slug});
+    // stage resets, YOUR FREAK walks on: swap audio + beats, replay in place
+    document.getElementById('replybox').classList.remove('show');
+    line.style.display = 'none';
+    await playReply(data);
+  } catch (e) {
+    line.textContent = 'Generation stumbled — check connection, retry';
+  }
+}
+
+async function playReply(data) {
+  // same viewer, new performer: swap source, rebuild beats, play
+  const res = await fetch(`/api/sets/${data.slug}`);
+  const full = await res.json();
+  if (!full.ok) return;
+  const c = full.character || {};
+  const prevName = (document.querySelector('#popcard h1') || {}).textContent || '';
+  document.querySelector('#popcard h1').textContent = c.name || 'Your Freak';
+  document.querySelector('#popcard .premise').textContent =
+    `answering ${prevName} · ${c.premise || ''}`;
+  Aud.src = data.audio;
+  Aud.currentTime = 0;
+  document.getElementById('endscreen').classList.remove('show');
+  document.getElementById('liveControls').style.display = 'flex';
+  document.getElementById('playBtn').style.display = '';
+  // rebuild caption beats from the reply's own delivery
+  const tb = document.getElementById('transcript');
+  tb.innerHTML = '';
+  (full.beats || []).forEach((b, i) => {
+    const d = document.createElement('div');
+    d.className = 'seg'; d.id = 'seg' + i;
+    d.textContent = b.text || '';
+    tb.appendChild(d);
+  });
+  BEATS.length = 0;
+  (full.beats || []).forEach((b) => {
+    const words = (b.text || '').split(/\s+/).filter(Boolean).length;
+    const prev = BEATS.length ? BEATS[BEATS.length - 1] : null;
+    const start = prev ? prev._end : 0;
+    const speech = Math.round(words / 2.82 * 1000);
+    BEATS.push({text: b.text, start, end: start + speech,
+                face: ((b.performance || {}).expression || 'neutral'),
+                _end: start + speech + (b.pause_after_ms || 300)});
+  });
+  // swap slug so reactions/votes/ideas/share now target the reply
+  SLUG = data.slug;
+  window.__replyUrl = data.url;
+  myLaughs = 0; myClaps = 0; voted = false;
+  document.getElementById('laughCount').textContent = '0';
+  document.getElementById('clapCount').textContent = '0';
+  document.getElementById('voteMsg').textContent = '';
+  try { await Aud.play(); } catch (e) { return; }
+  document.getElementById('playBtn').style.display = 'none';
+  timer = setInterval(tick, 150);
+  status('YOUR FREAK performs — SEND BACK when done');
+}
+
+function status(msg) {
+  let el = document.getElementById('watchStatus');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'watchStatus';
+    el.style.cssText = 'position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#1a1a2e;border:1px solid #333;padding:8px 16px;border-radius:8px;font-size:12px;z-index:50;';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.display = 'block';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.style.display = 'none'; }, 3000);
 }
 
 async function passItOn() {
-  const url = location.href;
+  const url = window.__replyUrl || location.href;
+  funnel('shared');
   try {
     if (navigator.share) { await navigator.share({title: document.title, url}); return; }
   } catch (e) { if (e && e.name === 'AbortError') return; }

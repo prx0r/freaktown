@@ -16,3 +16,4 @@ reactions*.jsonl
 portraits/
 beat_cache/
 emails/.state.json
+funnel.jsonl
