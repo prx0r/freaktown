@@ -11,7 +11,7 @@
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <title>Freak Town — Black Room</title>
-<script type="module" src="https://three.ws/agent-3d/1.5.2/agent-3d.js" crossorigin="anonymous"></script>
+
 <script type="importmap">
 {"imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
@@ -38,6 +38,7 @@ agent-3d { width: 100%; height: 340px; }
 .btn:hover { border-color: #ff00aa; }
 .btn-primary { background: #ff00aa; border-color: #ff00aa; color: white; }
 .btn-small { padding: 4px 10px; font-size: 11px; flex: 1; }
+.btn.on { border-color: #ff2fa8; color: #ff2fa8; }
 .workbench { flex: 1; overflow-y: auto; padding: 16px 20px 20px; }
 .beat { background: #111; border: 1px solid #222; border-radius: 6px; padding: 10px 12px; margin: 8px 0; transition: border-color 0.2s; }
 .beat.active { border-color: #ff00aa; box-shadow: 0 0 12px rgba(255,0,170,.25); }
@@ -100,8 +101,11 @@ input[type=range] { flex: 1; accent-color: #ff00aa; cursor: pointer; }
   <div class="stage">
     <button class="btn btn-primary" style="width:100%;margin-bottom:10px;" onclick="createFreak()">🎲 CREATE A FREAK</button>
     <canvas id="vrmStage" style="width:100%;height:340px;display:none;"></canvas>
+    <img id="stagePortrait" style="width:100%;border-radius:8px;display:none;" alt="performer portrait">
     <div id="vrmStatus" style="font-size:10px;color:#555;">VRM LOADING</div>
-    <agent-3d id="avatar" src="https://three.ws/avatars/michelle.glb" eager style="display:block;width:100%;height:340px"><span style="color:#555;font-size:12px;">3D performer loading…</span></agent-3d>
+    <div class="tempo-row" style="margin-top:6px;">
+      <button class="btn btn-small" id="micBtn" onclick="toggleMic()">🎙 SPEAK</button>
+    </div>
     <div class="performer" id="performerName">—</div>
     <div class="premise-line" id="premiseLine">write a premise below to begin</div>
     <div class="tempo-box">
@@ -675,7 +679,7 @@ function againWalkout() {
   genWalkout(lastMode);
 }
 
-async // ── Portraits: cheap 2D concept before any 3D ──
+// ── Portraits: cheap 2D concept before any 3D ──
 window._portrait = null;
 
 async function genPortrait(reroll) {
@@ -912,34 +916,22 @@ import { VRMLoaderPlugin } from '@pixiv/three-vrm';
 
 const VRM_URL = '/static/avatars/default-v1.vrm';
 
-function threewsFallback(reason) {
-  // Explicit state machine: VRM failed -> try minimal three.ws embed -> else static.
-  vrmStatus('VRM FAILED · THREE.WS LOADING');
-  const avatar = document.getElementById('avatar');
-  const timeout = setTimeout(() => {
-    console.error('agent-3d did not register');
-    vrmStatus('NO 3D PERFORMER');
-  }, 8000);
-  const done = (msg) => { clearTimeout(timeout); vrmStatus(msg); };
-  if (window.customElements && customElements.whenDefined) {
-    customElements.whenDefined('agent-3d').then(() => {
-      console.log('agent-3d registered');
-    });
-  }
-  avatar.addEventListener('agent:ready', e => {
-    console.log('THREE.WS READY', e.detail);
-    done('THREE.WS READY');
-  });
-  avatar.addEventListener('agent:error', e => {
-    console.error('THREE.WS ERROR', e.detail);
-    done('THREE.WS ERROR — see console');
-  });
-  avatar.addEventListener('agent:load-progress', e => {
-    console.log('THREE.WS LOAD', e.detail);
-  });
+// No 3D fallback chain: VRM is canonical. On failure the locked portrait
+// (or placeholder) shows. A mute stock model is worse than a still image.
+function noPerformer(reason) {
   if (reason) console.error('VRM failed:', reason);
+  const img = document.getElementById('stagePortrait');
+  const locked = window._portrait && window._portrait.url;
+  if (locked) {
+    img.src = window._portrait.url;
+    img.style.display = 'block';
+    vrmStatus('PORTRAIT MODE — audio still plays, no 3D performer');
+  } else {
+    vrmStatus('NO 3D PERFORMER');
+  }
 }
 let vrm = null, analyser = null, freqData = null, audioCtx = null;
+let micStream = null, micSource = null, micMode = false;
 let prevAA = 0, prevIH = 0, prevOH = 0, nextBlink = 0;
 const clock = new THREE.Clock();
 
@@ -979,7 +971,8 @@ async function initVRM() {
 
     // swap in: VRM primary, three.ws fallback stays hidden unless this fails
     canvas.style.display = 'block';
-    document.getElementById('avatar').style.display = 'none';
+    const oldAvatar = document.getElementById('avatar');
+    if (oldAvatar) oldAvatar.style.display = 'none';
 
     const animate = () => {
       requestAnimationFrame(animate);
@@ -1001,28 +994,94 @@ async function initVRM() {
       renderer.render(scene, camera);
     };
     animate();
-    vrmStatus('VRM READY');
+    // capability detection: ask the model what it can do, display it
+    try {
+      const presets = [];
+      if (vrm.expressionManager) {
+        for (const name of ['aa', 'ih', 'ou', 'ee', 'oh', 'blink', 'happy',
+                             'angry', 'sad', 'surprised', 'relaxed']) {
+          try {
+            vrm.expressionManager.setValue(name, 0);
+            presets.push(name);
+          } catch (e) { /* absent */ }
+        }
+        // clear any probe residue (mouth starts shut, face neutral)
+        for (const name of presets) {
+          try { vrm.expressionManager.setValue(name, 0); } catch (e) {}
+        }
+      }
+      window._vrmCaps = {
+        humanoid: !!vrm.humanoid,
+        visemes: presets.filter(x => ['aa', 'ih', 'ou', 'ee', 'oh'].includes(x)),
+        expressions: presets.filter(x => !['aa', 'ih', 'ou', 'ee', 'oh', 'blink'].includes(x)),
+        blink: presets.includes('blink'),
+      };
+      const c = window._vrmCaps;
+      vrmStatus(`VRM READY · visemes ${c.visemes.length}/5 · expr ${c.expressions.length} · ` +
+                `${c.humanoid ? 'humanoid' : 'non-humanoid'}`);
+    } catch (e) {
+      vrmStatus('VRM READY');
+    }
   } catch (err) {
-    threewsFallback(err);
+    noPerformer(err);
   }
 }
 
+// ── LipSyncAdapter: ONE mouth, ANY audible voice ──
+// Sources: prerecorded set.wav, edge-tts beats, mic input, (later: LiveKit,
+// Telnyx, realtime PCM). Mouth listens to whatever is actually playing.
+const LipSyncAdapter = {
+  ensureCtx() {
+    if (audioCtx) return true;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return false;
+    audioCtx = new AC();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.55;
+    freqData = new Uint8Array(analyser.frequencyBinCount);
+    analyser.connect(audioCtx.destination);
+    return true;
+  },
+  // element path (created once per page — browsers forbid re-creating it)
+  _elementSrc: null,
+  connectElement(el) {
+    if (!this.ensureCtx()) return false;
+    if (!this._elementSrc) {
+      this._elementSrc = audioCtx.createMediaElementSource(el);
+      this._elementSrc.connect(analyser);
+    }
+    this.setSource('element');
+    return true;
+  },
+  // mic path: same analyser, same mouth. Proves human-performer mode.
+  async connectMic() {
+    if (!this.ensureCtx()) return false;
+    if (!micStream) {
+      micStream = await navigator.mediaDevices.getUserMedia({audio: true});
+    }
+    if (micSource) micSource.disconnect();
+    micSource = audioCtx.createMediaStreamSource(micStream);
+    micSource.connect(analyser);
+    this.setSource('mic');
+    return true;
+  },
+  disconnectMic() {
+    try { if (micSource) micSource.disconnect(); } catch (e) {}
+    micSource = null;
+    if (micStream) {
+      micStream.getTracks().forEach(t => t.stop());
+      micStream = null;
+    }
+    this.setSource('element');
+  },
+  _source: 'element',
+  setSource(s) { this._source = s; },
+  get source() { return this._source; },
+};
+
 function ensureAudioGraph() {
-  if (audioCtx) {
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    return;
-  }
-  const AC = window.AudioContext || window.webkitAudioContext;
-  if (!AC) return;
-  // single graph per page: element -> analyser -> destination (never recreated)
-  audioCtx = new AC();
-  const src = audioCtx.createMediaElementSource(document.getElementById('audio'));
-  analyser = audioCtx.createAnalyser();
-  analyser.fftSize = 256;
-  analyser.smoothingTimeConstant = 0.55;
-  freqData = new Uint8Array(analyser.frequencyBinCount);
-  src.connect(analyser);
-  analyser.connect(audioCtx.destination);
+  LipSyncAdapter.connectElement(document.getElementById('audio'));
 }
 
 // Call FIRST inside every user-gesture play handler (iOS unlock).
@@ -1030,6 +1089,29 @@ async function unlockAudio() {
   ensureAudioGraph();
   if (audioCtx && audioCtx.state === 'suspended') {
     try { await audioCtx.resume(); } catch (e) {}
+  }
+}
+
+// 🎙 SPEAK: your mic drives the Freak's mouth. Same mouth, human voice.
+async function toggleMic() {
+  const btn = document.getElementById('micBtn');
+  if (micMode) {
+    LipSyncAdapter.disconnectMic();
+    micMode = false;
+    btn.textContent = '🎙 SPEAK';
+    btn.classList.remove('on');
+    status('Mic off — back to set audio');
+    return;
+  }
+  try {
+    await unlockAudio();
+    await LipSyncAdapter.connectMic();
+    micMode = true;
+    btn.textContent = '🎙 LIVE — tap to stop';
+    btn.classList.add('on');
+    status('Your mic is driving the mouth. Perform.');
+  } catch (e) {
+    status('Mic blocked — allow microphone access');
   }
 }
 
@@ -1047,7 +1129,8 @@ function updateMouth(dt) {
   if (!vrm?.expressionManager || !analyser) return;
   const em = vrm.expressionManager;
   const low = band(0, 10), mid = band(10, 40), high = band(40, 80);
-  const active = !document.getElementById('audio').paused;
+  const el = document.getElementById('audio');
+  const active = micMode || !el.paused;
   const gate = active ? 1 : 0;
   prevAA = smooth(prevAA, Math.min(1, low / 200) * gate, 0.5);
   prevIH = smooth(prevIH, Math.min(1, high / 180) * gate, 0.5);

@@ -1,6 +1,6 @@
 /* Freak Town service worker: app-shell cache + offline drafts page.
    Audio/TTS stays network-only (fresh voices beat stale bytes). */
-const CACHE = 'freaktown-shell-v1';
+const CACHE = 'freaktown-shell-v2';
 const SHELL = ['/', '/manifest.json', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -19,11 +19,25 @@ self.addEventListener('fetch', e => {
   // API + audio: network only
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/audio/') ||
       url.pathname.startsWith('/freaks/')) return;
+  // HTML pages: network first (a broken deploy must never stick),
+  // images + misc: cache first
+  const isPage = e.request.mode === 'navigate' ||
+    url.pathname.endsWith('.html') || url.pathname === '/';
+  if (!isPage) {
+    e.respondWith(
+      caches.match(e.request).then(hit => hit || fetch(e.request).then(res => {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, copy));
+        return res;
+      }).catch(() => caches.match('/')))
+    );
+    return;
+  }
   e.respondWith(
-    caches.match(e.request).then(hit => hit || fetch(e.request).then(res => {
+    fetch(e.request).then(res => {
       const copy = res.clone();
       caches.open(CACHE).then(c => c.put(e.request, copy));
       return res;
-    }).catch(() => caches.match('/')))
+    }).catch(() => caches.match(e.request)).catch(() => caches.match('/'))
   );
 });
