@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#ff2fa8">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Freak Town">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<title>Freak Town — Black Room</title>
+<script type="module" src="https://three.ws/agent-3d/1.5.2/agent-3d.js" crossorigin="anonymous"></script>
+<script type="importmap">
+{"imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+  "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.3.0/lib/three-vrm.module.js"
+}}
+</script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body { background: #0a0a0f; color: #e0e0e0; font-family: 'Courier New', monospace; display: flex; flex-direction: column; overflow: hidden; }
+.header { padding: 10px 20px; border-bottom: 1px solid #1a1a2e; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+.title { font-size: 14px; color: #ff00aa; font-weight: bold; letter-spacing: 2px; }
+.main { flex: 1; display: flex; min-height: 0; }
+.stage { width: 320px; flex-shrink: 0; border-right: 1px solid #1a1a2e; display: flex; flex-direction: column; align-items: center; padding: 16px; background: radial-gradient(circle at 50% 0, #1a1020 0, #09090b 60%); }
+agent-3d { width: 100%; height: 340px; }
+.performer { font-size: 16px; font-weight: bold; color: #ff00aa; margin-top: 8px; }
+.premise-line { font-size: 11px; color: #666; margin-top: 2px; text-align: center; }
+.tempo-box { width: 100%; margin-top: 16px; border: 1px solid #222; border-radius: 6px; padding: 10px; }
+.tempo-box h4 { font-size: 10px; letter-spacing: 1px; color: #555; margin-bottom: 8px; }
+.tempo-box select, .tempo-box input { width: 100%; background: #111; border: 1px solid #333; color: #e0e0e0; padding: 6px; border-radius: 4px; font-family: inherit; font-size: 12px; margin-bottom: 6px; }
+.tempo-row { display: flex; gap: 6px; }
+.btn { background: #1a1a2e; border: 1px solid #333; color: #e0e0e0; padding: 8px 14px; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 12px; }
+.btn:hover { border-color: #ff00aa; }
+.btn-primary { background: #ff00aa; border-color: #ff00aa; color: white; }
+.btn-small { padding: 4px 10px; font-size: 11px; flex: 1; }
+.workbench { flex: 1; overflow-y: auto; padding: 16px 20px 20px; }
+.beat { background: #111; border: 1px solid #222; border-radius: 6px; padding: 10px 12px; margin: 8px 0; transition: border-color 0.2s; }
+.beat.active { border-color: #ff00aa; box-shadow: 0 0 12px rgba(255,0,170,.25); }
+.beat.selected { border-color: #00d4ff; }
+.kbd-hint { font-size: 10px; color: #444; }
+kbd { background: #1a1a2e; border: 1px solid #333; padding: 0 5px; border-radius: 3px; font-size: 10px; }
+.beat-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.beat-type { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
+.type-setup { color: #666; } .type-punchline { color: #ff00aa; }
+.type-closer { color: #00d4ff; } .type-tag { color: #ffa500; }
+.type-escalation { color: #aa00ff; }
+.beat-text { font-size: 14px; line-height: 1.5; }
+.play-one { background: none; border: 1px solid #333; color: #00d4ff; border-radius: 3px; cursor: pointer; font-size: 11px; padding: 2px 8px; margin-left: auto; }
+.slider-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+input[type=range] { flex: 1; accent-color: #ff00aa; cursor: pointer; }
+.pause-val { font-size: 11px; color: #ff00aa; min-width: 58px; text-align: right; }
+.pause-label { font-size: 10px; color: #555; }
+.chatbar { flex-shrink: 0; border-top: 1px solid #1a1a2e; padding: 12px 20px; display: flex; gap: 8px; background: #0c0c12; }
+.chatbar input { flex: 1; background: #111; border: 1px solid #333; color: #e0e0e0; padding: 10px 14px; border-radius: 20px; font-family: inherit; font-size: 13px; }
+.chatbar input:focus { outline: none; border-color: #ff00aa; }
+.status { position: fixed; bottom: 70px; right: 20px; background: #1a1a2e; border: 1px solid #333; padding: 8px 16px; border-radius: 4px; font-size: 12px; opacity: 0; transition: opacity 0.3s; z-index: 100; }
+.status.show { opacity: 1; }
+/* ── Mobile: stage on top, workbench below, thumb-sized targets ── */
+@media (max-width: 820px) {
+  body { overflow: auto; }
+  .main { flex-direction: column; overflow: visible; }
+  .stage { width: 100%; border-right: none; border-bottom: 1px solid #1a1a2e; padding: 12px; }
+  agent-3d, #vrmStage { height: 240px !important; }
+  .workbench { overflow: visible; padding: 12px 12px 20px; }
+  .btn, .btn-small { min-height: 44px; font-size: 13px; }
+  .play-one, .pause-btn { min-height: 36px; min-width: 44px; font-size: 13px; }
+  input[type=range] { height: 36px; }
+  .chatbar { position: sticky; bottom: 0; padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+  .chatbar input { font-size: 16px; /* stops iOS zoom */ }
+  .beat { padding: 14px 12px; }
+}
+.hint { font-size: 11px; color: #444; padding: 8px 20px 0; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="title">FREAK TOWN · BLACK ROOM</div>
+  <div style="font-size: 11px; color: #555;" id="charLine">no character yet</div>
+</div>
+
+<div class="main">
+  <div class="stage">
+    <button class="btn btn-primary" style="width:100%;margin-bottom:10px;" onclick="createFreak()">🎲 CREATE A FREAK</button>
+    <canvas id="vrmStage" style="width:100%;height:340px;display:none;"></canvas>
+    <div id="vrmStatus" style="font-size:10px;color:#555;">VRM LOADING</div>
+    <agent-3d id="avatar" src="https://three.ws/avatars/michelle.glb" eager style="display:block;width:100%;height:340px"><span style="color:#555;font-size:12px;">3D performer loading…</span></agent-3d>
+    <div class="performer" id="performerName">—</div>
+    <div class="premise-line" id="premiseLine">write a premise below to begin</div>
+    <div class="tempo-box">
+      <h4>TEMPO TEMPLATE</h4>
+      <select id="templateSel"></select>
+      <div class="tempo-row">
+        <button class="btn btn-small" onclick="applyTemplate()">APPLY</button>
+        <button class="btn btn-small" onclick="saveTemplate()">SAVE AS…</button>
+      </div>
+      <div style="font-size:10px;color:#555;margin-top:6px;" id="templateDesc"></div>
+    </div>
+    <div class="tempo-box">
+      <h4>YOUR SETS</h4>
+      <div id="setsList" style="font-size:11px;color:#555;">nothing saved yet</div>
+    </div>
+    <div class="tempo-box">
+      <h4>WALKOUT (10s sting)</h4>
+      <div style="display:flex;gap:6px;">
+        <select id="woGenre" style="flex:1;">
+          <option>funk</option><option>rock</option><option>electronic</option>
+          <option>jazz</option><option>orchestral</option><option>comedy</option>
+          <option>hip-hop</option><option>disco</option>
+        </select>
+        <select id="woMood" style="flex:1;">
+          <option>absurd</option><option>heroic</option><option>confident</option>
+          <option>menacing</option><option>chill</option><option>chaotic</option>
+          <option>melancholic</option><option>triumphant</option>
+        </select>
+      </div>
+      <div class="tempo-row" style="margin-top:6px;">
+        <button class="btn btn-small" onclick="genWalkout('instant')">⚡ INSTANT</button>
+        <button class="btn btn-small" onclick="genWalkout('real')">✨ REAL</button>
+      </div>
+      <div class="tempo-row" style="margin-top:6px;">
+        <button class="btn btn-small" onclick="playWalkout()">▶ PLAY</button>
+        <button class="btn btn-small" onclick="againWalkout()">🎲 AGAIN</button>
+      </div>
+      <div style="font-size:10px;color:#555;margin-top:4px;" id="woStatus"></div>
+    </div>
+    <div class="tempo-box">
+      <h4>VOICE</h4>
+      <select id="voice">
+        <option value="en-US-AriaNeural">Ella (Aria)</option>
+        <option value="en-US-GuyNeural">Guy</option>
+        <option value="en-US-ChristopherNeural">Christopher</option>
+        <option value="en-US-SamanthaNeural">Samantha</option>
+        <option value="en-US-JoannaNeural">Joanna</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="workbench">
+    <div class="hint">click a box to select it · <kbd>space</kbd> pause / resume from box · <kbd>tab</kbd> split box at cursor (gap = pause) · drag sliders for exact ms</div>
+    <div id="beats"></div>
+    <div style="font-size:11px;color:#555;margin-top:8px;" id="stats"></div>
+    <div style="font-size:12px;margin-top:6px;display:none;" id="styleMatch">
+      sounds like: <b id="styleName" style="color:#ff00aa;"></b>
+      <span style="color:#555;" id="styleNote"></span>
+      <button class="btn btn-small" style="margin-left:8px;" onclick="applyMatchedStyle()">APPLY STYLE</button>
+    </div>
+  </div>
+</div>
+
+<div class="chatbar">
+  <input id="chat" placeholder="come on then funny bones — describe the character + minute…" autocomplete="off">
+  <button class="btn btn-primary" onclick="sendChat()">WRITE ▶</button>
+  <button class="btn" onclick="composePlay()">PLAY FULL SET</button>
+  <button class="btn" onclick="saveSet()">SAVE SET</button>
+  <button class="btn" onclick="shareClip()">SHARE</button>
+  <button class="btn" onclick="stopAudio()">⏹</button>
+</div>
+
+<div class="status" id="status"></div>
+<audio id="audio" preload="auto"></audio>
+
+<script>
+let beats = [];
+let offsets = [];
+let highlightTimer = null;
+
+function status(msg) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+// ── Templates ──
+async function loadTemplates() {
+  const res = await fetch('/api/templates');
+  const data = await res.json();
+  const sel = document.getElementById('templateSel');
+  sel.innerHTML = '';
+  window._templates = data.templates;
+  for (const [name, t] of Object.entries(data.templates)) {
+    const o = document.createElement('option');
+    o.value = name;
+    o.textContent = name + (t.builtin ? '' : ' (yours)');
+    sel.appendChild(o);
+  }
+  showTemplateDesc();
+}
+function showTemplateDesc() {
+  const t = window._templates[document.getElementById('templateSel').value];
+  document.getElementById('templateDesc').textContent = t ? t.description || '' : '';
+}
+document.getElementById('templateSel').addEventListener('change', showTemplateDesc);
+
+async function applyTemplate() {
+  if (!beats.length) return status('No beats to style');
+  const name = document.getElementById('templateSel').value;
+  const res = await fetch('/api/templates/apply', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({template: name, beats})
+  });
+  const data = await res.json();
+  if (data.ok) { beats = data.beats; renderBeats(); status(`Applied ${name} style`); }
+  else status(data.error || 'Apply failed');
+}
+
+async function saveTemplate() {
+  if (!beats.length) return status('No beats to save');
+  const name = prompt('Name this tempo style (e.g. deadpan-slow):');
+  if (!name) return;
+  const res = await fetch('/api/templates', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({name, beats})
+  });
+  const data = await res.json();
+  if (data.ok) { await loadTemplates(); status(`Saved style "${name}"`); }
+  else status(data.error || 'Save failed');
+}
+
+// ── Chatbar → generate ──
+async function sendChat() {
+  const input = document.getElementById('chat');
+  const premise = input.value.trim();
+  if (!premise) return;
+  input.value = '';
+  status('Writing minute…');
+  const res = await fetch('/api/generate', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({premise})
+  });
+  const data = await res.json();
+  if (!data.ok) return status(data.error || 'Generation failed');
+  window._char = {name: data.name || 'Guest Freak', species: data.species || '',
+                  premise: data.premise || '', vibe: data.vibe || ''};
+  document.getElementById('performerName').textContent = window._char.name;
+  document.getElementById('premiseLine').textContent = window._char.premise;
+  document.getElementById('charLine').textContent =
+    `${window._char.name} · ${window._char.species} · ${window._char.vibe} · via ${data.engine || 'ai'}`;
+  parseText(data.minute);
+  status(`Wrote ${window._char.name} — hit PLAY FULL SET`);
+}
+document.getElementById('chat').addEventListener('keydown', e => {
+  if (e.key === 'Enter') sendChat();
+});
+
+// ── Beats ──
+async function parseText(text) {
+  const res = await fetch('/api/parse', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({text})
+  });
+  const data = await res.json();
+  beats = data.beats;
+  renderBeats();
+}
+
+function renderBeats() {
+  const c = document.getElementById('beats');
+  c.innerHTML = '';
+  beats.forEach((b, i) => {
+    const el = document.createElement('div');
+    el.className = 'beat' + (selectedBeat === i ? ' selected' : '');
+    el.id = `beat-${b.id}`;
+    el.addEventListener('click', e => {
+      if (e.target.closest('button, input, .beat-text')) return;
+      selectBeat(i);
+      playFromHere(i); // tap card = play from this box
+    });
+    el.innerHTML = `
+      <div class="beat-head">
+        <span style="font-size:11px;color:#555;">${b.id}</span>
+        <span class="beat-type type-${b.type}">${b.type}</span>
+        <button class="play-one" onclick="playBeat(${i})">▶</button>
+      </div>
+      <div class="beat-text" contenteditable="true"
+           onblur="beats[${i}].text=this.textContent">${b.text}</div>
+      <div class="slider-row">
+        <span class="pause-label">pause</span>
+        <input type="range" min="0" max="2000" step="50" value="${b.pause_after_ms}"
+               oninput="setPause(${i}, this.value)">
+        <span class="pause-val" id="pv-${b.id}">${b.pause_after_ms}ms</span>
+      </div>`;
+    c.appendChild(el);
+  });
+  const words = beats.reduce((s, b) => s + (b.text.split(/\s+/).length), 0);
+  document.getElementById('stats').textContent =
+    `${beats.length} beats · ${words} words · drag sliders, then PLAY FULL SET`;
+  matchStyle();
+  saveDraft();
+}
+
+let matchedStyle = null;
+
+async function matchStyle() {
+  const box = document.getElementById('styleMatch');
+  if (!beats.length) { box.style.display = 'none'; return; }
+  try {
+    const res = await fetch('/api/match_style', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({text: beats.map(b => b.text).join(' ')})
+    });
+    const data = await res.json();
+    if (!data.ok) { box.style.display = 'none'; return; }
+    matchedStyle = data.style;
+    document.getElementById('styleName').textContent = data.style;
+    document.getElementById('styleNote').textContent = `(${data.note})`;
+    box.style.display = 'block';
+  } catch (e) { box.style.display = 'none'; }
+}
+
+async function applyMatchedStyle() {
+  if (!matchedStyle || !beats.length) return;
+  const res = await fetch('/api/templates/apply', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({template: matchedStyle, beats})
+  });
+  const data = await res.json();
+  if (data.ok) {
+    beats = data.beats;
+    renderBeats();
+    status(`Styled as ${matchedStyle}`);
+  }
+}
+
+function setPause(i, ms) {
+  beats[i].pause_after_ms = parseInt(ms);
+  document.getElementById(`pv-${beats[i].id}`).textContent = ms + 'ms';
+}
+
+// ── Playback with beat sync ──
+function clearHighlight() {
+  document.querySelectorAll('.beat').forEach(el => el.classList.remove('active'));
+  if (highlightTimer) { clearInterval(highlightTimer); highlightTimer = null; }
+}
+
+function syncHighlight() {
+  const audio = document.getElementById('audio');
+  const t = audio.currentTime * 1000;
+  let current = null;
+  for (const o of offsets) {
+    if (t >= o.start_ms) current = o.id;
+  }
+  currentBeatId = current;
+  document.querySelectorAll('.beat').forEach(el => {
+    el.classList.toggle('active', el.id === `beat-${current}`);
+  });
+  const active = current && document.getElementById(`beat-${current}`);
+  if (active) active.scrollIntoView({block: 'nearest', behavior: 'smooth'});
+}
+
+async function playBeat(i) {
+  const b = beats[i];
+  status(`Beat ${b.id}…`);
+  const res = await fetch('/api/tts', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({text: b.text, voice: document.getElementById('voice').value, beat_id: b.id})
+  });
+  const data = await res.json();
+  if (data.ok) {
+    const audio = document.getElementById('audio');
+    audio.src = data.audio;
+    await unlockAudio();
+    audio.play();
+    setAvatarTalking(true);
+    audio.onended = () => setAvatarTalking(false);
+  }
+}
+
+async function composePlay(opts = {}) {
+  if (!beats.length) { status('Write something first'); return false; }
+  if (!opts.silent) status('Composing with exact silence…');
+  const res = await fetch('/api/compose', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({beats, voice: document.getElementById('voice').value})
+  });
+  const data = await res.json();
+  if (!data.ok) { status('Compose failed'); return false; }
+  offsets = data.beats || [];
+  lastComposeSig = sig();
+  const audio = document.getElementById('audio');
+  audio.src = data.audio;
+  if (!opts.defer) {
+    await unlockAudio();
+    audio.play();
+    setAvatarTalking(true);
+    clearHighlight();
+    highlightTimer = setInterval(syncHighlight, 150);
+    audio.onended = () => { clearHighlight(); setAvatarTalking(false); };
+    if (!opts.silent) status(`Playing (~${(data.duration_ms / 1000).toFixed(1)}s)`);
+  }
+  return true;
+}
+
+function stopAudio() {
+  document.getElementById('audio').pause();
+  setAvatarTalking(false);
+  clearHighlight();
+  status('Stopped');
+}
+
+// ── Native bridges (Capacitor guarded, web fallbacks) ──
+function buzz(kind) {
+  try {
+    const H = window.Capacitor?.Plugins?.Haptics;
+    if (H) { H.impact({style: kind || 'LIGHT'}); return; }
+  } catch (e) {}
+  try { if (navigator.vibrate) navigator.vibrate(kind === 'HEAVY' ? 40 : 12); } catch (e) {}
+}
+
+async function shareClip() {
+  const audio = document.getElementById('audio');
+  if (!audio.src) return status('Compose something first');
+  const url = new URL(audio.src, location.origin).href;
+  try {
+    const Share = window.Capacitor?.Plugins?.Share;
+    if (Share) { await Share.share({title: 'My Freak Town set', url}); return; }
+  } catch (e) {}
+  try {
+    if (navigator.share) { await navigator.share({title: 'My Freak Town set', url}); return; }
+  } catch (e) { if (e?.name === 'AbortError') return; }
+  try {
+    await navigator.clipboard.writeText(url);
+    status('Link copied');
+  } catch (e) { status(url); }
+}
+
+// ── Offline drafts ──
+function saveDraft() {
+  try {
+    localStorage.setItem('freaktown_draft', JSON.stringify({
+      char: window._char || null, beats,
+      voice: document.getElementById('voice').value
+    }));
+  } catch (e) {}
+}
+
+function loadDraft() {
+  try {
+    const d = JSON.parse(localStorage.getItem('freaktown_draft') || 'null');
+    if (!d || !d.beats || !d.beats.length) return false;
+    if (d.char) {
+      window._char = d.char;
+      document.getElementById('performerName').textContent = d.char.name || 'Guest Freak';
+      document.getElementById('premiseLine').textContent = d.char.premise || '';
+    }
+    if (d.voice) document.getElementById('voice').value = d.voice;
+    beats = d.beats;
+    renderBeats();
+    return true;
+  } catch (e) { return false; }
+}
+
+// ── Play from box ──
+let lastComposeSig = '';
+const sig = () => JSON.stringify(beats.map(b => [b.text, b.pause_after_ms]));
+
+async function playFromHere(i) {
+  if (!beats.length) return;
+  buzz('LIGHT');
+  if (lastComposeSig !== sig() || !document.getElementById('audio').src) {
+    status('Composing…');
+    const ok = await composePlay({silent: true, defer: true});
+    if (!ok) return;
+  }
+  const id = beats[i].id;
+  const audio = document.getElementById('audio');
+  audio.currentTime = beatStartMs(id) / 1000;
+  await unlockAudio();
+  audio.play();
+  setAvatarTalking(true);
+  clearHighlight();
+  highlightTimer = setInterval(syncHighlight, 150);
+  audio.onended = () => { clearHighlight(); setAvatarTalking(false); };
+}
+
+function setAvatarTalking(talking) {
+  const av = document.getElementById('avatar');
+  if (av && av.setAttribute) {
+    try { av.setAttribute('clip', talking ? 'talk' : 'idle'); } catch (e) {}
+  }
+}
+
+// ── Freak roller + walkout ──
+let walkoutUrl = null;
+window._walkout = null;
+
+async function createFreak() {
+  status('Rolling a freak…');
+  const res = await fetch('/api/randomize', {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'
+  });
+  const data = await res.json();
+  if (!data.ok) return status('Roll failed');
+  const c = data.character;
+  window._char = {name: c.name, species: `${c.species} (${c.job})`,
+                  premise: c.premise, vibe: data.character && c.vibe};
+  window._walkout = data.walkout;
+  document.getElementById('woGenre').value = data.walkout.genre;
+  document.getElementById('woMood').value = data.walkout.mood;
+  const voiceSel = document.getElementById('voice');
+  [...voiceSel.options].forEach(o => {
+    if (o.value === c.voice) voiceSel.value = c.voice;
+  });
+  document.getElementById('chat').value = data.prompt;
+  status(`Rolled ${c.name} — writing minute…`);
+  sendChat();
+}
+
+async function genWalkout(mode) {
+  mode = mode || 'instant';
+  const body = {
+    genre: document.getElementById('woGenre').value,
+    mood: document.getElementById('woMood').value,
+    energy: 'high', shape: 'hit', duration: mode === 'real' ? 10 : 8,
+    seed: (window._walkout && window._walkout.seed) || Math.floor(Math.random() * 99999),
+    mode
+  };
+  document.getElementById('woStatus').textContent =
+    mode === 'real' ? 'rendering AI walkout (~1 min)…' : 'synthesizing…';
+  const res = await fetch('/api/walkout', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({...body, mode})
+  });
+  const data = await res.json();
+  if (!data.ok) {
+    document.getElementById('woStatus').textContent =
+      (data.error || 'failed') + (data.fallback ? ' — try INSTANT' : '');
+    return;
+  }
+  walkoutUrl = data.audio;
+  window._walkout = {...body, seed: data.seed, provider: data.provider, mode};
+  document.getElementById('woStatus').textContent =
+    `${body.genre}/${body.mood} · ${data.provider} · ${data.cached ? 'cached' : 'fresh'} · saved with set`;
+}
+
+function againWalkout() {
+  // same recipe, new seed — sample the same creative space
+  if (window._walkout) window._walkout.seed = Math.floor(Math.random() * 99999);
+  const lastMode = (window._walkout && window._walkout.mode) || 'instant';
+  genWalkout(lastMode);
+}
+
+async function playWalkout() {
+  if (!walkoutUrl) return status('Generate the walkout first');
+  const a = document.getElementById('audio');
+  a.src = walkoutUrl;
+  await unlockAudio();
+  a.play();
+  status('Walkout playing');
+}
+
+// ── DAW mode: select box, space = pause/resume-from-box, tab = split ──
+let selectedBeat = null;
+let currentBeatId = null;
+
+function selectBeat(i) {
+  selectedBeat = i;
+  document.querySelectorAll('.beat').forEach((el, idx) => {
+    el.classList.toggle('selected', idx === i);
+  });
+}
+
+function beatStartMs(id) {
+  const o = offsets.find(o => o.id === id);
+  return o ? o.start_ms / 1000 : 0;
+}
+
+async function togglePlay() {
+  const audio = document.getElementById('audio');
+  if (!audio.paused) {
+    audio.pause();
+    status('Paused — space resumes from current box');
+    return;
+  }
+  if (!audio.src || audio.ended) {
+    if (!beats.length) return status('Write something first');
+    await composePlay();
+    return;
+  }
+  // resume from start of current box
+  const beat = beats[selectedBeat ?? 0] || beats[0];
+  const target = currentBeatId
+    ? beatStartMs(currentBeatId)
+    : beatStartMs(beat.id);
+  audio.currentTime = target;
+  await unlockAudio();
+  audio.play();
+  clearHighlight();
+  highlightTimer = setInterval(syncHighlight, 150);
+  audio.onended = clearHighlight;
+}
+
+function splitBeatAtCursor() {
+  if (selectedBeat == null || !beats[selectedBeat]) {
+    return status('Click a box first, then Tab to split it');
+  }
+  const i = selectedBeat;
+  const el = document.querySelector(`#beat-${beats[i].id} .beat-text`);
+  if (el) beats[i].text = el.textContent; // sync un-blurred edits first
+  const text = beats[i].text;
+  let pos = -1;
+  const sel = window.getSelection();
+  if (sel.rangeCount && el && el.contains(sel.anchorNode)) {
+    const range = sel.getRangeAt(0).cloneRange();
+    range.selectNodeContents(el);
+    range.setEnd(sel.getRangeAt(0).startContainer, sel.getRangeAt(0).startOffset);
+    pos = range.toString().length;
+  }
+  if (pos <= 0 || pos >= text.length) {
+    // no cursor in text: split at middle word boundary
+    const words = text.split(/\s+/);
+    pos = words.slice(0, Math.ceil(words.length / 2)).join(' ').length;
+  }
+  // snap to nearest space so words never break
+  let cut = text.lastIndexOf(' ', pos);
+  if (cut < text.length * 0.2) cut = text.indexOf(' ', pos);
+  if (cut <= 0 || cut >= text.length - 1) return status('Nowhere clean to split');
+  const before = text.slice(0, cut).trim();
+  const after = text.slice(cut).trim();
+  if (!before || !after) return status('Nowhere clean to split');
+  beats[i].text = before;
+  beats[i].word_count = before.split(/\s+/).length;
+  const fresh = {id: 'b' + Date.now().toString(36), type: 'setup',
+                 text: after, pause_after_ms: beats[i].pause_after_ms,
+                 word_count: after.split(/\s+/).length};
+  beats.splice(i + 1, 0, fresh);
+  renderBeats();
+  selectBeat(i + 1); // the pushed content is the new box
+  buzz('LIGHT');
+  status(`Split — gap after "${before.slice(-24)}" is now its own pause`);
+}
+
+document.addEventListener('keydown', e => {
+  const tag = (e.target.tagName || '').toUpperCase();
+  const editing = tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable;
+  if (e.key === ' ' && !editing) {
+    e.preventDefault();
+    togglePlay();
+  }
+  if (e.key === 'Tab' && !editing) {
+    e.preventDefault();
+    splitBeatAtCursor();
+  }
+  // Tab inside a beat's text = split there (the gap becomes the pause)
+  if (e.key === 'Tab' && e.target.isContentEditable &&
+      e.target.classList.contains('beat-text')) {
+    e.preventDefault();
+    splitBeatAtCursor();
+  }
+});
+
+// ── Your Sets: save / load / submit ──
+async function saveSet() {
+  if (!beats.length) return status('Nothing to save — write something first');
+  const res = await fetch('/api/sets', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      character: window._char || {name: document.getElementById('performerName').textContent || 'Guest Freak'},
+      beats, voice: document.getElementById('voice').value,
+      style: document.getElementById('templateSel').value || '',
+      walkout: window._walkout || null
+    })
+  });
+  const data = await res.json();
+  if (!data.ok) return status(data.error || 'Save failed');
+  buzz('MEDIUM');
+  status(`Saved "${data.meta.character.name}" (${data.meta.duration_s}s)`);
+  loadSets();
+}
+
+async function loadSets() {
+  const res = await fetch('/api/sets');
+  const data = await res.json();
+  const box = document.getElementById('setsList');
+  const sets = data.sets || [];
+  if (!sets.length) { box.textContent = 'nothing saved yet'; return; }
+  box.innerHTML = '';
+  sets.forEach(s => {
+    const el = document.createElement('div');
+    el.style.cssText = 'margin-bottom:8px;padding:6px;border:1px solid #222;border-radius:4px;';
+    const badge = s.status === 'queued'
+      ? '<span style="color:#00d4ff;">QUEUED FOR LIVE SHOW</span>'
+      : `<button class="btn btn-small" onclick="submitSet('${s.slug}')">SUBMIT</button>`;
+    el.innerHTML = `
+      <div style="color:#e0e0e0;cursor:pointer;" onclick="loadSet('${s.slug}')">▶ ${s.name}</div>
+      <div style="margin-top:2px;">${s.beats} beats · ${s.duration_s}s${s.style ? ' · ' + s.style : ''}</div>
+      <div style="margin-top:4px;">${badge}</div>`;
+    box.appendChild(el);
+  });
+}
+
+async function loadSet(slug) {
+  const res = await fetch(`/api/sets/${slug}`);
+  const data = await res.json();
+  if (!data.ok) return status('Load failed');
+  window._char = data.character;
+  document.getElementById('performerName').textContent = data.character.name;
+  document.getElementById('premiseLine').textContent = data.character.premise || '';
+  document.getElementById('charLine').textContent =
+    `${data.character.name} · ${data.character.species || ''} · saved set`;
+  beats = data.beats;
+  renderBeats();
+  status(`Loaded "${data.character.name}" — hit PLAY FULL SET`);
+}
+
+async function submitSet(slug) {
+  const res = await fetch(`/api/sets/${slug}/submit`, {method: 'POST'});
+  const data = await res.json();
+  if (!data.ok) return status(data.error || 'Submit failed');
+  status('Queued for the live show');
+  loadSets();
+}
+
+loadTemplates();
+loadSets();
+if (loadDraft()) status('Draft restored');
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+</script>
+<script type="module">
+// ── VRM performer: audio-driven visemes from our composed WAV ──
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { VRMLoaderPlugin } from '@pixiv/three-vrm';
+
+const VRM_URL = '/static/avatars/default-v1.vrm';
+
+function threewsFallback(reason) {
+  // Explicit state machine: VRM failed -> try minimal three.ws embed -> else static.
+  vrmStatus('VRM FAILED · THREE.WS LOADING');
+  const avatar = document.getElementById('avatar');
+  const timeout = setTimeout(() => {
+    console.error('agent-3d did not register');
+    vrmStatus('NO 3D PERFORMER');
+  }, 8000);
+  const done = (msg) => { clearTimeout(timeout); vrmStatus(msg); };
+  if (window.customElements && customElements.whenDefined) {
+    customElements.whenDefined('agent-3d').then(() => {
+      console.log('agent-3d registered');
+    });
+  }
+  avatar.addEventListener('agent:ready', e => {
+    console.log('THREE.WS READY', e.detail);
+    done('THREE.WS READY');
+  });
+  avatar.addEventListener('agent:error', e => {
+    console.error('THREE.WS ERROR', e.detail);
+    done('THREE.WS ERROR — see console');
+  });
+  avatar.addEventListener('agent:load-progress', e => {
+    console.log('THREE.WS LOAD', e.detail);
+  });
+  if (reason) console.error('VRM failed:', reason);
+}
+let vrm = null, analyser = null, freqData = null, audioCtx = null;
+let prevAA = 0, prevIH = 0, prevOH = 0, nextBlink = 0;
+const clock = new THREE.Clock();
+
+function vrmStatus(msg) {
+  const el = document.getElementById('vrmStatus');
+  if (el) el.textContent = msg;
+}
+
+async function initVRM() {
+  try {
+    const canvas = document.getElementById('vrmStage');
+    const renderer = new THREE.WebGLRenderer({canvas, alpha: true, antialias: true});
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 20);
+    camera.position.set(0, 1.35, 2.6);
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x332233, 1.2));
+    const key = new THREE.DirectionalLight(0xffffff, 1.6);
+    key.position.set(1, 2, 2);
+    scene.add(key);
+
+    const loader = new GLTFLoader();
+    loader.register(parser => new VRMLoaderPlugin(parser));
+    const gltf = await loader.loadAsync(VRM_URL);
+    vrm = gltf.userData.vrm;
+    scene.add(vrm.scene);
+    vrm.scene.rotation.y = 0;
+
+    const fit = () => {
+      const w = canvas.clientWidth || 300, h = 340;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    };
+    fit();
+    window.addEventListener('resize', fit);
+
+    // swap in: VRM primary, three.ws fallback stays hidden unless this fails
+    canvas.style.display = 'block';
+    document.getElementById('avatar').style.display = 'none';
+
+    const animate = () => {
+      requestAnimationFrame(animate);
+      const dt = Math.min(clock.getDelta(), 0.05);
+      const t = clock.elapsedTime;
+      updateMouth(dt);
+      // idle sway + blink
+      if (vrm?.humanoid) {
+        const spine = vrm.humanoid.getNormalizedBoneNode('spine');
+        if (spine) spine.rotation.y = Math.sin(t * 0.6) * 0.04;
+        const head = vrm.humanoid.getNormalizedBoneNode('head');
+        if (head) head.rotation.x = Math.sin(t * 0.8) * 0.02;
+      }
+      if (t > nextBlink) {
+        nextBlink = t + 2.5 + Math.random() * 2.5;
+        blink();
+      }
+      vrm.update(dt);
+      renderer.render(scene, camera);
+    };
+    animate();
+    vrmStatus('VRM READY');
+  } catch (err) {
+    threewsFallback(err);
+  }
+}
+
+function ensureAudioGraph() {
+  if (audioCtx) {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return;
+  }
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  // single graph per page: element -> analyser -> destination (never recreated)
+  audioCtx = new AC();
+  const src = audioCtx.createMediaElementSource(document.getElementById('audio'));
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 256;
+  analyser.smoothingTimeConstant = 0.55;
+  freqData = new Uint8Array(analyser.frequencyBinCount);
+  src.connect(analyser);
+  analyser.connect(audioCtx.destination);
+}
+
+// Call FIRST inside every user-gesture play handler (iOS unlock).
+async function unlockAudio() {
+  ensureAudioGraph();
+  if (audioCtx && audioCtx.state === 'suspended') {
+    try { await audioCtx.resume(); } catch (e) {}
+  }
+}
+
+function band(lo, hi) {
+  if (!analyser || !freqData) return 0;
+  analyser.getByteFrequencyData(freqData);
+  let s = 0, n = 0;
+  for (let i = lo; i < Math.min(hi, freqData.length); i++) { s += freqData[i]; n++; }
+  return n ? s / n : 0;
+}
+
+const smooth = (prev, target, k) => prev + (target - prev) * k;
+
+function updateMouth(dt) {
+  if (!vrm?.expressionManager || !analyser) return;
+  const em = vrm.expressionManager;
+  const low = band(0, 10), mid = band(10, 40), high = band(40, 80);
+  const active = !document.getElementById('audio').paused;
+  const gate = active ? 1 : 0;
+  prevAA = smooth(prevAA, Math.min(1, low / 200) * gate, 0.5);
+  prevIH = smooth(prevIH, Math.min(1, high / 180) * gate, 0.5);
+  prevOH = smooth(prevOH, Math.min(1, mid / 220) * gate, 0.5);
+  em.setValue('aa', prevAA);
+  em.setValue('ih', prevIH * 0.7);
+  em.setValue('oh', prevOH * 0.7);
+  // grin on punchlines: pause logic drives the face
+  const activeEl = document.querySelector('.beat.active .beat-type');
+  const hot = activeEl && /punchline|closer/.test(activeEl.textContent || '');
+  em.setValue('happy', hot ? 0.55 : 0.0);
+}
+
+function blink() {
+  if (!vrm?.expressionManager) return;
+  vrm.expressionManager.setValue('blink', 1);
+  setTimeout(() => vrm?.expressionManager?.setValue('blink', 0), 140);
+}
+
+document.getElementById('audio').addEventListener('play', ensureAudioGraph);
+initVRM();
+</script>
+
+</body>
+</html>

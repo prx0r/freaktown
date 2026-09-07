@@ -141,9 +141,50 @@ def detect_beats(text: str) -> list[dict]:
 
 # ── Routes ──────────────────────────────────────────────────────────
 
+MAIN_ROOM = "bubble"  # "bubble" or "editor". One-line revert.
+
+
 @app.route("/")
 def index():
+    # Main room: bubble stage. Revert by setting MAIN_ROOM = "editor".
+    if MAIN_ROOM == "bubble":
+        html = (STAGE_DIR / "index.html").read_text()
+        html = html.replace("<head>", '<head><base href="/stage/">', 1)
+        return html, 200, {"Content-Type": "text/html; charset=utf-8"}
     return send_from_directory("static", "editor.html")
+
+
+@app.route("/edit")
+def edit_room():
+    """Black Room editor (workshop). Always available regardless of MAIN_ROOM."""
+    return send_from_directory("static", "editor.html")
+
+
+@app.route("/classic")
+def classic_room():
+    """Frozen pre-bubble editor backup. The revert target."""
+    return send_from_directory("static", "editor-classic.html")
+
+
+REACTIONS_LOG = Path(__file__).parent / "reactions.jsonl"
+
+
+@app.route("/api/laugh", methods=["POST"])
+@app.route("/api/clap", methods=["POST"])
+def react():
+    """Fire-and-forget audience reaction. Logged with server timestamp
+    against the current show for training data."""
+    from flask import request as _req
+    rtype = "laugh" if _req.path.endswith("/laugh") else "clap"
+    entry = {"t": time.time(), "reaction": rtype,
+             "show": SHOW_COUNTER[0],
+             "audio": (LAST_SET.get("payload") or {}).get("audio")}
+    try:
+        with open(REACTIONS_LOG, "a") as f:
+            f.write(json.dumps(entry) + "\n")
+    except Exception:
+        pass
+    return jsonify({"ok": True, "reaction": rtype})
 
 
 @app.route("/<path:filename>")
