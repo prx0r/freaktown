@@ -13,6 +13,9 @@ The compositor handles:
 
 import asyncio
 import hashlib
+import json
+import os
+import re
 import struct
 import subprocess
 import wave
@@ -23,6 +26,28 @@ from pathlib import Path
 
 AUDIO_DIR = Path(__file__).parent / "audio_output"
 AUDIO_DIR.mkdir(exist_ok=True)
+
+
+def load_hf_token() -> str:
+    """Load HF token from env, never from the repo.
+
+    Order: HF_TOKEN env -> /root/.agent-vault/vault.json (HF_TOKEN field).
+    Returns empty string if unavailable (callers must degrade gracefully).
+    """
+    token = os.getenv("HF_TOKEN", "").strip()
+    if token:
+        return token
+    try:
+        vault_path = Path("/root/.agent-vault/vault.json")
+        if vault_path.exists():
+            with open(vault_path) as f:
+                data = json.load(f)
+            token = str(data.get("HF_TOKEN", "")).strip()
+            if token:
+                return token
+    except Exception:
+        pass
+    return ""
 
 
 # ── Provider Interface ─────────────────────────────────────────────
@@ -83,38 +108,110 @@ class EdgeTTSProvider(TTSProvider):
 
 class QwenTTSProvider(TTSProvider):
     """Qwen3-TTS via HuggingFace Inference API.
-    
-    When available, this provides:
-    - 3-second voice cloning
-    - VoiceDesign from text descriptions
-    - Better comedy timing control
+
+    Provides 3-second voice cloning and VoiceDesign. Token is loaded
+    from env/vault at call time, never hardcoded or committed.
+    Note: Qwen does not reliably obey inline [pause:X] markup, so
+    callers must still use AudioCompositor for exact silence.
     """
-    
+
     API_URL = "https://api-inference.huggingface.co/models/Qwen/Qwen3-TTS-12Hz-0.6B-Base"
-    
+
     async def generate(self, text: str, voice: str = "default", **kwargs) -> bytes:
         """Generate via HF Inference API."""
         import httpx
-        
+
+        token = load_hf_token()
+        headers = {"Content-Type": "application/json"}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+
         ref_audio = kwargs.get("ref_audio")  # For voice cloning
-        
+
         payload = {"inputs": text}
         if ref_audio:
             payload["inputs"] = {"text": text, "reference_audio": ref_audio}
-        
+
         async with httpx.AsyncClient(timeout=60) as client:
             resp = await client.post(
                 self.API_URL,
                 json=payload,
-                headers={"Content-Type": "application/json"},
+                headers=headers,
             )
+            resp.raise_for_status()
             return resp.content
-    
+
     def list_voices(self) -> list[dict]:
         return [
             {"id": "cloned", "name": "Voice Clone (needs reference)", "gender": "any"},
             {"id": "designed", "name": "Voice Design (text description)", "gender": "any"},
         ]
+
+
+class MagicTTSProvider(TTSProvider):
+    """MAGIC-TTS backend with explicit token-level pause control.
+
+    Supported markup (stripped before fallback synthesis):
+    - word{300} -> word rendered with ~300ms duration intent
+    - [260]     -> ~260ms pause intent
+
+    The compositor still owns final silence. This provider only
+    records pause intents so timing stays provider-independent.
+    If the magic-tts package is unavailable, generate() raises
+    RuntimeError with install instructions.
+    """
+
+    PAUSE_RE = re.compile(r"\[(\d{2,4})\]")
+    WORD_DUR_RE = re.compile(r"(\S+?)\{(\d{2,4})\}")
+
+    def parse_markup(self, text: str) -> tuple[str, list[int]]:
+        """Split MAGIC markup into clean text + pause intents (ms)."""
+        pauses: list[int] = []
+
+        def _pause(m: re.Match) -> str:
+            pauses.append(int(m.group(1)))
+            return " "
+
+        clean = self.PAUSE_RE.sub(_pause, text)
+        # Keep the word, drop the {ms} duration hint (intent only)
+        clean = self.WORD_DUR_RE.sub(lambda m: m.group(1), clean)
+        clean = re.sub(r"\s+", " ", clean).strip()
+        return clean, pauses
+
+    async def generate(self, text: str, voice: str = "default", **kwargs) -> bytes:
+        """Generate via magic-tts if installed, else raise."""
+        try:
+            import magic_tts  # type: ignore
+        except ImportError as e:
+            raise RuntimeError(
+                "magic-tts package not installed. Install it, or use "
+                "EdgeTTSProvider/QwenTTSProvider. Compositor timing still applies."
+            ) from e
+
+        clean_text, _pauses = self.parse_markup(text)
+        # Delegate to the installed package; exact silence stays in compositor.
+        audio = await magic_tts.synthesize(clean_text, voice=voice, **kwargs)
+        if isinstance(audio, (bytes, bytearray)):
+            return bytes(audio)
+        raise RuntimeError("magic-tts returned unsupported audio type")
+
+    def list_voices(self) -> list[dict]:
+        return [
+            {"id": "magic-default", "name": "MAGIC default", "gender": "any"},
+        ]
+
+
+def get_provider(name: str) -> TTSProvider:
+    """Provider factory. Compositor owns timing in all cases."""
+    providers = {
+        "edge": EdgeTTSProvider,
+        "qwen": QwenTTSProvider,
+        "magic": MagicTTSProvider,
+    }
+    cls = providers.get(name.lower())
+    if cls is None:
+        raise ValueError(f"Unknown TTS provider: {name}")
+    return cls()
 
 
 # ── Audio Compositor ────────────────────────────────────────────────
@@ -222,7 +319,7 @@ class SoundEffectsGenerator:
     """
     
     def __init__(self, api_token: str = None):
-        self.api_token = api_token or os.getenv("HF_TOKEN", "")
+        self.api_token = api_token or load_hf_token()
         self.cache_dir = AUDIO_DIR / "effects"
         self.cache_dir.mkdir(exist_ok=True)
     

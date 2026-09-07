@@ -6,3 +6,8 @@ transcript_*.json
 .venv/
 training_data/
 *.jsonl
+.hf_token
+.hf-token
+HF_TOKEN
+sounds/*.wav
+sounds/*.mp3
