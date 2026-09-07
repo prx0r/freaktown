@@ -55,7 +55,7 @@ app.add_middleware(
 
 # ── API Routers ────────────────────────────────────────────────────────
 
-from backend.routes import admin, audience, comedians, episodes, mcp, stage, motions, dressing_room, green_room, shows, judge, sound, launchpad  # noqa: E402
+from backend.routes import admin, audience, comedians, episodes, mcp, stage, motions, dressing_room, green_room, shows, judge, sound, launchpad, potchain  # noqa: E402
 
 app.include_router(comedians.router, prefix="/v1/comedians", tags=["comedians"])
 app.include_router(episodes.router, prefix="/v1/episodes", tags=["episodes"])
@@ -70,6 +70,7 @@ app.include_router(shows.router, prefix="/v1", tags=["shows"])
 app.include_router(judge.router, prefix="/v1", tags=["judge"])
 app.include_router(sound.router, prefix="/v1", tags=["sound"])
 app.include_router(launchpad.router, prefix="/v1", tags=["launchpad"])
+app.include_router(potchain.router, prefix="/v1", tags=["potchain"])
 
 
 # ── API Info ───────────────────────────────────────────────────────────

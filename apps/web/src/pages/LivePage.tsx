@@ -10,6 +10,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useShowStore } from '../store/showStore';
+import { payForAction } from '../x402/pay';
 
 export function LivePage() {
   const { episodeId } = useParams<{ episodeId: string }>();
@@ -21,6 +22,8 @@ export function LivePage() {
   const judgeScores = useShowStore((s) => s.judgeScores);
 
   const [wsConnected, setWsConnected] = useState(false);
+  const [payNote, setPayNote] = useState<string | null>(null);
+  const [paying, setPaying] = useState(false);
 
   // Format time as MM:SS
   const formatTime = (ms: number): string => {
@@ -34,6 +37,23 @@ export function LivePage() {
     // Send reaction via WebSocket
     // This will be connected to the EventConsumer
     console.log(`Reaction: ${type}`);
+  };
+
+  const handlePaid = async (action: 'pot' | 'message' | 'hype' | 'tip') => {
+    if (paying || !episodeId) return;
+    setPaying(true);
+    setPayNote(null);
+    const message =
+      action === 'message' ? window.prompt('Message to flash on screen (140 chars):', '') ?? '' : '';
+    if (action === 'message' && !message) {
+      setPaying(false);
+      return;
+    }
+    const result = await payForAction({ action, showId: episodeId, message });
+    setPaying(false);
+    // The settled payment is already a show event by the time the modal
+    // resolves — EventConsumer picks it up over the live socket.
+    setPayNote(result.ok ? 'Payment settled — on screen!' : `Payment failed: ${result.error}`);
   };
 
   return (
@@ -117,6 +137,20 @@ export function LivePage() {
             onClick={() => handleReaction('crickets')}
           />
         </div>
+
+        {/* Paid actions (x402) */}
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <PaidButton emoji="🏺" label="POT $1+" onClick={() => handlePaid('pot')} disabled={paying} />
+          <PaidButton emoji="📣" label="MSG $2" onClick={() => handlePaid('message')} disabled={paying} />
+          <PaidButton emoji="🔥" label="HYPE $5" onClick={() => handlePaid('hype')} disabled={paying} />
+          <PaidButton emoji="💸" label="TIP $1+" onClick={() => handlePaid('tip')} disabled={paying} />
+        </div>
+
+        {payNote && (
+          <div style={{ fontSize: 12, opacity: 0.7 }}>
+            {payNote}
+          </div>
+        )}
 
         {/* Crowd stats */}
         <div style={{
@@ -219,6 +253,45 @@ function ReactionButton({
       {count > 0 && (
         <span style={{ fontSize: 11, fontWeight: 'bold' }}>{count}</span>
       )}
+    </button>
+  );
+}
+
+// ── Paid Button (x402) ─────────────────────────────────────────────
+
+function PaidButton({
+  emoji,
+  label,
+  onClick,
+  disabled,
+}: {
+  emoji: string;
+  label: string;
+  onClick: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 4,
+        padding: '12px 16px',
+        border: '1px solid #6b5320',
+        borderRadius: 8,
+        background: '#241d0e',
+        color: '#e0e0e0',
+        cursor: disabled ? 'wait' : 'pointer',
+        transition: 'all 0.15s',
+        minWidth: 70,
+        opacity: disabled ? 0.6 : 1,
+      }}
+    >
+      <span style={{ fontSize: 24 }}>{emoji}</span>
+      <span style={{ fontSize: 10, opacity: 0.7 }}>{label}</span>
     </button>
   );
 }

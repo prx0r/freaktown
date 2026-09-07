@@ -148,6 +148,15 @@ Worker DO tests
 Playwright: stage loads, audio starts, transport moves, camera cuts, events recorded, reconnect works, score cards hidden before reveal
 Audio: delivery composer produces valid WAV
 Replay: given event log N, fresh StageRuntime renders same final state
+Contracts: ShowPot compiles (verified vs real OZ) + Foundry invariant/
+  fuzz tests required before ANY deploy:
+  forge test --match-contract ShowPotInvariants covering:
+  sum(contributions)==totalPot; shares sum to total; no claim before
+  lock; no double claim/refund; only closer finalizes; refunds only
+  pre-finalize to actual contributors
+Payments: x402 402-then-settle flow against SDK models (no facilitator
+  needed for 402/validation paths); facilitator verify/settle path
+  requires FACILITATOR_URL + testnet funds in CI secrets
 ```
 
 ## Launchpad layer — WIRED (strategy.md, 2026-09-07)

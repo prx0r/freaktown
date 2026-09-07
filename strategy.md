@@ -121,3 +121,70 @@ FREAK TOWN → characters/clips/creators → own socials/viral/reputation
 Don't over-monetize early. The scarce resource is attention:
 "My stupid character might perform in front of thousands of people."
 Money attaches later (tips, appearances, ads, sponsors, merch).
+
+## On-chain POT: x402 in, USDC escrow, deterministic out (WIRED)
+
+Architecture: x402 is the payment interface, the contract is the money.
+No $FREAK until a real utility emerges.
+
+```text
+                    FREAK TOWN SHOW
+                           │
+                 ┌─────────▼─────────┐
+                 │   SHOW POT ESCROW  │
+                 │  USDC on Base      │
+                 │  contracts/ShowPot │
+                 └─────────┬─────────┘
+                           │
+             ┌─────────────┼─────────────┐
+             │             │             │
+          DONATE        MESSAGE        SPONSOR
+          $1–∞          $2            highest bid
+             │             │             │
+             └─────────────┼─────────────┘
+                           │
+                   LIVE POT INCREASES
+                           │
+                        SHOW END
+                           │
+                       WINNER LOCK
+                    Ella 70 / Stream 20
+                    / season pot 10
+                           │
+                    pull-based claim
+```
+
+Paid actions (`backend/services/potchain/actions.py`, x402 v2 exact
+scheme, EIP-3009): pot $1+, message $2, hype $5, sponsor bid, tip $1+.
+One endpoint serves discovery + settlement (`POST /v1/pay/{a}/settle`):
+unpaid → 402 envelope; X-PAYMENT (the three.ws modal transport) or JSON
+body → facilitator verify → execute → settle → `x-payment-response`
+receipt. Every settled payment becomes a canonical show event with tx +
+amount + set_time_ms. The LivePage wires the modal for POT/MSG/HYPE/TIP.
+
+Prior work reused, not reinvented: official x402 Python SDK v2
+(requirements builder models, facilitator client, canonical USDC
+addresses — caught our wrong Base mainnet USDC constant by cross-check)
+and `@three-ws/x402-modal` for checkout. No 402fun dir and no Algorand
+mechanism were found in the workspace (SDK TVM = TON); Base exact USDC
+is the rail.
+
+`contracts/ShowPot.sol`: tiny, boring, OpenZeppelin (SafeERC20,
+ReentrancyGuard), USDC-only, no upgradeability, pull-based claims,
+emergency refunds pre-finalize only, closer multisig submits one result
+(Ella winner + Stream champion). Compiles against real OZ (verified).
+Foundry invariant/fuzz tests required before any deploy (see devplan).
+
+Sponsor auction: intent-based bids (no custody), moderation gate
+(required — money never buys immunity), closes at SHOW_START - 5 min,
+winner pays via x402, settlement enters the pot. Explicit refund policy:
+nothing moves until the winner pays, so nothing is refundable; winner
+default promotes the runner-up.
+
+FREAK TICKETs: non-tradeable submission credits (weekly free, reputation,
+sponsor/admin grants; purchase path exists but disabled). Redeem one per
+submission. In-memory for Episode Zero; DB table required pre-launch.
+
+Voting: Ella selects the official winner (television + ungameable);
+Stream selects the People's Champion. Split 70/20/10 in integer atomic
+units, dust to season pot, always sums to total.
