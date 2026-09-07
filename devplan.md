@@ -190,3 +190,33 @@ Still open from strategy.md: clip MP4 rendering job (ffmpeg cut-list
 exists; needs the episode recording + runner), character social
 distribution, Regular perks/revenue-share, creation challenges, IP
 license terms (legal, before public submissions).
+
+## devplan2 integration status (2026-09-08)
+
+Product stack is now: Worker → EpisodeRoom → Stage/VRM → OBS → Rumble +
+YouTube 4K60, Cloudflare Stream 1080p for freak.town/watch + VOD.
+WebRTC/Realtime stays future (no recording/simulcast coexistence yet).
+
+- R2 bucket ✅ standardized on freak-town-assets (media_store default,
+  config, .env, wrangler binding) + drift-guard tests.
+- Hyperdrive ⏳ binding + Env + accessor wired (placeholder id, same
+  convention as D1/KV). Dashboard step required: create the Hyperdrive,
+  put its id in wrangler.jsonc. D1 routes untouched until then —
+  D1 holds edge-ephemeral only, no new business tables.
+- EllaSense ✅ DO getSense() + GET /live/:ep/sense (~1Hz polling shape:
+  phase/appearance/crowd/pot; set_time_ms null — only stage has clock).
+- EllaReflex ✅ worker/ella/reflex.ts pure rules (spike/silence/$100
+  tip/wtf/chatgpt-reveal → iris/stillness/flash/look) + 7 vitest.
+- EllaLive ✅ session manager + FakeLiveTransport + provider_status
+  (openai-realtime/gemini-live descriptors; no keys = honest not-ready).
+  Voice routing decided: realtime custom voice OR text→Eleven Flash,
+  edge-tts stays fallback.
+- EllaJudge ✅ per-beat accumulator (rubric + laugh curve) with
+  finalize; reactive banter structurally cannot touch it.
+- Ella tools ✅ registry with implemented/planned split; command
+  builders tested. ella.action contract both runtimes.
+- OBS routing: 4K→YouTube+Rumble, 1080p→Stream (dashboard-created
+  input; enable LL-HLS preferLowLatency). No code change — Stream
+  inputs are provisioned, not committed.
+- Redis: de-emphasized as show authority (DO owns live state);
+  remains for queues/cache. No Redis pub/sub migration performed.

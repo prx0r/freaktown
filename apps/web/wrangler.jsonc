@@ -15,6 +15,17 @@
       "database_id": "placeholder"
     }
   ],
+  // Postgres (canonical durable truth) via Hyperdrive. Provision with:
+  //   wrangler hyperdrive create freak-town-postgres --connection-string="..."
+  // then replace the placeholder id below. Until then, D1 serves ONLY
+  // genuinely edge-local ephemeral data; business rows live in Postgres
+  // via FastAPI. Do NOT add new business tables to D1.
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "placeholder"
+    }
+  ],
   "durable_objects": {
     "bindings": [
       {

@@ -21,6 +21,7 @@ export type Env = {
   AI_QUEUE: Queue;
   KV: KVNamespace;
   EPISODE_ROOM: DurableObjectNamespace;
+  HYPERDRIVE: Hyperdrive;
   PRIVY_APP_ID: string;
   PRIVY_APP_SECRET: string;
   OPENAI_API_KEY: string;
@@ -73,6 +74,13 @@ app.get('/live/:episodeId/state', async (c) => {
   if (!episodeId) return c.json({ error: 'episodeId required' }, 400);
   const stub = getRoom(c, episodeId);
   return stub.fetch('https://episode-room/state');
+});
+
+app.get('/live/:episodeId/sense', async (c) => {
+  const episodeId = c.req.param('episodeId');
+  if (!episodeId) return c.json({ error: 'episodeId required' }, 400);
+  const stub = getRoom(c, episodeId);
+  return stub.fetch('https://episode-room/sense');
 });
 
 app.post('/live/:episodeId/command', authMiddleware, requireAdmin, async (c) => {

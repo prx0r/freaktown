@@ -16,7 +16,7 @@
 
 import { DurableObject } from 'cloudflare:workers';
 
-import { CameraCutPayloadV1 } from '../src/contracts/show';
+import { CameraCutPayloadV1, type EllaSenseV1 } from '../src/contracts/show';
 
 export type EpisodeState = {
   episodeId: string;
@@ -158,6 +158,10 @@ export class EpisodeRoom extends DurableObject {
           puppeteer: this.ctx.getWebSockets('role:puppeteer').length,
         },
       });
+    }
+
+    if (url.pathname === '/sense') {
+      return Response.json(await this.getSense());
     }
 
     if (url.pathname === '/command' && request.method === 'POST') {
@@ -430,6 +434,48 @@ export class EpisodeRoom extends DurableObject {
     }
 
     void attachment;
+  }
+
+  // ── EllaSense (compact live context) ─────────────────────────────
+  //
+  // Normalized perception for Ella, not the raw firehose: crowd state,
+  // phase, pot total. Ella polls at ~1Hz. set_time_ms is null — only the
+  // stage knows the media playhead; the server never invents one.
+
+  async getSense(): Promise<EllaSenseV1> {
+    const windowKey = this.episodeState.activeAppearanceId || 'none';
+    const window = this.crowdWindows.get(windowKey);
+
+    let potCents = 0;
+    const stored = await this.ctx.storage.list<{ type?: unknown; payload?: unknown }>({
+      prefix: 'event:',
+    });
+    for (const e of stored.values()) {
+      if (e?.type !== 'pot.contribution') continue;
+      const payload = (e.payload ?? {}) as Record<string, unknown>;
+      if (typeof payload.amount_cents === 'number' && payload.amount_cents > 0) {
+        potCents += Math.floor(payload.amount_cents);
+      }
+    }
+
+    return {
+      episode_id: this.episodeState.episodeId,
+      phase: this.episodeState.phase,
+      active_appearance_id: this.episodeState.activeAppearanceId,
+      seq: this.episodeState.seq,
+      is_paused: this.episodeState.isPaused,
+      set_time_ms: null,
+      crowd: {
+        laugh_events: window?.laughs ?? 0,
+        claps: window?.claps ?? 0,
+        boos: window?.boos ?? 0,
+        crickets: window?.crickets ?? 0,
+        groans: window?.groans ?? 0,
+        unique_laughers: window?.uniqueSessions.length ?? 0,
+      },
+      pot_cents: potCents,
+      updated_at: new Date().toISOString(),
+    };
   }
 
   // ── Commands (persist before broadcast) ────────────────────────────

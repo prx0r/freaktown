@@ -87,6 +87,34 @@ class PerformancePreloadPayloadV1(BaseModel):
     model_config = {"extra": "allow"}
 
 
+class EllaSenseV1(BaseModel):
+    episode_id: str
+    phase: str
+    active_appearance_id: str | None = None
+    seq: int = Field(ge=0)
+    is_paused: bool = False
+    set_time_ms: float | None = None
+    crowd: CrowdUpdateV1
+    pot_cents: int = Field(ge=0)
+    updated_at: str
+
+    model_config = {"extra": "allow"}
+
+
+EllaActionSource = Literal["reflex-v1", "live-v1", "judge-v1"]
+
+
+class EllaActionV1(BaseModel):
+    set_time_ms: float | None = None
+    trigger: str
+    action: str
+    latency_ms: float = Field(ge=0)
+    source: EllaActionSource
+    text: str | None = None
+
+    model_config = {"extra": "allow"}
+
+
 class JudgeReactPayloadV1(BaseModel):
     judge: str
     reaction: JudgeReaction

@@ -168,6 +168,44 @@ export const CharacterModesV1 = z.object({
 
 export type CharacterModesV1 = z.infer<typeof CharacterModesV1>;
 
+// ── ella.sense (compact live context for Ella) ─────────────────────
+// Normalized perception, not raw events: the DO batches crowd state,
+// Ella subscribes at ~1Hz (never the raw firehose). set_time_ms is null
+// when the server has no media clock (only the stage knows playhead).
+
+export const EllaSenseV1 = z.object({
+  episode_id: z.string(),
+  phase: z.string(),
+  active_appearance_id: z.string().nullable(),
+  seq: z.number().int().nonnegative(),
+  is_paused: z.boolean(),
+  set_time_ms: z.number().nullable(),
+  crowd: CrowdUpdateV1,
+  pot_cents: z.number().int().nonnegative(),
+  updated_at: z.string().datetime({ offset: true }),
+});
+
+export type EllaSenseV1 = z.infer<typeof EllaSenseV1>;
+
+// ── ella.action (every Ella decision is an event) ────────────────────
+// Reflex (<100ms, rules), live (<1s, realtime model), judge (deep eval)
+// all converge here — and the log becomes training data.
+
+export const EllaActionSourceV1 = z.enum(['reflex-v1', 'live-v1', 'judge-v1']);
+
+export type EllaActionSourceV1 = z.infer<typeof EllaActionSourceV1>;
+
+export const EllaActionV1 = z.object({
+  set_time_ms: z.number().nullable(),
+  trigger: z.string().min(1),
+  action: z.string().min(1),
+  latency_ms: z.number().nonnegative(),
+  source: EllaActionSourceV1,
+  text: z.string().optional(),
+});
+
+export type EllaActionV1 = z.infer<typeof EllaActionV1>;
+
 // ── performance.preload payload ────────────────────────────────────
 
 export const PerformancePreloadPayloadV1 = z.object({

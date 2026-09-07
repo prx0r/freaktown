@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     r2_access_key_id: str = ""
     r2_secret_access_key: str = ""
     r2_s3_endpoint: str = ""
-    r2_bucket: str = "freak-town"
+    r2_bucket: str = "freak-town-assets"
 
     allowed_origins: list[str] = ["http://localhost:8000", "http://localhost:3000"]
 

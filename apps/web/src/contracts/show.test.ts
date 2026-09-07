@@ -17,6 +17,8 @@ import {
   JudgeReactPayloadV1,
   PanelSeatPayloadV1,
   CharacterModesV1,
+  EllaSenseV1,
+  EllaActionV1,
   CAMERA_NAMES,
 } from './show';
 
@@ -140,6 +142,26 @@ describe('wire contracts', () => {
     }).success).toBe(true);
     expect(CharacterModesV1.safeParse({
       judge: { seat: 'middle' },
+    }).success).toBe(false);
+  });
+
+  it('accepts ella sense and action events', () => {
+    expect(EllaSenseV1.safeParse({
+      episode_id: 'ep1', phase: 'set_active', active_appearance_id: 'perf1',
+      seq: 200, is_paused: false, set_time_ms: null,
+      crowd: {
+        laugh_events: 93, claps: 10, boos: 0,
+        crickets: 0, groans: 4, unique_laughers: 40,
+      },
+      pot_cents: 100,
+      updated_at: '2026-09-08T20:00:18.000Z',
+    }).success).toBe(true);
+    expect(EllaActionV1.safeParse({
+      set_time_ms: 42188, trigger: 'audience_laugh_spike',
+      action: 'look_at_chatgpt', latency_ms: 37, source: 'reflex-v1',
+    }).success).toBe(true);
+    expect(EllaActionV1.safeParse({
+      trigger: 'x', action: 'y', latency_ms: 0, source: 'vibes-v9',
     }).success).toBe(false);
   });
 
