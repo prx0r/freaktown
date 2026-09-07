@@ -141,7 +141,7 @@ def detect_beats(text: str) -> list[dict]:
 
 # ── Routes ──────────────────────────────────────────────────────────
 
-MAIN_ROOM = "bubble"  # "bubble" or "editor". One-line revert.
+MAIN_ROOM = "editor"  # "bubble" or "editor". One-line revert.
 
 
 @app.route("/")
