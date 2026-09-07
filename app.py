@@ -146,6 +146,14 @@ def index():
     return send_from_directory("static", "editor.html")
 
 
+@app.route("/<path:filename>")
+def static_files(filename):
+    if filename in ("manifest.json", "sw.js", "icon-192.png",
+                    "icon-512.png", "apple-touch-icon.png"):
+        return send_from_directory("static", filename)
+    return jsonify({"ok": False, "error": "not found"}), 404
+
+
 @app.route("/api/parse", methods=["POST"])
 def parse_script():
     data = request.json
