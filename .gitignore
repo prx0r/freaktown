@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+.env
+audio_output/
+transcript_*.json
