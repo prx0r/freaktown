@@ -1,0 +1,12 @@
+{
+  "model": "Random Forest",
+  "features": 403,
+  "training_samples": 225,
+  "label_distribution": {
+    "1": 15,
+    "2": 26,
+    "3": 42,
+    "4": 73,
+    "5": 69
+  }
+}
