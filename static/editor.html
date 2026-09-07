@@ -83,6 +83,11 @@ input[type=range] { flex: 1; accent-color: #ff00aa; cursor: pointer; }
     <div class="hint">beats auto-detect from your minute · drag sliders for exact pauses · ▶ plays the full set with silence baked in</div>
     <div id="beats"></div>
     <div style="font-size:11px;color:#555;margin-top:8px;" id="stats"></div>
+    <div style="font-size:12px;margin-top:6px;display:none;" id="styleMatch">
+      sounds like: <b id="styleName" style="color:#ff00aa;"></b>
+      <span style="color:#555;" id="styleNote"></span>
+      <button class="btn btn-small" style="margin-left:8px;" onclick="applyMatchedStyle()">APPLY STYLE</button>
+    </div>
   </div>
 </div>
 
@@ -216,6 +221,40 @@ function renderBeats() {
   const words = beats.reduce((s, b) => s + (b.text.split(/\s+/).length), 0);
   document.getElementById('stats').textContent =
     `${beats.length} beats · ${words} words · drag sliders, then PLAY FULL SET`;
+  matchStyle();
+}
+
+let matchedStyle = null;
+
+async function matchStyle() {
+  const box = document.getElementById('styleMatch');
+  if (!beats.length) { box.style.display = 'none'; return; }
+  try {
+    const res = await fetch('/api/match_style', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({text: beats.map(b => b.text).join(' ')})
+    });
+    const data = await res.json();
+    if (!data.ok) { box.style.display = 'none'; return; }
+    matchedStyle = data.style;
+    document.getElementById('styleName').textContent = data.style;
+    document.getElementById('styleNote').textContent = `(${data.note})`;
+    box.style.display = 'block';
+  } catch (e) { box.style.display = 'none'; }
+}
+
+async function applyMatchedStyle() {
+  if (!matchedStyle || !beats.length) return;
+  const res = await fetch('/api/templates/apply', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({template: matchedStyle, beats})
+  });
+  const data = await res.json();
+  if (data.ok) {
+    beats = data.beats;
+    renderBeats();
+    status(`Styled as ${matchedStyle}`);
+  }
 }
 
 function setPause(i, ms) {

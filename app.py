@@ -278,17 +278,80 @@ def generate():
 TEMPLATE_DIR = Path(__file__).parent / "tempo_templates"
 TEMPLATE_DIR.mkdir(exist_ok=True)
 
+def _load_style_model():
+    """Data-derived tempo styles (k-means on 225 Kill Tony sets)."""
+    try:
+        with open(Path(__file__).parent / "models" / "tempo_styles.json") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+_STYLE_MODEL = _load_style_model()
+
 BUILTIN_TEMPLATES = {
     "deadpan": {"setup": 250, "escalation": 300, "punchline": 900,
                 "tag": 400, "closer": 1400,
-                "description": "Flat delivery, long holds. Let silence do the work."},
+                "description": "Dash-heavy sniper rhythm. Top Kill Tony avg (4.40). Let silence work."},
+    "frantic": {"setup": 150, "escalation": 180, "punchline": 500,
+                "tag": 250, "closer": 750,
+                "description": "High-energy, exclamation-heavy. Avg 4.30 in the data."},
+    "machine-gun": {"setup": 200, "escalation": 250, "punchline": 600,
+                    "tag": 300, "closer": 1000,
+                    "description": "Rapid-fire short sentences. The dominant club rhythm (119/225 sets)."},
+    "storyteller": {"setup": 400, "escalation": 450, "punchline": 700,
+                    "tag": 350, "closer": 1000,
+                    "description": "Steady medium sentences. Unhurried setups, warm landing."},
     "manic": {"setup": 150, "escalation": 200, "punchline": 500,
               "tag": 250, "closer": 800,
               "description": "Fast, breathless, barely pauses. Energy over precision."},
-    "storyteller": {"setup": 400, "escalation": 450, "punchline": 700,
-                    "tag": 350, "closer": 1000,
-                    "description": "Unhurried setups, room to breathe, warm landing."},
 }
+
+if _STYLE_MODEL:
+    for _name, _s in _STYLE_MODEL["clusters"].items():
+        if _name in BUILTIN_TEMPLATES:
+            BUILTIN_TEMPLATES[_name]["description"] = (
+                _s["description"] + f" (n={_s['n']}, avg {_s['avg_score']:.2f}/5)")
+
+
+def _rhythm_features(text: str) -> list[float]:
+    """Same 8 features the style model was trained on (stdlib only)."""
+    import statistics
+    sents = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text.strip()) if s.strip()]
+    wl = [len(s.split()) for s in sents]
+    n = max(1, len(sents))
+    return [len(sents),
+            float(statistics.mean(wl)) if wl else 0.0,
+            float(statistics.pstdev(wl)) if len(wl) > 1 else 0.0,
+            sum(1 for w in wl if w < 6) / n,
+            sum(1 for w in wl if w > 20) / n,
+            text.count("?") / n,
+            text.count("!") / n,
+            (text.count("-") + text.count("—")) / n]
+
+
+@app.route("/api/match_style", methods=["POST"])
+def match_style():
+    """Match minute text to nearest data-derived tempo style.
+    Body: {"text": "..."} -> {style, distances, note}"""
+    data = request.json or {}
+    text = (data.get("text") or "").strip()
+    if not text or _STYLE_MODEL is None:
+        return jsonify({"ok": False, "error": "no text or no style model"}), 400
+
+    feats = _rhythm_features(text)
+    mean, scale = _STYLE_MODEL["mean"], _STYLE_MODEL["scale"]
+    std = [(f - m) / (s or 1) for f, m, s in zip(feats, mean, scale)]
+
+    dists = {}
+    for name, s in _STYLE_MODEL["clusters"].items():
+        c = s["centroid_std"]
+        dists[name] = round(sum((a - b) ** 2 for a, b in zip(std, c)) ** 0.5, 3)
+
+    best = min(dists, key=dists.get)
+    s = _STYLE_MODEL["clusters"][best]
+    return jsonify({"ok": True, "style": best, "distances": dists,
+                    "note": f"Closest to {best} (avg {s['avg_score']:.2f}/5 across {s['n']} Kill Tony sets)"})
 
 
 @app.route("/api/templates", methods=["GET"])
