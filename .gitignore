@@ -3,3 +3,4 @@ __pycache__/
 .env
 audio_output/
 transcript_*.json
+.venv/
