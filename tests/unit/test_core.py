@@ -205,18 +205,19 @@ class TestTTS:
     """Test the TTS service."""
 
     def test_voice_catalog(self):
-        from backend.services.tts import VOICE_CATALOG
-
-        assert "default" in VOICE_CATALOG
-        assert "ella" in VOICE_CATALOG
-        assert len(VOICE_CATALOG) >= 6
+        from backend.services.tts import list_providers
+        providers = list_providers()
+        assert len(providers) >= 4
+        ids = [p.id for p in providers]
+        assert "edge" in ids
+        assert "minimax" in ids
 
     def test_list_voices(self):
-        from backend.services.tts import list_voices
-
-        voices = list_voices()
+        from backend.services.tts import get_adapter
+        adapter = get_adapter("edge")
+        voices = adapter.list_voices()
         assert len(voices) > 0
-        assert any(v["key"] == "default" for v in voices)
+        assert any(v["id"] == "en-US-GuyNeural" for v in voices)
 
 
 # ── Event Sequencing Tests ─────────────────────────────────────────────

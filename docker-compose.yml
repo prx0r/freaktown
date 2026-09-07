@@ -3,14 +3,18 @@ services:
     build: .
     ports:
       - "8000:8000"
-    env_file: .env
+    environment:
+      DATABASE_URL: "postgresql+asyncpg://freak_town:freak_town@host.docker.internal:5432/freak_town"
+      REDIS_URL: "redis://redis:6379"
+      SECRET_KEY: "dev-secret-change-in-production"
     depends_on:
       redis:
         condition: service_healthy
-      postgres:
-        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./backend:/app/backend
+      - ./frontend:/app/frontend
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
 
   redis:
@@ -22,22 +26,3 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
-
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: freak_town
-      POSTGRES_USER: freak_town
-      POSTGRES_PASSWORD: freak_town
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U freak_town"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
-volumes:
-  pgdata:

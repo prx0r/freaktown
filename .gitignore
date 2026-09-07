@@ -10,3 +10,7 @@ anchor-target/
 
 # Large datasets (stored in R2)
 data/datasets/*.json
+.env
+deploy/pages/.wrangler/
+*.log
+.venv/

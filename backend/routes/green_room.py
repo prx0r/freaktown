@@ -23,11 +23,12 @@ from backend.models.draft import (
     WordTiming,
 )
 from backend.models.performance import PRESET_ENGINES, PerformanceEngine, StyleProfile
-from backend.services.edge_tts import edge_tts_service
 from backend.services.direction_parser import stage_direction_parser
 from backend.services.green_room_compiler import GreenRoomCompiler
 from backend.services.motion_compiler import MotionSearch
 from backend.models.motion_assets import SEED_MOTIONS
+from backend.services.tts import tts_registry, get_adapter, list_providers, list_available
+from backend.services.tts.registry import preprocess_text
 
 router = APIRouter()
 
@@ -56,6 +57,7 @@ class DraftCreate(BaseModel):
     character_id: str
     script: str = Field("", description="The comedy script")
     episode_id: str | None = None
+    tts_provider: str = Field("", description="TTS provider (empty = default)")
 
 
 class DraftUpdateScript(BaseModel):
@@ -76,6 +78,11 @@ class SpeechDirectiveAdd(BaseModel):
 
 class CompileRequest(BaseModel):
     draft_id: str
+
+
+class SynthesizeRequest(BaseModel):
+    provider: str = Field("", description="TTS provider (empty = use draft's provider)")
+    voice_id: str = Field("", description="Voice ID (empty = use draft's voice)")
 
 
 class EnterShowRequest(BaseModel):
@@ -172,34 +179,83 @@ async def get_character(character_id: str):
     return {"character": _characters[character_id]}
 
 
-# ── Voice Endpoints ─────────────────────────────────────────────────
+# ── TTS Provider Endpoints ──────────────────────────────────────────
+
+@router.get("/green-room/tts/providers")
+async def get_tts_providers():
+    """List all TTS providers with availability and comedy tag support."""
+    providers = list_providers()
+    available = list_available()
+    available_ids = {p.id for p in available}
+    return {
+        "providers": [
+            {
+                "id": p.id,
+                "name": p.name,
+                "description": p.description,
+                "default": p.id == tts_registry.default_id,
+                "available": p.id in available_ids,
+                "free": p.free,
+                "cost_per_minute": p.cost_per_minute,
+                "comedy_tags": p.comedy_tags,
+                "pause_tags": p.pause_tags,
+                "voice_count": len(p.voices),
+            }
+            for p in providers
+        ],
+        "default": tts_registry.default_id,
+    }
+
+
+@router.get("/green-room/tts/voices")
+async def get_tts_voices(provider: str = ""):
+    """List voices for a specific TTS provider (or all available)."""
+    if provider:
+        adapter = get_adapter(provider)
+        return {"provider": provider, "voices": adapter.list_voices()}
+    # Return voices from all available providers
+    all_voices = {}
+    for p in list_available():
+        try:
+            adapter = get_adapter(p.id)
+            all_voices[p.id] = adapter.list_voices()
+        except Exception:
+            pass
+    return {"voices": all_voices}
+
+
+# ── Legacy voice endpoint (redirects to adapter) ────────────────────
 
 @router.get("/green-room/voices")
 async def list_voices():
     """List available voices for draft synthesis."""
-    return {"voices": edge_tts_service.list_voices()}
+    return {"voices": get_adapter().list_voices()}
 
 
 @router.post("/green-room/voices/synthesize")
-async def synthesize_voice(text: str, voice_id: str = "en-US-GuyNeural"):
-    """Synthesize text to speech and return audio + word timings.
+async def synthesize_voice(text: str, voice_id: str = "", provider: str = ""):
+    """Synthesize text to speech using any available provider.
 
-    This is the DRAFT voice — fast, free, good enough to iterate.
+    Provider cascade: requested → default → edge fallback.
     """
     if not text.strip():
         raise HTTPException(400, "Text cannot be empty")
 
-    result = await edge_tts_service.synthesize(text, voice_id)
-
-    return {
-        "audio_format": result.audio_format,
-        "duration_ms": result.duration_ms,
-        "word_timings": [
-            {"word": w.word, "start_ms": w.start_ms, "end_ms": w.end_ms, "index": w.index}
-            for w in result.word_timings
-        ],
-        "voice_id": result.voice_id,
-    }
+    try:
+        adapter = get_adapter(provider or None)
+        result = await adapter.synthesize(text, voice_id or None)
+        return {
+            "audio_format": result.audio_format,
+            "duration_ms": result.duration_ms,
+            "word_timings": [
+                {"word": w.word, "start_ms": w.start_ms, "end_ms": w.end_ms, "index": w.index}
+                for w in result.word_timings
+            ],
+            "voice_id": result.voice_id,
+            "provider": result.provider,
+        }
+    except Exception as e:
+        raise HTTPException(502, f"TTS failed: {e}")
 
 
 # ── Draft Endpoints ─────────────────────────────────────────────────
@@ -244,10 +300,10 @@ async def update_script(draft_id: str, req: DraftUpdateScript):
 
 
 @router.post("/green-room/drafts/{draft_id}/synthesize")
-async def synthesize_draft(draft_id: str):
+async def synthesize_draft(draft_id: str, req: SynthesizeRequest | None = None):
     """Synthesize the draft script to speech with word timings.
 
-    This fills in the word timings and audio duration.
+    Uses the TTS adapter layer — supports MiniMax, Gemini, Edge, ElevenLabs, etc.
     """
     if draft_id not in _drafts:
         raise HTTPException(404, "Draft not found")
@@ -256,29 +312,50 @@ async def synthesize_draft(draft_id: str):
     if not draft.script.strip():
         raise HTTPException(400, "Script is empty")
 
-    result = await edge_tts_service.synthesize(draft.script, draft.voice_id)
+    provider = (req.provider if req else "") or getattr(draft, 'tts_provider', '') or None
+    voice_id = (req.voice_id if req else "") or draft.voice_id or None
 
-    # Upload audio to R2
+    # Preprocess comedy tags for the target provider
+    text = draft.script
+    if provider:
+        text = preprocess_text(text, provider)
+
+    try:
+        adapter = get_adapter(provider)
+        result = await adapter.synthesize(text, voice_id)
+        word_timings = result.word_timings
+        duration_ms = result.duration_ms
+        audio_bytes = result.audio_bytes
+        used_provider = result.provider
+    except Exception:
+        # TTS unavailable — fall back to estimated timings
+        adapter = get_adapter("edge")
+        word_timings = adapter._estimate_word_timings(draft.script)
+        duration_ms = adapter._estimate_duration_ms(draft.script)
+        audio_bytes = b""
+        used_provider = "fallback"
+
+    # Upload audio to R2 (optional)
     from backend.services.media_store import media_store
     r2_info = {}
-    if media_store.configured and result.audio_bytes:
+    if media_store.configured and audio_bytes:
         try:
-            r2_info = media_store.put_audio(draft_id, result.audio_bytes)
-        except Exception as e:
-            # Log but don't fail — audio is synthesized, R2 is optional for draft
+            r2_info = media_store.put_audio(draft_id, audio_bytes)
+        except Exception:
             pass
 
-    draft.word_timings = result.word_timings
-    draft.audio_duration_ms = result.duration_ms
+    draft.word_timings = word_timings
+    draft.audio_duration_ms = duration_ms
     draft.audio_r2_key = r2_info.get("r2_key", "")
     draft.version += 1
     draft.updated_at = datetime.now(timezone.utc)
 
     return {
         "draft": draft.to_dict(),
-        "duration_ms": result.duration_ms,
-        "word_count": len(result.word_timings),
+        "duration_ms": duration_ms,
+        "word_count": len(word_timings),
         "r2_uploaded": bool(r2_info),
+        "provider": used_provider,
     }
 
 

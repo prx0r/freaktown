@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Freak Town — One Minute Stage</title>
+<script type="module" src="https://three.ws/agent-3d/1.5.2/agent-3d.js" integrity="sha384-xkFDjVP866hYt7voUhfnQHj6IO4hYxA6n8Laupk+VtD6y+IKiO/AZdE3VbfLtg0C" crossorigin="anonymous"></script>
+<style>
+:root{color-scheme:dark;--bg:#09090b;--panel:#111116;--line:#282833;--text:#f4f4f5;--muted:#8b8b98;--hot:#ff2fa8;--cyan:#00d9ff}
+*{box-sizing:border-box}html,body{height:100%;margin:0}body{background:radial-gradient(circle at 50% 0,#1a1020 0,#09090b 45%);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,sans-serif;overflow:hidden}.app{height:100%;display:grid;grid-template-rows:auto 1fr auto}.topbar{height:54px;padding:0 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;background:rgba(9,9,11,.82);backdrop-filter:blur(10px)}.brand{font-weight:900;letter-spacing:.18em;font-size:13px;color:var(--cyan)}.meta{font:12px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted)}.stage{min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,440px);gap:18px;padding:18px;max-width:1200px;width:100%;margin:0 auto}.visual{position:relative;min-height:0;border:1px solid var(--line);border-radius:18px;overflow:hidden;background:linear-gradient(180deg,#180d19,#08080c 70%);box-shadow:0 30px 100px rgba(0,0,0,.35)}.spotlight{position:absolute;inset:-35% 15% 20%;background:conic-gradient(from 180deg at 50% 0,transparent 25%,rgba(255,255,255,.15) 48%,rgba(255,255,255,.15) 52%,transparent 75%);filter:blur(20px);pointer-events:none}.platform{position:absolute;left:12%;right:12%;height:32%;bottom:-19%;border-radius:50%;background:radial-gradient(ellipse,#39182e 0,#160b15 47%,#050507 73%);border:1px solid #4d203b}.avatar-wrap{position:absolute;inset:24px 8% 9%;display:flex;align-items:flex-end;justify-content:center}agent-3d{display:block;width:min(100%,620px);height:100%;min-height:360px;position:relative;z-index:2}.mic{position:absolute;bottom:18%;left:54%;width:5px;height:30%;background:#4b4b53;border-radius:4px;z-index:4}.mic:before{content:"";position:absolute;width:18px;height:42px;border-radius:12px;background:#222229;border:1px solid #5b5b66;left:-7px;top:-25px}.mic:after{content:"";position:absolute;left:-34px;bottom:0;width:72px;height:5px;border-radius:50%;background:#34343d}.clock{position:absolute;top:18px;right:18px;z-index:6;background:rgba(0,0,0,.6);border:1px solid var(--line);border-radius:999px;padding:8px 12px;font:700 13px ui-monospace,SFMono-Regular,Menlo,monospace}.clock.live{border-color:var(--hot);color:#fff}.side{min-height:0;display:grid;grid-template-rows:auto auto 1fr auto;gap:12px}.card{background:rgba(17,17,22,.92);border:1px solid var(--line);border-radius:14px;padding:14px}.performer-name{font-size:22px;font-weight:900}.premise{margin-top:4px;color:var(--muted);font-size:13px;line-height:1.45}.counts{display:grid;grid-template-columns:1fr 1fr;gap:10px}.stat{border:1px solid var(--line);border-radius:12px;padding:12px}.stat b{font-size:26px;display:block}.stat span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.12em}.transcript{min-height:0;overflow:auto;font-size:15px;line-height:1.62;color:#8e8e99;scrollbar-width:thin}.word{transition:color .12s}.word.spoken{color:#f0f0f3}.word.current{color:var(--hot)}.result{display:none;max-height:200px;overflow:auto;white-space:pre-wrap;font:11px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;color:#b6f5ff}.result.show{display:block}.controls{border-top:1px solid var(--line);padding:14px 18px 18px;background:rgba(9,9,11,.9);display:grid;grid-template-columns:minmax(180px,1fr) minmax(180px,1fr) auto auto;gap:10px;max-width:1200px;width:100%;margin:0 auto}.btn{border:1px solid #353540;border-radius:13px;background:#17171d;color:#fff;padding:14px 18px;font:800 15px/1 system-ui;cursor:pointer;min-height:50px}.btn:hover:not(:disabled){border-color:#666}.btn:active:not(:disabled){transform:translateY(1px) scale(.995)}.btn:disabled{opacity:.4;cursor:not-allowed}.laugh{background:linear-gradient(180deg,#3b1332,#261020);border-color:#74245d}.clap{background:linear-gradient(180deg,#123239,#0e2429);border-color:#1e6975}.primary{background:var(--hot);border-color:var(--hot)}.secondary{display:none}.secondary.show{display:block}.kbd{font-size:11px;opacity:.5;margin-left:6px}.error{position:fixed;left:50%;top:68px;transform:translateX(-50%);background:#3b1212;border:1px solid #8b2d2d;padding:9px 13px;border-radius:9px;font-size:12px;display:none;z-index:20}.error.show{display:block}@media(max-width:800px){body{overflow:auto}.app{min-height:100%;height:auto}.stage{grid-template-columns:1fr;padding:10px}.visual{height:54vh;min-height:420px}.side{height:50vh}.controls{position:sticky;bottom:0;grid-template-columns:1fr 1fr;padding:10px}.primary,.secondary{grid-column:span 1}.meta{display:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar"><div class="brand">FREAK TOWN</div><div class="meta" id="sessionMeta">ONE HUMAN AUDIENCE · SET DATA V1</div></header>
+  <main class="stage">
+    <section class="visual">
+      <div class="spotlight"></div><div class="platform"></div><div class="mic"></div>
+      <div class="clock" id="clock">01:00.0</div>
+      <div class="avatar-wrap">
+        <agent-3d id="avatar" body="https://three.ws/avatars/michelle.glb" mode="inline" kiosk eager clip="idle"><span>3D performer loading…</span></agent-3d>
+      </div>
+    </section>
+    <aside class="side">
+      <div class="card"><div class="performer-name" id="performerName">Freak Town</div><div class="premise" id="premise">Press START SET. React naturally. Every click is timestamped against the performance.</div></div>
+      <div class="counts"><div class="stat"><b id="laughCount">0</b><span>HAHA</span></div><div class="stat"><b id="clapCount">0</b><span>CLAP</span></div></div>
+      <div class="card transcript" id="transcript">The finished set JSON will include the raw reaction event stream and aggregate timing bins.</div>
+      <pre class="card result" id="result"></pre>
+    </aside>
+  </main>
+  <footer class="controls">
+    <button class="btn laugh" id="laughBtn" disabled>HAHA <span class="kbd">L</span></button>
+    <button class="btn clap" id="clapBtn" disabled>CLAP <span class="kbd">K</span></button>
+    <button class="btn primary" id="playBtn">START SET <span class="kbd">SPACE</span></button>
+    <button class="btn secondary" id="downloadBtn">JSON</button>
+  </footer>
+</div>
+<div class="error" id="errorBox"></div>
+<audio id="audio" preload="auto"></audio>
+<script>
+const TARGET_SECONDS=60;
+const el=id=>document.getElementById(id);
+const audio=el('audio'),avatar=el('avatar'),clockEl=el('clock'),playBtn=el('playBtn'),laughBtn=el('laughBtn'),clapBtn=el('clapBtn'),downloadBtn=el('downloadBtn'),transcript=el('transcript'),result=el('result');
+let session=null,finalJson=null,mode=null,running=false,pausedElapsed=0,startedPerf=0,raf=0,speech=null,completing=false;
+let counts={laugh:0,clap:0};
+const audienceMemberId=localStorage.getItem('freaktown_audience_id')||crypto.randomUUID(); localStorage.setItem('freaktown_audience_id',audienceMemberId);
+
+function showError(message){const box=el('errorBox');box.textContent=message;box.classList.add('show');setTimeout(()=>box.classList.remove('show'),3500)}
+function api(path,options={}){return fetch(path,{headers:{'Content-Type':'application/json',...(options.headers||{})},...options}).then(async r=>{const j=await r.json();if(!r.ok)throw new Error(j.error||`HTTP ${r.status}`);return j})}
+function nowSeconds(){if(!running)return pausedElapsed;if(mode==='audio')return Math.min(audio.currentTime,TARGET_SECONDS);return Math.min(pausedElapsed+(performance.now()-startedPerf)/1000,TARGET_SECONDS)}
+function formatClock(elapsed){const left=Math.max(0,TARGET_SECONDS-elapsed);return `00:${String(Math.floor(left)).padStart(2,'0')}.${Math.floor((left%1)*10)}`}
+function renderClock(){const t=nowSeconds();clockEl.textContent=formatClock(t);const words=[...transcript.querySelectorAll('.word')];if(words.length){const pct=Math.min(1,t/Math.max(1,mode==='audio'&&Number.isFinite(audio.duration)?Math.min(audio.duration,TARGET_SECONDS):TARGET_SECONDS));const idx=Math.min(words.length-1,Math.floor(pct*words.length));words.forEach((w,i)=>{w.classList.toggle('spoken',i<idx);w.classList.toggle('current',i===idx)});if(words[idx])words[idx].scrollIntoView({block:'nearest'})}if(running&&t>=TARGET_SECONDS-.02){finishSet();return}if(running)raf=requestAnimationFrame(renderClock)}
+function resetUi(){counts={laugh:0,clap:0};el('laughCount').textContent='0';el('clapCount').textContent='0';finalJson=null;result.textContent='';result.classList.remove('show');downloadBtn.classList.remove('show');completing=false;pausedElapsed=0;clockEl.textContent='01:00.0'}
+function renderTranscript(text){transcript.innerHTML='';text.split(/\s+/).forEach((word,i)=>{const span=document.createElement('span');span.className='word';span.textContent=word+(i?' ':'');transcript.appendChild(span)})}
+async function loadSet(){resetUi();playBtn.disabled=true;playBtn.textContent='LOADING…';try{session=await api('/api/set');el('performerName').textContent=session.performer.name;el('premise').textContent=session.performer.premise;el('sessionMeta').textContent=`SESSION ${session.session_id.slice(0,8)} · ${session.set.tts_mode.toUpperCase()}`;renderTranscript(session.set.transcript);avatar.setAttribute('body',session.performer.avatar_url);await startPlayback()}catch(e){showError(e.message);playBtn.disabled=false;playBtn.textContent='START SET'}}
+async function startPlayback(){await api('/api/start',{method:'POST',body:JSON.stringify({session_id:session.session_id})});pausedElapsed=0;startedPerf=performance.now();running=true;clockEl.classList.add('live');laughBtn.disabled=false;clapBtn.disabled=false;playBtn.disabled=false;playBtn.textContent='PAUSE';playBtn.onclick=togglePause;if(session.set.audio_url){mode='audio';audio.src=session.set.audio_url;audio.currentTime=0;audio.onended=finishSet;try{await audio.play()}catch(e){mode='browser';startBrowserSpeech()}}else{mode='browser';startBrowserSpeech()}cancelAnimationFrame(raf);raf=requestAnimationFrame(renderClock)}
+function startBrowserSpeech(){speechSynthesis.cancel();speech=new SpeechSynthesisUtterance(session.set.transcript);speech.rate=1.08;speech.onend=()=>{if(running&&nowSeconds()>5)finishSet()};speechSynthesis.speak(speech)}
+function togglePause(){if(!session||completing)return;if(running){pausedElapsed=nowSeconds();running=false;cancelAnimationFrame(raf);if(mode==='audio')audio.pause();else speechSynthesis.pause();playBtn.textContent='RESUME';clockEl.classList.remove('live');}else{startedPerf=performance.now();running=true;if(mode==='audio')audio.play();else speechSynthesis.resume();playBtn.textContent='PAUSE';clockEl.classList.add('live');raf=requestAnimationFrame(renderClock)}}
+async function react(type){if(!running||!session)return;const t=nowSeconds();counts[type]++;el(type==='laugh'?'laughCount':'clapCount').textContent=counts[type];try{await api('/api/reaction',{method:'POST',body:JSON.stringify({session_id:session.session_id,type,set_time_seconds:t,audience_member_id:audienceMemberId})})}catch(e){counts[type]--;el(type==='laugh'?'laughCount':'clapCount').textContent=counts[type];showError(`Reaction not saved: ${e.message}`)}}
+async function finishSet(){if(completing||!session)return;completing=true;const duration=Math.max(.001,nowSeconds());running=false;cancelAnimationFrame(raf);audio.pause();speechSynthesis.cancel();clockEl.classList.remove('live');laughBtn.disabled=true;clapBtn.disabled=true;playBtn.disabled=true;playBtn.textContent='FINALIZING…';try{finalJson=await api('/api/complete',{method:'POST',body:JSON.stringify({session_id:session.session_id,duration_seconds:duration})});result.textContent=JSON.stringify(finalJson,null,2);result.classList.add('show');downloadBtn.classList.add('show');playBtn.disabled=false;playBtn.textContent='NEXT SET';playBtn.onclick=loadSet;clockEl.textContent=formatClock(finalJson.actual_duration_seconds);el('sessionMeta').textContent=`COMPLETE · ${finalJson.summary.reaction_counts.total} REACTIONS · ${finalJson.actual_duration_seconds.toFixed(1)}s`}catch(e){showError(e.message);completing=false;playBtn.disabled=false;playBtn.textContent='FINISH SET';playBtn.onclick=finishSet}}
+function downloadJson(){if(!finalJson)return;const blob=new Blob([JSON.stringify(finalJson,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`freaktown-${finalJson.session_id}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500)}
+playBtn.onclick=loadSet;laughBtn.onclick=()=>react('laugh');clapBtn.onclick=()=>react('clap');downloadBtn.onclick=downloadJson;
+document.addEventListener('keydown',e=>{if(['INPUT','TEXTAREA'].includes(document.activeElement.tagName))return;if(e.code==='Space'){e.preventDefault();if(playBtn.disabled)return;playBtn.click()}if(e.key.toLowerCase()==='l'&&!laughBtn.disabled)react('laugh');if(e.key.toLowerCase()==='k'&&!clapBtn.disabled)react('clap')});
+</script>
+</body>
+</html>

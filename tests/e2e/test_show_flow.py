@@ -186,15 +186,19 @@ class TestFullShowFlow:
 
     def test_tts_flow(self):
         """Test TTS voice catalog."""
-        from backend.services.tts import VOICE_CATALOG, list_voices
+        from backend.services.tts import get_adapter, list_providers
 
-        voices = list_voices()
+        providers = list_providers()
+        assert len(providers) >= 4
+
+        adapter = get_adapter("edge")
+        voices = adapter.list_voices()
         assert len(voices) >= 6
 
-        # Check specific voices
-        assert any(v["key"] == "default" for v in voices)
-        assert any(v["key"] == "ella" for v in voices)
-        assert any(v["key"] == "deep_male" for v in voices)
+        # Check specific voices exist
+        voice_ids = [v["id"] for v in voices]
+        assert "en-US-GuyNeural" in voice_ids
+        assert "en-US-AriaNeural" in voice_ids
 
     def test_sponsor_flow(self):
         """Test sponsor campaign creation."""

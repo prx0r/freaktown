@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Freak Town</title>
+  <meta name="description" content="A live talent show for artificial personalities">
+  <style>
+    :root { --bg: #0a0a0f; --card: #1a1a2e; --border: #2a2a4a; --accent: #ff4444; --green: #4ade80; --amber: #fbbf24; --red: #f87171; --text: #e0e0e0; --muted: #888; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, system-ui, sans-serif; min-height: 100vh; }
+
+    /* Layout */
+    header { padding: 1.25rem 2rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; background: var(--bg); z-index: 100; }
+    header h1 { font-size: 1.4rem; color: var(--accent); letter-spacing: -0.5px; }
+    header nav { display: flex; gap: 0.5rem; }
+    nav button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.85rem; padding: 0.5rem 1rem; border-radius: 6px; transition: all 0.15s; }
+    nav button:hover, nav button.active { background: var(--card); color: #fff; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+
+    /* Config banner */
+    .config-banner { background: #1a1a2e; border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.5rem; margin-bottom: 1.5rem; display: flex; gap: 1rem; align-items: center; }
+    .config-banner input { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); padding: 0.5rem 0.75rem; font-size: 0.85rem; }
+    .config-banner input:focus { outline: none; border-color: var(--accent); }
+    .config-banner .btn { padding: 0.5rem 1rem; font-size: 0.85rem; }
+
+    /* Cards */
+    .shelf { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1.25rem; margin-top: 1.5rem; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; cursor: pointer; transition: all 0.2s; }
+    .card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 4px 20px rgba(255,68,68,0.1); }
+    .card.new { border-style: dashed; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 180px; }
+    .card .avatar { font-size: 2.5rem; margin-bottom: 0.5rem; }
+    .card h3 { font-size: 1rem; margin-bottom: 0.25rem; }
+    .card p { font-size: 0.8rem; color: var(--muted); line-height: 1.4; }
+    .tag { display: inline-block; margin-top: 0.5rem; padding: 2px 8px; background: var(--border); border-radius: 4px; font-size: 0.7rem; color: #aaa; margin-right: 4px; }
+
+    /* Editor */
+    .editor { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 1.5rem; }
+    @media (max-width: 768px) { .editor { grid-template-columns: 1fr; } }
+    textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.95rem; padding: 1rem; resize: vertical; font-family: inherit; line-height: 1.6; min-height: 200px; }
+    textarea:focus { outline: none; border-color: var(--accent); }
+    .stats { display: flex; gap: 1rem; margin-top: 0.5rem; font-size: 0.8rem; color: var(--muted); flex-wrap: wrap; }
+    .badge { padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; font-weight: 600; }
+    .badge.green { background: #1a3a1a; color: var(--green); }
+    .badge.amber { background: #3a3a1a; color: var(--amber); }
+    .badge.red { background: #3a1a1a; color: var(--red); }
+    .words { display: flex; flex-wrap: wrap; gap: 4px; line-height: 2; }
+    .word { padding: 2px 6px; border-radius: 4px; cursor: pointer; transition: all 0.1s; font-size: 0.85rem; }
+    .word:hover { background: var(--border); }
+    .word.dir { background: #1a3a2a; border-bottom: 2px solid var(--green); }
+    .dir-bar { margin-top: 1rem; padding: 0.75rem; background: var(--card); border: 1px solid var(--border); border-radius: 8px; display: flex; gap: 0.5rem; align-items: center; }
+    .dir-bar input { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); padding: 0.5rem; }
+    .dir-bar input:focus { outline: none; border-color: var(--accent); }
+
+    /* Buttons */
+    .btn { padding: 0.6rem 1.25rem; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:hover { background: #cc3333; }
+    .btn-primary:disabled { background: #4a4a4a; cursor: not-allowed; }
+    .btn-secondary { background: var(--border); color: var(--text); border: 1px solid #3a3a5a; }
+    .btn-secondary:hover { background: #3a3a5a; }
+    .actions { display: flex; gap: 1rem; margin-top: 1.5rem; justify-content: flex-end; }
+
+    /* Plan */
+    .plan { background: var(--bg); border-radius: 8px; padding: 1rem; margin-top: 1rem; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.8rem; max-height: 300px; overflow-y: auto; border: 1px solid var(--border); }
+    .cue { padding: 2px 0; display: flex; gap: 1rem; }
+    .cue-time { color: var(--accent); min-width: 55px; }
+    .cue-action { color: var(--green); }
+    .cue-layer { color: var(--muted); }
+
+    /* Show */
+    .show-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; }
+    .act-row { display: flex; align-items: center; gap: 1rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
+    .act-row:last-child { border: none; }
+    .act-pos { width: 30px; text-align: center; color: var(--accent); font-weight: 700; }
+    .act-name { flex: 1; }
+    .act-stat { width: 80px; text-align: right; font-size: 0.85rem; }
+    .act-stat.good { color: var(--green); }
+    .act-stat.bad { color: var(--red); }
+
+    /* Stage placeholder */
+    .stage { background: var(--bg); border-radius: 12px; height: 300px; display: flex; align-items: center; justify-content: center; margin-bottom: 1rem; border: 1px solid var(--border); position: relative; overflow: hidden; }
+    .stage::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 50% 80%, rgba(255,68,68,0.05), transparent 70%); }
+
+    /* Toast */
+    .toast { position: fixed; bottom: 2rem; right: 2rem; background: #1a3a1a; color: var(--green); padding: 0.75rem 1.25rem; border-radius: 8px; border: 1px solid #2a5a2a; font-size: 0.85rem; z-index: 1000; animation: slideUp 0.3s ease-out; }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    .section-title { font-size: 1.1rem; margin-bottom: 1rem; color: var(--accent); font-weight: 600; }
+    .empty { color: var(--muted); text-align: center; padding: 3rem; font-size: 1rem; }
+    .loading { color: var(--muted); text-align: center; padding: 2rem; }
+
+    /* WebSocket indicator */
+    .ws-status { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+    .ws-status.connected { background: var(--green); }
+    .ws-status.disconnected { background: var(--red); }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    // ── Config ──────────────────────────────────────────────────────
+    const STORAGE_KEY = 'freak-town-api-url';
+    let API = localStorage.getItem(STORAGE_KEY) || '';
+    let ws = null;
+    let state = { view: 'shelf', chars: [], draft: null, plan: null, shows: [] };
+
+    // ── API Client ──────────────────────────────────────────────────
+    async function api(path, opts = {}) {
+      if (!API) throw new Error('Backend URL not configured');
+      const r = await fetch(API + path, {
+        ...opts,
+        headers: { 'Content-Type': 'application/json', ...opts.headers },
+        body: opts.body ? JSON.stringify(opts.body) : undefined,
+      });
+      if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+      return r.json();
+    }
+
+    function toast(msg) {
+      const el = document.createElement('div');
+      el.className = 'toast';
+      el.textContent = msg;
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 3000);
+    }
+
+    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+    // ── WebSocket ───────────────────────────────────────────────────
+    function connectWS(episodeId) {
+      if (ws) ws.close();
+      const wsUrl = API.replace(/^http/, 'ws') + `/v1/ws/episodes/${episodeId}/stage`;
+      ws = new WebSocket(wsUrl);
+      ws.onopen = () => { render(); };
+      ws.onclose = () => { render(); };
+      ws.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'crowd.update' && msg.data?.laugh) {
+          toast('HA! (' + msg.data.intensity + ')');
+        }
+      };
+    }
+
+    // ── Render ──────────────────────────────────────────────────────
+    function render() {
+      const app = document.getElementById('app');
+      const views = { shelf: renderShelf, editor: renderEditor, watch: renderWatch, shows: renderShows };
+      app.innerHTML = (views[state.view] || renderShelf)();
+      bindEvents();
+    }
+
+    function renderConfigBanner() {
+      if (API) return '';
+      return `
+        <div class="config-banner">
+          <span style="color:var(--accent);font-weight:600">⚙️</span>
+          <input id="apiUrl" placeholder="Backend URL (e.g. https://tunnel.trycloudflare.com)" value="${esc(API)}">
+          <button class="btn btn-primary" onclick="setApiUrl()">Connect</button>
+        </div>`;
+    }
+
+    function renderShelf() {
+      const cards = state.chars.map(c => `
+        <div class="card" onclick="selectChar('${c.id}')">
+          <div class="avatar">${c.body_class === 'quadruped-v1' ? '🐕' : c.body_class === 'rigid-object-v1' ? '🔧' : '🎭'}</div>
+          <h3>${esc(c.name)}</h3>
+          <p>${esc(c.premise)}</p>
+          <span class="tag">${c.engine_preset}</span>
+          <span class="tag">${c.body_class}</span>
+        </div>
+      `).join('');
+      return `
+        <header>
+          <h1>🎬 Freak Town</h1>
+          <nav>
+            <button class="active">Green Room</button>
+            <button onclick="loadShows()">Shows</button>
+            <button onclick="window.open(API + '/docs','_blank')" style="font-size:0.75rem">API</button>
+          </nav>
+        </header>
+        <div class="container">
+          ${renderConfigBanner()}
+          <div class="section-title">The Green Room</div>
+          ${!API ? '<div class="empty">Enter your backend URL above to connect.</div>' :
+            state.chars.length === 0 ? '<div class="empty">No characters yet. Try Lucky Dip or Create.</div>' : ''}
+          <div class="shelf">
+            ${cards}
+            <div class="card new" onclick="luckyDip()"><div class="avatar">🎲</div><h3>Lucky Dip</h3><p>Random character</p></div>
+            <div class="card new" onclick="promptCreate()"><div class="avatar">✨</div><h3>Create</h3><p>New character</p></div>
+          </div>
+        </div>`;
+    }
+
+    function renderEditor() {
+      const d = state.draft;
+      if (!d) return '<div class="loading">Loading...</div>';
+      const words = d.script.split(/\s+/);
+      const wordHtml = words.map((w, i) => {
+        const hasDir = d.stage_directions?.some(x => x.at_word === i);
+        return `<span class="word ${hasDir ? 'dir' : ''}" data-idx="${i}">${esc(w)}</span>`;
+      }).join(' ');
+      const charName = state.chars.find(c => c.id === d.comedian_id)?.name || 'Character';
+      return `
+        <header>
+          <h1>🎬 Freak Town</h1>
+          <nav>
+            <button onclick="state.view='shelf';state.draft=null;state.plan=null;render()">← Shelf</button>
+            <button class="active">Editor</button>
+            <button onclick="compileAndWatch()" ${!d.audio_duration_ms ? 'disabled' : ''} class="btn btn-primary" style="padding:0.35rem 0.75rem;font-size:0.8rem">▶ Watch</button>
+          </nav>
+        </header>
+        <div class="container">
+          <div class="section-title">${esc(charName)}</div>
+          <div class="editor">
+            <div>
+              <textarea id="script" oninput="updateScript(this.value)" placeholder="Write the comedy script...">${esc(d.script)}</textarea>
+              <div class="stats">
+                <span>${d.word_count} words</span>
+                <span>~${(d.estimated_duration_ms/1000).toFixed(1)}s est</span>
+                ${d.audio_duration_ms ? `<span>${(d.audio_duration_ms/1000).toFixed(1)}s actual</span>` : ''}
+                <span class="badge ${d.duration_status}">${d.duration_status}</span>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:0.8rem;color:var(--muted);margin-bottom:0.5rem">Click a word to add a direction:</div>
+              <div class="words" id="wordGrid">${wordHtml}</div>
+              <div id="dirBar"></div>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="btn btn-secondary" onclick="synthesize()">🔊 Synthesize</button>
+            <button class="btn btn-primary" onclick="compileAndWatch()" ${!d.audio_duration_ms ? 'disabled' : ''}>▶ WATCH</button>
+          </div>
+          ${state.plan ? `<div class="plan"><div style="color:var(--muted);margin-bottom:0.5rem">Performance Plan — ${state.plan.cue_count} cues, ${(state.plan.duration_ms/1000).toFixed(1)}s</div>${state.plan.cues.map(c => `<div class="cue"><span class="cue-time">${(c.at_ms/1000).toFixed(1)}s</span><span class="cue-action">${c.action}</span><span class="cue-layer">${c.layer}</span></div>`).join('')}</div>` : ''}
+        </div>`;
+    }
+
+    function renderWatch() {
+      const p = state.plan;
+      const d = state.draft;
+      if (!p) return '<div class="loading">No plan compiled yet</div>';
+      const charName = state.chars.find(c => c.id === d?.comedian_id)?.name || '';
+      return `
+        <header>
+          <h1>🎬 Freak Town</h1>
+          <nav>
+            <button onclick="state.view='editor';render()">← Edit</button>
+            <button class="active">Watch</button>
+          </nav>
+        </header>
+        <div class="container">
+          <div class="section-title">Rehearsal — ${esc(charName)}</div>
+          <div class="stage">
+            <div style="text-align:center;color:var(--muted);z-index:1">
+              <div style="font-size:3.5rem">🎭</div>
+              <p>Stage renders here with three-vrm avatar</p>
+              <p style="font-size:0.8rem;margin-top:0.25rem">${p.cue_count} motion cues · ${(p.duration_ms/1000).toFixed(1)}s</p>
+            </div>
+          </div>
+          <div style="background:var(--card);border-radius:8px;padding:1rem;font-size:0.85rem;max-height:80px;overflow-y:auto;margin-bottom:1rem;border:1px solid var(--border)">${esc(d?.script || '')}</div>
+          <div class="actions">
+            <button class="btn btn-primary" onclick="enterShow()">🎬 ENTER TONIGHT'S SHOW</button>
+          </div>
+          <div class="plan"><div style="color:var(--muted);margin-bottom:0.5rem">Cue Timeline</div>${p.cues.map(c => `<div class="cue"><span class="cue-time">${(c.at_ms/1000).toFixed(1)}s</span><span class="cue-action">${c.action}</span><span class="cue-layer">${c.layer}</span></div>`).join('')}</div>
+        </div>`;
+    }
+
+    function renderShows() {
+      const shows = state.shows || [];
+      return `
+        <header>
+          <h1>🎬 Freak Town</h1>
+          <nav>
+            <button onclick="state.view='shelf';render()">← Green Room</button>
+            <button class="active">Shows</button>
+          </nav>
+        </header>
+        <div class="container">
+          <div class="section-title">Shows</div>
+          ${shows.length === 0 ? '<div class="empty">No shows yet.</div>' :
+            shows.map(s => `
+              <div class="show-card">
+                <h3>${s.date || 'Today'} <span style="font-weight:normal;color:var(--muted);font-size:0.85rem">(${s.phase})</span></h3>
+                <p style="color:var(--muted);font-size:0.85rem">${s.total_duration_sec}s · ${s.total_laughs} laughs</p>
+                ${(s.acts||[]).map(a => `
+                  <div class="act-row">
+                    <span class="act-pos">#${a.position}</span>
+                    <span class="act-name">${esc(a.character_name)}</span>
+                    <span class="act-stat">${a.laugh_count} laughs</span>
+                    <span class="act-stat ${a.return_rate > 50 ? 'good' : 'bad'}">${a.return_rate}% return</span>
+                  </div>`).join('')}
+              </div>`).join('')}
+        </div>`;
+    }
+
+    // ── Actions ─────────────────────────────────────────────────────
+    function setApiUrl() {
+      const input = document.getElementById('apiUrl');
+      API = input.value.replace(/\/+$/, '');
+      localStorage.setItem(STORAGE_KEY, API);
+      loadChars();
+      render();
+      toast('Connected to ' + API);
+    }
+
+    async function loadChars() {
+      if (!API) return;
+      try {
+        const r = await api('/v1/green-room/characters');
+        state.chars = r.characters || [];
+      } catch (e) { console.error(e); }
+    }
+
+    async function luckyDip() {
+      const d = await api('/v1/green-room/lucky-dip', { method: 'POST', body: {} });
+      state.chars.push(d.character);
+      render();
+      toast('Created: ' + d.character.name);
+    }
+
+    async function promptCreate() {
+      const name = prompt('Character name:');
+      if (!name) return;
+      const premise = prompt('One-line premise:') || '';
+      const d = await api('/v1/green-room/characters', {
+        method: 'POST', body: { name, premise, body_class: 'humanoid-v1', engine_preset: 'confident' }
+      });
+      state.chars.push(d.character);
+      render();
+      toast('Created: ' + name);
+    }
+
+    async function selectChar(id) {
+      const d = await api('/v1/green-room/drafts', { method: 'POST', body: { character_id: id } });
+      state.draft = d.draft;
+      state.plan = null;
+      state.view = 'editor';
+      render();
+    }
+
+    let scriptTimeout;
+    function updateScript(v) {
+      clearTimeout(scriptTimeout);
+      scriptTimeout = setTimeout(async () => {
+        await api(`/v1/green-room/drafts/${state.draft.id}/script`, { method: 'PATCH', body: { script: v } });
+        const d = await api(`/v1/green-room/drafts/${state.draft.id}`);
+        state.draft = d.draft;
+        const grid = document.getElementById('wordGrid');
+        if (grid) {
+          grid.innerHTML = v.split(/\s+/).map((w, i) => {
+            const hasDir = state.draft.stage_directions?.some(x => x.at_word === i);
+            return `<span class="word ${hasDir ? 'dir' : ''}" data-idx="${i}">${esc(w)}</span>`;
+          }).join(' ');
+          bindEvents();
+        }
+      }, 500);
+    }
+
+    async function synthesize() {
+      const btn = document.querySelector('.btn-secondary');
+      if (btn) btn.textContent = '⏳ Synthesizing...';
+      try {
+        const r = await api(`/v1/green-room/drafts/${state.draft.id}/synthesize`, { method: 'POST' });
+        state.draft = r.draft;
+        render();
+        toast(`Synthesized: ${(r.duration_ms/1000).toFixed(1)}s`);
+      } catch (e) { toast('Error: ' + e.message); }
+    }
+
+    async function compileAndWatch() {
+      const r = await api('/v1/green-room/compile', { method: 'POST', body: { draft_id: state.draft.id } });
+      state.plan = r.plan;
+      state.view = 'watch';
+      render();
+    }
+
+    async function enterShow() {
+      if (!confirm('Seal this performance and enter tonight\'s show?')) return;
+      await api('/v1/green-room/enter-show', {
+        method: 'POST', body: { draft_id: state.draft.id, episode_id: 'live' }
+      });
+      toast('Performance sealed!');
+    }
+
+    async function loadShows() {
+      const r = await api('/v1/shows');
+      state.shows = r.shows || [];
+      state.view = 'shows';
+      render();
+    }
+
+    function bindEvents() {
+      document.querySelectorAll('.word').forEach(el => {
+        el.onclick = () => {
+          const idx = parseInt(el.dataset.idx);
+          const words = state.draft.script.split(/\s+/);
+          const bar = document.getElementById('dirBar');
+          if (bar) {
+            bar.innerHTML = `<div class="dir-bar"><span style="color:var(--muted);font-size:0.8rem">Word ${idx}: "${esc(words[idx])}"</span><input id="dirInput" placeholder="stare at Ella, shrug, freeze..." onkeydown="if(event.key==='Enter')addDir(${idx})"><button class="btn btn-primary" style="padding:0.35rem 0.75rem;font-size:0.8rem" onclick="addDir(${idx})">Add</button></div>`;
+            document.getElementById('dirInput')?.focus();
+          }
+        };
+      });
+    }
+
+    async function addDir(idx) {
+      const input = document.getElementById('dirInput');
+      if (!input?.value) return;
+      await api(`/v1/green-room/drafts/${state.draft.id}/directions`, {
+        method: 'POST', body: { at_word: idx, description: input.value }
+      });
+      const d = await api(`/v1/green-room/drafts/${state.draft.id}`);
+      state.draft = d.draft;
+      render();
+      toast('Direction added');
+    }
+
+    // ── Init ────────────────────────────────────────────────────────
+    (async () => {
+      if (API) await loadChars();
+      render();
+    })();
+  </script>
+</body>
+</html>

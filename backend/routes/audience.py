@@ -19,7 +19,6 @@ from backend.models import (
     CrowdBucket,
     Episode,
     Appearance,
-    EpisodeStatus,
     ShowEvent,
 )
 
@@ -33,7 +32,6 @@ async def join_audience(episode_id: uuid.UUID):
     """Create an anonymous audience session."""
     session_id = uuid.uuid4()
     async with async_session() as db:
-        # Verify episode exists
         result = await db.execute(select(Episode).where(Episode.id == episode_id))
         episode = result.scalar_one_or_none()
         if not episode:
@@ -49,7 +47,6 @@ async def join_audience(episode_id: uuid.UUID):
 # ── Crowd aggregation in-memory store ─────────────────────────────────
 
 # In production this would be Redis. For MVP, in-memory per episode.
-# key = episode_id, value = { contestant_id: { bucket_start: { ... } } }
 crowd_store: dict[str, dict[str, dict[int, dict]]] = {}
 
 # Active audience connections per episode
@@ -101,8 +98,8 @@ async def audience_ws(websocket: WebSocket, episode_id: uuid.UUID):
       {"type": "laugh", "intensity": 3}
       {"type": "clap"}
       {"type": "boo"}
-      {"type": "tip", "contestant_id": "...", "amount": 5.0}
-      {"type": "vote", "contestant_id": "...", "vote": "yes"}
+      {"type": "tip", "appearance_id": "...", "amount": 5.0}
+      {"type": "vote", "appearance_id": "...", "vote": "yes"}
 
     Server sends:
       {"type": "crowd.aggregate", "data": {...}}
@@ -127,8 +124,8 @@ async def audience_ws(websocket: WebSocket, episode_id: uuid.UUID):
                 "type": "snapshot",
                 "data": {
                     "episode_id": ep_id,
-                    "status": episode.status.value,
-                    "phase": episode.current_phase.value if episode.current_phase else None,
+                    "status": episode.status,
+                    "phase": episode.current_phase,
                 },
             }))
 
@@ -139,25 +136,23 @@ async def audience_ws(websocket: WebSocket, episode_id: uuid.UUID):
             msg_type = msg.get("type")
 
             if msg_type == "laugh":
-                # Record laugh event
                 intensity = msg.get("intensity", 1)
                 now = datetime.now(timezone.utc)
 
                 async with async_session() as db:
-                    # Get current contestant
-                    ec_result = await db.execute(
+                    # Get current active appearance (latest draw position)
+                    ap_result = await db.execute(
                         select(Appearance).where(
                             Appearance.episode_id == episode_id,
-                            Appearance.qualification_status == "performed",
                         ).order_by(Appearance.draw_position.desc()).limit(1)
                     )
-                    ec = ec_result.scalar_one_or_none()
-                    if ec:
-                        bucket = _bucket_key(0)  # simplified — would use performance elapsed time
+                    ap = ap_result.scalar_one_or_none()
+                    if ap:
+                        bucket = _bucket_key(0)
                         bucket_result = await db.execute(
                             select(CrowdBucket).where(
                                 CrowdBucket.episode_id == episode_id,
-                                CrowdBucket.contestant_id == ec.id,
+                                CrowdBucket.appearance_id == ap.id,
                                 CrowdBucket.bucket_start == bucket,
                             )
                         )
@@ -168,7 +163,7 @@ async def audience_ws(websocket: WebSocket, episode_id: uuid.UUID):
                         else:
                             cb = CrowdBucket(
                                 episode_id=episode_id,
-                                contestant_id=ec.id,
+                                appearance_id=ap.id,
                                 bucket_start=bucket,
                                 laugh_events=intensity,
                                 unique_laughers=1,
@@ -190,11 +185,10 @@ async def audience_ws(websocket: WebSocket, episode_id: uuid.UUID):
                 })
 
             elif msg_type == "tip":
-                # Broadcast tip to everyone
                 tip_data = {
                     "type": "tip.received",
                     "data": {
-                        "contestant_id": msg.get("contestant_id"),
+                        "appearance_id": msg.get("appearance_id"),
                         "amount": msg.get("amount", 0),
                         "sender": msg.get("sender", "anonymous"),
                         "message": msg.get("message", ""),
@@ -240,15 +234,12 @@ async def stage_ws(websocket: WebSocket, episode_id: uuid.UUID):
             msg_type = msg.get("type")
 
             if msg_type == "ready":
-                # Client is ready — send full snapshot
                 last_seq = msg.get("last_seq", 0)
 
                 async with async_session() as db:
-                    # Episode state
                     ep_result = await db.execute(select(Episode).where(Episode.id == episode_id))
                     episode = ep_result.scalar_one_or_none()
 
-                    # All events since last_seq
                     events_result = await db.execute(
                         select(ShowEvent).where(
                             ShowEvent.episode_id == episode_id,
@@ -257,7 +248,6 @@ async def stage_ws(websocket: WebSocket, episode_id: uuid.UUID):
                     )
                     events = events_result.scalars().all()
 
-                    # Current contestants
                     ec_result = await db.execute(
                         select(Appearance).where(Appearance.episode_id == episode_id)
                         .order_by(Appearance.draw_position)
@@ -268,20 +258,19 @@ async def stage_ws(websocket: WebSocket, episode_id: uuid.UUID):
                         "type": "show.snapshot",
                         "data": {
                             "episode_id": ep_id,
-                            "status": episode.status.value if episode else "unknown",
-                            "phase": episode.current_phase.value if episode and episode.current_phase else None,
+                            "status": episode.status if episode else "unknown",
+                            "phase": episode.current_phase if episode else None,
                             "contestants": [
                                 {
                                     "id": str(c.id),
                                     "draw_position": c.draw_position,
-                                    "is_resident": c.is_resident,
                                 }
                                 for c in contestants
                             ],
                             "events": [
                                 {
                                     "seq": e.seq,
-                                    "type": e.type.value,
+                                    "type": e.type,
                                     "actor": e.actor,
                                     "payload": e.payload,
                                     "effective_at": str(e.effective_at) if e.effective_at else None,

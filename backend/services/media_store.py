@@ -1,17 +1,21 @@
 """Media Store — upload/download assets to R2.
 
-Real R2 integration using boto3. No fake URLs.
-
-Cloudflare recommends bucket-scoped API tokens for R2.
-Reference: https://developers.cloudflare.com/r2/examples/aws/boto3/
+Real R2 integration using boto3. Falls back gracefully if boto3 is not installed.
 """
 
 import hashlib
+import logging
 import os
-import uuid
 from pathlib import Path
 
-import boto3
+logger = logging.getLogger("freak_town.media")
+
+try:
+    import boto3
+    _HAS_BOTO3 = True
+except ImportError:
+    _HAS_BOTO3 = False
+    logger.info("boto3 not installed — R2 media store disabled. Install with: pip install boto3")
 
 
 class MediaStore:
@@ -22,6 +26,8 @@ class MediaStore:
 
     @property
     def client(self):
+        if not _HAS_BOTO3:
+            raise RuntimeError("boto3 not installed. Run: pip install boto3")
         if self._client is None:
             self._client = boto3.client(
                 "s3",
@@ -38,6 +44,8 @@ class MediaStore:
 
     @property
     def configured(self) -> bool:
+        if not _HAS_BOTO3:
+            return False
         return bool(os.getenv("R2_S3_ENDPOINT")) and bool(os.getenv("R2_ACCESS_KEY_ID"))
 
     def put_bytes(self, key: str, data: bytes, content_type: str = "application/octet-stream") -> dict:

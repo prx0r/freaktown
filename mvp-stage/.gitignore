@@ -1,0 +1,6 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+web/data/sessions/*.json
+web/audio/set_*.mp3

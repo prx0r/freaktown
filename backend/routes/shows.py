@@ -9,26 +9,36 @@ Reference: anime.dm — Episode 1 format
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from backend.services.show_runtime import show_runner, ShowAct, DailyShow
+from backend.services.show_runtime import show_runner, ShowAct
 from backend.services.chat_summary import chat_summary_engine, ChatSummary
-from backend.routes.green_room import _characters, _drafts
 
 router = APIRouter()
 
 
 # ── Request Schemas ─────────────────────────────────────────────────
 
+class ActSpec(BaseModel):
+    character_name: str = Field(..., description="Character name")
+    comedian_id: str = Field("", description="Comedian ID")
+    performance_plan: dict = Field(default_factory=dict, description="Compiled performance plan")
+    audio_url: str = Field("", description="Audio R2 key or URL")
+    duration_ms: int = Field(60000, description="Duration in ms")
+
+
 class CreateShowRequest(BaseModel):
     date: str = Field(..., description="Show date (YYYY-MM-DD)")
-    draft_ids: list[str] = Field(..., description="Draft IDs to include (max 5)")
+    acts: list[ActSpec] = Field(..., description="Acts to include (max 5)")
+
 
 class LaughRecord(BaseModel):
     act_id: str
     timestamp_ms: int
 
+
 class VoteRecord(BaseModel):
     act_id: str
     vote: bool  # True = YES, False = NO
+
 
 class ChatMessage(BaseModel):
     act_id: str
@@ -39,23 +49,16 @@ class ChatMessage(BaseModel):
 
 @router.post("/shows")
 async def create_show(req: CreateShowRequest):
-    """Create a new daily show from draft IDs."""
+    """Create a new daily show from act specs."""
     acts = []
-    for i, draft_id in enumerate(req.draft_ids[:5]):
-        if draft_id not in _drafts:
-            raise HTTPException(404, f"Draft {draft_id} not found")
-
-        draft = _drafts[draft_id]
-        char = _characters.get(draft.comedian_id, {})
-
+    for i, spec in enumerate(req.acts[:5]):
         act = ShowAct(
             position=i + 1,
-            comedian_id=draft.comedian_id,
-            character_name=char.get("name", "Unknown"),
-            draft_id=draft_id,
-            performance_plan=draft.compiled_plan or {},
-            audio_url=draft.audio_r2_key,
-            duration_ms=draft.audio_duration_ms or 60000,
+            comedian_id=spec.comedian_id,
+            character_name=spec.character_name,
+            performance_plan=spec.performance_plan,
+            audio_url=spec.audio_url,
+            duration_ms=spec.duration_ms,
         )
         acts.append(act)
 
@@ -110,7 +113,8 @@ async def record_vote(show_id: str, req: VoteRecord):
     """Record a SEE THEM AGAIN? vote."""
     show_runner.record_return_vote(show_id, req.act_id, req.vote)
 
-    act = show_runner.shows.get(show_id, {}).get_act(req.act_id) if show_runner.shows.get(show_id) else None
+    show = show_runner.shows.get(show_id)
+    act = show.get_act(req.act_id) if show else None
     return {
         "return_votes": act.return_votes if act else 0,
         "return_total": act.return_total if act else 0,
@@ -163,7 +167,7 @@ async def get_show_summary(show_id: str):
     for act_data in summary.get("acts", []):
         char_name = act_data.get("character_name", "Unknown")
         act_summary = ChatSummary(
-            labels=[],  # Would come from stored chat data
+            labels=[],
             top_reactions=[],
             return_rate=act_data.get("return_rate", 0) / 100,
         )
@@ -174,7 +178,7 @@ async def get_show_summary(show_id: str):
 
 @router.get("/shows/{show_id}/timeline")
 async def get_laugh_timeline(show_id: str, act_id: str):
-    """Get the laugh timeline for an act (for the creator's feedback)."""
+    """Get the laugh timeline for an act."""
     show = show_runner.shows.get(show_id)
     if not show:
         raise HTTPException(404, "Show not found")
@@ -183,11 +187,9 @@ async def get_laugh_timeline(show_id: str, act_id: str):
     if not act:
         raise HTTPException(404, "Act not found")
 
-    # Build timeline visualization
     max_count = max((b["count"] for b in act.laugh_timeline), default=1)
     timeline = []
     for ms in range(0, act.duration_ms, 1000):
-        # Find laughs in this 1-second window
         window_count = sum(
             b["count"] for b in act.laugh_timeline
             if ms <= b["ms"] < ms + 1000
