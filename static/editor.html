@@ -689,9 +689,9 @@ async function genPortrait(reroll) {
   const body = {
     species,
     job: '', vibe: c.vibe || '',
-    seed: reroll ? Math.floor(Math.random() * 999999) :
-      ((window._portrait && window._portrait.seed) || Math.floor(Math.random() * 999999))
+    seed: (window._portrait && window._portrait.seed) || Math.floor(Math.random() * 999999)
   };
+  if (reroll) body.nonce = String(Date.now());
   const m = (c.species || '').match(/\(([^)]+)\)/);
   if (m) body.job = m[1];
   document.getElementById('portraitStatus').textContent = 'painting…';

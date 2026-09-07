@@ -36,11 +36,22 @@ async def tts_generate(text: str, voice: str = "en-US-AriaNeural",
     """Generate speech as WAV bytes. pace in slow/normal/fast/rush."""
     import edge_tts
 
+    import asyncio as _asyncio
     rate = PACE_RATES.get(pace, "+0%")
     tag = hashlib.sha256(f"{voice}|{rate}|{text}".encode()).hexdigest()[:12]
     tmp_mp3 = AUDIO_DIR / f"_tmp_{tag}.mp3"
-    communicate = edge_tts.Communicate(text, voice, rate=rate)
-    await communicate.save(str(tmp_mp3))
+    tmp_mp3.unlink(missing_ok=True)  # never convert a stale partial file
+    last_err: Exception | None = None
+    for attempt in range(4):
+        try:
+            communicate = edge_tts.Communicate(text, voice, rate=rate)
+            await communicate.save(str(tmp_mp3))
+            break
+        except Exception as e:
+            last_err = e
+            await _asyncio.sleep(2 * (attempt + 1))
+    else:
+        raise RuntimeError(f"TTS failed after retries: {last_err}")
     
     tmp_wav = AUDIO_DIR / f"_tmp_{tag}.wav"
     subprocess.run([
@@ -358,6 +369,18 @@ def compose():
         "duration_ms": int(duration_ms),
         "beats": offsets,
     })
+
+
+@app.errorhandler(500)
+def _json_500(e):
+    # API clients call res.json() unconditionally; an HTML traceback page
+    # surfaces as "unexpected character at line 1". Always answer JSON.
+    return jsonify({"ok": False, "error": "server error, retry"}), 500
+
+
+@app.errorhandler(404)
+def _json_404(e):
+    return jsonify({"ok": False, "error": "not found"}), 404
 
 
 @app.route("/audio/<path:filename>")
@@ -1391,8 +1414,10 @@ def portrait():
         prompt += f" working as a {job}"
     prompt += f", {style} portrait, expressive face, plain background"
 
-    # NOTE: flux-1-schnell takes no seed param — every call is a fresh roll.
-    key = hashlib.sha256(f"{prompt}|{seed}".encode()).hexdigest()[:12]
+    # NOTE: flux-1-schnell takes no seed param. FACE omits nonce (stable,
+    # cacheable); AGAIN sends a random nonce (always a fresh roll).
+    nonce = str(data.get("nonce", "") or "")
+    key = hashlib.sha256(f"{prompt}|{seed}|{nonce}".encode()).hexdigest()[:12]
     pdir = Path(__file__).parent / "portraits"
     pdir.mkdir(exist_ok=True)
     path = pdir / f"{key}.png"
