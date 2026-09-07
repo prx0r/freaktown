@@ -690,17 +690,26 @@ async function genPortrait(reroll) {
   const m = (c.species || '').match(/\(([^)]+)\)/);
   if (m) body.job = m[1];
   document.getElementById('portraitStatus').textContent = 'painting…';
-  const res = await fetch('/api/portrait', {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(body)
-  });
-  const data = await res.json();
+  let data;
+  try {
+    const res = await fetch('/api/portrait', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+    data = await res.json();
+  } catch (e) {
+    document.getElementById('portraitStatus').textContent = 'network failed — retry';
+    return;
+  }
   if (!data.ok) {
     document.getElementById('portraitStatus').textContent = data.error || 'failed';
     return;
   }
   window._portrait = {url: data.image, seed: body.seed, prompt: data.prompt};
   const img = document.getElementById('portraitImg');
+  img.onerror = () => {
+    document.getElementById('portraitStatus').textContent = 'image failed to load — retry';
+  };
   img.src = data.image;
   img.style.display = 'block';
   document.getElementById('portraitStatus').textContent =
