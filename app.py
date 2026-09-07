@@ -474,6 +474,20 @@ def save_set():
         "audio": bundle_audio,
     }, indent=2))
 
+    # 5. portrait.png + visual.json (2D concept locked in the editor)
+    portrait = data.get("portrait") or {}
+    if portrait.get("url", "").startswith("/portraits/"):
+        import shutil
+        src = Path(__file__).parent / portrait["url"].lstrip("/")
+        if src.exists():
+            shutil.copy(src, bdir / "portrait.png")
+    (bdir / "visual.json").write_text(json.dumps({
+        "model": "flux-1-schnell",
+        "seed": portrait.get("seed", 0),
+        "prompt": portrait.get("prompt", ""),
+        "image": "portrait.png" if (bdir / "portrait.png").exists() else None,
+    }, indent=2))
+
     words = sum(len(b.get("text", "").split()) for b in beats)
     meta = {"slug": slug,
             "character": {"name": name,
@@ -846,6 +860,63 @@ def _rhythm_features(text: str) -> list[float]:
             text.count("?") / n,
             text.count("!") / n,
             (text.count("-") + text.count("—")) / n]
+
+
+@app.route("/api/portrait", methods=["POST"])
+def portrait():
+    """2D character portrait via Cloudflare FLUX Schnell (free neurons).
+    Body: {"species": "moth", "job": "divorce lawyer", "vibe": "exhausted",
+           "style": "cartoon", "seed": 0}
+    Returns {image: "/portraits/<hash>.png", prompt, cached}."""
+    import base64
+    import httpx
+    data = request.json or {}
+    species = str(data.get("species", "creature"))[:60]
+    job = str(data.get("job", ""))[:60]
+    vibe = str(data.get("vibe", ""))[:40]
+    style = str(data.get("style", "cartoon"))[:30]
+    seed = int(data.get("seed", 0))
+
+    prompt = f"{vibe} {species}"
+    if job:
+        prompt += f" working as a {job}"
+    prompt += f", {style} portrait, expressive face, plain background"
+
+    # NOTE: flux-1-schnell takes no seed param — every call is a fresh roll.
+    key = hashlib.sha256(f"{prompt}|{seed}".encode()).hexdigest()[:12]
+    pdir = Path(__file__).parent / "portraits"
+    pdir.mkdir(exist_ok=True)
+    path = pdir / f"{key}.png"
+    if path.exists():
+        return jsonify({"ok": True, "image": f"/portraits/{key}.png",
+                        "prompt": prompt, "cached": True})
+
+    tok, acct = _cf_creds()
+    if not tok or not acct:
+        return jsonify({"ok": False, "error": "no Cloudflare creds"}), 502
+    try:
+        r = httpx.post(
+            f"https://api.cloudflare.com/client/v4/accounts/{acct}/ai/run/@cf/black-forest-labs/flux-1-schnell",
+            headers={"Authorization": f"Bearer {tok}", "Content-Type": "application/json"},
+            json={"prompt": prompt, "steps": 4},
+            timeout=180)
+        if r.status_code != 200:
+            return jsonify({"ok": False, "error": f"cf {r.status_code}"}), 502
+        img = r.json()["result"]["image"]
+        if isinstance(img, list):
+            img = img[0]
+        path.write_bytes(base64.b64decode(img))
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)[:120]}), 502
+    return jsonify({"ok": True, "image": f"/portraits/{key}.png",
+                    "prompt": prompt, "cached": False})
+
+
+@app.route("/portraits/<path:filename>")
+def serve_portrait(filename):
+    if not re.fullmatch(r"[a-f0-9]{12}\.png", filename):
+        return jsonify({"ok": False, "error": "not found"}), 404
+    return send_from_directory(str(Path(__file__).parent / "portraits"), filename)
 
 
 @app.route("/api/match_style", methods=["POST"])

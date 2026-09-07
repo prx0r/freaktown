@@ -106,6 +106,18 @@ input[type=range] { flex: 1; accent-color: #ff00aa; cursor: pointer; }
       <div id="setsList" style="font-size:11px;color:#555;">nothing saved yet</div>
     </div>
     <div class="tempo-box">
+      <h4>LOOK (2D portrait)</h4>
+      <img id="portraitImg" style="width:100%;border-radius:6px;display:none;" alt="character portrait">
+      <div class="tempo-row" style="margin-top:6px;">
+        <button class="btn btn-small" onclick="genPortrait(false)">🎨 FACE</button>
+        <button class="btn btn-small" onclick="genPortrait(true)">🎲 AGAIN</button>
+      </div>
+      <div style="font-size:10px;color:#555;margin-top:4px;" id="portraitStatus"></div>
+      <div class="tempo-row" style="margin-top:6px;">
+        <button class="btn btn-small" onclick="keepLook()">KEEP LOOK ✓</button>
+      </div>
+    </div>
+    <div class="tempo-box">
       <h4>WALKOUT (10s sting)</h4>
       <div style="display:flex;gap:6px;">
         <select id="woGenre" style="flex:1;">
@@ -544,7 +556,46 @@ function againWalkout() {
   genWalkout(lastMode);
 }
 
-async function playWalkout() {
+async // ── Portraits: cheap 2D concept before any 3D ──
+window._portrait = null;
+
+async function genPortrait(reroll) {
+  const c = window._char || {};
+  const species = (c.species || 'creature').split('(')[0].trim();
+  const body = {
+    species,
+    job: '', vibe: c.vibe || '',
+    seed: reroll ? Math.floor(Math.random() * 999999) :
+      ((window._portrait && window._portrait.seed) || Math.floor(Math.random() * 999999))
+  };
+  const m = (c.species || '').match(/\(([^)]+)\)/);
+  if (m) body.job = m[1];
+  document.getElementById('portraitStatus').textContent = 'painting…';
+  const res = await fetch('/api/portrait', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  if (!data.ok) {
+    document.getElementById('portraitStatus').textContent = data.error || 'failed';
+    return;
+  }
+  window._portrait = {url: data.image, seed: body.seed, prompt: data.prompt};
+  const img = document.getElementById('portraitImg');
+  img.src = data.image;
+  img.style.display = 'block';
+  document.getElementById('portraitStatus').textContent =
+    (data.cached ? 'cached' : 'fresh') + ' · KEEP LOOK to lock it in';
+}
+
+function keepLook() {
+  if (!window._portrait) return status('Generate a face first');
+  buzz('MEDIUM');
+  document.getElementById('portraitStatus').textContent = 'look locked ✓';
+  status('Look locked — portrait ships with the bundle');
+}
+
+function playWalkout() {
   if (!walkoutUrl) return status('Generate the walkout first');
   const a = document.getElementById('audio');
   a.src = walkoutUrl;
@@ -660,7 +711,8 @@ async function saveSet() {
       character: window._char || {name: document.getElementById('performerName').textContent || 'Guest Freak'},
       beats, voice: document.getElementById('voice').value,
       style: document.getElementById('templateSel').value || '',
-      walkout: window._walkout || null
+      walkout: window._walkout || null,
+      portrait: window._portrait || null
     })
   });
   const data = await res.json();
