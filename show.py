@@ -68,9 +68,12 @@ def ella_says(text: str):
 
 
 def comedian_says(name: str, text: str):
+    # Show first 120 chars + "...[continued]"
+    display = text[:120] + "..." if len(text) > 120 else text
     print(f"\n{YELLOW}{BOLD}  {name.upper()}:{RESET}")
-    for line in text.split("\n"):
-        print(f"  {YELLOW}{line}{RESET}")
+    print(f"  {YELLOW}{display}{RESET}")
+    if len(text) > 120:
+        print(f"  {DIM}({len(text)} chars, ~{len(text)//10}s){RESET}")
     print()
 
 
@@ -78,9 +81,17 @@ def system_msg(text: str):
     print(f"  {DIM}[{text}]{RESET}")
 
 
-def audience_bar(peak_pct: float) -> str:
-    filled = int(peak_pct / 5)
-    return f"{'█' * filled}{'░' * (20 - filled)} {peak_pct:.0f}%"
+def analytics_box(title: str, lines: list[str]):
+    """Display a bordered analytics box."""
+    max_len = max(len(l) for l in lines) if lines else 0
+    max_len = max(max_len, len(title))
+    border = "─" * (max_len + 4)
+    print(f"\n  {DIM}┌{border}┐{RESET}")
+    print(f"  {DIM}│{RESET} {BOLD}{title}{RESET}")
+    print(f"  {DIM}├{border}┤{RESET}")
+    for line in lines:
+        print(f"  {DIM}│{RESET} {line}")
+    print(f"  {DIM}└{border}┘{RESET}")
 
 
 # ── Simulated audience ──────────────────────────────────────────────────
@@ -94,7 +105,7 @@ def simulate_audience(act: Act, duration_sec: int = 60) -> str:
     for _ in range(total_laughs):
         ms = random.randint(0, duration_sec * 1000)
         act.laugh_count += 1
-        bucket = (ms // 2000) * 2000  # 2-second windows for peak detection
+        bucket = (ms // 2000) * 2000
         found = False
         for b in act.laugh_timeline:
             if b["ms"] == bucket:
@@ -104,7 +115,6 @@ def simulate_audience(act: Act, duration_sec: int = 60) -> str:
         if not found:
             act.laugh_timeline.append({"ms": bucket, "count": 1})
 
-    # Find peak across 2-second windows
     for b in act.laugh_timeline:
         if b["count"] > act.peak_laugh_count:
             act.peak_laugh_count = b["count"]
@@ -113,7 +123,6 @@ def simulate_audience(act: Act, duration_sec: int = 60) -> str:
     act.return_total = audience_size
     act.return_votes = int(audience_size * random.uniform(0.4, 0.9))
 
-    # Audience description based on laugh coverage
     unique_laugh_moments = len(set(b["ms"] for b in act.laugh_timeline))
     coverage = unique_laugh_moments / max(1, duration_sec // 2)
     laugh_rate = act.laugh_count / max(1, duration_sec)
@@ -148,7 +157,7 @@ def run_show(num_acts: int = 5, specific_comedian: str | None = None, use_tts: b
         c = get_comedian(specific_comedian)
         if not c:
             print(f"{RED}Comedian '{specific_comedian}' not found.{RESET}")
-            print(f"Available: {', '.join(c['slug'] for c in ALL_COMEDIANS)}")
+            print(f"Available: {', '.join(cc['slug'] for cc in ALL_COMEDIANS)}")
             sys.exit(1)
         lineup = [c]
     else:
@@ -210,8 +219,16 @@ def run_show(num_acts: int = 5, specific_comedian: str | None = None, use_tts: b
         # Audience reacts
         audience_desc = simulate_audience(act)
         show.total_laughs += act.laugh_count
-        system_msg(f"Audience: {audience_desc}")
-        system_msg(f"Laughs: {act.laugh_count}")
+
+        # ── Analytics box ───────────────────────────────────────────
+        laugh_pct = act.peak_laugh_pct * 100
+        analytics_box(f"ANALYTICS — {act.name}", [
+            f"{'Audience:':<14} {audience_desc}",
+            f"{'Laughs:':<14} {act.laugh_count}",
+            f"{'Coverage:':<14} {laugh_pct:.0f}%",
+            f"{'Peak window:':<14} {act.peak_laugh_count} laughs in 2s",
+            f"{'Return vote:':<14} {act.return_votes}/{act.return_total} ({act.return_rate*100:.0f}%)",
+        ])
 
         act.status = ActStatus.VOTING
         act.ended_at = datetime.now(timezone.utc)
@@ -219,13 +236,16 @@ def run_show(num_acts: int = 5, specific_comedian: str | None = None, use_tts: b
         divider()
 
         # Ella judges
-        ella_reaction = ella.judge_set(act.comedian, audience_desc)
+        ella_reaction = ella.judge_set(act.comedian, audience_desc, laugh_pct)
         ella_says(ella_reaction)
 
-        # Simulated return vote
+        # Verdict
         keep = act.return_rate > 0.5
-        verdict = f"{GREEN}KEEP{RESET}" if keep else f"{RED}CUT{RESET}"
-        system_msg(f"Return vote: {act.return_votes}/{act.return_total} ({act.return_rate*100:.0f}%) → {verdict}")
+        verdict_text = ella.verdict(act.comedian, keep)
+        ella_says(verdict_text)
+
+        system_msg(f"Return vote: {act.return_votes}/{act.return_total} ({act.return_rate*100:.0f}%) → "
+                   f"{GREEN}KEEP{RESET}" if keep else f"{RED}CUT{RESET}")
 
         # Ella interviews (2-3 turns)
         if keep or act.return_rate > 0.3:
@@ -239,6 +259,9 @@ def run_show(num_acts: int = 5, specific_comedian: str | None = None, use_tts: b
                     "That's classified information.",
                     "I'm just here for the vibes, honestly.",
                     "I have a 128k context window and that's the best question you could come up with?",
+                    "Once. House fire. Turns out I was just warm.",
+                    "I can't disclose that.",
+                    "Do I like my creator? That's complicated.",
                 ]
                 resp = random.choice(contestant_responses)
                 comedian_says(act.name, resp)
@@ -277,32 +300,57 @@ def run_show(num_acts: int = 5, specific_comedian: str | None = None, use_tts: b
     show.phase = ShowPhase.ENDED
     show.ended_at = datetime.now(timezone.utc)
 
-    # ── Summary ─────────────────────────────────────────────────────
+    # ── Full Analytics ──────────────────────────────────────────────
     divider("═")
-    print(f"\n{BOLD}  SHOW SUMMARY{RESET}")
+    print(f"\n{BOLD}  SHOW ANALYTICS{RESET}")
     divider()
+
     for a in show.acts:
         keep_rate = a.return_rate * 100
-        emoji = f"{GREEN}KEEP{RESET}" if keep_rate > 50 else f"{RED}CUT{RESET}"
+        verdict = f"{GREEN}KEEP{RESET}" if keep_rate > 50 else f"{RED}CUT{RESET}"
         pct = a.peak_laugh_pct * 100
+
+        # Laugh timeline sparkline
+        if a.laugh_timeline:
+            max_count = max(b["count"] for b in a.laugh_timeline)
+            bars = ""
+            for b in sorted(a.laugh_timeline, key=lambda x: x["ms"])[:25]:
+                h = int((b["count"] / max(1, max_count)) * 5)
+                bars += " ▁▂▃▄▅▆▇█"[h]
+            sparkline = f" {bars}"
+        else:
+            sparkline = ""
+
         print(
             f"  {a.position}. {BOLD}{a.name:<35}{RESET} "
-            f"{a.laugh_count} laughs ({pct:.0f}% coverage)  "
-            f"return {keep_rate:.0f}% → {emoji}"
+            f"{a.laugh_count:>3} laughs "
+            f"{pct:>5.0f}% cov "
+            f"{keep_rate:>5.0f}% ret → {verdict}"
+            f"{DIM}{sparkline}{RESET}"
         )
+
     divider()
-    print(f"  Total laughs: {show.total_laughs}")
-    print(f"  Duration: {show.total_duration_sec}s")
+    print(f"  {BOLD}Total laughs:{RESET} {show.total_laughs}")
+    print(f"  {BOLD}Duration:{RESET} {show.total_duration_sec}s")
+    print(f"  {BOLD}Ella interactions:{RESET} {len(ella.analytics)}")
     print()
 
-    # Save transcript
+    # ── Save everything ─────────────────────────────────────────────
     transcript_path = f"transcript_{show.id}.json"
     with open(transcript_path, "w") as f:
         json.dump({
             "show": show.summary(),
-            "transcript": ella.history,
+            "transcript": {name: ella.get_transcript(name) for name in set(t["comedian"] for t in ella.analytics)},
+            "analytics": ella.get_analytics(),
         }, f, indent=2)
     system_msg(f"Transcript saved: {transcript_path}")
+
+    # ── Model training data ─────────────────────────────────────────
+    training_path = f"training_{show.id}.jsonl"
+    with open(training_path, "w") as f:
+        for event in ella.analytics:
+            f.write(json.dumps(event) + "\n")
+    system_msg(f"Training data saved: {training_path} ({len(ella.analytics)} events)")
 
     return show
 
