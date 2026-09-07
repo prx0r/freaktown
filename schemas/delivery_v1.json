@@ -1,0 +1,35 @@
+{
+  "version": "freaktown.delivery.v1",
+  "description": "Comedy delivery schema — provider-independent timing and performance intent",
+  "schema": {
+    "voice": {
+      "provider": "string (qwen3|minimax|elevenlabs|edge-tts)",
+      "voice_id": "string",
+      "reference_audio": "string (path for cloning)"
+    },
+    "beats": [
+      {
+        "id": "string",
+        "type": "string (setup|escalation|misdirect|punchline|tag|callback|closer)",
+        "text": "string",
+        "delivery": {
+          "pace": "float (0.5-2.0, 1.0 = normal)",
+          "energy": "float (0.0-1.0)",
+          "emphasis": "float (0.0-1.0)",
+          "expression": "string (deadpan|excited|whisper|shout|normal)"
+        },
+        "pause_after_ms": "int",
+        "stage": "string (normal|hold|freeze)",
+        "gesture": "string (still|shrug|point|lean|wave)",
+        "camera": "string (wide|medium|close|side)",
+        "sound": "string (none|rimshot|drum_hit|laugh_track|crowd_cheer)"
+      }
+    ],
+    "metadata": {
+      "total_duration_ms": "int",
+      "word_count": "int",
+      "beat_count": "int",
+      "punchline_count": "int"
+    }
+  }
+}
