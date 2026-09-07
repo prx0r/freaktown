@@ -188,3 +188,27 @@ submission. In-memory for Episode Zero; DB table required pre-launch.
 Voting: Ella selects the official winner (television + ungameable);
 Stream selects the People's Champion. Split 70/20/10 in integer atomic
 units, dust to season pot, always sums to total.
+
+## Multichain + endpoint naming (WIRED)
+
+**Any chain/wallet:** the `accepts[]` array is the multichain mechanism.
+`NetworkConfig.multichain()` builds one entry per configured chain (Base
+Sepolia/Base mainnet/Solana devnet/mainnet today; USDC 6 decimals
+everywhere so $1.00 ≡ same atomic amount on all chains). Chains without
+a recipient address are never offered; unknown network ids fail loudly.
+The client (modal, wallet, agent) picks whichever entry it can sign;
+settle verifies against the *matched* entry, never blindly the first.
+`GET /v1/pay/discovery` exposes all five actions in Bazaar item shape
+for agent price discovery. Env: `X402_NETWORKS` (comma CAIP-2),
+`POT_ESCROW_ADDRESS` (EVM), `POT_ESCROW_ADDRESS_SVM` (Solana).
+
+**"Buy x402freaktown":** there is no protocol-level endpoint-name
+purchase in x402 — names live in three places, all already handled:
+1. The HTTP URL — you own the domain (freak.town). That IS the endpoint.
+2. The `payTo` address — buy a Basename (`freaktown.base.eth`) or ENS
+   name pointing at the escrow wallet and display it in UI. The wire
+   keeps the hex address (machines); resolution is client-side.
+   TODO: resolve basename → address at config load and fail on mismatch.
+3. Discovery identity — `serviceName`/`tags` in every requirements
+   envelope plus local `/pay/discovery`; facilitator Bazaar listing
+   once a facilitator is configured.

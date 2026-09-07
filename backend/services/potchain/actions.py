@@ -53,6 +53,13 @@ BASE_SEPOLIA = "eip155:84532"
 USDC_BASE_MAINNET = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 USDC_BASE_SEPOLIA = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
 
+# Solana USDC mints, canonical per the official x402 SDK (svm constants).
+USDC_SOLANA_MAINNET = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+USDC_SOLANA_DEVNET = "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"
+
+SOLANA_MAINNET = "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"
+SOLANA_DEVNET = "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1"
+
 USDC_DECIMALS = 6
 
 # Fixed-price actions in USD cents. Sponsor is a dynamic bid (auction).
@@ -66,11 +73,13 @@ ACTION_PRICES_CENTS: dict[str, int] = {
 MAX_TIMEOUT_SECONDS = 300
 
 
-def usd_cents_to_atomic(cents: int) -> str:
+def usd_cents_to_atomic(cents: int, decimals: int = USDC_DECIMALS) -> str:
     """$1.00 (100 cents) → 1000000 atomic USDC units, as spec string."""
     if not isinstance(cents, int) or cents <= 0:
         raise ValueError("cents must be a positive integer")
-    return str(cents * 10 ** (USDC_DECIMALS - 2))
+    if decimals < 2:
+        raise ValueError("decimals must be >= 2 for cent pricing")
+    return str(cents * 10 ** (decimals - 2))
 
 
 def atomic_to_usd_cents(atomic: str | int) -> int:
@@ -126,19 +135,80 @@ ACTIONS: dict[str, PaidAction] = {
 
 
 @dataclass
+class PaymentOption:
+    """One way to pay: a network + asset + recipient.
+
+    The accepts[] array is what makes the endpoint multichain — the
+    client (wallet, modal, agent) picks whichever option it can sign for.
+    USDC is 6 decimals on every supported chain, so amounts translate 1:1.
+    """
+    network: str
+    asset: str
+    pay_to: str
+    decimals: int = 6
+    label: str = ""
+
+
+@dataclass
 class NetworkConfig:
-    network: str = BASE_SEPOLIA
-    usdc: str = USDC_BASE_SEPOLIA
-    pay_to: str = ""  # show pot escrow address; empty = not deployed yet
+    """Multichain endpoint config: one PaymentOption per accepted chain."""
+
+    options: list[PaymentOption] = field(default_factory=list)
     mainnet: bool = False
 
     @classmethod
     def sepolia(cls, pay_to: str = "") -> "NetworkConfig":
-        return cls(network=BASE_SEPOLIA, usdc=USDC_BASE_SEPOLIA, pay_to=pay_to)
+        return cls(options=[PaymentOption(
+            network=BASE_SEPOLIA, asset=USDC_BASE_SEPOLIA,
+            pay_to=pay_to, label="Base Sepolia",
+        )])
 
     @classmethod
     def mainnet(cls, pay_to: str) -> "NetworkConfig":
-        return cls(network=BASE_MAINNET, usdc=USDC_BASE_MAINNET, pay_to=pay_to, mainnet=True)
+        return cls(options=[PaymentOption(
+            network=BASE_MAINNET, asset=USDC_BASE_MAINNET,
+            pay_to=pay_to, label="Base",
+        )], mainnet=True)
+
+    @classmethod
+    def multichain(cls, evm_pay_to: str = "", svm_pay_to: str = "",
+                   networks: list[str] | None = None) -> "NetworkConfig":
+        """Build options for any subset of known chains.
+
+        Unknown network ids raise ValueError — offering a chain we have
+        no asset/recipient for would strand user funds.
+        """
+        known: dict[str, PaymentOption] = {
+            BASE_SEPOLIA: PaymentOption(BASE_SEPOLIA, USDC_BASE_SEPOLIA, evm_pay_to, label="Base Sepolia"),
+            BASE_MAINNET: PaymentOption(BASE_MAINNET, USDC_BASE_MAINNET, evm_pay_to, label="Base"),
+            SOLANA_DEVNET: PaymentOption(SOLANA_DEVNET, USDC_SOLANA_DEVNET, svm_pay_to, label="Solana Devnet"),
+            SOLANA_MAINNET: PaymentOption(SOLANA_MAINNET, USDC_SOLANA_MAINNET, svm_pay_to, label="Solana"),
+        }
+        networks = networks if networks is not None else [BASE_SEPOLIA]
+        options = []
+        for net in networks:
+            net = net.strip()
+            if net not in known:
+                raise ValueError(f"unknown x402 network: {net}")
+            opt = known[net]
+            if not opt.pay_to:
+                continue  # no recipient on this chain → don't offer it
+            options.append(opt)
+        mainnet = any(n in (BASE_MAINNET, SOLANA_MAINNET) for n in networks)
+        return cls(options=options, mainnet=mainnet)
+
+    # Back-compat: single-chain view (first option) for legacy callers.
+    @property
+    def network(self) -> str:
+        return self.options[0].network if self.options else ""
+
+    @property
+    def usdc(self) -> str:
+        return self.options[0].asset if self.options else ""
+
+    @property
+    def pay_to(self) -> str:
+        return self.options[0].pay_to if self.options else ""
 
 
 def payment_required(
@@ -162,8 +232,23 @@ def payment_required(
     spec = ACTIONS[action]
     if amount_cents < spec.min_cents:
         raise ValueError(f"{action} requires at least ${spec.min_cents / 100:.2f}")
-    if not config.pay_to:
+    # Chains without a recipient are never offered (never strand funds).
+    options = [o for o in config.options if o.pay_to]
+    if not options:
         raise ValueError("no pot escrow address configured (set pay_to)")
+
+    accepts = [
+        SDKRequirements(
+            scheme=SCHEME_EXACT,
+            network=opt.network,  # type: ignore[arg-type]
+            amount=usd_cents_to_atomic(amount_cents, opt.decimals),
+            asset=opt.asset,
+            pay_to=opt.pay_to,
+            max_timeout_seconds=MAX_TIMEOUT_SECONDS,
+            extra={"name": "USDC", "version": "2"},
+        )
+        for opt in options
+    ]
 
     required = PaymentRequired(
         x402_version=X402_VERSION,
@@ -175,17 +260,7 @@ def payment_required(
             service_name=service_name[:32],
             tags=["freak-town", action],
         ),
-        accepts=[
-            SDKRequirements(
-                scheme=SCHEME_EXACT,
-                network=config.network,  # type: ignore[arg-type]
-                amount=usd_cents_to_atomic(amount_cents),
-                asset=config.usdc,
-                pay_to=config.pay_to,
-                max_timeout_seconds=MAX_TIMEOUT_SECONDS,
-                extra={"name": "USDC", "version": "2"},
-            )
-        ],
+        accepts=accepts,
         extensions={},
     )
     return required.model_dump(by_alias=True, exclude_none=True)
@@ -223,6 +298,32 @@ def parse_payment_payload(data: dict | str) -> PaymentPayload:
         raise ValueError("invalid_payload")
 
 
+def match_accepted(payload: dict, required: dict) -> dict | None:
+    """Find the accepts[] entry the client's payload satisfies.
+
+    The client picks whichever chain it can sign for; the server must
+    honor any offered option, not just the first. Returns the matched
+    requirements entry, or None.
+    """
+    try:
+        parsed = parse_payment_payload(payload)
+    except ValueError:
+        return None
+    accepted = parsed.accepted.model_dump(by_alias=True)
+    for want in required.get("accepts", []):
+        if not isinstance(want, dict):
+            continue
+        if any(accepted.get(k) != want.get(k) for k in ("scheme", "network", "asset", "payTo")):
+            continue
+        try:
+            if int(accepted.get("amount", "0")) < int(want["amount"]):
+                continue
+        except (ValueError, TypeError):
+            continue
+        return want
+    return None
+
+
 def validate_payment_payload(payload: dict, required: dict) -> tuple[bool, str]:
     """Structural pre-check of a client payload against requirements.
 
@@ -235,18 +336,16 @@ def validate_payment_payload(payload: dict, required: dict) -> tuple[bool, str]:
         parsed = parse_payment_payload(payload)
     except ValueError as e:
         return False, str(e)
-    want = required["accepts"][0]
-    accepted = parsed.accepted.model_dump(by_alias=True)
-    for key in ("scheme", "network", "asset", "payTo"):
-        if accepted.get(key) != want.get(key):
-            return False, "invalid_payment_requirements"
-    try:
-        if int(accepted.get("amount", "0")) < int(want["amount"]):
-            return False, "invalid_exact_evm_payload_authorization_value_mismatch"
-    except (ValueError, TypeError):
-        return False, "invalid_payload"
     if not parsed.payload.get("signature") or not parsed.payload.get("authorization"):
         return False, "invalid_payload"
+    if match_accepted(payload, required) is None:
+        # Distinguish wrong-chain/asset/recipient from underpayment.
+        accepted = parsed.accepted.model_dump(by_alias=True)
+        want = (required.get("accepts") or [{}])[0]
+        for key in ("scheme", "network", "asset", "payTo"):
+            if accepted.get(key) != want.get(key):
+                return False, "invalid_payment_requirements"
+        return False, "invalid_exact_evm_payload_authorization_value_mismatch"
     return True, ""
 
 

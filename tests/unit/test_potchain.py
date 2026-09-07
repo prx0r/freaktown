@@ -31,6 +31,34 @@ class TestX402Actions:
         assert USDC_BASE_MAINNET in mainnet
         assert USDC_BASE_SEPOLIA in sepolia
 
+    def test_solana_constants_match_official_sdk(self):
+        import importlib.util
+        from pathlib import Path
+
+        from backend.services.potchain import (
+            SOLANA_DEVNET,
+            SOLANA_MAINNET,
+            USDC_SOLANA_DEVNET,
+            USDC_SOLANA_MAINNET,
+        )
+
+        # Load the SDK constants module by path: importing the svm package
+        # itself requires solana client libs we don't need server-side.
+        x402_spec = importlib.util.find_spec("x402")
+        assert x402_spec and x402_spec.origin
+        constants_path = (
+            Path(x402_spec.origin).parent / "mechanisms" / "svm" / "constants.py"
+        )
+        spec = importlib.util.spec_from_file_location("svm_constants", constants_path)
+        assert spec and spec.loader
+        svm = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(svm)  # type: ignore[union-attr]
+
+        assert USDC_SOLANA_MAINNET == svm.USDC_MAINNET_ADDRESS
+        assert USDC_SOLANA_DEVNET == svm.USDC_DEVNET_ADDRESS
+        assert SOLANA_MAINNET == svm.SOLANA_MAINNET_CAIP2
+        assert SOLANA_DEVNET == svm.SOLANA_DEVNET_CAIP2
+
     def test_requirements_are_spec_conformant(self):
         from backend.services.potchain import NetworkConfig, payment_required
         from x402.schemas import PaymentRequired
@@ -101,6 +129,91 @@ class TestX402Actions:
             parse_payment_payload("!!!not-base64!!!")
         with pytest.raises(ValueError, match="invalid_payload"):
             parse_payment_payload({"x402Version": 2})  # missing accepted
+
+
+# ── Multichain ───────────────────────────────────────────────────────
+
+class TestMultichain:
+    def _payload_for(self, network, asset, pay_to, amount):
+        return {
+            "x402Version": 2,
+            "accepted": {
+                "scheme": "exact", "network": network,
+                "amount": amount, "asset": asset,
+                "payTo": pay_to, "maxTimeoutSeconds": 300,
+                "extra": {"name": "USDC", "version": "2"},
+            },
+            "payload": {"signature": "0xabc", "authorization": {"from": "0x1"}},
+        }
+
+    def test_multi_accepts(self):
+        from backend.services.potchain import NetworkConfig, payment_required
+        from x402.schemas import PaymentRequired
+
+        cfg = NetworkConfig.multichain(
+            evm_pay_to="0xEVM", svm_pay_to="SolanaPayTo1111111111111111111111111",
+            networks=["eip155:84532", "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1"],
+        )
+        req = payment_required("tip", "u", 100, cfg)
+        parsed = PaymentRequired.model_validate(req)
+        assert len(parsed.accepts) == 2
+        nets = {a.network for a in parsed.accepts}
+        assert nets == {"eip155:84532", "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1"}
+        # Same $1.00 on both chains (USDC 6 decimals everywhere)
+        assert {a.amount for a in parsed.accepts} == {"1000000"}
+
+    def test_chain_without_recipient_not_offered(self):
+        from backend.services.potchain import NetworkConfig, payment_required
+
+        cfg = NetworkConfig.multichain(
+            evm_pay_to="0xEVM", svm_pay_to="",
+            networks=["eip155:84532", "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1"],
+        )
+        req = payment_required("tip", "u", 100, cfg)
+        assert len(req["accepts"]) == 1
+        assert req["accepts"][0]["network"] == "eip155:84532"
+
+    def test_unknown_network_fails_loudly(self):
+        from backend.services.potchain import NetworkConfig
+
+        with pytest.raises(ValueError, match="unknown x402 network"):
+            NetworkConfig.multichain(evm_pay_to="0xEVM", networks=["eip155:99999"])
+
+    def test_no_recipient_anywhere_means_unconfigured(self):
+        from backend.services.potchain import NetworkConfig, payment_required
+
+        cfg = NetworkConfig.multichain(evm_pay_to="", svm_pay_to="",
+                                       networks=["eip155:84532"])
+        assert cfg.options == []
+        with pytest.raises(ValueError, match="no pot escrow"):
+            payment_required("tip", "u", 100, cfg)
+
+    def test_client_can_pick_any_offered_chain(self):
+        from backend.services.potchain import (
+            NetworkConfig, match_accepted, payment_required,
+            validate_payment_payload,
+        )
+
+        cfg = NetworkConfig.multichain(
+            evm_pay_to="0xEVM", svm_pay_to="SolanaPayTo1111111111111111111111111",
+            networks=["eip155:84532", "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1"],
+        )
+        req = payment_required("tip", "u", 100, cfg)
+
+        sol_payload = self._payload_for(
+            "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+            "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+            "SolanaPayTo1111111111111111111111111", "1000000")
+        matched = match_accepted(sol_payload, req)
+        assert matched is not None and "solana" in matched["network"]
+        ok, _ = validate_payment_payload(sol_payload, req)
+        assert ok is True
+
+        # Wrong chain entirely → rejected
+        bad = self._payload_for("eip155:1", "0xA0b8", "0xEVM", "1000000")
+        assert match_accepted(bad, req) is None
+        ok, reason = validate_payment_payload(bad, req)
+        assert ok is False and reason == "invalid_payment_requirements"
 
 
 # ── Escrow ───────────────────────────────────────────────────────────

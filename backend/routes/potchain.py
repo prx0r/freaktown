@@ -45,6 +45,7 @@ from backend.services.potchain import (
     decode_payment_required,
     encode_payment_required,
     get_facilitator,
+    match_accepted,
     parse_payment_payload,
     payment_required,
     payout_event_payload,
@@ -57,17 +58,62 @@ router = APIRouter()
 
 
 def _network_config() -> NetworkConfig:
-    """Chain config from env. Testnet default — mainnet must be explicit."""
-    pay_to = os.getenv("POT_ESCROW_ADDRESS", "")
-    network = os.getenv("POT_NETWORK", "eip155:84532")
-    if network == "eip155:8453":
-        if not pay_to:
-            raise HTTPException(501, "mainnet escrow not configured")
-        return NetworkConfig.mainnet(pay_to)
-    return NetworkConfig.sepolia(pay_to)
+    """Multichain endpoint config from env.
+
+    X402_NETWORKS: comma-separated CAIP-2 ids, default Base Sepolia.
+    POT_ESCROW_ADDRESS: EVM recipient. POT_ESCROW_ADDRESS_SVM: Solana recipient.
+    Chains without a recipient are not offered (never strand funds).
+    Unknown network ids are a 400, not a silent skip.
+    """
+    pay_evm = os.getenv("POT_ESCROW_ADDRESS", "")
+    pay_svm = os.getenv("POT_ESCROW_ADDRESS_SVM", "")
+    networks = [n.strip() for n in os.getenv("X402_NETWORKS", "eip155:84532").split(",") if n.strip()]
+    try:
+        config = NetworkConfig.multichain(pay_evm, pay_svm, networks)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    if not config.options:
+        raise HTTPException(501, "pot escrow not deployed yet (set POT_ESCROW_ADDRESS*)")
+    return config
 
 
 # ── Paid actions (x402) ──────────────────────────────────────────────
+
+@router.get("/pay/discovery")
+async def pay_discovery(request: Request):
+    """Agent-facing price list: all paid actions in Bazaar item shape
+    (resource, type, x402Version, accepts, lastUpdated).
+
+    This is how agents find and price our endpoints before paying.
+    Matches the local accepts[] exactly — same builder, minimum amounts.
+    NOTE: defined before /pay/{action} so "discovery" isn't parsed as
+    an action name.
+    """
+    from datetime import datetime, timezone
+
+    config = _network_config()  # 501 when no chain has a recipient
+    base = str(request.base_url).rstrip("/")
+    now = datetime.now(timezone.utc).isoformat()
+    items = []
+    for name, spec in ACTIONS.items():
+        try:
+            required = payment_required(
+                name, f"{base}/v1/pay/{name}/settle",
+                spec.min_cents, config,
+            )
+        except ValueError:
+            continue
+        items.append({
+            "resource": f"{base}/v1/pay/{name}/settle",
+            "type": "http",
+            "x402Version": 2,
+            "accepts": required["accepts"],
+            "lastUpdated": now,
+            "description": spec.description,
+            "min_cents": spec.min_cents,
+        })
+    return {"x402Version": 2, "items": items}
+
 
 @router.get("/pay/{action}")
 async def pay_requirements(
@@ -79,12 +125,7 @@ async def pay_requirements(
     """Return 402 + x402 v2 PaymentRequired for a paid show action."""
     if action not in ACTIONS:
         raise HTTPException(404, f"unknown paid action: {action}")
-    try:
-        config = _network_config()
-    except HTTPException:
-        raise
-    if not config.pay_to:
-        raise HTTPException(501, "pot escrow not deployed yet (POT_ESCROW_ADDRESS unset)")
+    config = _network_config()  # 501 when no chain has a recipient
     try:
         required = payment_required(
             action, resource or f"freak-town:{action}:{target}",
@@ -106,13 +147,11 @@ class SettleRequest(BaseModel):
     target: str = Field("", description="character slug for tips")
 
 
-def _required_for(action: str, target: str, db: AsyncSession | None = None) -> tuple[dict, NetworkConfig]:
+def _required_for(action: str, target: str) -> tuple[dict, NetworkConfig]:
     """Minimum-amount requirements for an action. Raises 404/400/501."""
     if action not in ACTIONS:
         raise HTTPException(404, f"unknown paid action: {action}")
-    config = _network_config()
-    if not config.pay_to:
-        raise HTTPException(501, "pot escrow not deployed yet (POT_ESCROW_ADDRESS unset)")
+    config = _network_config()  # 501 when no chain has a recipient
     spec = ACTIONS[action]
     try:
         required = payment_required(
@@ -183,7 +222,12 @@ async def pay_settle(
 
     from x402.schemas import PaymentRequirements as SDKRequirements
 
-    sdk_required = SDKRequirements.model_validate(required["accepts"][0])
+    # The client picks its chain: verify/settle against the matched
+    # accepts[] entry, never blindly the first.
+    matched = match_accepted(parsed.model_dump(by_alias=True), required)
+    if matched is None:  # unreachable (validate passed) — defensive
+        raise HTTPException(400, "invalid payment: no matching accept")
+    sdk_required = SDKRequirements.model_validate(matched)
     try:
         verdict = await facilitator.verify(parsed, sdk_required)
     except Exception as e:
