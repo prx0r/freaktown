@@ -11,7 +11,7 @@
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <title>Freak Town — Black Room</title>
-<script type="module" src="https://three.ws/agent-3d/1.5.2/agent-3d.js" integrity="sha384-pHt0PdHr/kqdAKPMvQDvAay9fUxtQeIpJE/rplcr8sX/HtOgv/v3C6Z6/WpMDRrb" crossorigin="anonymous"></script>
+<script type="module" src="https://three.ws/agent-3d/1.5.2/agent-3d.js" crossorigin="anonymous"></script>
 <script type="importmap">
 {"imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
@@ -88,8 +88,8 @@ input[type=range] { flex: 1; accent-color: #ff00aa; cursor: pointer; }
   <div class="stage">
     <button class="btn btn-primary" style="width:100%;margin-bottom:10px;" onclick="createFreak()">🎲 CREATE A FREAK</button>
     <canvas id="vrmStage" style="width:100%;height:340px;display:none;"></canvas>
-    <div id="vrmStatus" style="font-size:10px;color:#555;">loading performer…</div>
-    <agent-3d id="avatar" body="https://three.ws/avatars/michelle.glb" mode="inline" kiosk eager clip="idle"><span style="color:#555;font-size:12px;">3D performer loading…</span></agent-3d>
+    <div id="vrmStatus" style="font-size:10px;color:#555;">VRM LOADING</div>
+    <agent-3d id="avatar" src="https://three.ws/avatars/michelle.glb" eager style="display:block;width:100%;height:340px"><span style="color:#555;font-size:12px;">3D performer loading…</span></agent-3d>
     <div class="performer" id="performerName">—</div>
     <div class="premise-line" id="premiseLine">write a premise below to begin</div>
     <div class="tempo-box">
@@ -106,7 +106,7 @@ input[type=range] { flex: 1; accent-color: #ff00aa; cursor: pointer; }
       <div id="setsList" style="font-size:11px;color:#555;">nothing saved yet</div>
     </div>
     <div class="tempo-box">
-      <h4>WALKOUT (8s sting)</h4>
+      <h4>WALKOUT (10s sting)</h4>
       <div style="display:flex;gap:6px;">
         <select id="woGenre" style="flex:1;">
           <option>funk</option><option>rock</option><option>electronic</option>
@@ -120,8 +120,12 @@ input[type=range] { flex: 1; accent-color: #ff00aa; cursor: pointer; }
         </select>
       </div>
       <div class="tempo-row" style="margin-top:6px;">
-        <button class="btn btn-small" onclick="genWalkout()">GENERATE</button>
+        <button class="btn btn-small" onclick="genWalkout('instant')">⚡ INSTANT</button>
+        <button class="btn btn-small" onclick="genWalkout('real')">✨ REAL</button>
+      </div>
+      <div class="tempo-row" style="margin-top:6px;">
         <button class="btn btn-small" onclick="playWalkout()">▶ PLAY</button>
+        <button class="btn btn-small" onclick="againWalkout()">🎲 AGAIN</button>
       </div>
       <div style="font-size:10px;color:#555;margin-top:4px;" id="woStatus"></div>
     </div>
@@ -509,27 +513,38 @@ async function createFreak() {
   sendChat();
 }
 
-async function genWalkout() {
+async function genWalkout(mode) {
+  mode = mode || 'instant';
   const body = {
     genre: document.getElementById('woGenre').value,
     mood: document.getElementById('woMood').value,
-    energy: 'high', shape: 'hit', duration: 8,
-    seed: (window._walkout && window._walkout.seed) || Math.floor(Math.random() * 99999)
+    energy: 'high', shape: 'hit', duration: mode === 'real' ? 10 : 8,
+    seed: (window._walkout && window._walkout.seed) || Math.floor(Math.random() * 99999),
+    mode
   };
-  document.getElementById('woStatus').textContent = 'generating…';
+  document.getElementById('woStatus').textContent =
+    mode === 'real' ? 'rendering AI walkout (~1 min)…' : 'synthesizing…';
   const res = await fetch('/api/walkout', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(body)
+    body: JSON.stringify({...body, mode})
   });
   const data = await res.json();
   if (!data.ok) {
-    document.getElementById('woStatus').textContent = 'failed';
+    document.getElementById('woStatus').textContent =
+      (data.error || 'failed') + (data.fallback ? ' — try INSTANT' : '');
     return;
   }
   walkoutUrl = data.audio;
-  window._walkout = {...body, seed: data.seed};
+  window._walkout = {...body, seed: data.seed, provider: data.provider, mode};
   document.getElementById('woStatus').textContent =
-    `${body.genre}/${body.mood} · ${data.cached ? 'cached' : 'fresh'} · saved with set`;
+    `${body.genre}/${body.mood} · ${data.provider} · ${data.cached ? 'cached' : 'fresh'} · saved with set`;
+}
+
+function againWalkout() {
+  // same recipe, new seed — sample the same creative space
+  if (window._walkout) window._walkout.seed = Math.floor(Math.random() * 99999);
+  const lastMode = (window._walkout && window._walkout.mode) || 'instant';
+  genWalkout(lastMode);
 }
 
 async function playWalkout() {
@@ -716,7 +731,35 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin } from '@pixiv/three-vrm';
 
-const VRM_URL = 'https://raw.githack.com/pixiv/three-vrm/dev/packages/three-vrm/examples/models/VRM1_Constraint_Twist_Sample.vrm';
+const VRM_URL = '/static/avatars/default-v1.vrm';
+
+function threewsFallback(reason) {
+  // Explicit state machine: VRM failed -> try minimal three.ws embed -> else static.
+  vrmStatus('VRM FAILED · THREE.WS LOADING');
+  const avatar = document.getElementById('avatar');
+  const timeout = setTimeout(() => {
+    console.error('agent-3d did not register');
+    vrmStatus('NO 3D PERFORMER');
+  }, 8000);
+  const done = (msg) => { clearTimeout(timeout); vrmStatus(msg); };
+  if (window.customElements && customElements.whenDefined) {
+    customElements.whenDefined('agent-3d').then(() => {
+      console.log('agent-3d registered');
+    });
+  }
+  avatar.addEventListener('agent:ready', e => {
+    console.log('THREE.WS READY', e.detail);
+    done('THREE.WS READY');
+  });
+  avatar.addEventListener('agent:error', e => {
+    console.error('THREE.WS ERROR', e.detail);
+    done('THREE.WS ERROR — see console');
+  });
+  avatar.addEventListener('agent:load-progress', e => {
+    console.log('THREE.WS LOAD', e.detail);
+  });
+  if (reason) console.error('VRM failed:', reason);
+}
 let vrm = null, analyser = null, freqData = null, audioCtx = null;
 let prevAA = 0, prevIH = 0, prevOH = 0, nextBlink = 0;
 const clock = new THREE.Clock();
@@ -758,7 +801,6 @@ async function initVRM() {
     // swap in: VRM primary, three.ws fallback stays hidden unless this fails
     canvas.style.display = 'block';
     document.getElementById('avatar').style.display = 'none';
-    vrmStatus('performer live · lips follow the audio');
 
     const animate = () => {
       requestAnimationFrame(animate);
@@ -780,8 +822,9 @@ async function initVRM() {
       renderer.render(scene, camera);
     };
     animate();
+    vrmStatus('VRM READY');
   } catch (err) {
-    vrmStatus('VRM failed to load — three.ws fallback showing');
+    threewsFallback(err);
   }
 }
 

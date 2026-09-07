@@ -151,6 +151,10 @@ def static_files(filename):
     if filename in ("manifest.json", "sw.js", "icon-192.png",
                     "icon-512.png", "apple-touch-icon.png"):
         return send_from_directory("static", filename)
+    if filename.startswith("static/avatars/") and filename.endswith(".vrm"):
+        name = filename.split("/")[-1]
+        if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", name):
+            return send_from_directory("static/avatars", name)
     return jsonify({"ok": False, "error": "not found"}), 404
 
 
@@ -396,20 +400,37 @@ def save_set():
     wav_bytes, offsets = compose_beats(beat_audios)
     (bdir / "set.wav").write_bytes(wav_bytes)
 
-    # 4. walkout.wav (generated now) + walkout.json (recipe)
+    # 4. walkout audio + walkout.json (recipe)
     walkout = data.get("walkout") or {}
     if walkout.get("genre"):
+        import shutil
         import sound_synth
         recipe = {"genre": walkout.get("genre", "funk"), "mood": walkout.get("mood", "confident"),
-                  "energy": walkout.get("energy", "high"), "shape": walkout.get("shape", "hit"),
-                  "duration": 8}
+                  "energy": walkout.get("energy", "high"), "shape": walkout.get("shape", "hit")}
         seed = int(walkout.get("seed", 0))
-        (bdir / "walkout.wav").write_bytes(sound_synth.generate(recipe, seed))
+        if walkout.get("provider") == "fal":
+            # keep the real render: copy from audio cache by recipe hash
+            key = hashlib.sha256(json.dumps(
+                {"provider": "fal", "model": FAL_MODEL, "prompt_version": WALKOUT_PROMPT_VERSION,
+                 **recipe, "seed": seed}, sort_keys=True).encode()).hexdigest()[:12]
+            cached = AUDIO_DIR / "walkouts" / f"fal_{key}.mp3"
+            if cached.exists():
+                shutil.copy(cached, bdir / "walkout.mp3")
+            else:  # cache missed: instant render so the bundle is never empty
+                full = {**recipe, "duration": 8}
+                (bdir / "walkout.wav").write_bytes(sound_synth.generate(full, seed))
+        else:
+            full = {**recipe, "duration": 8}
+            (bdir / "walkout.wav").write_bytes(sound_synth.generate(full, seed))
+    bundle_audio = "walkout.mp3" if (bdir / "walkout.mp3").exists() else (
+        "walkout.wav" if (bdir / "walkout.wav").exists() else None)
     (bdir / "walkout.json").write_text(json.dumps({
         "genre": walkout.get("genre", ""), "mood": walkout.get("mood", ""),
         "energy": walkout.get("energy", ""), "shape": walkout.get("shape", "hit"),
         "seed": int(walkout.get("seed", 0)),
-        "duration": 8, "audio": "walkout.wav" if (bdir / "walkout.wav").exists() else None,
+        "provider": walkout.get("provider", "procedural"),
+        "duration": 10 if walkout.get("provider") == "fal" else 8,
+        "audio": bundle_audio,
     }, indent=2))
 
     words = sum(len(b.get("text", "").split()) for b in beats)
@@ -466,11 +487,91 @@ def submit_set(slug):
     return jsonify({"ok": True, "slug": slug, "status": "queued"})
 
 
+WALKOUT_GENRES = {
+    "funk":       {"instruments": "wah guitar, punchy electric bass, muted brass stabs", "bpm": 118},
+    "rock":       {"instruments": "distorted power chords, punchy live drums", "bpm": 138},
+    "electronic": {"instruments": "driving synth bass, neon pads, tight electronic drums", "bpm": 128},
+    "jazz":       {"instruments": "walking upright bass, brushed drums, muted brass", "bpm": 108},
+    "orchestral": {"instruments": "brass section, timpani, sweeping strings", "bpm": 100},
+    "comedy":     {"instruments": "tuba, plucked strings, slide whistle accents", "bpm": 100},
+    "hip-hop":    {"instruments": "deep 808 bass, crisp snare, hi-hat rolls", "bpm": 92},
+    "disco":      {"instruments": "four-on-the-floor drums, funky bassline, string stabs", "bpm": 120},
+}
+
+WALKOUT_SHAPES = {
+    "hit":    "immediate strong entrance hit, no slow intro, front-loaded impact",
+    "groove": "continuous tight groove, loop-like structure",
+    "build":  "rapid build in intensity, decisive final hit",
+    "fanfare": "short ceremonial fanfare phrase, clear beginning and ending",
+    "weird":  "quirky characterful production, unusual sonic detail, comedic",
+}
+
+FAL_MODEL = "fal-ai/stable-audio-3/small/music/text-to-audio"
+WALKOUT_PROMPT_VERSION = 1
+
+
+def build_walkout_prompt(recipe: dict) -> str:
+    g = WALKOUT_GENRES.get(recipe.get("genre", "funk"), WALKOUT_GENRES["funk"])
+    return (
+        "TrackType: Music, "
+        "10-second instrumental comedy walk-on sting, "
+        f"Genre: {recipe.get('genre', 'funk')}, "
+        f"{g['instruments']}, "
+        f"{recipe.get('mood', 'confident')}, "
+        f"{recipe.get('energy', 'high')} energy, "
+        f"{g['bpm']} BPM, "
+        f"{WALKOUT_SHAPES.get(recipe.get('shape', 'hit'), WALKOUT_SHAPES['hit'])}, "
+        "immediate hook in the first half second, "
+        "one memorable musical motif, "
+        "clean stereo production, "
+        "hard decisive ending at exactly 10 seconds, "
+        "no vocals, no lyrics"
+    )
+
+
+def _fal_key() -> str:
+    key = os.getenv("FAL_KEY", "").strip()
+    if key:
+        return key
+    try:
+        with open("/root/.agent-vault/vault.json") as f:
+            return str(json.load(f).get("FAL_KEY", "")).strip()
+    except Exception:
+        return ""
+
+
+def _generate_walkout_fal(recipe: dict, seed: int) -> bytes:
+    """Real walkout via fal Stable Audio 3 Small. Raises on failure."""
+    import fal_client
+    key = _fal_key()
+    if not key:
+        raise RuntimeError("no FAL_KEY")
+    os.environ["FAL_KEY"] = key
+    result = fal_client.subscribe(
+        FAL_MODEL,
+        arguments={
+            "prompt": build_walkout_prompt(recipe),
+            "duration": 10,
+            "num_inference_steps": 8,
+            "seed": seed,
+            "output_format": "mp3",
+            "negative_prompt": "vocals, singing, spoken words, long intro, long fade out",
+        },
+    )
+    url = result["audio"]["url"]
+    import httpx
+    resp = httpx.get(url, timeout=120)
+    resp.raise_for_status()
+    return resp.content
+
+
 @app.route("/api/walkout", methods=["POST"])
 def walkout():
-    """Generate (or fetch cached) walkout sting from a recipe.
-    Body: {"genre": "funk", "mood": "absurd", "energy": "high", "shape": "hit",
-           "duration": 8, "seed": 0} -> {audio, recipe, cached}"""
+    """Walkout sting from a recipe. Two engines, one contract.
+    Body: {"genre","mood","energy","shape","seed", "mode": "instant"|"real"}
+    - instant (default): procedural synth, <1s, free, exact duration
+    - real: fal Stable Audio 3 Small, 10s, needs FAL_KEY, falls back to instant
+    Cache key covers provider + model + prompt version + recipe + seed."""
     import sound_synth
     data = request.json or {}
     recipe = {
@@ -478,18 +579,42 @@ def walkout():
         "mood": str(data.get("mood", "confident"))[:20],
         "energy": str(data.get("energy", "high"))[:20],
         "shape": str(data.get("shape", "hit"))[:20],
-        "duration": min(11, max(2, float(data.get("duration", 8)))),
     }
     seed = int(data.get("seed", 0))
-    rid = sound_synth.recipe_id(recipe, seed)
+    mode = str(data.get("mode", "instant")).lower()
+
     wdir = AUDIO_DIR / "walkouts"
     wdir.mkdir(exist_ok=True)
+
+    if mode == "real":
+        key = hashlib.sha256(json.dumps(
+            {"provider": "fal", "model": FAL_MODEL,
+             "prompt_version": WALKOUT_PROMPT_VERSION,
+             **recipe, "seed": seed}, sort_keys=True).encode()).hexdigest()[:12]
+        path = wdir / f"fal_{key}.mp3"
+        if path.exists():
+            return jsonify({"ok": True, "audio": f"/audio/walkouts/fal_{key}.mp3",
+                            "recipe": recipe, "seed": seed, "cached": True,
+                            "provider": "fal", "duration": 10})
+        try:
+            path.write_bytes(_generate_walkout_fal(recipe, seed))
+            return jsonify({"ok": True, "audio": f"/audio/walkouts/fal_{key}.mp3",
+                            "recipe": recipe, "seed": seed, "cached": False,
+                            "provider": "fal", "duration": 10})
+        except Exception as e:
+            return jsonify({"ok": False, "error": f"fal failed ({e}), retry mode=instant",
+                            "fallback": "instant"}), 502
+
+    # instant: procedural
+    full = {**recipe, "duration": min(11, max(2, float(data.get("duration", 8))))}
+    rid = sound_synth.recipe_id(full, seed)
     path = wdir / f"{rid}.wav"
     cached = path.exists()
     if not cached:
-        path.write_bytes(sound_synth.generate(recipe, seed))
+        path.write_bytes(sound_synth.generate(full, seed))
     return jsonify({"ok": True, "audio": f"/audio/walkouts/{rid}.wav",
-                    "recipe": recipe, "seed": seed, "cached": cached})
+                    "recipe": recipe, "seed": seed, "cached": cached,
+                    "provider": "procedural"})
 
 
 FREAK_SPECIES = ["moth", "pigeon", "roomba", "dog", "toaster", "goblin",
