@@ -1,0 +1,83 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Freak Character Pack",
+  "type": "object",
+  "required": ["character"],
+  "properties": {
+    "character": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1, "maxLength": 80},
+        "species": {"type": "string", "maxLength": 60},
+        "premise": {"type": "string", "maxLength": 300},
+        "vibe": {"type": "string", "maxLength": 40},
+        "voice": {
+          "type": "object",
+          "properties": {
+            "provider": {"enum": ["edge-tts", "qwen3", "minimax", "elevenlabs"]},
+            "voice_id": {"type": "string"},
+            "reference_audio": {"type": "string"}
+          }
+        },
+        "persona": {
+          "type": "object",
+          "properties": {
+            "deal": {"type": "string"},
+            "facts": {"type": "array", "items": {"type": "string"}},
+            "interview_style": {"type": "string"}
+          }
+        },
+        "profile": {
+          "type": "object",
+          "properties": {
+            "pace": {"type": "number", "minimum": 0.5, "maximum": 1.5},
+            "movement": {"type": "number", "minimum": 0, "maximum": 1},
+            "eye_contact": {"type": "number", "minimum": 0, "maximum": 1},
+            "energy": {"type": "number", "minimum": 0, "maximum": 1},
+            "punchline_hold_ms": {"type": "number", "minimum": 0, "maximum": 5000},
+            "gesture_frequency": {"type": "number", "minimum": 0, "maximum": 1}
+          }
+        },
+        "actions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["trigger", "fallback"],
+            "properties": {
+              "trigger": {"enum": ["on_enter", "after_setup", "after_punchline",
+                "after_tag", "on_laugh", "on_groan", "on_silence",
+                "before_closer", "after_closer", "on_exit", "manual"]},
+              "tags": {"type": "array", "items": {"type": "string"}},
+              "face": {"enum": ["neutral", "deadpan", "grin", "annoyed", "confused", "surprised"]},
+              "body": {"enum": ["normal", "hold still", "lean in", "look left",
+                "look right", "shrug", "small gesture", "big gesture"]},
+              "requires": {"type": "object"},
+              "fallback": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "avatar": {
+      "type": "object",
+      "required": ["version", "format", "asset", "capabilities"],
+      "properties": {
+        "version": {"const": "freaktown.avatar.v1"},
+        "format": {"enum": ["vrm", "glb"]},
+        "asset": {"type": "string"},
+        "capabilities": {
+          "type": "object",
+          "required": ["humanoid", "blink", "visemes", "look_at", "expressions"],
+          "properties": {
+            "humanoid": {"type": "boolean"},
+            "blink": {"type": "boolean"},
+            "visemes": {"type": "array", "items": {"type": "string"}},
+            "look_at": {"type": "boolean"},
+            "expressions": {"type": "array", "items": {"type": "string"}}
+          }
+        }
+      }
+    }
+  }
+}

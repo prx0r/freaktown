@@ -40,16 +40,19 @@ Switching providers should require zero frontend changes.
 ```
 freaks/
   conspiracy-pigeon/
-    character.json      # name, premise, voice config, walkout prompt
-    avatar.glb          # three.ws rigged GLB
-    voice.wav           # reference audio for cloning
-    walkout.mp3         # MiniMax generated
-    success_sting.mp3   # crowd goes wild
-    bomb_sting.mp3      # crickets
-    system_prompt.md    # personality for LLM judge
+    character.json      # identity, persona, voice, profile, actions
+    avatar.vrm          # canonical performer (VRM)
+    avatar.json         # capability contract (required with avatar.vrm)
+    voice_reference.wav # cloning source (optional)
+    portrait.png        # 2D concept (optional)
+    delivery.json       # performance score v1 (optional until first set)
+    set.wav             # composed clip (optional until composed)
+    walkout.wav         # entrance sting (optional)
+    meta.json           # status, hashes, timestamps (tool-written)
 ```
 
 Drop folder into Freak Town. Character performs.
+Full contract: docs/CHARACTER_PACK.md. Validate: scripts/validate_pack.py.
 
 ## One Audio Timeline (core abstraction)
 
