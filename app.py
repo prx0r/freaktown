@@ -206,5 +206,6 @@ def serve_audio(filename):
 if __name__ == "__main__":
     print(f"\n  FREAK TOWN — Live Script Editor v2")
     print(f"  TTS: edge-tts | Compositor: exact silence")
-    print(f"  http://localhost:8080\n")
-    app.run(host="0.0.0.0", port=8080, debug=True)
+    print(f"  http://localhost:{os.getenv('PORT', '8090')}\n")
+    port = int(os.getenv("PORT", "8090"))
+    app.run(host="0.0.0.0", port=port, debug=True)
