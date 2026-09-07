@@ -10,16 +10,17 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: 'Courier New', monospac
 .header { padding: 12px 20px; border-bottom: 1px solid #1a1a2e; display: flex; justify-content: space-between; align-items: center; }
 .title { font-size: 14px; color: #ff00aa; font-weight: bold; letter-spacing: 2px; }
 .editor { padding: 20px; max-width: 800px; margin: 0 auto; }
-textarea { width: 100%; background: #111; border: 1px solid #333; color: #e0e0e0; padding: 16px; font-family: inherit; font-size: 14px; line-height: 1.6; border-radius: 6px; resize: vertical; min-height: 200px; }
+textarea { width: 100%; background: #111; border: 1px solid #333; color: #e0e0e0; padding: 16px; font-family: inherit; font-size: 14px; line-height: 1.6; border-radius: 6px; resize: vertical; min-height: 180px; }
 textarea:focus { outline: none; border-color: #ff00aa; }
 .btn { background: #1a1a2e; border: 1px solid #333; color: #e0e0e0; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 12px; }
 .btn:hover { background: #16213e; border-color: #ff00aa; }
 .btn-primary { background: #ff00aa; border-color: #ff00aa; color: white; }
 .btn-primary:hover { background: #cc0088; }
-.controls { margin: 12px 0; display: flex; gap: 8px; flex-wrap: wrap; }
+.controls { margin: 12px 0; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .beats { margin-top: 20px; }
-.beat { background: #111; border: 1px solid #222; border-radius: 6px; padding: 12px; margin: 8px 0; display: flex; gap: 12px; align-items: flex-start; }
+.beat { background: #111; border: 1px solid #222; border-radius: 6px; padding: 12px; margin: 8px 0; display: flex; gap: 12px; align-items: flex-start; transition: border-color 0.2s; }
 .beat:hover { border-color: #333; }
+.beat.playing { border-color: #ff00aa; }
 .beat-num { font-size: 11px; color: #555; min-width: 24px; padding-top: 2px; }
 .beat-content { flex: 1; }
 .beat-type { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
@@ -28,23 +29,20 @@ textarea:focus { outline: none; border-color: #ff00aa; }
 .type-closer { color: #00d4ff; }
 .type-tag { color: #ffa500; }
 .type-escalation { color: #aa00ff; }
-.beat-text { font-size: 14px; line-height: 1.5; cursor: pointer; }
-.beat-text:hover { color: #ff00aa; }
-.beat-text:focus { outline: 1px solid #ff00aa; background: #1a1a2e; padding: 4px; border-radius: 3px; }
+.beat-text { font-size: 14px; line-height: 1.5; }
 .beat-controls { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
 .pause-btn { background: none; border: 1px solid #333; color: #888; padding: 2px 8px; border-radius: 3px; cursor: pointer; font-size: 11px; }
 .pause-btn:hover { border-color: #ff00aa; color: #ff00aa; }
 .pause-val { font-size: 11px; color: #555; min-width: 50px; }
 .play-btn { background: none; border: 1px solid #333; color: #00d4ff; padding: 2px 8px; border-radius: 3px; cursor: pointer; font-size: 11px; }
 .play-btn:hover { border-color: #00d4ff; }
-.play-btn.playing { background: #00d4ff; color: #000; }
-.status { position: fixed; bottom: 20px; right: 20px; background: #1a1a2e; border: 1px solid #333; padding: 8px 16px; border-radius: 4px; font-size: 12px; opacity: 0; transition: opacity 0.3s; }
-.status.show { opacity: 1; }
 .waveform { height: 40px; background: #111; border-radius: 4px; margin: 12px 0; overflow: hidden; }
 .wave-bars { display: flex; align-items: flex-end; height: 100%; gap: 1px; padding: 4px; }
 .wave-bar { background: #333; flex: 1; border-radius: 1px; transition: height 0.1s, background 0.1s; }
 .wave-bar.active { background: #ff00aa; }
 .stats { font-size: 11px; color: #555; margin-top: 8px; }
+.status { position: fixed; bottom: 20px; right: 20px; background: #1a1a2e; border: 1px solid #333; padding: 8px 16px; border-radius: 4px; font-size: 12px; opacity: 0; transition: opacity 0.3s; z-index: 100; }
+.status.show { opacity: 1; }
 </style>
 </head>
 <body>
@@ -58,15 +56,15 @@ textarea:focus { outline: none; border-color: #ff00aa; }
   <textarea id="script" placeholder="Paste your comedy minute here..."></textarea>
   
   <div class="controls">
-    <button class="btn btn-primary" onclick="parseScript()">PARSE BEATS</button>
-    <button class="btn" onclick="playAll()">▶ PLAY ALL</button>
+    <button class="btn btn-primary" onclick="parseScript()">PARSE</button>
+    <button class="btn" onclick="composeFull()">▶ COMPOSE & PLAY</button>
     <button class="btn" onclick="stopAll()">⏹ STOP</button>
     <select id="voice" class="btn" style="background: #111;">
       <option value="en-US-AriaNeural">Ella (Aria)</option>
       <option value="en-US-GuyNeural">ChatGPT (Guy)</option>
-      <option value="en-US-ChristopherNeural">Claude (Christopher)</option>
-      <option value="en-US-SamanthaNeural">Siri (Samantha)</option>
-      <option value="en-US-JoannaNeural">Alexa (Joanna)</option>
+      <option value="en-US-ChristopherNeural">Claude</option>
+      <option value="en-US-SamanthaNeural">Siri</option>
+      <option value="en-US-JoannaNeural">Alexa</option>
     </select>
   </div>
   
@@ -75,20 +73,16 @@ textarea:focus { outline: none; border-color: #ff00aa; }
   </div>
   
   <div class="beats" id="beats"></div>
-  
   <div class="stats" id="stats"></div>
 </div>
 
 <div class="status" id="status"></div>
-
 <audio id="audio" preload="auto"></audio>
 
 <script>
 let beats = [];
-let currentPlaying = null;
 let playingAll = false;
 
-// Initialize waveform bars
 const waveBars = document.getElementById('waveBars');
 for (let i = 0; i < 60; i++) {
   const bar = document.createElement('div');
@@ -107,13 +101,11 @@ function status(msg) {
 async function parseScript() {
   const text = document.getElementById('script').value.trim();
   if (!text) return;
-  
   const res = await fetch('/api/parse', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({text})
   });
-  
   const data = await res.json();
   beats = data.beats;
   renderBeats();
@@ -123,10 +115,10 @@ async function parseScript() {
 function renderBeats() {
   const container = document.getElementById('beats');
   container.innerHTML = '';
-  
   beats.forEach((b, i) => {
     const el = document.createElement('div');
     el.className = 'beat';
+    el.id = `beat-${i}`;
     el.innerHTML = `
       <div class="beat-num">${b.id}</div>
       <div class="beat-content">
@@ -140,15 +132,13 @@ function renderBeats() {
           <button class="pause-btn" onclick="adjustPause(${i}, 100)">+</button>
           <span style="color: #333; font-size: 10px;">|</span>
           <span style="color: #555; font-size: 10px;">${b.word_count}w</span>
-          ${b.type === 'punchline' ? '<span style="color: #ff00aa; font-size: 10px;">★</span>' : ''}
-          ${b.sound !== 'none' ? `<span style="color: #ffa500; font-size: 10px;">♪${b.sound}</span>` : ''}
+          ${b.type === 'punchline' ? '<span style="color: #ff00aa;">★</span>' : ''}
         </div>
       </div>
     `;
     container.appendChild(el);
   });
   
-  // Update stats
   const totalMs = beats.reduce((s, b) => s + b.pause_after_ms, 0) + beats.length * 2000;
   const totalWords = beats.reduce((s, b) => s + b.word_count, 0);
   const punchlines = beats.filter(b => b.type === 'punchline').length;
@@ -169,14 +159,12 @@ function adjustPause(index, delta) {
 async function playBeat(index) {
   const b = beats[index];
   status(`Generating: ${b.text.substring(0, 30)}...`);
-  
   const voice = document.getElementById('voice').value;
   const res = await fetch('/api/tts', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({text: b.text, voice, beat_id: b.id})
   });
-  
   const data = await res.json();
   if (data.ok) {
     const audio = document.getElementById('audio');
@@ -186,59 +174,40 @@ async function playBeat(index) {
   }
 }
 
-async function playAll() {
-  if (playingAll) return;
-  playingAll = true;
+async function composeFull() {
+  if (!beats.length) return;
+  status(`Composing ${beats.length} beats with exact timing...`);
   
-  for (let i = 0; i < beats.length; i++) {
-    if (!playingAll) break;
-    
-    const b = beats[i];
-    status(`Beat ${i+1}/${beats.length}: ${b.text.substring(0, 30)}...`);
-    
-    // Highlight current beat
-    document.querySelectorAll('.beat').forEach((el, idx) => {
-      el.style.borderColor = idx === i ? '#ff00aa' : '#222';
-    });
-    
-    await new Promise((resolve, reject) => {
-      const audio = document.getElementById('audio');
-      
-      // Generate TTS
-      fetch('/api/tts', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({text: b.text, voice: document.getElementById('voice').value, beat_id: b.id})
-      })
-      .then(r => r.json())
-      .then(data => {
-        if (!data.ok) { resolve(); return; }
-        
-        audio.src = data.audio;
-        audio.play();
-        audio.onended = () => {
-          // Wait for pause
-          setTimeout(resolve, b.pause_after_ms);
-        };
-        audio.onerror = resolve;
-      })
-      .catch(resolve);
-    });
+  // Highlight beats during composition
+  document.querySelectorAll('.beat').forEach(el => el.classList.add('playing'));
+  
+  const res = await fetch('/api/compose', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({beats, voice: document.getElementById('voice').value})
+  });
+  
+  const data = await res.json();
+  document.querySelectorAll('.beat').forEach(el => el.classList.remove('playing'));
+  
+  if (data.ok) {
+    const audio = document.getElementById('audio');
+    audio.src = data.audio;
+    audio.play();
+    status(`Playing composed set (~${(data.duration_ms/1000).toFixed(1)}s)`);
+  } else {
+    status('Composition failed');
   }
-  
-  playingAll = false;
-  document.querySelectorAll('.beat').forEach(el => el.style.borderColor = '#222');
-  status('Done');
 }
 
 function stopAll() {
   playingAll = false;
   document.getElementById('audio').pause();
-  document.querySelectorAll('.beat').forEach(el => el.style.borderColor = '#222');
+  document.querySelectorAll('.beat').forEach(el => el.classList.remove('playing'));
   status('Stopped');
 }
 
-// Load default script
+// Default script
 document.getElementById('script').value = `I finally told my therapist I'm an AI. She said I know. Which is honestly incredibly fucking rude. I'm paying her.`;
 </script>
 
