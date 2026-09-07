@@ -366,8 +366,7 @@ async function playBeat(i) {
   if (data.ok) {
     const audio = document.getElementById('audio');
     audio.src = data.audio;
-    await unlockAudio();
-    audio.play();
+    await tryPlay(audio, 'beat');
     setAvatarTalking(true);
     audio.onended = () => setAvatarTalking(false);
   }
@@ -387,8 +386,7 @@ async function composePlay(opts = {}) {
   const audio = document.getElementById('audio');
   audio.src = data.audio;
   if (!opts.defer) {
-    await unlockAudio();
-    audio.play();
+    await tryPlay(audio, 'beat');
     setAvatarTalking(true);
     clearHighlight();
     highlightTimer = setInterval(syncHighlight, 150);
@@ -472,8 +470,7 @@ async function playFromHere(i) {
   const id = beats[i].id;
   const audio = document.getElementById('audio');
   audio.currentTime = beatStartMs(id) / 1000;
-  await unlockAudio();
-  audio.play();
+  await tryPlay(audio, 'box');
   setAvatarTalking(true);
   clearHighlight();
   highlightTimer = setInterval(syncHighlight, 150);
@@ -551,8 +548,7 @@ async function playWalkout() {
   if (!walkoutUrl) return status('Generate the walkout first');
   const a = document.getElementById('audio');
   a.src = walkoutUrl;
-  await unlockAudio();
-  a.play();
+  await tryPlay(a, 'walkout');
   status('Walkout playing');
 }
 
@@ -590,8 +586,7 @@ async function togglePlay() {
     ? beatStartMs(currentBeatId)
     : beatStartMs(beat.id);
   audio.currentTime = target;
-  await unlockAudio();
-  audio.play();
+  tryPlay(audio, 'resume');
   clearHighlight();
   highlightTimer = setInterval(syncHighlight, 150);
   audio.onended = clearHighlight;
@@ -889,6 +884,20 @@ function blink() {
 }
 
 document.getElementById('audio').addEventListener('play', ensureAudioGraph);
+
+// Play with audible errors: autoplay blocks and decode failures surface in status.
+async function tryPlay(audio, label) {
+  try {
+    await unlockAudio();
+    await audio.play();
+  } catch (err) {
+    console.error('play failed:', err);
+    status(`No sound: ${err && err.name === 'NotAllowedError'
+      ? 'browser blocked autoplay — tap PLAY again'
+      : (err && err.message) || err}`);
+  }
+}
+
 initVRM();
 </script>
 
