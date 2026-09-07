@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Freak Town — Ella's Stage</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #0a0a0f;
+  color: #e0e0e0;
+  font-family: 'Courier New', monospace;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Header ─────────────────────────────────── */
+.header {
+  padding: 12px 20px;
+  border-bottom: 1px solid #1a1a2e;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.title {
+  font-size: 14px;
+  color: #00d4ff;
+  font-weight: bold;
+  letter-spacing: 2px;
+}
+
+.show-num {
+  font-size: 12px;
+  color: #555;
+}
+
+/* ── Main stage ─────────────────────────────── */
+.stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+/* ── Avatar ─────────────────────────────────── */
+.avatar-container {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  margin-bottom: 20px;
+}
+
+.avatar {
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
+  border: 3px solid #00d4ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.3s;
+}
+
+.avatar.speaking {
+  border-color: #ff00aa;
+  box-shadow: 0 0 30px rgba(255, 0, 170, 0.3);
+}
+
+.avatar-face {
+  font-size: 64px;
+  z-index: 2;
+}
+
+.avatar-mouth {
+  position: absolute;
+  bottom: 55px;
+  width: 40px;
+  height: 8px;
+  background: #ff00aa;
+  border-radius: 4px;
+  transform: scaleY(1);
+  transition: transform 0.1s;
+}
+
+.avatar.speaking .avatar-mouth {
+  animation: talk 0.15s infinite alternate;
+}
+
+@keyframes talk {
+  0% { transform: scaleY(1); }
+  100% { transform: scaleY(2.5); }
+}
+
+.avatar-name {
+  text-align: center;
+  font-size: 18px;
+  color: #ff00aa;
+  font-weight: bold;
+  margin-top: 8px;
+  letter-spacing: 1px;
+}
+
+.avatar-subtitle {
+  text-align: center;
+  font-size: 11px;
+  color: #555;
+  margin-top: 2px;
+}
+
+/* ── Transcript ─────────────────────────────── */
+.transcript {
+  width: 100%;
+  max-width: 600px;
+  padding: 0 20px;
+  margin-top: 16px;
+  flex: 1;
+  overflow-y: auto;
+  mask-image: linear-gradient(transparent, black 20%, black 80%, transparent);
+}
+
+.transcript-line {
+  padding: 6px 12px;
+  margin: 4px 0;
+  font-size: 14px;
+  line-height: 1.5;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.3s, transform 0.3s;
+}
+
+.transcript-line.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.transcript-line.highlight {
+  color: #ff00aa;
+}
+
+/* ── Controls ───────────────────────────────── */
+.controls {
+  padding: 16px 20px;
+  border-top: 1px solid #1a1a2e;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.btn {
+  background: #1a1a2e;
+  border: 1px solid #333;
+  color: #e0e0e0;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn:hover {
+  background: #16213e;
+  border-color: #00d4ff;
+}
+
+.btn:active {
+  transform: scale(0.95);
+}
+
+.btn-primary {
+  background: #ff00aa;
+  border-color: #ff00aa;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #cc0088;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.reaction-count {
+  font-size: 11px;
+  color: #888;
+  min-width: 20px;
+  text-align: center;
+}
+
+/* ── Toast ──────────────────────────────────── */
+.toast {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  background: #1a1a2e;
+  border: 1px solid #333;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  opacity: 0;
+  transition: all 0.3s;
+  pointer-events: none;
+  z-index: 100;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ── Waveform ───────────────────────────────── */
+.waveform {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 30px;
+  margin: 8px 0;
+}
+
+.wave-bar {
+  width: 3px;
+  height: 4px;
+  background: #333;
+  border-radius: 2px;
+  transition: height 0.1s, background 0.1s;
+}
+
+.wave-bar.active {
+  background: #ff00aa;
+}
+
+/* ── Info ───────────────────────────────────── */
+.info {
+  text-align: center;
+  font-size: 12px;
+  color: #444;
+  padding: 8px;
+}
+
+.info kbd {
+  background: #1a1a2e;
+  border: 1px solid #333;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="title">FREAK TOWN</div>
+  <div class="show-num" id="showNum">—</div>
+</div>
+
+<div class="stage">
+  <div class="avatar-container">
+    <div class="avatar" id="avatar">
+      <div class="avatar-face">👩‍🦰</div>
+      <div class="avatar-mouth" id="mouth"></div>
+    </div>
+  </div>
+  <div class="avatar-name">ELLA M</div>
+  <div class="avatar-subtitle" id="setTitle">press play</div>
+
+  <div class="waveform" id="waveform"></div>
+
+  <div class="transcript" id="transcript"></div>
+</div>
+
+<div class="controls">
+  <button class="btn btn-primary" id="playBtn" onclick="playSet()">
+    ▶ PLAY SET
+  </button>
+  <button class="btn" id="laughBtn" onclick="react('laugh')" disabled>
+    😂 <span id="laughCount">0</span>
+  </button>
+  <button class="btn" id="clapBtn" onclick="react('clap')" disabled>
+    👏 <span id="clapCount">0</span>
+  </button>
+</div>
+
+<div class="info">
+  <kbd>Space</kbd> play/pause &nbsp; <kbd>L</kbd> laugh &nbsp; <kbd>K</kbd> clap
+</div>
+
+<div class="toast" id="toast"></div>
+
+<audio id="audio" preload="auto"></audio>
+
+<script>
+const audio = document.getElementById('audio');
+const avatar = document.getElementById('avatar');
+const mouth = document.getElementById('mouth');
+const transcript = document.getElementById('transcript');
+const playBtn = document.getElementById('playBtn');
+const laughBtn = document.getElementById('laughBtn');
+const clapBtn = document.getElementById('clapBtn');
+const toast = document.getElementById('toast');
+const waveform = document.getElementById('waveform');
+
+let currentText = '';
+let wordIndex = 0;
+let words = [];
+let wordTimer = null;
+let laughs = 0;
+let claps = 0;
+let audioCtx = null;
+let analyser = null;
+let source = null;
+
+// ── Waveform bars ───────────────────────────
+for (let i = 0; i < 40; i++) {
+  const bar = document.createElement('div');
+  bar.className = 'wave-bar';
+  waveform.appendChild(bar);
+}
+
+// ── Audio setup ─────────────────────────────
+function setupAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 128;
+  source = audioCtx.createMediaElementSource(audio);
+  source.connect(analyser);
+  analyser.connect(audioCtx.destination);
+}
+
+function updateWaveform() {
+  if (!analyser) return;
+  const data = new Uint8Array(analyser.frequencyBinCount);
+  analyser.getByteFrequencyData(data);
+  const bars = waveform.children;
+  for (let i = 0; i < bars.length; i++) {
+    const val = data[i * 2] || 0;
+    const h = Math.max(4, (val / 255) * 30);
+    bars[i].style.height = h + 'px';
+    bars[i].classList.toggle('active', val > 50);
+  }
+  if (!audio.paused) requestAnimationFrame(updateWaveform);
+}
+
+// ── Load a set ──────────────────────────────
+async function playSet() {
+  playBtn.disabled = true;
+  playBtn.textContent = '⏳ GENERATING...';
+
+  try {
+    const res = await fetch('/api/set');
+    const data = await res.json();
+
+    currentText = data.text;
+    words = currentText.split(' ');
+    wordIndex = 0;
+
+    document.getElementById('showNum').textContent = `SHOW #${data.show_number}`;
+    document.getElementById('setTitle').textContent = data.title;
+
+    // Clear transcript
+    transcript.innerHTML = '';
+    words.forEach((w, i) => {
+      const span = document.createElement('span');
+      span.className = 'transcript-line';
+      span.textContent = w + ' ';
+      span.id = `word-${i}`;
+      transcript.appendChild(span);
+    });
+
+    // Load audio
+    audio.src = data.audio;
+    audio.load();
+
+    audio.oncanplaythrough = () => {
+      setupAudio();
+      audio.play();
+      avatar.classList.add('speaking');
+      playBtn.textContent = '⏸ PAUSE';
+      playBtn.disabled = false;
+      playBtn.onclick = togglePause;
+      laughBtn.disabled = false;
+      clapBtn.disabled = false;
+      requestAnimationFrame(updateWaveform);
+      startWordDisplay();
+    };
+
+    audio.onended = () => {
+      avatar.classList.remove('speaking');
+      playBtn.textContent = '▶ PLAY SET';
+      playBtn.disabled = false;
+      playBtn.onclick = playSet;
+      laughBtn.disabled = true;
+      clapBtn.disabled = true;
+      stopWordDisplay();
+      resetWaveform();
+      showToast(`Set complete. ${laughs} laughs, ${claps} claps.`);
+    };
+
+  } catch (e) {
+    playBtn.textContent = '▶ PLAY SET';
+    playBtn.disabled = false;
+    showToast('Error loading set');
+  }
+}
+
+function togglePause() {
+  if (audio.paused) {
+    audio.play();
+    avatar.classList.add('speaking');
+    playBtn.textContent = '⏸ PAUSE';
+    startWordDisplay();
+    requestAnimationFrame(updateWaveform);
+  } else {
+    audio.pause();
+    avatar.classList.remove('speaking');
+    playBtn.textContent = '▶ RESUME';
+    stopWordDisplay();
+  }
+}
+
+// ── Word-by-word display ────────────────────
+function startWordDisplay() {
+  stopWordDisplay();
+  const msPerWord = (audio.duration * 1000) / words.length;
+  wordTimer = setInterval(() => {
+    if (wordIndex < words.length) {
+      const el = document.getElementById(`word-${wordIndex}`);
+      if (el) {
+        el.classList.add('visible');
+        // Scroll to latest
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+      wordIndex++;
+    }
+  }, msPerWord);
+}
+
+function stopWordDisplay() {
+  if (wordTimer) clearInterval(wordTimer);
+}
+
+// ── Reactions ───────────────────────────────
+async function react(type) {
+  try {
+    await fetch(`/api/${type}`, { method: 'POST' });
+  } catch (e) {}
+
+  if (type === 'laugh') {
+    laughs++;
+    document.getElementById('laughCount').textContent = laughs;
+    showToast('😂');
+  } else if (type === 'clap') {
+    claps++;
+    document.getElementById('clapCount').textContent = claps;
+    showToast('👏');
+  }
+}
+
+// ── Toast ───────────────────────────────────
+let toastTimeout;
+function showToast(msg) {
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => toast.classList.remove('show'), 1500);
+}
+
+// ── Waveform reset ──────────────────────────
+function resetWaveform() {
+  Array.from(waveform.children).forEach(bar => {
+    bar.style.height = '4px';
+    bar.classList.remove('active');
+  });
+}
+
+// ── Keyboard shortcuts ──────────────────────
+document.addEventListener('keydown', (e) => {
+  if (e.key === ' ' || e.key === 'Spacebar') {
+    e.preventDefault();
+    if (playBtn.textContent.includes('PLAY') || playBtn.textContent.includes('RESUME')) {
+      playBtn.onclick === playSet ? playSet() : togglePause();
+    } else {
+      togglePause();
+    }
+  }
+  if (e.key === 'l' || e.key === 'L') {
+    if (!laughBtn.disabled) react('laugh');
+  }
+  if (e.key === 'k' || e.key === 'K') {
+    if (!clapBtn.disabled) react('clap');
+  }
+});
+</script>
+
+</body>
+</html>
