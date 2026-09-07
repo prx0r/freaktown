@@ -692,6 +692,13 @@ def _save_bundle(data: dict):
                             "pause_ms": int(b.get("pause_after_ms", 300))})
     wav_bytes, offsets = compose_beats(beat_audios)
     (bdir / "set.wav").write_bytes(wav_bytes)
+    # Measured beat timings — the ms-resolution source for downstream
+    # cue/word-timing resolution (killella MotionCue resolver reads this).
+    (bdir / "offsets.json").write_text(json.dumps({
+        "version": "freaktown.offsets.v1",
+        "sample_rate": 24000,
+        "offsets": offsets,
+    }, indent=2))
 
     # 4. walkout audio + walkout.json (recipe)
     walkout = data.get("walkout") or {}
@@ -811,7 +818,10 @@ def name_set(slug):
 
 @app.route("/api/sets/<slug>/submit", methods=["POST"])
 def submit_set(slug):
-    """Submit a saved set for the live show. Status: draft -> queued."""
+    """Submit a saved set for the live show. Status: draft -> queued.
+    Body opt: {"enter_show": true} — also forwards the bundle to the
+    killella intake (KILLELLA_INTAKE_URL + KILLELLA_API_KEY env).
+    Without env configured, submit stays local-only (never fails)."""
     import datetime
     slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
     bdir = FREAK_DIR / slug
@@ -823,7 +833,72 @@ def submit_set(slug):
     meta["status"] = "queued"
     meta["submitted_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
     (bdir / "meta.json").write_text(json.dumps(meta, indent=2))
-    return jsonify({"ok": True, "slug": slug, "status": "queued"})
+    out = {"ok": True, "slug": slug, "status": "queued"}
+    if (request.json or {}).get("enter_show"):
+        fwd = _forward_to_intake(slug, bdir)
+        out["intake"] = fwd
+    return jsonify(out)
+
+
+def _intake_payload(slug: str, bdir) -> dict:
+    """Build the exact killella IntakeRequest body for a bundle.
+    Audio goes inline base64 (intake cap 10MB); offsets ride along when
+    present so word timings are measured, not estimated."""
+    import base64
+    character = json.loads((bdir / "character.json").read_text())
+    delivery = json.loads((bdir / "delivery.json").read_text())
+    try:
+        offsets = json.loads((bdir / "offsets.json").read_text()).get("offsets", [])
+    except Exception:
+        offsets = []
+    wav = (bdir / "set.wav").read_bytes()
+    payload = {
+        "character": {
+            "name": character.get("name", "Guest Freak"),
+            "species": character.get("species", ""),
+            "premise": character.get("premise", ""),
+            "vibe": character.get("vibe", ""),
+            "voice": character.get("voice", "en-US-AriaNeural"),
+        },
+        "delivery": delivery,
+        "episode_id": "00000000-0000-0000-0000-000000000000",
+        "audio_base64": base64.b64encode(wav).decode(),
+        "audio_format": "wav",
+        "offsets": offsets,
+        "duration_ms": int(meta_duration(bdir)),
+        "style": ((_bundle_meta(slug) or {}).get("style") or ""),
+    }
+    walkout = bdir / "walkout.wav"
+    if walkout.exists() and walkout.stat().st_size < 10_000_000:
+        payload["walkout_base64"] = base64.b64encode(walkout.read_bytes()).decode()
+    return payload
+
+
+def meta_duration(bdir) -> float:
+    try:
+        return float((_bundle_meta(bdir.name) or {}).get("duration_s", 0)) * 1000
+    except Exception:
+        return 0
+
+
+def _forward_to_intake(slug: str, bdir) -> dict:
+    """POST the bundle to killella intake. Never raises (returns status)."""
+    import os as _os
+    url = _os.getenv("KILLELLA_INTAKE_URL", "").rstrip("/")
+    if not url:
+        return {"ok": False, "error": "KILLELLA_INTAKE_URL not configured"}
+    try:
+        import httpx
+        r = httpx.post(
+            f"{url}/v1/intake/bundle",
+            json=_intake_payload(slug, bdir),
+            headers={"X-API-Key": _os.getenv("KILLELLA_API_KEY", "")},
+            timeout=120)
+        if r.status_code in (200, 201):
+            return {"ok": True, "intake": r.json()}
+        return {"ok": False, "error": f"intake {r.status_code}: {r.text[:200]}"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:200]}
 
 
 WALKOUT_GENRES = {
@@ -2096,6 +2171,7 @@ def share_set(slug):
         for fname, ctype in [("set.wav", "audio/wav"), ("portrait.png", "image/png"),
                              ("character.json", "application/json"),
                              ("delivery.json", "application/json"),
+                             ("offsets.json", "application/json"),
                              ("meta.json", "application/json")]:
             p = bdir / fname
             if p.exists():
