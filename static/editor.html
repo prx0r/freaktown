@@ -42,6 +42,18 @@ agent-3d { width: 100%; height: 340px; }
 .beat { background: #111; border: 1px solid #222; border-radius: 6px; padding: 10px 12px; margin: 8px 0; transition: border-color 0.2s; }
 .beat.active { border-color: #ff00aa; box-shadow: 0 0 12px rgba(255,0,170,.25); }
 .beat.selected { border-color: #00d4ff; }
+.delivery-row { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.delivery-row label { font-size: 10px; color: #555; display: flex; flex-direction: column; gap: 2px; }
+.delivery-row select { background: #111; border: 1px solid #333; color: #e0e0e0; border-radius: 4px; font-family: inherit; font-size: 11px; padding: 4px 6px; min-height: 32px; }
+.mode-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+.mode-tabs .btn.on { border-color: #ff00aa; color: #ff00aa; }
+#rehearseBar { display: none; text-align: center; padding: 10px; border: 1px solid #222; border-radius: 8px; margin-bottom: 10px; background: #0c0c12; }
+#rehearseBar.show { display: block; }
+#rehearseClock { font-size: 28px; font-weight: bold; letter-spacing: 2px; }
+#rehearseStats { font-size: 11px; color: #888; margin-top: 6px; }
+body.locked #chatRow { display: none; }
+#lockState { font-size: 10px; color: #555; }
+#lockState.locked { color: #00d4ff; }
 .kbd-hint { font-size: 10px; color: #444; }
 kbd { background: #1a1a2e; border: 1px solid #333; padding: 0 5px; border-radius: 3px; font-size: 10px; }
 .beat-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
@@ -155,6 +167,19 @@ input[type=range] { flex: 1; accent-color: #ff00aa; cursor: pointer; }
 
   <div class="workbench">
     <div class="hint">click a box to select it · <kbd>space</kbd> pause / resume from box · <kbd>tab</kbd> split box at cursor (gap = pause) · drag sliders for exact ms</div>
+    <div class="mode-tabs">
+      <button class="btn btn-small on" id="tabEdit" onclick="setMode('edit')">EDIT</button>
+      <button class="btn btn-small" id="tabRehearse" onclick="setMode('rehearse')">REHEARSE</button>
+      <span id="lockState" style="margin-left:auto;align-self:center;cursor:pointer;" onclick="toggleLock()" title="lock audio, perform visually">🔓 audio open</span>
+    </div>
+    <div id="rehearseBar">
+      <div id="rehearseClock">00:00</div>
+      <div style="margin-top:8px;display:flex;gap:8px;justify-content:center;">
+        <button class="btn btn-small" onclick="composePlay()">◀ REHEARSE AGAIN</button>
+        <button class="btn btn-small" onclick="setMode('edit')">EDIT SET ▶</button>
+      </div>
+      <div id="rehearseStats"></div>
+    </div>
     <div id="beats"></div>
     <div style="font-size:11px;color:#555;margin-top:8px;" id="stats"></div>
     <div style="font-size:12px;margin-top:6px;display:none;" id="styleMatch">
@@ -255,7 +280,7 @@ async function sendChat() {
   document.getElementById('premiseLine').textContent = window._char.premise;
   document.getElementById('charLine').textContent =
     `${window._char.name} · ${window._char.species} · ${window._char.vibe} · via ${data.engine || 'ai'}`;
-  parseText(data.minute);
+  parseText(data.minute, data.vibe);
   status(`Wrote ${window._char.name} — hit PLAY FULL SET`);
 }
 document.getElementById('chat').addEventListener('keydown', e => {
@@ -263,13 +288,35 @@ document.getElementById('chat').addEventListener('keydown', e => {
 });
 
 // ── Beats ──
-async function parseText(text) {
+async function parseText(text, vibe) {
   const res = await fetch('/api/parse', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({text})
   });
   const data = await res.json();
   beats = data.beats;
+  // character profile sets punchline-hold defaults (user edits win afterwards)
+  try {
+    if (vibe) {
+      const pr = await fetch('/api/profile', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({vibe})
+      });
+      const pd = await pr.json();
+      if (pd.ok && pd.profile) {
+        window._profile = pd.profile;
+        const hold = Math.round(pd.profile.punchline_hold_ms || 850);
+        beats.forEach(b => {
+          if (b.type === 'punchline') b.pause_after_ms = hold;
+          b.pace = b.pace || 'normal';
+        });
+      }
+    }
+  } catch (e) {}
+  beats.forEach(b => {
+    b.pace = b.pace || 'normal';
+    b.performance = b.performance || {expression: 'neutral', gesture: 'normal', look: 'audience'};
+  });
   renderBeats();
 }
 
@@ -281,7 +328,7 @@ function renderBeats() {
     el.className = 'beat' + (selectedBeat === i ? ' selected' : '');
     el.id = `beat-${b.id}`;
     el.addEventListener('click', e => {
-      if (e.target.closest('button, input, .beat-text')) return;
+      if (e.target.closest('button, input, select, .beat-text')) return;
       selectBeat(i);
       playFromHere(i); // tap card = play from this box
     });
@@ -298,6 +345,20 @@ function renderBeats() {
         <input type="range" min="0" max="2000" step="50" value="${b.pause_after_ms}"
                oninput="setPause(${i}, this.value)">
         <span class="pause-val" id="pv-${b.id}">${b.pause_after_ms}ms</span>
+      </div>
+      <div class="delivery-row">
+        <label>PACE<select onchange="setPerf(${i},'pace',this.value)">
+          ${['slow','normal','fast','rush'].map(p =>
+            `<option ${((b.pace||'normal')===p)?'selected':''}>${p}</option>`).join('')}
+        </select></label>
+        <label>FACE<select onchange="setPerf(${i},'face',this.value)">
+          ${['neutral','deadpan','grin','annoyed','confused','surprised'].map(f =>
+            `<option ${(((b.performance||{}).face||'neutral')===f)?'selected':''}>${f}</option>`).join('')}
+        </select></label>
+        <label>BODY<select onchange="setPerf(${i},'body',this.value)">
+          ${['normal','hold still','lean in','look left','look right','shrug','small gesture','big gesture'].map(g =>
+            `<option ${(((b.performance||{}).body||'normal')===g)?'selected':''}>${g}</option>`).join('')}
+        </select></label>
       </div>`;
     c.appendChild(el);
   });
@@ -306,6 +367,7 @@ function renderBeats() {
     `${beats.length} beats · ${words} words · drag sliders, then PLAY FULL SET`;
   matchStyle();
   saveDraft();
+  updateRehearseStats();
 }
 
 let matchedStyle = null;
@@ -344,6 +406,62 @@ async function applyMatchedStyle() {
 function setPause(i, ms) {
   beats[i].pause_after_ms = parseInt(ms);
   document.getElementById(`pv-${beats[i].id}`).textContent = ms + 'ms';
+}
+
+// ── Performance state: visual-only edits never rebuild TTS ──
+function setPerf(i, field, value) {
+  const b = beats[i];
+  if (field === 'pace') {
+    b.pace = value; // speech change: next compose regens ONLY this beat
+    status(`${b.id} pace → ${value} (rebuilds on next play)`);
+    return;
+  }
+  b.performance = b.performance || {};
+  b.performance[field] = value; // visual-only: applies instantly, no rebuild
+}
+
+let appMode = 'edit';
+let audioLocked = false;
+
+function setMode(mode) {
+  appMode = mode;
+  document.getElementById('tabEdit').classList.toggle('on', mode === 'edit');
+  document.getElementById('tabRehearse').classList.toggle('on', mode === 'rehearse');
+  document.getElementById('rehearseBar').classList.toggle('show', mode === 'rehearse');
+  document.querySelector('.workbench').style.display = mode === 'rehearse' ? 'none' : '';
+  if (mode === 'rehearse') updateRehearseStats();
+}
+
+function toggleLock() {
+  audioLocked = !audioLocked;
+  const el = document.getElementById('lockState');
+  el.textContent = audioLocked ? '🔒 audio locked' : '🔓 audio open';
+  el.classList.toggle('locked', audioLocked);
+  document.body.classList.toggle('locked', audioLocked);
+  status(audioLocked
+    ? 'Audio locked — pace/text/voice edits still work, face/body apply live'
+    : 'Audio open — back to writing mode');
+}
+
+function updateRehearseStats() {
+  const words = beats.reduce((s, b) => s + (b.text.split(/\s+/).length), 0);
+  const pauses = beats.map(b => b.pause_after_ms || 0);
+  const longest = pauses.length ? Math.max(...pauses) : 0;
+  const punch = beats.filter(b => b.type === 'punchline').length;
+  const est = beats.reduce((s, b) => s + b.pause_after_ms + (b.word_count || b.text.split(/\s+/).length) / 2.82 * 1000, 0);
+  const closers = beats.filter(b => b.type === 'closer');
+  document.getElementById('rehearseStats').textContent =
+    `~${(est / 1000).toFixed(1)}s · ${words} words · longest hold ${(longest / 1000).toFixed(1)}s · ` +
+    `${punch} punchline${punch === 1 ? '' : 's'} · ${closers.length ? 'closer set' : 'no closer yet'}`;
+}
+
+function tickRehearseClock() {
+  const audio = document.getElementById('audio');
+  const t = audio.currentTime || 0;
+  const mm = String(Math.floor(t / 60)).padStart(2, '0');
+  const ss = String(Math.floor(t % 60)).padStart(2, '0');
+  document.getElementById('rehearseClock').textContent = `${mm}:${ss}`;
+  if (!audio.paused && !audio.ended) requestAnimationFrame(tickRehearseClock);
 }
 
 // ── Playback with beat sync ──
@@ -402,6 +520,7 @@ async function composePlay(opts = {}) {
     setAvatarTalking(true);
     clearHighlight();
     highlightTimer = setInterval(syncHighlight, 150);
+    tickRehearseClock();
     audio.onended = () => { clearHighlight(); setAvatarTalking(false); };
     if (!opts.silent) status(`Playing (~${(data.duration_ms / 1000).toFixed(1)}s)`);
   }
@@ -595,7 +714,7 @@ function keepLook() {
   status('Look locked — portrait ships with the bundle');
 }
 
-function playWalkout() {
+async function playWalkout() {
   if (!walkoutUrl) return status('Generate the walkout first');
   const a = document.getElementById('audio');
   a.src = walkoutUrl;
@@ -675,7 +794,9 @@ function splitBeatAtCursor() {
   beats[i].word_count = before.split(/\s+/).length;
   const fresh = {id: 'b' + Date.now().toString(36), type: 'setup',
                  text: after, pause_after_ms: beats[i].pause_after_ms,
-                 word_count: after.split(/\s+/).length};
+                 word_count: after.split(/\s+/).length,
+                 pace: beats[i].pace || 'normal',
+                 performance: {...(beats[i].performance || {})}};
   beats.splice(i + 1, 0, fresh);
   renderBeats();
   selectBeat(i + 1); // the pushed content is the new box
@@ -712,7 +833,8 @@ async function saveSet() {
       beats, voice: document.getElementById('voice').value,
       style: document.getElementById('templateSel').value || '',
       walkout: window._walkout || null,
-      portrait: window._portrait || null
+      portrait: window._portrait || null,
+      profile: window._profile || null
     })
   });
   const data = await res.json();
@@ -748,6 +870,7 @@ async function loadSet(slug) {
   const data = await res.json();
   if (!data.ok) return status('Load failed');
   window._char = data.character;
+  window._profile = data.profile || null;
   document.getElementById('performerName').textContent = data.character.name;
   document.getElementById('premiseLine').textContent = data.character.premise || '';
   document.getElementById('charLine').textContent =
@@ -923,10 +1046,24 @@ function updateMouth(dt) {
   em.setValue('aa', prevAA);
   em.setValue('ih', prevIH * 0.7);
   em.setValue('oh', prevOH * 0.7);
-  // grin on punchlines: pause logic drives the face
-  const activeEl = document.querySelector('.beat.active .beat-type');
-  const hot = activeEl && /punchline|closer/.test(activeEl.textContent || '');
-  em.setValue('happy', hot ? 0.55 : 0.0);
+  // face channel: per-beat performance.face, independent of mouth/blink.
+  // mouth = analyser, face = semantic beat, blink = timer. Never reset all.
+  const activeEl = document.querySelector('.beat.active');
+  let face = 'neutral';
+  if (activeEl) {
+    const m = (activeEl.id || '').match(/^beat-(.+)$/);
+    const b = m && beats.find(x => String(x.id) === m[1]);
+    face = ((b && b.performance && b.performance.face) || 'neutral').toLowerCase();
+  }
+  const targets = {happy: 0, relaxed: 0, angry: 0, surprised: 0, sad: 0};
+  if (face === 'grin') targets.happy = 0.55;
+  else if (face === 'deadpan') targets.relaxed = 0.7;
+  else if (face === 'annoyed') targets.angry = 0.6;
+  else if (face === 'confused') targets.surprised = 0.35;
+  else if (face === 'surprised') targets.surprised = 0.8;
+  for (const [k, v] of Object.entries(targets)) {
+    try { em.setValue(k, v); } catch (e) {}
+  }
 }
 
 function blink() {

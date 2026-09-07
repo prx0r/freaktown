@@ -28,15 +28,21 @@ AUDIO_DIR.mkdir(exist_ok=True)
 
 # ── Provider (edge-tts now, Qwen later) ────────────────────────────
 
-async def tts_generate(text: str, voice: str = "en-US-AriaNeural") -> bytes:
-    """Generate speech as WAV bytes."""
+PACE_RATES = {"slow": "-15%", "normal": "+0%", "fast": "+12%", "rush": "+25%"}
+
+
+async def tts_generate(text: str, voice: str = "en-US-AriaNeural",
+                       pace: str = "normal") -> bytes:
+    """Generate speech as WAV bytes. pace in slow/normal/fast/rush."""
     import edge_tts
-    
-    tmp_mp3 = AUDIO_DIR / f"_tmp_{hash(text) % 100000}.mp3"
-    communicate = edge_tts.Communicate(text, voice)
+
+    rate = PACE_RATES.get(pace, "+0%")
+    tag = hashlib.sha256(f"{voice}|{rate}|{text}".encode()).hexdigest()[:12]
+    tmp_mp3 = AUDIO_DIR / f"_tmp_{tag}.mp3"
+    communicate = edge_tts.Communicate(text, voice, rate=rate)
     await communicate.save(str(tmp_mp3))
     
-    tmp_wav = AUDIO_DIR / f"_tmp_{hash(text) % 100000}.wav"
+    tmp_wav = AUDIO_DIR / f"_tmp_{tag}.wav"
     subprocess.run([
         "ffmpeg", "-y", "-i", str(tmp_mp3),
         "-ar", "24000", "-ac", "1", "-f", "wav", str(tmp_wav)
@@ -223,17 +229,104 @@ def tts():
     return jsonify({"ok": False}), 500
 
 
+# ── Performance profiles: character vibe -> default delivery ──────────
+
+VIBE_PROFILES = {
+    "paranoid":           {"pace": 1.08, "movement": 0.70, "eye_contact": 0.40,
+                           "energy": 0.80, "punchline_hold_ms": 600, "gesture_frequency": 0.70},
+    "manic":              {"pace": 1.12, "movement": 0.90, "eye_contact": 0.40,
+                           "energy": 0.95, "punchline_hold_ms": 450, "gesture_frequency": 0.85},
+    "dangerously optimistic": {"pace": 1.05, "movement": 0.75, "eye_contact": 0.85,
+                           "energy": 0.90, "punchline_hold_ms": 500, "gesture_frequency": 0.70},
+    "overconfident":      {"pace": 1.02, "movement": 0.60, "eye_contact": 0.90,
+                           "energy": 0.80, "punchline_hold_ms": 700, "gesture_frequency": 0.55},
+    "exhausted":          {"pace": 0.90, "movement": 0.25, "eye_contact": 0.60,
+                           "energy": 0.40, "punchline_hold_ms": 1000, "gesture_frequency": 0.20},
+    "melancholic":        {"pace": 0.88, "movement": 0.20, "eye_contact": 0.50,
+                           "energy": 0.35, "punchline_hold_ms": 1100, "gesture_frequency": 0.15},
+    "passive-aggressive": {"pace": 0.96, "movement": 0.40, "eye_contact": 0.85,
+                           "energy": 0.60, "punchline_hold_ms": 800, "gesture_frequency": 0.30},
+}
+DEFAULT_PROFILE = {"pace": 0.94, "movement": 0.40, "eye_contact": 0.80,
+                   "energy": 0.65, "punchline_hold_ms": 850, "gesture_frequency": 0.30}
+
+
+def profile_for_vibe(vibe: str) -> dict:
+    return dict(VIBE_PROFILES.get((vibe or "").lower(), DEFAULT_PROFILE))
+
+
+@app.route("/api/profile", methods=["GET", "POST"])
+def get_profile():
+    """Default performance profile for a character vibe."""
+    if request.method == "POST":
+        vibe = (request.json or {}).get("vibe", "")
+    else:
+        vibe = request.args.get("vibe", "")
+    return jsonify({"ok": True, "vibe": vibe, "profile": profile_for_vibe(vibe)})
+
+
+# ── Beat audio cache: visual-only edits never rebuild TTS ────────────
+
+BEAT_CACHE = Path(__file__).parent / "beat_cache"
+BEAT_CACHE.mkdir(exist_ok=True)
+
+
+def beat_cache_key(text: str, voice: str, pace: str) -> str:
+    return hashlib.sha256(f"{voice}|{pace}|{text}".encode()).hexdigest()[:16]
+
+
+def beat_wav(text: str, voice: str, pace: str = "normal") -> tuple[bytes, str, bool]:
+    """TTS for one beat with cache. Returns (wav, key, cached)."""
+    key = beat_cache_key(text, voice, pace)
+    path = BEAT_CACHE / f"{key}.wav"
+    if path.exists():
+        return path.read_bytes(), key, True
+    audio = asyncio.run(tts_generate(text, voice, pace))
+    if audio:
+        path.write_bytes(audio)
+    return audio, key, False
+
+
+@app.route("/api/regen_beat", methods=["POST"])
+def regen_beat():
+    """Regenerate ONE beat (text/pace/voice change). Everything else reuses cache.
+    Body: {"text": "...", "voice": "...", "pace": "slow"}"""
+    data = request.json or {}
+    text = (data.get("text") or "").strip()
+    if not text:
+        return jsonify({"ok": False, "error": "text required"}), 400
+    voice = data.get("voice", "en-US-AriaNeural")
+    pace = data.get("pace", "normal")
+    audio, key, cached = beat_wav(text, voice, pace)
+    if not audio:
+        return jsonify({"ok": False, "error": "tts failed"}), 502
+    samples = wav_to_samples(audio)
+    return jsonify({"ok": True, "key": key, "cached": cached,
+                    "duration_ms": int(len(samples) / 24000 * 1000)})
+
+
 @app.route("/api/compose", methods=["POST"])
 def compose():
-    """Compose full set with exact timing."""
+    """Compose full set with exact timing.
+    Beats may carry a `key` from /api/regen_beat or a previous compose;
+    matching cache entries skip TTS entirely (visual-only edits = instant)."""
     data = request.json
     beats = data.get("beats", [])
     voice = data.get("voice", "en-US-AriaNeural")
-    
-    # Generate TTS for each beat
+
+    # Generate TTS for each beat (cache-aware)
     beat_audios = []
     for b in beats:
-        audio = asyncio.run(tts_generate(b["text"], voice))
+        pace = b.get("pace", "normal")
+        key = b.get("key")
+        audio = None
+        if key:
+            cached = BEAT_CACHE / f"{re.sub(r'[^a-f0-9]', '', key)[:16]}.wav"
+            if cached.exists():
+                audio = cached.read_bytes()
+        if audio is None:
+            audio, key, _ = beat_wav(b["text"], voice, pace)
+            b["key"] = key
         beat_audios.append({
             "id": b["id"],
             "audio": audio,
@@ -422,20 +515,43 @@ def save_set():
         "voice": voice,
     }, indent=2))
 
-    # 2. delivery.json (freaktown.delivery.v1, timings included)
+    # 2. delivery.json — the persistent performance score (v1)
+    profile = profile_for_vibe(character.get("vibe", ""))
+    if isinstance(data.get("profile"), dict):
+        for k, v in data["profile"].items():
+            if k in profile:
+                try:
+                    profile[k] = float(v)
+                except (TypeError, ValueError):
+                    pass
+    beats_out = []
+    for b in beats:
+        perf = b.get("performance") or {}
+        beats_out.append({
+            "id": b.get("id"), "type": b.get("type", "setup"),
+            "text": b.get("text", ""),
+            "speech": {"pace": b.get("pace", "normal"),
+                       "emphasis": float(b.get("emphasis", 0.5))},
+            "performance": {
+                "expression": perf.get("expression", "neutral"),
+                "gesture": perf.get("gesture", "normal"),
+                "look": perf.get("look", "audience"),
+            },
+            "pause_after_ms": int(b.get("pause_after_ms", 300)),
+        })
     (bdir / "delivery.json").write_text(json.dumps({
         "version": "freaktown.delivery.v1",
         "voice": {"provider": "edge-tts", "voice_id": voice},
-        "beats": [{"id": b.get("id"), "type": b.get("type", "setup"),
-                   "text": b.get("text", ""),
-                   "pause_after_ms": int(b.get("pause_after_ms", 300))}
-                  for b in beats],
+        "profile": profile,
+        "beats": beats_out,
     }, indent=2))
 
-    # 3. set.wav (composed clip with exact silence)
+    # 3. set.wav (composed clip with exact silence, cache-aware)
     beat_audios = []
     for b in beats:
-        audio = asyncio.run(tts_generate(b.get("text", ""), voice))
+        pace = b.get("pace", "normal")
+        audio, key, _ = beat_wav(b.get("text", ""), voice, pace)
+        b["key"] = key
         beat_audios.append({"id": b.get("id"), "audio": audio,
                             "pause_ms": int(b.get("pause_after_ms", 300))})
     wav_bytes, offsets = compose_beats(beat_audios)
@@ -519,8 +635,19 @@ def get_set(slug):
         meta = json.loads((bdir / "meta.json").read_text())
     except Exception:
         return jsonify({"ok": False, "error": "corrupt bundle"}), 500
+    # flatten v1 speech/performance blocks for the editor (which keeps
+    # pace top-level and performance nested — same shape it saves)
+    flat = []
+    for b in delivery.get("beats", []):
+        b = dict(b)
+        if isinstance(b.get("speech"), dict) and "pace" not in b:
+            b["pace"] = b["speech"].get("pace", "normal")
+        b.setdefault("performance", {"expression": "neutral", "gesture": "normal",
+                                     "look": "audience"})
+        flat.append(b)
     return jsonify({"ok": True, "slug": slug, "character": character,
-                    "beats": delivery.get("beats", []), "voice": meta.get("voice", ""),
+                    "beats": flat, "voice": meta.get("voice", ""),
+                    "profile": delivery.get("profile", {}),
                     "style": meta.get("style", ""), "status": meta.get("status", "draft"),
                     "audio": f"/freaks/{slug}/set.wav" if (bdir / "set.wav").exists() else None})
 
