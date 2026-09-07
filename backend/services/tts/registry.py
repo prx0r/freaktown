@@ -146,6 +146,7 @@ def _register_all():
     from backend.services.tts.elevenlabs import elevenlabs_tts
     from backend.services.tts.chattts import chattts_adapter
     from backend.services.tts.inworld import inworld_tts
+    from backend.services.tts.qwen3 import qwen3_tts
 
     # MiniMax is the preferred default
     tts_registry.register(minimax_tts, default=True)
@@ -154,6 +155,7 @@ def _register_all():
     tts_registry.register(elevenlabs_tts)
     tts_registry.register(chattts_adapter)
     tts_registry.register(inworld_tts)
+    tts_registry.register(qwen3_tts)  # Canonical open-source
 
     # If default is unavailable, cascade to next available
     if not tts_registry.get().is_available():
