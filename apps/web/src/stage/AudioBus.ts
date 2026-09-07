@@ -6,8 +6,16 @@
  * SFX   — rimshots, bombs, crowd effects
  * CROWD — live audience audio (future)
  *
- * Each channel is a GainNode for volume control.
- * Ducking: music ramps down when comedian starts speaking.
+ * One graph only:
+ *
+ *   VOICE SOURCE → VOICE Gain → voice analyser → MASTER → destination
+ *   MUSIC SOURCE → MUSIC Gain ─┐
+ *   SFX SOURCE   → SFX Gain   ─┤→ MASTER → destination
+ *   CROWD SOURCE → CROWD Gain ┘
+ *
+ * LipSync reads the voice analyser. Transport sends its source into the
+ * VOICE bus instead of directly to destination. Ducking: music ramps
+ * down when comedian starts speaking.
  */
 
 export type AudioChannel = 'VOICE' | 'MUSIC' | 'SFX' | 'CROWD';
@@ -15,18 +23,36 @@ export type AudioChannel = 'VOICE' | 'MUSIC' | 'SFX' | 'CROWD';
 export class AudioBus {
   private context: AudioContext;
   private channels: Map<AudioChannel, GainNode> = new Map();
-  private destinations: Map<AudioChannel, AudioNode> = new Map();
+  private master: GainNode;
+  private voiceAnalyser: AnalyserNode;
 
   constructor(context: AudioContext) {
     this.context = context;
+
+    this.master = context.createGain();
+    this.master.connect(context.destination);
+
+    // Voice tap for lipsync (owned by the bus, shared, never recreated)
+    this.voiceAnalyser = context.createAnalyser();
+    this.voiceAnalyser.fftSize = 256;
+    this.voiceAnalyser.smoothingTimeConstant = 0.55;
+    this.voiceAnalyser.connect(this.master);
 
     // Create gain nodes for each channel
     const channelNames: AudioChannel[] = ['VOICE', 'MUSIC', 'SFX', 'CROWD'];
     for (const name of channelNames) {
       const gain = context.createGain();
-      gain.connect(context.destination);
+      if (name === 'VOICE') {
+        gain.connect(this.voiceAnalyser);
+      } else {
+        gain.connect(this.master);
+      }
       this.channels.set(name, gain);
     }
+  }
+
+  getVoiceAnalyser(): AnalyserNode {
+    return this.voiceAnalyser;
   }
 
   // ── Channel Control ──────────────────────────────────────────────
@@ -122,5 +148,7 @@ export class AudioBus {
       gain.disconnect();
     }
     this.channels.clear();
+    this.voiceAnalyser.disconnect();
+    this.master.disconnect();
   }
 }

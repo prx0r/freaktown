@@ -16,6 +16,8 @@
 
 import { DurableObject } from 'cloudflare:workers';
 
+import { CameraCutPayloadV1 } from '../src/contracts/show';
+
 export type EpisodeState = {
   episodeId: string;
   phase: string;
@@ -45,9 +47,16 @@ type CrowdWindow = {
   laughs: number;
   claps: number;
   boos: number;
+  crickets: number;
+  groans: number;
   uniqueSessions: string[];
   startTime: number;
 };
+
+/** Explicit reaction vocabulary. Anything else is discarded at the door. */
+const SUPPORTED_REACTIONS: ReadonlySet<string> = new Set([
+  'laugh', 'clap', 'boo', 'crickets', 'groan', 'love', 'wtf',
+]);
 
 const ALARM_INTERVAL_MS = 5000;
 const SEQ_PAD = 12;
@@ -97,11 +106,20 @@ export class EpisodeRoom extends DurableObject {
         this.episodeState = saved;
       }
 
-      // Rehydrate crowd windows persisted by the alarm handler
+      // Rehydrate crowd windows persisted by the alarm handler.
+      // Normalize older shapes (pre-crickets/groans) defensively.
       const crowd = await this.ctx.storage.list<CrowdWindow>({ prefix: 'crowd:' });
       for (const [key, window] of crowd) {
         const appearanceId = key.slice('crowd:'.length);
-        this.crowdWindows.set(appearanceId, window);
+        this.crowdWindows.set(appearanceId, {
+          laughs: window.laughs ?? 0,
+          claps: window.claps ?? 0,
+          boos: window.boos ?? 0,
+          crickets: window.crickets ?? 0,
+          groans: window.groans ?? 0,
+          uniqueSessions: window.uniqueSessions ?? [],
+          startTime: window.startTime ?? Date.now(),
+        });
       }
 
       // If a show was mid-flight when we were evicted, resume persistence
@@ -325,13 +343,34 @@ export class EpisodeRoom extends DurableObject {
           break;
         case 'camera.cut':
           if ((attachment.role === 'stage' || attachment.role === 'puppeteer') && attachment.authenticated) {
+            // Shared contract gates the payload: unknown camera names are
+            // dropped here, never persisted, never broadcast.
+            const parsed = CameraCutPayloadV1.safeParse({
+              camera: data.camera,
+              performance_id: this.episodeState.activeAppearanceId,
+              set_time_ms: data.set_time_ms ?? null,
+              source: 'human_director',
+            });
+            if (!parsed.success) break;
             await this.executeCommand('camera.cut', {
               actor: attachment.role,
-              performance_id: this.episodeState.activeAppearanceId,
-              camera: data.camera,
-              source: 'human_director',
-              set_time_ms: data.set_time_ms ?? null,
+              ...parsed.data,
             });
+          }
+          break;
+        case 'stage.ack':
+          // Readiness/completion ACKs from the stage's own authenticated
+          // socket (e.g. performance.ready after preload). Persisted like
+          // any command so replay reconstructs the same show.
+          if (attachment.role === 'stage' && attachment.authenticated) {
+            const ackEvent = data.event;
+            if (typeof ackEvent === 'string' && ackEvent) {
+              const payload: Record<string, unknown> = { actor: 'stage' };
+              for (const [k, v] of Object.entries(data)) {
+                if (k !== 'type' && k !== 'event') payload[k] = v;
+              }
+              await this.executeCommand(ackEvent, payload);
+            }
           }
           break;
         case 'heartbeat':
@@ -433,7 +472,7 @@ export class EpisodeRoom extends DurableObject {
       type,
       actor: (payload.actor as string) || 'system',
       payload,
-      createdAt: new Date().toISOString(),
+      created_at: new Date().toISOString(),
     };
 
     // Persist event BEFORE broadcasting
@@ -482,11 +521,29 @@ export class EpisodeRoom extends DurableObject {
     return event;
   }
 
-  // ── Audience reactions ─────────────────────────────────────────────
+  // ── Audience reactions (raw ML events + derived aggregates) ──────
+  //
+  // Raw reactions are more valuable than aggregates: every accepted
+  // reaction is persisted with session_id + client_seq + performance_id
+  // + set_time_ms + source, and the 1s crowd buckets are DERIVED from
+  // the raw log (reproducible both directions). Aggregates alone would
+  // throw away the dataset the whole system is designed to produce.
 
   private async handleReaction(data: { [k: string]: unknown }, attachment: ClientAttachment) {
     const reaction = data.reaction as string;
-    if (reaction !== 'laugh' && reaction !== 'clap' && reaction !== 'boo') return;
+    if (!SUPPORTED_REACTIONS.has(reaction)) return;
+
+    // Reactions count only while a performer is on stage.
+    if (!this.episodeState.activeAppearanceId || this.episodeState.isPaused) return;
+
+    // Duplicate/out-of-order client_seq from the same session is a
+    // resend: ignore. The high-water mark lives in storage (not memory)
+    // so dedup survives hibernation/eviction exactly like the raw log.
+    const clientSeq = Number(data.client_seq ?? NaN);
+    if (!Number.isInteger(clientSeq) || clientSeq <= 0) return;
+    const highKey = `sess:${attachment.sessionId}`;
+    const high = (await this.ctx.storage.get<number>(highKey)) ?? 0;
+    if (clientSeq <= high) return;
 
     // Best-effort per-session rate limit: max 1 reaction / 250ms
     const now = Date.now();
@@ -494,10 +551,35 @@ export class EpisodeRoom extends DurableObject {
     if (now - last < 250) return;
     this.lastReactionAt.set(attachment.sessionId, now);
 
+    const setTimeMs = Number(data.set_time_ms ?? 0) || 0;
+    const source = typeof data.source === 'string' ? data.source : 'freaktown_web';
+
+    // 1. Persist the raw event first.
+    this.episodeState.seq += 1;
+    const seq = this.episodeState.seq;
+    const rawEvent = {
+      seq,
+      event_id: crypto.randomUUID(),
+      episode_id: this.episodeState.episodeId,
+      performance_id: this.episodeState.activeAppearanceId,
+      session_id: attachment.sessionId,
+      client_seq: clientSeq,
+      type: 'reaction',
+      reaction,
+      set_time_ms: setTimeMs,
+      server_received_at: new Date(now).toISOString(),
+      source,
+    };
+    await this.ctx.storage.put(this.eventKey(seq), rawEvent);
+    await this.ctx.storage.put(highKey, clientSeq);
+    await this.ctx.storage.put('episodeState', this.episodeState);
+    await this.ensureAlarm();
+
+    // 2. Derive the live aggregate.
     const windowKey = this.episodeState.activeAppearanceId || 'none';
     let window = this.crowdWindows.get(windowKey);
     if (!window) {
-      window = { laughs: 0, claps: 0, boos: 0, uniqueSessions: [], startTime: now };
+      window = { laughs: 0, claps: 0, boos: 0, crickets: 0, groans: 0, uniqueSessions: [], startTime: now };
       this.crowdWindows.set(windowKey, window);
     }
 
@@ -509,19 +591,30 @@ export class EpisodeRoom extends DurableObject {
       }
     } else if (reaction === 'clap') {
       window.claps += 1;
-    } else {
+    } else if (reaction === 'boo') {
       window.boos += 1;
+    } else if (reaction === 'crickets') {
+      window.crickets += 1;
+    } else if (reaction === 'groan') {
+      window.groans += 1;
+    } else {
+      // love / wtf: counted as engagement volume only
+      window.laughs += 0;
     }
 
     this.broadcastToRole(
       'audience',
       JSON.stringify({
         type: 'crowd.update',
+        // snake_case wire names matching the frontend CrowdState
+        // (freaktown.event.v1) — never camelCase on the wire.
         data: {
-          laughs: window.laughs,
+          laugh_events: window.laughs,
           claps: window.claps,
           boos: window.boos,
-          uniqueLaughers: window.uniqueSessions.length,
+          crickets: window.crickets ?? 0,
+          groans: window.groans ?? 0,
+          unique_laughers: window.uniqueSessions.length,
         },
       })
     );

@@ -18,6 +18,7 @@ Killella accepts the full schema and carries unknown-safe defaults.
 """
 
 import hashlib
+import json
 import re
 from dataclasses import dataclass, field
 
@@ -26,6 +27,7 @@ from backend.services.delivery.sequencer import DeliveryScore
 
 SCHEMA_VERSION = "freaktown.delivery.v1"
 PERFORMANCE_SCHEMA_VERSION = "freaktown.performance.v1"
+AVATAR_SCHEMA_VERSION = "freaktown.avatar.v1"
 
 BEAT_TYPES = {"setup", "escalation", "misdirect", "punchline", "tag", "callback", "actout", "closer"}
 
@@ -222,6 +224,68 @@ def words_from_beats(beats: list[dict], spans: list[BeatSpan]) -> list[Word]:
     return words
 
 
+# ── Avatar contract (freaktown.avatar.v1) ────────────────────────────
+# VRM is the canonical performer format. The runtime asks what the
+# avatar CAN do instead of assuming: a floating toaster with one viseme
+# still performs. three.ws is a creation/import/fallback path — assets
+# enter only when they satisfy this contract.
+
+VRM_VISEMES = ["aa", "ih", "ou", "ee", "oh"]
+
+VROID_DEFAULT_CAPABILITIES = {
+    "humanoid": True,
+    "blink": True,
+    "visemes": list(VRM_VISEMES),
+    "look_at": True,
+    "expressions": ["happy", "angry", "sad", "surprised"],
+}
+
+
+def validate_avatar(avatar: dict) -> BundleValidation:
+    """Validate a freaktown.avatar.v1 dict. Collects all errors."""
+    errors: list[str] = []
+    if not isinstance(avatar, dict):
+        return BundleValidation(False, ["avatar must be an object"])
+    if avatar.get("version", AVATAR_SCHEMA_VERSION) != AVATAR_SCHEMA_VERSION:
+        errors.append(f"avatar version must be {AVATAR_SCHEMA_VERSION}")
+    if avatar.get("format") != "vrm":
+        errors.append("avatar format must be vrm (canonical performer format)")
+    if not (avatar.get("asset") or "").strip():
+        errors.append("avatar asset required (key, URL, or inline ref)")
+    caps = avatar.get("capabilities", {})
+    if not isinstance(caps, dict):
+        errors.append("avatar capabilities must be an object")
+    else:
+        for key in ("humanoid", "blink", "look_at"):
+            if key in caps and not isinstance(caps[key], bool):
+                errors.append(f"avatar capabilities.{key} must be boolean")
+        for key in ("visemes", "expressions"):
+            if key in caps and (
+                not isinstance(caps[key], list)
+                or not all(isinstance(v, str) for v in caps[key])
+            ):
+                errors.append(f"avatar capabilities.{key} must be string list")
+    return BundleValidation(not errors, errors)
+
+
+def avatar_capabilities(avatar: dict | None) -> dict:
+    """Effective capabilities: declared avatar.json merged over VRoid
+    defaults (declared keys win, including False). Absent avatar.json
+    assumes a standard VRoid VRM — three-vrm still probes at runtime."""
+    caps = dict(VROID_DEFAULT_CAPABILITIES)
+    caps["visemes"] = list(VRM_VISEMES)
+    caps["expressions"] = list(VROID_DEFAULT_CAPABILITIES["expressions"])
+    if isinstance(avatar, dict) and isinstance(avatar.get("capabilities"), dict):
+        for key, value in avatar["capabilities"].items():
+            if key in caps:
+                caps[key] = value
+    return caps
+
+
+def can_viseme(avatar: dict | None, viseme: str) -> bool:
+    return viseme in avatar_capabilities(avatar).get("visemes", [])
+
+
 def build_performance_manifest(
     performance_id: str,
     character: dict,
@@ -230,11 +294,17 @@ def build_performance_manifest(
     audio_ref: str,
     duration_ms: int,
     episode_id: str = "",
+    avatar: dict | None = None,
+    walkout_ref: str = "",
+    walkout_duration_ms: int = 0,
 ) -> dict:
     """Sealed freaktown.performance.v1 manifest — what the stage performs.
 
-    Immutable once issued: audio + delivery + words + cues are frozen.
-    The stage refuses to start a performance whose manifest is missing.
+    Immutable once issued: avatar + audio + delivery + words + cues are
+    frozen. The stage refuses to start a performance whose manifest is
+    missing. The same folder (avatar.vrm + avatar.json + delivery.json +
+    set.wav + walkout.wav + character.json) runs identically in the Black
+    Room, killella rehearsal, killella live, and future clients.
     """
     body_class = f"{species_to_body(character.get('species', ''))}-v1"
     cues = []
@@ -245,6 +315,14 @@ def build_performance_manifest(
             cues.append({"at": "beat", "beat_id": b.id, "type": "camera", "value": b.camera})
         if b.sound and b.sound != "none":
             cues.append({"at": "beat", "beat_id": b.id, "type": "sfx", "value": b.sound})
+    avatar_block: dict = {
+        "version": AVATAR_SCHEMA_VERSION,
+        "format": "vrm",
+        "asset": (avatar or {}).get("asset", "") or character.get("avatar_url", ""),
+        "capabilities": avatar_capabilities(avatar),
+    }
+    if isinstance(avatar, dict) and avatar.get("vrm_version"):
+        avatar_block["vrm_version"] = avatar["vrm_version"]
     manifest = {
         "version": PERFORMANCE_SCHEMA_VERSION,
         "performance_id": performance_id,
@@ -253,16 +331,22 @@ def build_performance_manifest(
             "name": character.get("name", "Guest Freak"),
             "species": character.get("species", ""),
             "premise": character.get("premise", ""),
-            "avatar_url": character.get("avatar_url", ""),
+            "avatar_url": avatar_block["asset"],
             "body_class": body_class,
             "voice": {"provider": score.provider, "voice_id": score.voice_id},
         },
-        "audio": {"set_url": audio_ref, "duration_ms": duration_ms},
+        "avatar": avatar_block,
+        "audio": {
+            "set_url": audio_ref,
+            "duration_ms": duration_ms,
+            "walkout_url": walkout_ref,
+            "walkout_duration_ms": walkout_duration_ms,
+        },
         "delivery": score.to_dict(),
         "words": [{"word": w.word, "start_ms": w.start_ms, "end_ms": w.end_ms} for w in words],
         "motion": {"cues": cues},
     }
     manifest["sha256"] = hashlib.sha256(
-        __import__("json").dumps(manifest, sort_keys=True).encode()
+        json.dumps(manifest, sort_keys=True).encode()
     ).hexdigest()
     return manifest

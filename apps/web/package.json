@@ -8,6 +8,9 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
     "worker:dev": "wrangler dev",
     "worker:build": "wrangler deploy --dry-run --outdir=dist-worker",
     "worker:deploy": "wrangler deploy"
@@ -16,15 +19,17 @@
     "@pixiv/three-vrm": "^3.0.0",
     "@three-ws/x402-modal": "^0.3.0",
     "hono": "^4.0.0",
+    "jose": "^6.2.12",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.0.0",
     "three": "^0.170.0",
-    "zod": "^3.23.0",
+    "zod": "^3.25.76",
     "zustand": "^5.0.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20240925.0",
+    "@types/node": "^26.5.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/three": "^0.170.0",

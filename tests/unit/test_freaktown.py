@@ -224,14 +224,29 @@ class TestSoundBank:
 class TestJudgeVoices:
     def test_voices_and_rotation(self):
         from backend.services.judge.panel import (
-            GUEST_JUDGES, JUDGE_VOICES, pick_guest_judge,
+            GUEST_JUDGES, JUDGE_VOICES, judge_voice_line, pick_guest_judge,
         )
 
-        assert set(JUDGE_VOICES) == {"ella", "chatgpt", "siri", "alexa", "claude", "stream"}
+        assert {"ella", "chatgpt", "siri", "alexa", "claude", "stream"} <= set(JUDGE_VOICES)
         assert JUDGE_VOICES["stream"] is None
+        assert JUDGE_VOICES["chatgpt"] == "en-US-AndrewMultilingualNeural"
         assert set(GUEST_JUDGES) == {"chatgpt", "siri", "alexa", "claude"}
         assert pick_guest_judge("ep1") == pick_guest_judge("ep1")
         assert pick_guest_judge("ep1") in GUEST_JUDGES
+
+        voice, ssml = judge_voice_line("chatgpt", "Nuanced exploration of themes.")
+        assert voice == "en-US-AndrewMultilingualNeural"
+        assert ssml.startswith("<speak") and 'rate="-5%"' in ssml
+        assert "Nuanced exploration" in ssml
+        voice, text = judge_voice_line("ella", "That was a choice.")
+        assert voice == "en-US-AriaNeural" and text == "That was a choice."
+        assert judge_voice_line("stream", "9.3")[0] is None
+
+    def test_chatgpt_voices_in_catalog(self):
+        from backend.services.tts.edge import EDGE_VOICES
+
+        assert "en-US-AndrewMultilingualNeural" in EDGE_VOICES
+        assert "en-US-AvaMultilingualNeural" in EDGE_VOICES
 
     def test_chatgpt_sees_no_transcript(self):
         """ChatGPT judges name+premise only — the transcript must not leak

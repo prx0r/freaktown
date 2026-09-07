@@ -9,7 +9,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { apiRouter } from './api/index';
-import { authMiddleware, type AppBindings } from './auth/middleware';
+import { authMiddleware, requireAdmin, type AppBindings } from './auth/middleware';
 import { EpisodeRoom } from './episode-room';
 
 export { EpisodeRoom };
@@ -75,7 +75,7 @@ app.get('/live/:episodeId/state', async (c) => {
   return stub.fetch('https://episode-room/state');
 });
 
-app.post('/live/:episodeId/command', authMiddleware, async (c) => {
+app.post('/live/:episodeId/command', authMiddleware, requireAdmin, async (c) => {
   const episodeId = c.req.param('episodeId');
   if (!episodeId) return c.json({ error: 'episodeId required' }, 400);
   const stub = getRoom(c, episodeId);
@@ -87,7 +87,7 @@ app.post('/live/:episodeId/command', authMiddleware, async (c) => {
   });
 });
 
-app.post('/live/:episodeId/stage-token', authMiddleware, async (c) => {
+app.post('/live/:episodeId/stage-token', authMiddleware, requireAdmin, async (c) => {
   const episodeId = c.req.param('episodeId');
   if (!episodeId) return c.json({ error: 'episodeId required' }, 400);
   const stub = getRoom(c, episodeId);

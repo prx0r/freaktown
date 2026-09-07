@@ -45,6 +45,7 @@ from backend.services.freaktown import (
     estimate_spans,
     species_to_body,
     spans_from_offsets,
+    validate_avatar,
     validate_bundle,
     words_from_beats,
 )
@@ -53,6 +54,7 @@ from backend.services.media_store import media_store
 router = APIRouter()
 
 MAX_AUDIO_BYTES = 10_000_000  # 10MB decoded cap on inline audio
+MAX_AVATAR_BYTES = 30_000_000  # 30MB cap on inline .vrm
 
 
 class CharacterIn(BaseModel):
@@ -70,10 +72,24 @@ class IntakeRequest(BaseModel):
     audio_base64: str = Field("", description="set.wav bytes, base64 (cap 10MB decoded)")
     audio_url: str = Field("", description="stage-fetchable URL, alternative to base64")
     audio_format: str = Field("wav", description="wav|mp3")
-    avatar_url: str = Field("", max_length=500, description="avatar GLB URL (three.ws body); default stage avatar when empty")
+    avatar_url: str = Field("", max_length=500, description="avatar GLB/VRM URL (three.ws body); default stage avatar when empty")
+    avatar_base64: str = Field("", description="avatar.vrm bytes, base64 (cap 30MB decoded)")
+    avatar_json: dict = Field(default_factory=dict, description="freaktown.avatar.v1 capabilities")
+    walkout_base64: str = Field("", description="walkout.wav bytes, base64 (cap 10MB decoded)")
+    walkout_recipe: dict = Field(default_factory=dict, description="walkout recipe {genre,mood,energy,shape,seed}")
     offsets: list[dict] = Field(default_factory=list, description="compose offsets for word timings")
     duration_ms: int = Field(0, ge=0, description="0 = estimate from beats")
     style: str = Field("", max_length=40)
+
+
+def _decode_b64(data: str, field_name: str, cap: int) -> bytes:
+    try:
+        raw = base64.b64decode(data)
+    except (binascii.Error, ValueError):
+        raise HTTPException(400, f"{field_name} is not valid base64")
+    if len(raw) > cap:
+        raise HTTPException(413, f"{field_name} exceeds cap")
+    return raw
 
 
 def _body_archetype(species: str) -> BodyArchetype:
@@ -186,12 +202,7 @@ async def intake_bundle(
     audio_bytes_len = 0
     audio_bytes: bytes | None = None
     if req.audio_base64:
-        try:
-            audio_bytes = base64.b64decode(req.audio_base64)
-        except (binascii.Error, ValueError):
-            raise HTTPException(400, "audio_base64 is not valid base64")
-        if len(audio_bytes) > MAX_AUDIO_BYTES:
-            raise HTTPException(413, "audio exceeds 10MB cap")
+        audio_bytes = _decode_b64(req.audio_base64, "audio_base64", MAX_AUDIO_BYTES)
         audio_bytes_len = len(audio_bytes)
         if media_store.configured:
             fmt = req.audio_format if req.audio_format in ("wav", "mp3", "ogg") else "wav"
@@ -202,6 +213,45 @@ async def intake_bundle(
                 audio_ref = ""
         else:
             audio_ref = f"intake:{act.id}"
+
+    # Avatar: inline .vrm (stored) or URL. Capabilities validated; the
+    # runtime asks the contract what the avatar can do, never assumes.
+    avatar_ref = req.avatar_url
+    avatar_doc: dict = dict(req.avatar_json) if req.avatar_json else {}
+    if req.avatar_base64:
+        avatar_bytes = _decode_b64(req.avatar_base64, "avatar_base64", MAX_AVATAR_BYTES)
+        if media_store.configured:
+            try:
+                info = media_store.put_bytes(f"acts/{act.id}/avatar.vrm", avatar_bytes,
+                                             "model/gltf-binary")
+                avatar_ref = info.get("r2_key", "")
+            except Exception:
+                avatar_ref = ""
+        else:
+            avatar_ref = f"intake:{act.id}:avatar"
+    if avatar_doc:
+        avatar_doc = {**avatar_doc, "asset": avatar_ref or avatar_doc.get("asset", "")}
+        av = validate_avatar(avatar_doc)
+        if not av.ok:
+            raise HTTPException(400, f"invalid avatar: {av.errors[0]}")
+    elif avatar_ref:
+        avatar_doc = {"version": "freaktown.avatar.v1", "format": "vrm", "asset": avatar_ref}
+
+    # Walkout: inline wav (stored) or synthesized later from the recipe.
+    walkout_ref = ""
+    walkout_ms = 0
+    if req.walkout_base64:
+        walkout_bytes = _decode_b64(req.walkout_base64, "walkout_base64", MAX_AUDIO_BYTES)
+        if media_store.configured:
+            try:
+                info = media_store.put_bytes(f"acts/{act.id}/walkout.wav", walkout_bytes,
+                                             "audio/wav")
+                walkout_ref = info.get("r2_key", "")
+            except Exception:
+                walkout_ref = ""
+        else:
+            walkout_ref = f"intake:{act.id}:walkout"
+        walkout_ms = 8000  # Black Room walkouts are exact 8s
 
     # Words: compose offsets when provided, else proportional estimate.
     beats = req.delivery.get("beats", [])
@@ -215,12 +265,15 @@ async def intake_bundle(
 
     manifest_out = build_performance_manifest(
         performance_id=str(act.id),
-        character={**req.character.model_dump(), "avatar_url": req.avatar_url},
+        character={**req.character.model_dump(), "avatar_url": avatar_ref or req.avatar_url},
         score=score,
         words=words,
         audio_ref=audio_ref,
         duration_ms=duration_ms,
         episode_id=str(req.episode_id),
+        avatar=avatar_doc or None,
+        walkout_ref=walkout_ref,
+        walkout_duration_ms=walkout_ms,
     )
 
     # Persist the sealed manifest + words for the stage to load.
@@ -248,6 +301,8 @@ async def intake_bundle(
         "act_version_id": str(act.id),
         "submission_id": str(submission.id),
         "audio_ref": audio_ref,
+        "avatar_ref": avatar_ref,
+        "walkout_ref": walkout_ref,
         "word_count": len(words),
         "duration_ms": duration_ms,
         "performance": manifest_out,
@@ -321,4 +376,23 @@ async def get_performance_audio(act_version_id: uuid.UUID):
         url = media_store.get_signed_url(audio_ref)
     except Exception:
         raise HTTPException(500, "could not sign audio URL")
+    return RedirectResponse(url=url, status_code=302)
+
+
+@router.get("/performances/{act_version_id}/avatar")
+async def get_performance_avatar(act_version_id: uuid.UUID):
+    """Redirect to a signed URL for the sealed avatar.vrm."""
+    from fastapi.responses import RedirectResponse
+
+    if not media_store.configured:
+        raise HTTPException(404, "media not configured")
+    manifest = await get_performance(act_version_id)
+    asset = ((manifest.get("avatar") or {}).get("asset", "")
+             or (manifest.get("actor") or {}).get("avatar_url", ""))
+    if not asset or not asset.startswith("acts/"):
+        raise HTTPException(404, "no sealed avatar for this performance")
+    try:
+        url = media_store.get_signed_url(asset)
+    except Exception:
+        raise HTTPException(500, "could not sign avatar URL")
     return RedirectResponse(url=url, status_code=302)

@@ -5,6 +5,7 @@
 
 import { Context, Next } from 'hono';
 import type { Env } from '../index';
+import { verifyPrivyAccessToken } from './privy';
 
 export type User = {
   id: string;
@@ -59,25 +60,22 @@ export async function authMiddleware(c: Context<AppBindings>, next: Next) {
     return next();
   }
 
-  // Privy token auth
+  // Privy token auth — real RS256 verification via JWKS.
   if (authHeader?.startsWith('Bearer ')) {
     const token = authHeader.slice(7);
 
-    // Verify Privy token
     const privyAppId = c.env.PRIVY_APP_ID;
-    const privyAppSecret = c.env.PRIVY_APP_SECRET;
 
-    if (!privyAppId || !privyAppSecret) {
+    if (!privyAppId) {
       return c.json({ error: 'Auth not configured' }, 500);
     }
 
+    let payload;
     try {
-      // In production, verify the Privy JWT token
-      // For now, decode the token to get user info
-      const payload = decodeJwtPayload(token);
-      if (!payload?.sub) {
-        return c.json({ error: 'Invalid token' }, 401);
-      }
+      payload = await verifyPrivyAccessToken(token, { appId: privyAppId });
+    } catch {
+      return c.json({ error: 'Invalid token' }, 401);
+    }
 
       const db = c.env.DB;
       const userResult = await db.prepare(
@@ -111,9 +109,6 @@ export async function authMiddleware(c: Context<AppBindings>, next: Next) {
       }
 
       return next();
-    } catch (err) {
-      return c.json({ error: 'Invalid token' }, 401);
-    }
   }
 
   return c.json({ error: 'Authentication required' }, 401);
@@ -139,19 +134,4 @@ async function hashApiKey(key: string): Promise<string> {
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-/**
- * Decode JWT payload without verification (for dev only).
- * In production, use proper JWT verification.
- */
-function decodeJwtPayload(token: string): any {
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    const payload = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'));
-    return JSON.parse(payload);
-  } catch {
-    return null;
-  }
 }

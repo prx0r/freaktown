@@ -145,14 +145,40 @@ OUTPUT STRICT JSON:
 
 JUDGE_VOICES = {
     "ella": "en-US-AriaNeural",          # custom voice (ElevenLabs in production)
-    "chatgpt": "en-US-GuyNeural",        # generic male
+    "chatgpt": "en-US-AndrewMultilingualNeural",  # corporate-assistant smooth, confidently wrong
+    "chatgpt_alt": "en-US-AvaMultilingualNeural",  # relentlessly supportive while wrong
+    "chatgpt_pompous": "en-US-ChristopherNeural",  # overconfident encyclopedia
     "siri": "en-US-SamanthaNeural",      # stats robot
     "alexa": "en-US-JoannaNeural",       # accidentally helpful
-    "claude": "en-US-ChristopherNeural", # overthinks
+    "claude": "en-US-ChristopherNeural",  # overthinks
     "stream": None,                      # text only
 }
 
 GUEST_JUDGES = ["chatgpt", "siri", "alexa", "claude"]
+
+# ChatGPT speaks 5% slow, perfectly measured. Too clean to be human.
+CHATGPT_PROSODY_RATE = "-5%"
+
+
+def judge_voice_line(judge: str, text: str) -> tuple[str | None, str]:
+    """Voice id + speakable text for a judge line.
+
+    ChatGPT's lines are wrapped in SSML prosody (edge-tts auto-detects
+    SSML): slightly slowed, pitch-flat corporate calm. Everyone else
+    speaks plain text in their assigned voice.
+    """
+    voice = JUDGE_VOICES.get(judge)
+    if voice is None:
+        return None, text
+    if judge.startswith("chatgpt"):
+        ssml = (
+            f'<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" '
+            f'xml:lang="en-US"><voice name="{voice}">'
+            f'<prosody rate="{CHATGPT_PROSODY_RATE}">{text}</prosody>'
+            f"</voice></speak>"
+        )
+        return voice, ssml
+    return voice, text
 
 
 def pick_guest_judge(seed: str = "") -> str:

@@ -242,21 +242,30 @@ async def compose(score: DeliveryScore) -> bytes:
     assume raw PCM. pause_after_ms means EXACTLY that many ms of silence,
     regardless of provider.
 
-    If TTS is unavailable the beats contribute silence, pause timing stays
-    exact, and the output is still a valid, decodable WAV of the correct
-    total duration. If ffmpeg itself is missing we raise — a corrupt or
-    fake file is worse than an error.
+    Fail-loud contract: a TTS/decode failure on ANY beat with text fails
+    the whole build (RuntimeError listing the failed beats). A contestant
+    standing silent for six seconds is not a valid compiled performance —
+    only READY builds (validate_score + successful compose) enter a show.
+    If ffmpeg itself is missing we raise — a corrupt or fake file is
+    worse than an error.
     """
+    failures = validate_score(score)
+    if failures:
+        raise ValueError(f"invalid delivery score: {failures[0]}")
+
     try:
         from backend.services.tts import get_adapter
         adapter = get_adapter(score.provider if score.provider != "qwen3" else None)
-    except Exception:
-        adapter = None
+    except Exception as e:
+        raise RuntimeError(f"no TTS provider available: {e}")
 
-    if adapter is not None:
-        _require_ffmpeg()
+    if adapter is None:
+        raise RuntimeError("no TTS provider available")
+
+    _require_ffmpeg()
 
     pcm_segments: list[bytes] = []
+    failed: list[str] = []
 
     for beat in score.beats:
         # pause_before (EXACT)
@@ -268,12 +277,35 @@ async def compose(score: DeliveryScore) -> bytes:
                 result = await adapter.synthesize(beat.text, score.voice_id)
                 pcm_segments.append(await _decode_to_canonical_pcm(result.audio_bytes, result.audio_format))
             except Exception as e:
-                logger.warning(f"Beat {beat.id} TTS/decode failed, keeping silence: {e}")
+                failed.append(f"{beat.id}: {e}")
         # pause_after (EXACT, regardless of provider)
         if beat.pause_after_ms > 0:
             pcm_segments.append(_silence(beat.pause_after_ms, CANONICAL_SAMPLE_RATE))
 
+    if failed:
+        raise RuntimeError(f"performance build failed ({len(failed)} beats): " + "; ".join(failed))
+
     return _encode_wav(b"".join(pcm_segments))
+
+
+def validate_score(score: DeliveryScore) -> list[str]:
+    """Pre-build validation. Empty list = READY to compose.
+
+    States: DRAFT (has text) → GENERATING (compose running) →
+    VALIDATING (these checks) → READY (valid WAV) / FAILED (raised).
+    """
+    problems: list[str] = []
+    if not score.beats:
+        problems.append("score has no beats")
+        return problems
+    for i, beat in enumerate(score.beats):
+        if not beat.text.strip():
+            problems.append(f"beats[{i}] ({beat.id}) has empty text")
+        if beat.pause_after_ms < 0 or beat.pause_after_ms > 10_000:
+            problems.append(f"beats[{i}] ({beat.id}) pause_after_ms out of range")
+        if beat.type not in BEAT_TYPES:
+            problems.append(f"beats[{i}] ({beat.id}) unknown type {beat.type!r}")
+    return problems
 
 
 def _silence(ms: int, sample_rate: int = CANONICAL_SAMPLE_RATE) -> bytes:

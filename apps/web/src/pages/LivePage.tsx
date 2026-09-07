@@ -7,10 +7,26 @@
  * URL: /live/:episodeId
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useShowStore } from '../store/showStore';
+import { EventConsumer } from '../stage/EventConsumer';
 import { payForAction } from '../x402/pay';
+
+const SESSION_STORAGE_KEY = 'freaktown_session_id';
+
+function stableSessionId(): string {
+  try {
+    let id = localStorage.getItem(SESSION_STORAGE_KEY);
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem(SESSION_STORAGE_KEY, id);
+    }
+    return id;
+  } catch {
+    return `s-${Date.now()}`;
+  }
+}
 
 export function LivePage() {
   const { episodeId } = useParams<{ episodeId: string }>();
@@ -24,6 +40,26 @@ export function LivePage() {
   const [wsConnected, setWsConnected] = useState(false);
   const [payNote, setPayNote] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
+  const consumerRef = useRef<EventConsumer | null>(null);
+
+  // Audience socket: stable session id so laughs dedup to one laugher
+  // and reconnects resume the same identity.
+  useEffect(() => {
+    if (!episodeId) return;
+    const consumer = new EventConsumer();
+    consumerRef.current = consumer;
+    consumer
+      .connect(episodeId, { role: 'audience', sessionId: stableSessionId() })
+      .then(() => setWsConnected(true))
+      .catch(() => setWsConnected(false));
+    const timer = window.setInterval(() => setWsConnected(consumer.connected), 2000);
+    return () => {
+      window.clearInterval(timer);
+      consumer.disconnect();
+      consumerRef.current = null;
+      setWsConnected(false);
+    };
+  }, [episodeId]);
 
   // Format time as MM:SS
   const formatTime = (ms: number): string => {
@@ -34,9 +70,14 @@ export function LivePage() {
   };
 
   const handleReaction = (type: string) => {
-    // Send reaction via WebSocket
-    // This will be connected to the EventConsumer
-    console.log(`Reaction: ${type}`);
+    // Canonical reaction event: session + monotonic client_seq +
+    // current media time. The DO persists the raw event, dedups by
+    // (session, client_seq), and derives the crowd aggregate.
+    consumerRef.current?.sendReaction(
+      type,
+      useShowStore.getState().currentTimeMs,
+      { source: 'freaktown_web' }
+    );
   };
 
   const handlePaid = async (action: 'pot' | 'message' | 'hype' | 'tip') => {
@@ -158,7 +199,11 @@ export function LivePage() {
           opacity: 0.5,
           display: 'flex',
           gap: 16,
+          alignItems: 'center',
         }}>
+          <span style={{ color: wsConnected ? '#4aff4a' : '#ff4a4a' }}>
+            {wsConnected ? '●' : '○'}
+          </span>
           <span>{crowd.active_viewers} watching</span>
           <span>{crowd.unique_laughers} laughing</span>
         </div>

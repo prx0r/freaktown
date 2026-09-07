@@ -80,6 +80,8 @@ export interface CrowdState {
   laugh_events: number;
   claps: number;
   boos: number;
+  crickets: number;
+  groans: number;
 }
 
 // ── Performance Plan Types (shared with StageRuntime) ─────────────
@@ -193,7 +195,7 @@ export const useShowStore = create<ShowState>((set, get) => ({
   currentTimeMs: 0,
 
   // Crowd
-  crowd: { active_viewers: 0, unique_laughers: 0, laugh_events: 0, claps: 0, boos: 0 },
+  crowd: { active_viewers: 0, unique_laughers: 0, laugh_events: 0, claps: 0, boos: 0, crickets: 0, groans: 0 },
 
   // Judges
   judgeScores: [],
@@ -231,10 +233,15 @@ export const useShowStore = create<ShowState>((set, get) => ({
   setJudgeScores: (scores) => set({ judgeScores: scores }),
   setScoresRevealed: (revealed) => set({ scoresRevealed: revealed }),
 
-  addEvent: (event) => set((s) => ({
-    events: [...s.events, event],
-    lastSeq: Math.max(s.lastSeq, event.seq),
-  })),
+  addEvent: (event) => set((s) => {
+    // Idempotent: reconnect replay or duplicate delivery must never
+    // duplicate the log or re-apply state transitions twice.
+    if (event.seq <= s.lastSeq) return s;
+    return {
+      events: [...s.events, event],
+      lastSeq: Math.max(s.lastSeq, event.seq),
+    };
+  }),
 
   applyEvent: (event) => {
     const state = get();

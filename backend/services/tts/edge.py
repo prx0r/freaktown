@@ -20,6 +20,11 @@ EDGE_VOICES = {
     "en-US-JennyNeural": {"name": "Jenny", "gender": "female", "style": "friendly"},
     "en-US-TonyNeural": {"name": "Tony", "gender": "male", "style": "casual"},
     "en-US-AndrewNeural": {"name": "Andrew", "gender": "male", "style": "narrative"},
+    # Copilot/Conversation-tagged multilingual voices — polished corporate
+    # assistant sound. Andrew is the ChatGPT judge voice: smooth, helpful,
+    # unhurried, completely wrong.
+    "en-US-AndrewMultilingualNeural": {"name": "Andrew Multilingual", "gender": "male", "style": "copilot-conversational"},
+    "en-US-AvaMultilingualNeural": {"name": "Ava Multilingual", "gender": "female", "style": "copilot-supportive"},
     "en-GB-RyanNeural": {"name": "Ryan", "gender": "male", "style": "british"},
     "en-GB-SoniaNeural": {"name": "Sonia", "gender": "female", "style": "british"},
     "en-AU-WilliamNeural": {"name": "William", "gender": "male", "style": "australian"},

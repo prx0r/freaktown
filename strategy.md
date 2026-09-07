@@ -212,3 +212,25 @@ purchase in x402 — names live in three places, all already handled:
 3. Discovery identity — `serviceName`/`tags` in every requirements
    envelope plus local `/pay/discovery`; facilitator Bazaar listing
    once a facilitator is configured.
+
+## Mobile money: Apple Pay funds, x402 spends (WIRED for, not yet live)
+
+Apple Pay does not speak x402 — and it shouldn't have to. The stack:
+
+```text
+iPhone watching → +$5 POT → Privy embedded wallet
+  wallet has USDC → authorize x402 instantly → POT increases
+  wallet empty → Apple Pay / card onramp fills USDC → x402 retries → POT increases
+```
+
+Rules: never Apple Pay a $1 reaction (onramp fees/minimums/KYC make
+micro-fiat silly). Fund once ($10 → 10 USDC in the FREAK WALLET), then
+x402 handles +$1/+$2/+$5 instantly during the show. First-ever
+contribution still needs the onramp's identity flow; after that it's
+Face ID → coins rain → Ella ignores your $100. Crypto invisible, fun
+visible: the audience only ever sees HAHA, CHAT, +$1, POT.
+
+Status: LivePage paid buttons + modal + x402 settle path exist; Privy
+wallet/onramp wiring (keys, funding endpoints, balance display) is
+explicitly deferred until facilitator + escrow are live — no stubs that
+pretend to hold money.

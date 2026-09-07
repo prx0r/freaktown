@@ -113,7 +113,7 @@ export function ThreeWsStagePage() {
     if (!episodeId) return;
     const consumer = new EventConsumer();
     consumerRef.current = consumer;
-    consumer.connect(episodeId, 'stage').catch(() => {});
+    consumer.connect(episodeId, { role: 'stage' }).catch(() => {});
     return () => { consumer.disconnect(); consumerRef.current = null; };
   }, [episodeId]);
 

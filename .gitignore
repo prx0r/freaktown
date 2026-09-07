@@ -11,6 +11,7 @@ anchor-target/
 # Frontend build outputs
 apps/web/dist/
 apps/web/dist-worker/
+apps/web/.vite/
 
 # Local-only Worker dev vars (never deployed; see .dev.vars.example)
 apps/web/.dev.vars
@@ -21,3 +22,5 @@ data/datasets/*.json
 deploy/pages/.wrangler/
 *.log
 .venv/
+
+.vite/

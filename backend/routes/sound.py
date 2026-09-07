@@ -105,12 +105,21 @@ class ComposeRequest(BaseModel):
 
 @router.post("/delivery/compose")
 async def compose_delivery(req: ComposeRequest):
-    """DeliveryScore → final WAV with exact silence. Returns base64 audio."""
+    """DeliveryScore → final WAV with exact silence. Returns base64 audio.
+
+    Fail-loud: invalid scores are 400, TTS/decode/ffmpeg failures are 502.
+    A silent-unless-pauses file is never returned as a performance.
+    """
     try:
         score = DeliveryScore.from_dict(req.delivery)
     except Exception as e:
         raise HTTPException(400, f"Invalid delivery object: {e}")
-    wav = await compose(score)
+    try:
+        wav = await compose(score)
+    except ValueError as e:
+        raise HTTPException(400, f"Invalid delivery score: {e}")
+    except RuntimeError as e:
+        raise HTTPException(502, f"Performance build failed: {e}")
     return Response(
         content=wav, media_type="audio/wav",
         headers={"X-Delivery-Schema": SCHEMA_VERSION, "X-Beats": str(len(score.beats))},

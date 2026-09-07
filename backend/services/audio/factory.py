@@ -275,6 +275,8 @@ class SoundFactory:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.local = StableAudioOpenSmall()
         self.remote = RemoteAudioWorker()
+        from backend.services.audio.procedural import ProceduralProvider
+        self.procedural = ProceduralProvider()
 
     def cached(self, recipe: SoundRecipe) -> AudioAsset | None:
         path = self.cache_dir / f"{recipe.asset_id}.wav"
@@ -295,7 +297,21 @@ class SoundFactory:
         hit = self.cached(recipe)
         if hit:
             return hit
-        provider = self.remote if self.remote.is_available() else self.local
+        # Chain: remote worker → local GPU → procedural instant synth.
+        # Procedural covers walkouts (always available: rolling a Freak
+        # immediately hears *something*). One-shot SFX still need a model
+        # backend and 503 honestly without one.
+        if self.remote.is_available():
+            provider: AudioProvider = self.remote
+        elif self.local.is_available():
+            provider = self.local
+        elif recipe.type == "walkout":
+            provider = self.procedural
+        else:
+            raise RuntimeError(
+                "SFX generation needs Stable Audio (CUDA) or AUDIO_WORKER_URL; "
+                "procedural synth covers walkouts only."
+            )
         asset = await provider.generate(recipe)
         self._store(asset)
         return asset

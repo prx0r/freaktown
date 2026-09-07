@@ -20,7 +20,10 @@ export class Transport {
   private audioContext: AudioContext | null = null;
   private audioBuffer: AudioBuffer | null = null;
   private audioSource: AudioBufferSourceNode | null = null;
-  private analyser: AnalyserNode | null = null;
+
+  // Output node for the voice chain (e.g. the AudioBus VOICE gain).
+  // When unset, the source connects straight to destination.
+  private outputNode: AudioNode | null = null;
 
   private startedContextTime: number = 0;
   private pausedMediaTime: number = 0;
@@ -57,6 +60,19 @@ export class Transport {
     this.audioContext = ctx;
   }
 
+  getAudioContext(): AudioContext | null {
+    return this.audioContext;
+  }
+
+  /**
+   * Route voice output into the mix bus (AudioBus VOICE gain).
+   * The bus owns the lipsync analyser tap — Transport never creates
+   * its own, so there is exactly one audio graph.
+   */
+  setOutputNode(node: AudioNode | null): void {
+    this.outputNode = node;
+  }
+
   async loadAudio(url: string): Promise<void> {
     if (!this.audioContext) {
       this.audioContext = new AudioContext();
@@ -65,10 +81,6 @@ export class Transport {
     const response = await fetch(url);
     const arrayBuffer = await response.arrayBuffer();
     this.audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
-
-    // Set up analyser
-    this.analyser = this.audioContext.createAnalyser();
-    this.analyser.fftSize = 256;
   }
 
   async loadAudioFromBytes(bytes: ArrayBuffer): Promise<void> {
@@ -77,13 +89,6 @@ export class Transport {
     }
 
     this.audioBuffer = await this.audioContext.decodeAudioData(bytes);
-
-    this.analyser = this.audioContext.createAnalyser();
-    this.analyser.fftSize = 256;
-  }
-
-  getAnalyser(): AnalyserNode | null {
-    return this.analyser;
   }
 
   // ── Controls ─────────────────────────────────────────────────────
@@ -92,21 +97,16 @@ export class Transport {
     if (!this.audioBuffer || !this.audioContext) return;
     if (this._state === 'playing') return;
 
-    // Resume audio context if suspended
+    // Resume audio context if suspended (iPhone: first PLAY must come
+    // from a user gesture — StagePage gates on unlockAudio for this).
     if (this.audioContext.state === 'suspended') {
-      this.audioContext.resume();
+      void this.audioContext.resume();
     }
 
-    // Create and connect audio source
+    // Create and connect audio source into the voice bus (or destination)
     this.audioSource = this.audioContext.createBufferSource();
     this.audioSource.buffer = this.audioBuffer;
-
-    if (this.analyser) {
-      this.audioSource.connect(this.analyser);
-      this.analyser.connect(this.audioContext.destination);
-    } else {
-      this.audioSource.connect(this.audioContext.destination);
-    }
+    this.audioSource.connect(this.outputNode ?? this.audioContext.destination);
 
     // Start at the correct offset
     const startOffset = this._state === 'paused' ? this.pausedMediaTime / 1000 : 0;
@@ -203,9 +203,6 @@ export class Transport {
     this.stop();
     if (this.audioSource) {
       try { this.audioSource.disconnect(); } catch {}
-    }
-    if (this.analyser) {
-      try { this.analyser.disconnect(); } catch {}
     }
   }
 }

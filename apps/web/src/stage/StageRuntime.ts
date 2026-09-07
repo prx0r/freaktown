@@ -21,6 +21,16 @@ import { useShowStore, MotionCue, WordTiming, PerformancePlan } from '../store/s
 
 // ── Types ──────────────────────────────────────────────────────────
 
+export type RuntimeStatus = 'EMPTY' | 'LOADING' | 'READY' | 'PLAYING' | 'PAUSED' | 'ENDED';
+
+export interface PreloadSpec {
+  avatarUrl: string;
+  audioUrl: string;
+  plan: PerformancePlan;
+  wordTimings?: WordTiming[];
+  walkoutUrl?: string;
+}
+
 export interface StageConfig {
   mode: 'live' | 'green-room';
   container: HTMLElement;
@@ -53,7 +63,14 @@ export class StageRuntime {
   // State
   private config: StageConfig;
   private animationFrameId: number | null = null;
-  private isInitialized: boolean = false;
+  private unbindCameraKeyboard: (() => void) | null = null;
+
+  /**
+   * Explicit lifecycle. play() is a no-op until preload() resolves READY;
+   * performance.start is only legal in READY (the show gates on the
+   * stage.performance_ready ACK the executor sends after preload).
+   */
+  status: RuntimeStatus = 'EMPTY';
 
   // Gaze target (persistent Object3D — vrm.lookAt.target must be an Object3D)
   private gazeTarget: THREE.Object3D;
@@ -89,18 +106,22 @@ export class StageRuntime {
     this.gazeTarget.position.set(0, 1.5, 3);
     this.scene.add(this.gazeTarget);
 
-    // Audio
+    // Audio — one graph: transport → VOICE bus → analyser → MASTER.
+    // The bus owns the lipsync tap; nothing else creates analysers.
     const audioContext = new AudioContext();
     this.transport = new Transport();
     this.transport.setAudioContext(audioContext);
+    this.transport.setOnEnd(() => this.onTransportEnd());
     this.audioBus = new AudioBus(audioContext);
+    this.transport.setOutputNode(this.audioBus.getGain('VOICE'));
 
     // Camera director
     this.cameraDirector = new CameraDirector(this.camera);
     this.cameraDirector.setClock(() => this.transport.currentTimeMs);
 
-    // Lip sync
+    // Lip sync reads the bus voice tap; mouth channel only.
     this.lipSync = new LipSyncAdapter();
+    this.lipSync.attach(this.audioBus.getVoiceAnalyser());
 
     // Event consumer
     this.eventConsumer = new EventConsumer();
@@ -111,8 +132,22 @@ export class StageRuntime {
     // Setup resize handler
     window.addEventListener('resize', this.handleResize);
 
-    // Bind keyboard for camera control
-    this.cameraDirector.bindKeyboard();
+    // CameraDirector owns keyboard mapping (StagePage must NOT add its own
+    // handler — double handling crashes cutCamera with raw key strings).
+    this.unbindCameraKeyboard = this.cameraDirector.bindKeyboard();
+  }
+
+  /** The shared consumer, so pages can attach one executor to it. */
+  get consumer(): EventConsumer {
+    return this.eventConsumer;
+  }
+
+  get audio(): AudioBus {
+    return this.audioBus;
+  }
+
+  get director(): CameraDirector {
+    return this.cameraDirector;
   }
 
   // ── Setup ────────────────────────────────────────────────────────
@@ -188,22 +223,27 @@ export class StageRuntime {
 
   async loadAudio(url: string): Promise<void> {
     await this.transport.loadAudio(url);
-
-    // Connect analyser to audio bus
-    const analyser = this.transport.getAnalyser();
-    if (analyser) {
-      // Voice channel
-      this.audioBus.getGain('VOICE').connect(analyser);
-    }
   }
 
   async loadAudioFromBytes(bytes: ArrayBuffer): Promise<void> {
     await this.transport.loadAudioFromBytes(bytes);
+  }
 
-    const analyser = this.transport.getAnalyser();
-    if (analyser) {
-      this.audioBus.getGain('VOICE').connect(analyser);
+  /**
+   * Unlock audio from a user gesture (required on iPhone/mobile Safari
+   * where Web Audio starts suspended). StagePage calls this on first tap.
+   */
+  async unlockAudio(): Promise<void> {
+    const ctx = this.transport.getAudioContext();
+    if (ctx && ctx.state === 'suspended') {
+      await ctx.resume();
     }
+  }
+
+  /** True while the AudioContext needs a user gesture to start. */
+  isAudioLocked(): boolean {
+    const ctx = this.transport.getAudioContext();
+    return !!ctx && ctx.state === 'suspended';
   }
 
   // ── Performance Plan ─────────────────────────────────────────────
@@ -214,33 +254,76 @@ export class StageRuntime {
     this.currentCueIndex = 0;
   }
 
-  // ── Transport Controls ──────────────────────────────────────────
+  /**
+   * Load a Freak onto the stage: avatar GLB + set audio + plan + words.
+   * EMPTY → LOADING → READY. play() is a no-op until READY.
+   */
+  async preload(spec: PreloadSpec): Promise<void> {
+    this.setStatus('LOADING');
+    await this.loadAvatar(spec.avatarUrl);
+    await this.loadAudio(spec.audioUrl);
+    this.setPlan(spec.plan, spec.wordTimings ?? []);
+    this.setStatus('READY');
+  }
 
-  play(): void {
-    if (this.isInitialized) {
-      this.transport.play();
-      this.startAnimationLoop();
+  private statusListeners = new Set<(s: RuntimeStatus) => void>();
+
+  onStatus(cb: (s: RuntimeStatus) => void): () => void {
+    this.statusListeners.add(cb);
+    return () => { this.statusListeners.delete(cb); };
+  }
+
+  private setStatus(s: RuntimeStatus): void {
+    this.status = s;
+    for (const cb of this.statusListeners) {
+      try { cb(s); } catch { /* listener errors never break playback */ }
     }
   }
 
-  pause(): void {
-    this.transport.pause();
-  }
+  // ── Transport Controls (state-machine gated) ──────────────────────
 
-  resume(): void {
-    this.transport.resume();
+  play(): void {
+    if (this.status !== 'READY' && this.status !== 'PAUSED' && this.status !== 'ENDED') return;
+    this.lipSync.setActive(true);
+    this.transport.play();
+    this.setStatus('PLAYING');
     this.startAnimationLoop();
   }
 
+  pause(): void {
+    if (this.status !== 'PLAYING') return;
+    this.lipSync.setActive(false);
+    this.transport.pause();
+    this.setStatus('PAUSED');
+  }
+
+  resume(): void {
+    if (this.status !== 'PAUSED') return;
+    this.play();
+  }
+
   seek(ms: number): void {
+    if (this.status !== 'PLAYING' && this.status !== 'PAUSED') return;
     this.transport.seek(ms);
     this.currentCueIndex = this.plan?.cues.findIndex(c => c.at_ms >= ms) ?? 0;
+    if (this.currentCueIndex < 0) this.currentCueIndex = 0;
+  }
+
+  /** Called when the set audio naturally ends. */
+  private onTransportEnd(): void {
+    this.lipSync.setActive(false);
+    this.setStatus('ENDED');
   }
 
   // ── Camera Control ──────────────────────────────────────────────
 
   cutCamera(preset: CameraPresetName): void {
     this.cameraDirector.cut(preset);
+  }
+
+  /** Gaze out at the crowd (character entrance default). */
+  async lookAtAudience(): Promise<void> {
+    this.gazeTarget.position.set(0, 1.5, 3);
   }
 
   // ── Audio Control ───────────────────────────────────────────────
@@ -255,8 +338,8 @@ export class StageRuntime {
 
   // ── Connection ──────────────────────────────────────────────────
 
-  async connect(episodeId: string): Promise<void> {
-    await this.eventConsumer.connect(episodeId, 'stage');
+  async connect(episodeId: string, token?: string): Promise<void> {
+    await this.eventConsumer.connect(episodeId, { role: 'stage', token });
   }
 
   // ── Animation Loop ──────────────────────────────────────────────
@@ -377,13 +460,16 @@ export class StageRuntime {
     // In production: fetch motion asset from R2, create AnimationClip, play
   }
 
+  // Emotion expressions driven by semantic beats. Targeted writes ONLY —
+  // never resetValues() here: that would also clear the mouth visemes
+  // (lipsync channel) and blink (timer channel) mid-frame and make them
+  // fight. Channels: mouth = analyser, face = beats, blink = timer.
+  private static readonly EMOTION_EXPRESSIONS = ['happy', 'angry', 'sad', 'surprised', 'neutral'];
+
   private executeFace(action: string, intensity: number): void {
     if (!this.vrm?.expressionManager) return;
 
     const em = this.vrm.expressionManager;
-
-    // Reset all expressions
-    em.resetValues();
 
     const exprMap: Record<string, string> = {
       'face.smile': 'happy',
@@ -400,9 +486,12 @@ export class StageRuntime {
     };
 
     const expr = exprMap[action];
-    if (expr) {
-      em.setValue(expr, intensity);
+    if (!expr) return;
+
+    for (const name of StageRuntime.EMOTION_EXPRESSIONS) {
+      if (name !== expr) em.setValue(name, 0);
     }
+    em.setValue(expr, intensity);
   }
 
   private executePose(action: string, cue: MotionCue): void {
@@ -459,6 +548,8 @@ export class StageRuntime {
     }
 
     window.removeEventListener('resize', this.handleResize);
+    this.unbindCameraKeyboard?.();
+    this.unbindCameraKeyboard = null;
 
     this.transport.dispose();
     this.audioBus.dispose();

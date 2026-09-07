@@ -26,20 +26,40 @@ export class LipSyncAdapter {
   // Smoothing
   private prevMouth = 0;
 
+  // Gate: mouth targets are multiplied by this. 1 while speaking, 0 on
+  // pause — so the mouth closes instead of freezing open mid-vowel.
+  private active = true;
+
   setVRM(vrm: VRM): void {
     this.vrm = vrm;
+  }
+
+  setActive(active: boolean): void {
+    this.active = active;
   }
 
   connect(audioContext: AudioContext, sourceNode: AudioNode): void {
     this.analyser = audioContext.createAnalyser();
     this.analyser.fftSize = 256;
+    this.analyser.smoothingTimeConstant = 0.55;
     this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
     sourceNode.connect(this.analyser);
   }
 
   /**
+   * Attach to an existing analyser (e.g. the AudioBus voice tap).
+   * Preferred over connect(): one audio graph, analyser owned by the bus.
+   */
+  attach(analyser: AnalyserNode): void {
+    this.analyser = analyser;
+    this.dataArray = new Uint8Array(analyser.frequencyBinCount);
+  }
+
+  /**
    * Update lip sync every frame.
-   * Call from the animation loop.
+   * Writes ONLY mouth visemes (aa/ih/oh). Emotion (happy/...) belongs
+   * to semantic beats, blink to its own timer — independent channels
+   * that must never clear each other.
    */
   update(): void {
     if (!this.analyser || !this.dataArray || !this.vrm?.expressionManager) return;
@@ -53,10 +73,11 @@ export class LipSyncAdapter {
     const mid = this.getAverage(10, 40);   // mid = tongue
     const high = this.getAverage(40, 80);  // high = lips
 
-    // Map to VRM visemes with smoothing
-    const targetAA = Math.min(1, low / 200);   // aa = open mouth
-    const targetIH = Math.min(1, high / 180);  // ih = narrow mouth
-    const targetOH = Math.min(1, mid / 220);   // oh = round mouth
+    // Map to VRM visemes with smoothing, gated by speaking state
+    const gate = this.active ? 1 : 0;
+    const targetAA = Math.min(1, low / 200) * gate;   // aa = open mouth
+    const targetIH = Math.min(1, high / 180) * gate;  // ih = narrow mouth
+    const targetOH = Math.min(1, mid / 220) * gate;   // oh = round mouth
 
     const smooth = 0.3; // smoothing factor
 
@@ -67,7 +88,7 @@ export class LipSyncAdapter {
     em.setValue('ih', targetIH * 0.5);
     em.setValue('oh', targetOH * 0.4);
 
-    // Blink occasionally
+    // Blink occasionally (its own channel — never cleared by faces)
     if (Math.random() < 0.01) {
       em.setValue('blink', 1);
       setTimeout(() => em.setValue('blink', 0), 100);
