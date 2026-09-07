@@ -22,13 +22,8 @@
 
 import type { StageRuntime } from './StageRuntime';
 import type { EventConsumer } from './EventConsumer';
-import type { CameraPresetName } from './CameraDirector';
+import { CAMERA_NAMES, type CameraPresetV1 } from '../contracts/show';
 import type { ShowEvent } from '../store/showStore';
-
-const CAMERA_PRESETS: ReadonlySet<string> = new Set([
-  'WIDE_STAGE', 'COMIC_MEDIUM', 'COMIC_CLOSE',
-  'SIDE_STAGE', 'PANEL_WIDE', 'ELLA_CLOSE',
-]);
 
 export interface ExecutorOptions {
   /** Resolve asset keys/URLs. SFX names map to URLs here. */
@@ -98,8 +93,10 @@ export class StageEventExecutor {
         this.runtime.pause();
         break;
       case 'camera.cut':
-        if (typeof payload.camera === 'string' && CAMERA_PRESETS.has(payload.camera)) {
-          this.runtime.cutCamera(payload.camera as CameraPresetName);
+        // Single source of truth: the shared contract. Unknown names
+        // were already dropped by the DO gate; this is defense in depth.
+        if (typeof payload.camera === 'string' && (CAMERA_NAMES as readonly string[]).includes(payload.camera)) {
+          this.runtime.cutCamera(payload.camera as CameraPresetV1);
         }
         break;
       case 'audio.music.play':

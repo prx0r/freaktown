@@ -81,9 +81,13 @@ export type CrowdUpdateV1 = z.infer<typeof CrowdUpdateV1>;
 export const CameraPresetV1 = z.enum([
   'WIDE_STAGE', 'COMIC_MEDIUM', 'COMIC_CLOSE',
   'SIDE_STAGE', 'PANEL_WIDE', 'ELLA_CLOSE',
+  'CHATGPT_CLOSE', 'STREAM_CLOSE',
 ]);
 
 export type CameraPresetV1 = z.infer<typeof CameraPresetV1>;
+
+/** All valid camera names, for runtime checks without a second list. */
+export const CAMERA_NAMES = CameraPresetV1.options;
 
 export const CameraCutPayloadV1 = z.object({
   camera: CameraPresetV1,
@@ -93,6 +97,76 @@ export const CameraCutPayloadV1 = z.object({
 });
 
 export type CameraCutPayloadV1 = z.infer<typeof CameraCutPayloadV1>;
+
+// ── judge.react (signature panel reactions) ────────────────────────
+// Vocabulary only — the event is persisted by the generic command path.
+// VRM-safe subset executes on performer avatars today; orb/procedural
+// reactions (iris, flare, morph) are renderer work, recorded not rendered.
+
+export const JudgeReactionV1 = z.enum([
+  'iris_narrow', 'nod', 'flare', 'stillness',
+  'pulse', 'thinking', 'glow', 'freeze',
+  'jitter', 'burst', 'morph',
+]);
+
+export type JudgeReactionV1 = z.infer<typeof JudgeReactionV1>;
+
+export const JudgeReactPayloadV1 = z.object({
+  judge: z.string().min(1), // ella | chatgpt | stream | guest id
+  reaction: JudgeReactionV1,
+  performance_id: z.string().nullable().optional(),
+  set_time_ms: z.number().nullable().optional(),
+});
+
+export type JudgeReactPayloadV1 = z.infer<typeof JudgeReactPayloadV1>;
+
+// ── panel.seat (stream-slot rotation) ──────────────────────────────
+
+export const PanelSeatV1 = z.enum(['stream-left', 'ella-center', 'chatgpt-right']);
+
+export type PanelSeatV1 = z.infer<typeof PanelSeatV1>;
+
+export const PanelSeatPayloadV1 = z.object({
+  seat: PanelSeatV1,
+  character_id: z.string().nullable(), // null = seat empty / back to default
+  character_name: z.string().optional(),
+  reason: z.string().optional(), // previous-winner | theme-champion | community-pick
+});
+
+export type PanelSeatPayloadV1 = z.infer<typeof PanelSeatPayloadV1>;
+
+// ── judge_mode (character pack extension) ──────────────────────────
+// One pack, two modes. Judge mode is stance + framing + chrome +
+// prompts + authority — never a separate character system.
+
+export const JudgeModeV1 = z.object({
+  seat: PanelSeatV1.optional(),
+  camera_profile: z.string().optional(), // comic | judge
+  animations: z.array(z.string()).optional(),
+  ui_theme: z.object({
+    primary: z.string().optional(),
+    score_card_style: z.string().optional(),
+  }).catchall(z.unknown()).optional(),
+  authority: z.enum(['full', 'commentary', 'none']).optional(),
+  critique_persona: z.string().optional(),
+});
+
+export type JudgeModeV1 = z.infer<typeof JudgeModeV1>;
+
+export const PerformerModeV1 = z.object({
+  stance: z.string().optional(),
+  camera_profile: z.string().optional(),
+  animations: z.array(z.string()).optional(),
+});
+
+export type PerformerModeV1 = z.infer<typeof PerformerModeV1>;
+
+export const CharacterModesV1 = z.object({
+  performer: PerformerModeV1.optional(),
+  judge: JudgeModeV1.optional(),
+});
+
+export type CharacterModesV1 = z.infer<typeof CharacterModesV1>;
 
 // ── performance.preload payload ────────────────────────────────────
 

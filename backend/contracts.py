@@ -10,7 +10,18 @@ from pydantic import BaseModel, Field
 CameraPreset = Literal[
     "WIDE_STAGE", "COMIC_MEDIUM", "COMIC_CLOSE",
     "SIDE_STAGE", "PANEL_WIDE", "ELLA_CLOSE",
+    "CHATGPT_CLOSE", "STREAM_CLOSE",
 ]
+
+CAMERA_NAMES = list(CameraPreset.__args__)
+
+JudgeReaction = Literal[
+    "iris_narrow", "nod", "flare", "stillness",
+    "pulse", "thinking", "glow", "freeze",
+    "jitter", "burst", "morph",
+]
+
+PanelSeat = Literal["stream-left", "ella-center", "chatgpt-right"]
 
 
 class ShowEventV1(BaseModel):
@@ -72,5 +83,41 @@ class PerformancePreloadPayloadV1(BaseModel):
     plan: dict = Field(default_factory=dict)
     word_timings: list = Field(default_factory=list)
     episode_id: str | None = None
+
+    model_config = {"extra": "allow"}
+
+
+class JudgeReactPayloadV1(BaseModel):
+    judge: str
+    reaction: JudgeReaction
+    performance_id: str | None = None
+    set_time_ms: float | None = None
+
+    model_config = {"extra": "allow"}
+
+
+class PanelSeatPayloadV1(BaseModel):
+    seat: PanelSeat
+    character_id: str | None = None
+    character_name: str | None = None
+    reason: str | None = None
+
+    model_config = {"extra": "allow"}
+
+
+class JudgeModeV1(BaseModel):
+    seat: PanelSeat | None = None
+    camera_profile: str | None = None
+    animations: list[str] | None = None
+    ui_theme: dict | None = None
+    authority: Literal["full", "commentary", "none"] | None = None
+    critique_persona: str | None = None
+
+    model_config = {"extra": "allow"}
+
+
+class CharacterModesV1(BaseModel):
+    performer: dict | None = None
+    judge: JudgeModeV1 | None = None
 
     model_config = {"extra": "allow"}

@@ -10,7 +10,10 @@ from pydantic import ValidationError
 
 from backend.contracts import (
     CameraCutPayloadV1,
+    CharacterModesV1,
     CrowdUpdateV1,
+    JudgeReactPayloadV1,
+    PanelSeatPayloadV1,
     PerformancePreloadPayloadV1,
     ReactionRawV1,
     ShowEventV1,
@@ -83,3 +86,26 @@ class TestContractsMirror:
             audio_url="https://x/y.wav", plan={}).performance_id == "p"
         with pytest.raises(ValidationError):
             PerformancePreloadPayloadV1(performance_id="p", audio_url="u", plan={})
+
+    def test_judge_cameras_accepted(self):
+        assert CameraCutPayloadV1(camera="CHATGPT_CLOSE",
+                                  source="human_director").camera == "CHATGPT_CLOSE"
+        assert CameraCutPayloadV1(camera="STREAM_CLOSE",
+                                  source="human_director").camera == "STREAM_CLOSE"
+
+    def test_judge_react_vocabulary(self):
+        assert JudgeReactPayloadV1(judge="ella", reaction="iris_narrow").reaction == "iris_narrow"
+        with pytest.raises(ValidationError):
+            JudgeReactPayloadV1(judge="ella", reaction="fireworks")
+
+    def test_panel_seat(self):
+        assert PanelSeatPayloadV1(seat="stream-left",
+                                  character_id="c1").seat == "stream-left"
+        with pytest.raises(ValidationError):
+            PanelSeatPayloadV1(seat="middle", character_id="c1")
+
+    def test_character_modes(self):
+        m = CharacterModesV1(judge={"seat": "stream-left", "authority": "commentary"})
+        assert m.judge is not None and m.judge.seat == "stream-left"
+        with pytest.raises(ValidationError):
+            CharacterModesV1(judge={"seat": "middle"})

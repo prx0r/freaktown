@@ -27,6 +27,7 @@ const PHASES: ShowPhase[] = [
 const CAMERA_PRESETS_LIST: CameraPreset[] = [
   'WIDE_STAGE', 'COMIC_MEDIUM', 'COMIC_CLOSE',
   'SIDE_STAGE', 'PANEL_WIDE', 'ELLA_CLOSE',
+  'CHATGPT_CLOSE', 'STREAM_CLOSE',
 ];
 
 const ADMIN_KEY_STORAGE = 'freaktown_admin_key';
@@ -79,7 +80,7 @@ export function ControlPage() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      const idx = ['1', '2', '3', '4', '5', '6'].indexOf(e.key);
+      const idx = ['1', '2', '3', '4', '5', '6', '7', '8'].indexOf(e.key);
       if (idx >= 0) void runCommand(`camera ${CAMERA_PRESETS_LIST[idx]}`, () =>
         client.cutCamera(CAMERA_PRESETS_LIST[idx]));
     };
@@ -169,7 +170,7 @@ export function ControlPage() {
           width: 240, borderRight: '1px solid #333', padding: 16,
           display: 'flex', flexDirection: 'column', gap: 12, overflow: 'auto',
         }}>
-          <h3 style={{ fontSize: 12, opacity: 0.5, margin: 0 }}>CAMERAS (1-6)</h3>
+          <h3 style={{ fontSize: 12, opacity: 0.5, margin: 0 }}>CAMERAS (1-8)</h3>
           {CAMERA_PRESETS_LIST.map((preset, i) => (
             <button
               key={preset}

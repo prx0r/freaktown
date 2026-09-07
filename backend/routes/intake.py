@@ -47,6 +47,7 @@ from backend.services.freaktown import (
     spans_from_offsets,
     validate_avatar,
     validate_bundle,
+    validate_modes,
     words_from_beats,
 )
 from backend.services.media_store import media_store
@@ -63,6 +64,7 @@ class CharacterIn(BaseModel):
     premise: str = Field("", max_length=500)
     vibe: str = Field("", max_length=40)
     voice: str = Field("en-US-AriaNeural", max_length=80)
+    modes: dict = Field(default_factory=dict, description="performer/judge mode blocks")
 
 
 class IntakeRequest(BaseModel):
@@ -115,6 +117,9 @@ async def intake_bundle(
     v = validate_bundle(bundle)
     if not v.ok:
         raise HTTPException(400, f"invalid bundle: {v.errors[0]}")
+    mv = validate_modes(req.character.modes or None)
+    if not mv.ok:
+        raise HTTPException(400, f"invalid modes: {mv.errors[0]}")
 
     # Episode must be open for submissions.
     ep_result = await db.execute(select(Episode).where(Episode.id == req.episode_id))
@@ -171,6 +176,7 @@ async def intake_bundle(
         "voice": {"voiceId": req.character.voice, "provider": req.delivery.get("voice", {}).get("provider", "edge-tts")},
         "minute": {"text": minute_text, "authorship": "human", "assistance": []},
         "interview": {"controller": "freak_town_ai", "facts": []},
+        "modes": req.character.modes or {},
         "black_room": {
             "beats": score.to_dict()["beats"],
             "style": req.style,

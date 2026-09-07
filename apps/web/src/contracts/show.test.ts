@@ -14,6 +14,10 @@ import {
   DeliveryV1,
   AvatarV1,
   BundleV1,
+  JudgeReactPayloadV1,
+  PanelSeatPayloadV1,
+  CharacterModesV1,
+  CAMERA_NAMES,
 } from './show';
 
 describe('wire contracts', () => {
@@ -109,6 +113,33 @@ describe('wire contracts', () => {
     }).success).toBe(true);
     expect(PerformancePreloadPayloadV1.safeParse({
       performance_id: 'perf1', audio_url: 'https://cdn/y.wav', plan: {},
+    }).success).toBe(false);
+  });
+
+  it('accepts judge cameras, reactions, seats and modes', () => {
+    expect(CAMERA_NAMES).toContain('CHATGPT_CLOSE');
+    expect(CAMERA_NAMES).toContain('STREAM_CLOSE');
+    expect(CameraCutPayloadV1.safeParse({
+      camera: 'STREAM_CLOSE', source: 'human_director',
+    }).success).toBe(true);
+    expect(JudgeReactPayloadV1.safeParse({
+      judge: 'ella', reaction: 'iris_narrow',
+    }).success).toBe(true);
+    expect(JudgeReactPayloadV1.safeParse({
+      judge: 'ella', reaction: 'fireworks',
+    }).success).toBe(false);
+    expect(PanelSeatPayloadV1.safeParse({
+      seat: 'stream-left', character_id: 'c1', reason: 'previous-winner',
+    }).success).toBe(true);
+    expect(PanelSeatPayloadV1.safeParse({
+      seat: 'middle', character_id: 'c1',
+    }).success).toBe(false);
+    expect(CharacterModesV1.safeParse({
+      performer: { stance: 'stage' },
+      judge: { seat: 'stream-left', authority: 'commentary' },
+    }).success).toBe(true);
+    expect(CharacterModesV1.safeParse({
+      judge: { seat: 'middle' },
     }).success).toBe(false);
   });
 

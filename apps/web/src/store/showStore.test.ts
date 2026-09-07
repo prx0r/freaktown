@@ -12,6 +12,8 @@ function reset(): void {
     isPaused: false,
     scoresRevealed: false,
     judgeScores: [],
+    streamSeat: { character_id: null },
+    judgeReactions: {},
   });
 }
 
@@ -54,5 +56,27 @@ describe('showStore.applyEvent', () => {
     const crowd = useShowStore.getState().crowd;
     expect(crowd.laugh_events).toBe(10);
     expect(crowd.unique_laughers).toBe(4);
+  });
+
+  it('tracks the rotating stream seat, ignores fixed seats', () => {
+    const s = useShowStore.getState();
+    s.applyEvent(ev(1, 'panel.seat', {
+      seat: 'stream-left', character_id: 'c1',
+      character_name: 'Martin Lamp', reason: 'previous-winner',
+    }));
+    expect(useShowStore.getState().streamSeat).toEqual({
+      character_id: 'c1', character_name: 'Martin Lamp', reason: 'previous-winner',
+    });
+    s.applyEvent(ev(2, 'panel.seat', { seat: 'ella-center', character_id: 'x' }));
+    expect(useShowStore.getState().streamSeat.character_id).toBe('c1');
+  });
+
+  it('records judge reactions per judge', () => {
+    const s = useShowStore.getState();
+    s.applyEvent(ev(1, 'judge.react', { judge: 'ella', reaction: 'iris_narrow' }));
+    s.applyEvent(ev(2, 'judge.react', { judge: 'chatgpt', reaction: 'pulse' }));
+    expect(useShowStore.getState().judgeReactions).toEqual({
+      ella: 'iris_narrow', chatgpt: 'pulse',
+    });
   });
 });

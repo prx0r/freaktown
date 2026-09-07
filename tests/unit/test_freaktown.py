@@ -306,3 +306,79 @@ class TestIntakeRoutes:
         client = TestClient(app, raise_server_exceptions=False)
         r = client.post("/v1/intake/bundle", json={})
         assert r.status_code in (401, 422)
+
+
+# ── Judge mode + seats ─────────────────────────────────────────────
+
+class TestJudgeMode:
+    def test_modes_valid(self):
+        from backend.services.freaktown import validate_modes
+
+        assert validate_modes(None).ok is True
+        assert validate_modes({}).ok is True
+        assert validate_modes({
+            "performer": {"stance": "stage"},
+            "judge": {
+                "seat": "stream-left",
+                "camera_profile": "judge",
+                "animations": ["idle", "speak", "react"],
+                "ui_theme": {"primary": "#f5c542"},
+                "authority": "commentary",
+                "critique_persona": "chaotic hype",
+            },
+        }).ok is True
+
+    def test_modes_rejects_bad(self):
+        from backend.services.freaktown import validate_modes
+
+        assert validate_modes({"judge": {"seat": "middle"}}).ok is False
+        assert validate_modes({"judge": {"authority": "god"}}).ok is False
+        assert validate_modes({"judge": {"animations": "idle"}}).ok is False
+        assert validate_modes({"judge": "yes"}).ok is False
+        assert validate_modes({"performer": "x"}).ok is False
+
+    def test_manifest_carries_modes(self):
+        from backend.services.delivery.sequencer import arrange
+        from backend.services.freaktown import (
+            build_performance_manifest, estimate_spans, words_from_beats,
+        )
+
+        score = arrange("First line here. Punchline lands now.")
+        beats = [{"id": b.id, "text": b.text, "pause_after_ms": b.pause_after_ms}
+                 for b in score.beats]
+        spans = estimate_spans(beats)
+        words = words_from_beats(beats, spans)
+        m = build_performance_manifest(
+            "p1", {"name": "Martin Lamp",
+                   "modes": {"judge": {"seat": "stream-left"}}},
+            score, words, audio_ref="", duration_ms=1000,
+        )
+        assert m["actor"]["modes"]["judge"]["seat"] == "stream-left"
+        m2 = build_performance_manifest(
+            "p1", {"name": "X"}, score, words, audio_ref="", duration_ms=1000,
+        )
+        assert "modes" not in m2["actor"]
+
+
+class TestSeats:
+    def test_rotation_priority(self):
+        from backend.services.judge import assign_stream_seat
+
+        assert assign_stream_seat().character_id is None
+        assert assign_stream_seat(
+            previous_winner_id="w", previous_winner_name="W",
+            community_pick_id="c").reason == "previous-winner"
+        assert assign_stream_seat(
+            previous_winner_id="w", theme_champion_id="t",
+            theme_champion_name="T").reason == "theme-champion"
+        assert assign_stream_seat(community_pick_id="c").reason == "community-pick"
+
+    def test_seat_mappings(self):
+        from backend.services.judge import seat_camera, seat_color
+
+        assert seat_camera("stream-left") == "STREAM_CLOSE"
+        assert seat_camera("ella-center") == "ELLA_CLOSE"
+        assert seat_camera("chatgpt-right") == "CHATGPT_CLOSE"
+        assert seat_color("ella-center") == "ivory"
+        assert seat_color("chatgpt-right") == "blue"
+        assert seat_color("stream-left") == "chaos"

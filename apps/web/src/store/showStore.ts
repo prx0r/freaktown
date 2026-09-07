@@ -11,6 +11,11 @@
 
 import { create } from 'zustand';
 
+import type { CameraPresetV1 } from '../contracts/show';
+import { CAMERA_PRESETS } from '../stage/CameraDirector';
+
+export { CAMERA_PRESETS };
+
 // ── Types ──────────────────────────────────────────────────────────
 
 export type ShowPhase =
@@ -31,13 +36,7 @@ export type ShowPhase =
   | 'outro'
   | 'ended';
 
-export type CameraPreset =
-  | 'WIDE_STAGE'
-  | 'COMIC_MEDIUM'
-  | 'COMIC_CLOSE'
-  | 'SIDE_STAGE'
-  | 'PANEL_WIDE'
-  | 'ELLA_CLOSE';
+export type CameraPreset = CameraPresetV1;
 
 export interface CameraCut {
   type: 'camera.cut';
@@ -72,6 +71,12 @@ export interface JudgeScore {
   verdict?: 'KEEP' | 'CUT';
   award?: 'GOLDEN_TICKET' | 'none';
   confidence?: number;
+}
+
+export interface StreamSeatState {
+  character_id: string | null;
+  character_name?: string;
+  reason?: string;
 }
 
 export interface CrowdState {
@@ -144,6 +149,15 @@ export interface ShowState {
   judgeScores: JudgeScore[];
   scoresRevealed: boolean;
 
+  // Panel seats — who sits where. Ella center + ChatGPT right are
+  // permanent; stream-left rotates (previous winner / theme champion /
+  // community pick) via panel.seat commands.
+  streamSeat: StreamSeatState;
+
+  // Latest signature reaction per judge (judge.react events).
+  // Recorded, not rendered — orb/procedural reactions are renderer work.
+  judgeReactions: Record<string, string>;
+
   // Events
   events: ShowEvent[];
   lastSeq: number;
@@ -160,20 +174,11 @@ export interface ShowState {
   setCrowd: (crowd: Partial<CrowdState>) => void;
   setJudgeScores: (scores: JudgeScore[]) => void;
   setScoresRevealed: (revealed: boolean) => void;
+  setStreamSeat: (seat: StreamSeatState) => void;
+  setJudgeReaction: (judge: string, reaction: string) => void;
   addEvent: (event: ShowEvent) => void;
   applyEvent: (event: ShowEvent) => void;
 }
-
-const CAMERA_PRESETS: Record<CameraPreset, { position: [number, number, number]; target: [number, number, number]; fov: number }> = {
-  WIDE_STAGE:    { position: [0, 2.4, 7.8],  target: [0, 1.3, 0], fov: 46 },
-  COMIC_MEDIUM:  { position: [0, 1.75, 4.2], target: [0, 1.45, 0], fov: 34 },
-  COMIC_CLOSE:   { position: [0, 1.72, 2.6], target: [0, 1.62, 0], fov: 28 },
-  SIDE_STAGE:    { position: [4, 1.8, 5],    target: [0, 1.3, 0], fov: 40 },
-  PANEL_WIDE:    { position: [3, 1.6, 6],    target: [0, 1.4, 0], fov: 50 },
-  ELLA_CLOSE:    { position: [2, 1.6, 2.5],  target: [2, 1.5, 0], fov: 30 },
-};
-
-export { CAMERA_PRESETS };
 
 export const useShowStore = create<ShowState>((set, get) => ({
   // Episode
@@ -200,6 +205,10 @@ export const useShowStore = create<ShowState>((set, get) => ({
   // Judges
   judgeScores: [],
   scoresRevealed: false,
+
+  // Panel seats
+  streamSeat: { character_id: null },
+  judgeReactions: {},
 
   // Events
   events: [],
@@ -232,6 +241,10 @@ export const useShowStore = create<ShowState>((set, get) => ({
   setCrowd: (crowd) => set((s) => ({ crowd: { ...s.crowd, ...crowd } })),
   setJudgeScores: (scores) => set({ judgeScores: scores }),
   setScoresRevealed: (revealed) => set({ scoresRevealed: revealed }),
+  setStreamSeat: (seat) => set({ streamSeat: seat }),
+  setJudgeReaction: (judge, reaction) => set((s) => ({
+    judgeReactions: { ...s.judgeReactions, [judge]: reaction },
+  })),
 
   addEvent: (event) => set((s) => {
     // Idempotent: reconnect replay or duplicate delivery must never
@@ -292,6 +305,26 @@ export const useShowStore = create<ShowState>((set, get) => ({
       case 'judge.reveal':
         set({ scoresRevealed: true });
         break;
+      case 'judge.react': {
+        const judge = event.payload.judge;
+        const reaction = event.payload.reaction;
+        if (typeof judge === 'string' && typeof reaction === 'string') {
+          state.setJudgeReaction(judge, reaction);
+        }
+        break;
+      }
+      case 'panel.seat': {
+        // Only the rotating stream-left seat is tracked; Ella center
+        // and ChatGPT right are permanent fixtures.
+        if (event.payload.seat === 'stream-left') {
+          state.setStreamSeat({
+            character_id: (event.payload.character_id as string | null) ?? null,
+            character_name: event.payload.character_name as string | undefined,
+            reason: event.payload.reason as string | undefined,
+          });
+        }
+        break;
+      }
     }
   },
 }));

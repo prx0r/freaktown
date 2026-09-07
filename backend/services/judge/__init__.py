@@ -12,6 +12,15 @@ from backend.services.judge.panel import (
     judge_voice_line,
     pick_guest_judge,
 )
+from backend.services.judge.seats import (
+    SEATS,
+    PERMANENT_SEATS,
+    SEAT_REASONS,
+    StreamSeatAssignment,
+    assign_stream_seat,
+    seat_camera,
+    seat_color,
+)
 
 __all__ = [
     "JUDGE_VOICES",
@@ -24,4 +33,11 @@ __all__ = [
     "generate_panel_argument",
     "judge_voice_line",
     "pick_guest_judge",
+    "SEATS",
+    "PERMANENT_SEATS",
+    "SEAT_REASONS",
+    "StreamSeatAssignment",
+    "assign_stream_seat",
+    "seat_camera",
+    "seat_color",
 ]

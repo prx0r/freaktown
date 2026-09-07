@@ -234,3 +234,20 @@ Status: LivePage paid buttons + modal + x402 settle path exist; Privy
 wallet/onramp wiring (keys, funding endpoints, balance display) is
 explicitly deferred until facilitator + escrow are live — no stubs that
 pretend to hold money.
+
+## Panel canon: judges as system parts (WIRED)
+
+Stream-left (rotating) / Ella-center (permanent) / ChatGPT-right
+(permanent). White authority, blue pundit, chaos people.
+
+- `modes.performer|judge` on the character pack (`freaktown` bundle
+  contract, both runtimes): same pack, different stance/framing/chrome/
+  prompts/authority. ANY character can become a judge — winning means
+  elevation, not just a prize.
+- Stream-left rotation: theme champion > previous winner >
+  community pick > empty, via `panel.seat` commands (`seats.py`).
+- Judge cameras CHATGPT_CLOSE/STREAM_CLOSE join the single contract
+  table (keys 7/8); SPLIT stays future work (needs two-viewport render).
+- `judge.react` vocabulary persisted (iris_narrow/nod/flare/stillness/
+  pulse/thinking/glow/freeze/jitter/burst/morph); orb/procedural
+  rendering is renderer work, recording is done.

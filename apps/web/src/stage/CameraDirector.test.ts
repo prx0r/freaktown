@@ -54,6 +54,14 @@ describe('CameraDirector', () => {
     expect(data.fov).toBe(28);
   });
 
+  it('maps judge closeups on keys 7-8', () => {
+    const d = makeDirector();
+    expect(d.handleKeyboard('7')).toBe(true);
+    expect(d.getCurrentPreset()).toBe('CHATGPT_CLOSE');
+    expect(d.handleKeyboard('8')).toBe(true);
+    expect(d.getCurrentPreset()).toBe('STREAM_CLOSE');
+  });
+
   it('bindKeyboard returns an unbind function that removes the listener', () => {
     const added: Array<[string, unknown]> = [];
     const removed: Array<[string, unknown]> = [];

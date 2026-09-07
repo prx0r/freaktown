@@ -286,6 +286,46 @@ def can_viseme(avatar: dict | None, viseme: str) -> bool:
     return viseme in avatar_capabilities(avatar).get("visemes", [])
 
 
+# ── Judge mode (character pack extension) ────────────────────────────
+# One pack, two modes: performer stance vs judge seat. Judge mode is
+# stance + framing + chrome + prompts + authority — never a separate
+# character system. ANY character can eventually become a judge, which
+# is what makes winning meaningful beyond one night.
+
+PANEL_SEATS = ("stream-left", "ella-center", "chatgpt-right")
+JUDGE_AUTHORITIES = ("full", "commentary", "none")
+
+
+def validate_modes(modes: dict | None) -> BundleValidation:
+    """Validate a character modes block. None/absent is valid (performer)."""
+    if modes is None:
+        return BundleValidation(True)
+    if not isinstance(modes, dict):
+        return BundleValidation(False, ["modes must be an object"])
+    errors: list[str] = []
+    judge = modes.get("judge")
+    if judge is not None:
+        if not isinstance(judge, dict):
+            errors.append("modes.judge must be an object")
+        else:
+            seat = judge.get("seat")
+            if seat is not None and seat not in PANEL_SEATS:
+                errors.append(f"modes.judge.seat must be one of {PANEL_SEATS}")
+            authority = judge.get("authority")
+            if authority is not None and authority not in JUDGE_AUTHORITIES:
+                errors.append(f"modes.judge.authority must be one of {JUDGE_AUTHORITIES}")
+            animations = judge.get("animations")
+            if animations is not None and (
+                not isinstance(animations, list)
+                or not all(isinstance(a, str) for a in animations)
+            ):
+                errors.append("modes.judge.animations must be string list")
+    performer = modes.get("performer")
+    if performer is not None and not isinstance(performer, dict):
+        errors.append("modes.performer must be an object")
+    return BundleValidation(not errors, errors)
+
+
 def build_performance_manifest(
     performance_id: str,
     character: dict,
@@ -323,18 +363,21 @@ def build_performance_manifest(
     }
     if isinstance(avatar, dict) and avatar.get("vrm_version"):
         avatar_block["vrm_version"] = avatar["vrm_version"]
+    actor: dict = {
+        "name": character.get("name", "Guest Freak"),
+        "species": character.get("species", ""),
+        "premise": character.get("premise", ""),
+        "avatar_url": avatar_block["asset"],
+        "body_class": body_class,
+        "voice": {"provider": score.provider, "voice_id": score.voice_id},
+    }
+    if isinstance(character.get("modes"), dict):
+        actor["modes"] = character["modes"]
     manifest = {
         "version": PERFORMANCE_SCHEMA_VERSION,
         "performance_id": performance_id,
         "episode_id": episode_id,
-        "actor": {
-            "name": character.get("name", "Guest Freak"),
-            "species": character.get("species", ""),
-            "premise": character.get("premise", ""),
-            "avatar_url": avatar_block["asset"],
-            "body_class": body_class,
-            "voice": {"provider": score.provider, "voice_id": score.voice_id},
-        },
+        "actor": actor,
         "avatar": avatar_block,
         "audio": {
             "set_url": audio_ref,

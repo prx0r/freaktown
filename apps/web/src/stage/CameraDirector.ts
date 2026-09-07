@@ -10,15 +10,11 @@
 
 import * as THREE from 'three';
 
+import { CAMERA_NAMES, type CameraPresetV1 } from '../contracts/show';
+
 // ── Camera Presets ────────────────────────────────────────────────
 
-export type CameraPresetName =
-  | 'WIDE_STAGE'
-  | 'COMIC_MEDIUM'
-  | 'COMIC_CLOSE'
-  | 'SIDE_STAGE'
-  | 'PANEL_WIDE'
-  | 'ELLA_CLOSE';
+export type CameraPresetName = CameraPresetV1;
 
 export interface CameraPreset {
   position: [number, number, number];
@@ -58,7 +54,25 @@ export const CAMERA_PRESETS: Record<CameraPresetName, CameraPreset> = {
     target: [2, 1.5, 0],
     fov: 30,
   },
+  // Judge closeups. Framing placeholders: no desk geometry exists yet,
+  // so these frame the seat x-positions the desk layout specifies
+  // (stream-left x=-2, chatgpt-right x=+4 relative to Ella at x=+2).
+  CHATGPT_CLOSE: {
+    position: [4, 1.6, 2.5],
+    target: [4, 1.5, 0],
+    fov: 30,
+  },
+  STREAM_CLOSE: {
+    position: [-2, 1.6, 2.5],
+    target: [-2, 1.5, 0],
+    fov: 30,
+  },
 };
+
+// Compile-time + runtime proof the preset table matches the contract:
+// adding a preset anywhere without updating contracts breaks the build.
+const _exhaustive: Record<CameraPresetV1, CameraPreset> = CAMERA_PRESETS;
+export const CAMERA_PRESET_NAMES: ReadonlyArray<CameraPresetName> = CAMERA_NAMES;
 
 // ── Keyboard Mapping ──────────────────────────────────────────────
 
@@ -69,6 +83,8 @@ const KEYBOARD_MAP: Record<string, CameraPresetName> = {
   '4': 'SIDE_STAGE',
   '5': 'PANEL_WIDE',
   '6': 'ELLA_CLOSE',
+  '7': 'CHATGPT_CLOSE',
+  '8': 'STREAM_CLOSE',
 };
 
 // ── Camera Director ───────────────────────────────────────────────
