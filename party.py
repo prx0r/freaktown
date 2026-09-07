@@ -383,19 +383,23 @@ def _mq_advance(room: dict, reason: str = ""):
         _broadcast(room, "round.revealed", {"round": st["round"],
                                             "word": st["word"],
                                             "reason": reason or "timeout"})
+    if _pack_quota_met(room):
+        _pack_next(room)
+        return
     _mq_start_round(room)
 
 
 def _rr_create(room: dict):
     room["mode_state"] = {
-        "target": None, "lines": {}, "order": [], "votes": {},
+        "round": 0, "target": None, "lines": {}, "order": [], "votes": {},
         "phase": "collecting", "deadline_at": None, "revealed": False,
-        "audio": None, "audio_status": "none",
+        "audio": None, "audio_status": "none", "callback": None,
     }
 
 
 def _rr_start_round(room: dict, target: str = ""):
     st = room["mode_state"]
+    st["round"] = st.get("round", 0) + 1
     st["target"] = _clean(target, 60) or "the host's air fryer obsession"
     st["lines"] = {}
     st["votes"] = {}
@@ -460,8 +464,10 @@ def _rr_reveal(room: dict):
     st["phase"] = "voting"
     st["deadline_at"] = _now() + 60
     clips = _rr_assembled(room)
+    st["callback"] = _ella_callback(room)
     _broadcast(room, "set.revealed", {"mode": "roast-relay",
                                       "target": st["target"], "clips": clips,
+                                      "callback": st["callback"],
                                       "deadline_at": st["deadline_at"]})
     # SHORT_GENERATION audio upgrade runs async; the room never waits for it.
     _rr_maybe_tts(room, clips)
@@ -531,7 +537,60 @@ def _rr_advance(room: dict, reason: str = ""):
     elif st["phase"] == "voting":
         _rr_score(room)
     else:
+        if _pack_quota_met(room):
+            _pack_next(room)
+            return
         _rr_start_round(room, st.get("target") or "")
+
+
+def _ella_callback(room: dict) -> str | None:
+    """Ella narrates the lore: rivalries get called out on stage.
+    Rookies get silence — callbacks are earned, not given."""
+    for line in room.get("lore") or []:
+        if line.startswith("rivalry:"):
+            return f"ELLA: {line}. Settle it on stage."
+    return None
+
+
+def _pack_quota_met(room: dict) -> bool:
+    pack = room.get("pack")
+    if not pack:
+        return False
+    st = room.get("mode_state") or {}
+    return st.get("round", 0) >= pack.get("rounds_each", 2)
+
+
+def _start_mode(room: dict, mode: str, target: str = ""):
+    room["mode"] = mode
+    MODES[mode]["create"](room)
+    if mode == "freaktionary":
+        _mq_start_round(room)
+    else:
+        _rr_start_round(room, target)
+
+
+def _pack_next(room: dict):
+    """Advance the playlist: next mode, or crown the night's winner."""
+    pack = room.get("pack") or {}
+    pack["idx"] = pack.get("idx", 0) + 1
+    modes = pack.get("modes", [])
+    if pack["idx"] >= len(modes):
+        room["phase"] = "done"
+        players = sorted(room["players"].values(),
+                         key=lambda p: p["score"], reverse=True)
+        room["winner"] = players[0]["freak"] if players else None
+        line = (f"ELLA: {room['winner']} takes the night. "
+                f"The rest of you were witnesses."
+                if room["winner"] else "ELLA: Nobody won. Correct.")
+        _broadcast(room, "pack.done",
+                   {"pack": pack.get("name"), "winner": room["winner"],
+                    "scores": _public_players(room), "ella": line})
+        return
+    mode = modes[pack["idx"]]
+    _start_mode(room, mode)
+    _broadcast(room, "mode.changed",
+               {"pack": pack.get("name"), "mode": mode,
+                "idx": pack["idx"], "of": len(modes)})
 
 
 MODES = {
