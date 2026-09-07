@@ -150,6 +150,11 @@ export class StageRuntime {
     return this.cameraDirector;
   }
 
+  /** Current transport time in milliseconds. */
+  get currentTimeMs(): number {
+    return this.transport.currentTimeMs;
+  }
+
   // ── Setup ────────────────────────────────────────────────────────
 
   private setupLights(): void {

@@ -21,12 +21,12 @@ export type Env = {
   AI_QUEUE: Queue;
   KV: KVNamespace;
   EPISODE_ROOM: DurableObjectNamespace;
-  HYPERDRIVE: Hyperdrive;
   PRIVY_APP_ID: string;
   PRIVY_APP_SECRET: string;
   OPENAI_API_KEY: string;
   ANTHROPIC_API_KEY: string;
   ELEVENLABS_API_KEY: string;
+  STAGE_TOKEN_SECRET: string;
   ASSETS: { fetch: typeof fetch };
 };
 

@@ -259,6 +259,40 @@ async def synthesize_voice(text: str, voice_id: str = "", provider: str = ""):
         raise HTTPException(502, f"TTS failed: {e}")
 
 
+@router.get("/green-room/drafts/{draft_id}/audio")
+async def get_draft_audio(draft_id: str):
+    """Serve the synthesized audio for a draft.
+
+    Returns the raw audio bytes (MP3) with correct content-type.
+    The Green Room StageRuntime loads this URL for rehearsal playback.
+    """
+    if draft_id not in _drafts:
+        raise HTTPException(404, "Draft not found")
+
+    draft = _drafts[draft_id]
+    if not draft.audio_duration_ms:
+        raise HTTPException(404, "No audio synthesized yet")
+
+    # Try R2 first (if uploaded during synthesis)
+    from backend.services.media_store import media_store
+    if media_store.configured and draft.audio_r2_key:
+        try:
+            audio_bytes = media_store.get_bytes(draft.audio_r2_key)
+            from fastapi.responses import Response
+            return Response(content=audio_bytes, media_type="audio/mpeg")
+        except Exception:
+            pass
+
+    # Fallback: re-synthesize on the fly (edge TTS is free)
+    try:
+        adapter = get_adapter("edge")
+        result = await adapter.synthesize(draft.script, draft.voice_id)
+        from fastapi.responses import Response
+        return Response(content=result.audio_bytes, media_type="audio/mpeg")
+    except Exception as e:
+        raise HTTPException(502, f"Audio generation failed: {e}")
+
+
 # ── Draft Endpoints ─────────────────────────────────────────────────
 
 @router.post("/green-room/drafts")

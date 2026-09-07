@@ -55,6 +55,20 @@ export class AudioBus {
     return this.voiceAnalyser;
   }
 
+  /**
+   * Connect a MediaStream (e.g. microphone) to the VOICE channel.
+   * The audio flows through the voice analyser → lipsync, same as Transport.
+   * Returns the source node for cleanup.
+   */
+  connectStream(stream: MediaStream): MediaStreamAudioSourceNode {
+    const source = this.context.createMediaStreamSource(stream);
+    const gain = this.channels.get('VOICE');
+    if (gain) {
+      source.connect(gain);
+    }
+    return source;
+  }
+
   // ── Channel Control ──────────────────────────────────────────────
 
   getGain(channel: AudioChannel): GainNode {

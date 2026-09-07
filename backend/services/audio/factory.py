@@ -117,7 +117,15 @@ class SoundRecipe:
 
     @property
     def asset_id(self) -> str:
-        canonical = json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":"))
+        # Legacy key (no provider). Prefer asset_id_for(provider).
+        return self.asset_id_for("stable-audio")
+
+    def asset_id_for(self, provider: str) -> str:
+        """Cache key covering provider + model + prompt_version + recipe
+        + seed (handoff contract). A prompt-compiler change (prompt_version
+        bump) or a different backend must NEVER serve stale audio."""
+        canonical = json.dumps({"provider": provider, **self.to_dict()},
+                               sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(canonical.encode()).hexdigest()[:12]
 
 

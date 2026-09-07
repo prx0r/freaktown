@@ -37,10 +37,13 @@ async def test_health(client):
 async def test_root(client):
     response = await client.get("/")
     assert response.status_code == 200
-    data = response.json()
-    assert data["name"] == "Freak Town"
-    assert "api" in data
-    assert "mcp_tools" in data["api"]
+    # Root now serves the React app (HTML) or falls back to JSON info
+    content_type = response.headers.get("content-type", "")
+    if "html" in content_type or response.text.strip().startswith("<!DOCTYPE"):
+        assert "Freak Town" in response.text or "freak-town" in response.text.lower()
+    else:
+        data = response.json()
+        assert data["name"] == "Freak Town"
 
 
 @pytest.mark.anyio

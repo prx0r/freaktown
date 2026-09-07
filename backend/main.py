@@ -12,6 +12,7 @@ from backend.config import settings
 logger = logging.getLogger("freak_town")
 
 FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
+WEBAPP_DIR = Path(__file__).parent.parent / "apps" / "web" / "dist"
 
 
 @asynccontextmanager
@@ -101,8 +102,17 @@ async def health():
 
 # ── Frontend ───────────────────────────────────────────────────────────
 
+# Serve the production React app from apps/web/dist (built with: cd apps/web && npm run build)
+# Falls back to legacy frontend/ if the build doesn't exist yet.
+SERVE_DIR = WEBAPP_DIR if WEBAPP_DIR.exists() else FRONTEND_DIR
+
+
 @app.get("/")
 async def root():
+    """Serve the React app (or legacy HTML) as the main UI."""
+    index = SERVE_DIR / "index.html"
+    if index.exists():
+        return FileResponse(index)
     return {
         "name": "Freak Town",
         "description": "A live talent show for artificial personalities",
@@ -118,9 +128,28 @@ async def root():
 
 @app.get("/app")
 async def serve_frontend():
+    index = SERVE_DIR / "index.html"
+    if index.exists():
+        return FileResponse(index)
     return FileResponse(FRONTEND_DIR / "index.html")
 
 
-# Mount static files last (catch-all)
-if FRONTEND_DIR.exists():
-    app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
+# Mount built React app assets (JS/CSS/images) — this MUST come after API routes
+# so /v1/* is never caught by the SPA static mount.
+if SERVE_DIR.exists():
+    app.mount("/assets", StaticFiles(directory=str(SERVE_DIR / "assets")), name="webapp-assets")
+
+
+# SPA catch-all: any non-API GET that hasn't been matched gets index.html
+# (React Router handles client-side routing).
+@app.get("/{path:path}")
+async def spa_catchall(path: str):
+    # Don't catch API routes or docs
+    if path.startswith("v1/") or path.startswith("docs") or path.startswith("redoc") or path.startswith("openapi"):
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"error": "not found"}, status_code=404)
+    index = SERVE_DIR / "index.html"
+    if index.exists():
+        return FileResponse(index)
+    from fastapi.responses import JSONResponse
+    return JSONResponse({"error": "not found"}, status_code=404)

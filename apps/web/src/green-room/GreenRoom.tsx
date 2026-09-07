@@ -1,11 +1,13 @@
 /**
  * Green Room — the creator's studio.
  *
- * Character shelf, script editor, WATCH button, stage directions.
- * Same renderer as live show. If it works here, it works live.
+ * Character shelf, script editor, rehearsal stage, submit.
+ * Same StageRuntime as the live show. If it works here, it works live.
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { StageRuntime, RuntimeStatus } from '../stage/StageRuntime';
+import type { PerformancePlan as StagePlan, MotionCue, WordTiming as StageWordTiming } from '../store/showStore';
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -35,6 +37,7 @@ interface Draft {
   duration_status: 'green' | 'amber' | 'red';
   voice_id: string;
   word_timings: WordTiming[];
+  audio_r2_key?: string;
   stage_directions: {
     id: string;
     at_word: number;
@@ -44,7 +47,7 @@ interface Draft {
   version: number;
 }
 
-interface PerformancePlan {
+interface BackendPlan {
   appearance_id: string;
   body_class: string;
   duration_ms: number;
@@ -64,16 +67,24 @@ const API = ''; // same origin
 
 // ── Green Room App ─────────────────────────────────────────────────
 
-export default function GreenRoom() {
+export function GreenRoom() {
   const [characters, setCharacters] = useState<Character[]>([]);
   const [selectedChar, setSelectedChar] = useState<Character | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
-  const [plan, setPlan] = useState<PerformancePlan | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [highlightedWord, setHighlightedWord] = useState(-1);
+  const [plan, setPlan] = useState<BackendPlan | null>(null);
+  const [view, setView] = useState<'shelf' | 'editor' | 'watch'>('shelf');
   const [directionInput, setDirectionInput] = useState('');
   const [directionTarget, setDirectionTarget] = useState<number>(-1);
-  const [view, setView] = useState<'shelf' | 'editor' | 'watch'>('shelf');
+
+  // Rehearsal state
+  const [runtimeStatus, setRuntimeStatus] = useState<RuntimeStatus>('EMPTY');
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTimeMs, setCurrentTimeMs] = useState(0);
+  const [highlightedWord, setHighlightedWord] = useState(-1);
+  const [audioLocked, setAudioLocked] = useState(false);
+
+  const stageContainerRef = useRef<HTMLDivElement>(null);
+  const runtimeRef = useRef<StageRuntime | null>(null);
 
   // Load characters
   useEffect(() => {
@@ -142,7 +153,7 @@ export default function GreenRoom() {
     setDirectionTarget(-1);
   };
 
-  // Compile
+  // Compile → enter watch mode
   const compile = async () => {
     if (!draft) return;
     const r = await fetch(`${API}/v1/green-room/compile`, {
@@ -166,12 +177,117 @@ export default function GreenRoom() {
     alert('Performance sealed and entered into tonight\'s show!');
   };
 
+  // ── StageRuntime lifecycle (watch mode) ────────────────────────────
+
+  useEffect(() => {
+    if (view !== 'watch' || !stageContainerRef.current || !plan || !draft) return;
+
+    const container = stageContainerRef.current;
+    const runtime = new StageRuntime({
+      mode: 'green-room',
+      container,
+      background: '#0a0a1a',
+    });
+    runtimeRef.current = runtime;
+
+    const offStatus = runtime.onStatus((s) => setRuntimeStatus(s));
+
+    // Word highlighting callback
+    runtime.setWordCallback((index) => {
+      setHighlightedWord(index);
+    });
+
+    // Load audio if we have a synthesized draft
+    if (draft.audio_duration_ms > 0) {
+      // Audio is served from the backend green room synthesis endpoint
+      // For now, we use a placeholder URL — in production this would be R2 signed URL
+      const audioUrl = `${API}/v1/green-room/drafts/${draft.id}/audio`;
+
+      // Build the StagePlan from the backend plan
+      const stagePlan: StagePlan = {
+        appearance_id: plan.appearance_id || draft.id,
+        body_class: plan.body_class || 'humanoid-v1',
+        duration_ms: plan.duration_ms,
+        base_idle_asset_id: null,
+        energy: plan.energy || 0.5,
+        stillness: plan.stillness || 0.5,
+        gesture_density: plan.gesture_density || 0.5,
+        cue_count: plan.cue_count,
+        cues: plan.cues.map(c => ({
+          at_ms: c.at_ms,
+          action: c.action,
+          motion_asset_id: null,
+          duration_ms: 1000,
+          intensity: c.intensity || 0.5,
+          bone_mask: 'all',
+          layer: (c.layer as 'base' | 'upper' | 'head' | 'face') || 'base',
+        })),
+      };
+
+      // Convert word timings to StageWordTiming format
+      const wordTimings: StageWordTiming[] = (draft.word_timings || []).map(wt => ({
+        word: wt.word,
+        start_ms: wt.start_ms,
+        end_ms: wt.end_ms,
+        index: wt.index,
+      }));
+
+      // Preload: audio + plan + word timings
+      // Note: no avatar GLB yet — stage renders without avatar until we have one
+      runtime.preload({
+        avatarUrl: '', // no avatar GLB yet
+        audioUrl,
+        plan: stagePlan,
+        wordTimings,
+      }).catch((e) => {
+        console.warn('[green-room] preload failed (avatar may be missing):', e);
+        // Still set plan so transport/cues work even without avatar
+        runtime.setPlan(stagePlan, wordTimings);
+      });
+    }
+
+    // Time update for UI
+    const timeInterval = setInterval(() => {
+      if (runtime.status === 'PLAYING') {
+        setCurrentTimeMs(runtime.currentTimeMs);
+      }
+    }, 100);
+
+    return () => {
+      clearInterval(timeInterval);
+      offStatus();
+      runtime.dispose();
+      runtimeRef.current = null;
+      setHighlightedWord(-1);
+      setCurrentTimeMs(0);
+    };
+  }, [view, plan?.appearance_id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Play/Pause controls
+  const handlePlayPause = useCallback(() => {
+    const runtime = runtimeRef.current;
+    if (!runtime) return;
+
+    if (isPlaying) {
+      runtime.pause();
+      setIsPlaying(false);
+    } else {
+      // Unlock audio on first user gesture (iPhone)
+      if (runtime.isAudioLocked()) {
+        runtime.unlockAudio().catch(() => {});
+      }
+      runtime.play();
+      setIsPlaying(true);
+    }
+  }, [isPlaying]);
+
   // ── Character Shelf ────────────────────────────────────────────
 
   if (view === 'shelf') {
     return (
       <div className="green-room">
-        <h1>The Green Room</h1>
+        <h1>Freak Town Studio</h1>
+        <p className="subtitle">Create a Freak. Write their minute. Watch them perform.</p>
         <div className="character-shelf">
           {characters.map(char => (
             <div key={char.id} className="character-card" onClick={() => selectCharacter(char)}>
@@ -241,7 +357,7 @@ export default function GreenRoom() {
 
             {directionTarget >= 0 && (
               <div className="direction-bar">
-                <span>Word {directionTarget}: "{words[directionTarget]}"</span>
+                <span>Word {directionTarget}: &quot;{words[directionTarget]}&quot;</span>
                 <input
                   value={directionInput}
                   onChange={(e) => setDirectionInput(e.target.value)}
@@ -259,41 +375,63 @@ export default function GreenRoom() {
             🔊 Synthesize Voice
           </button>
           <button onClick={compile} className="btn-primary" disabled={!draft.audio_duration_ms}>
-            ▶ WATCH
+            ▶ REHEARSE
           </button>
         </div>
       </div>
     );
   }
 
-  // ── Watch Mode ─────────────────────────────────────────────────
+  // ── Watch / Rehearse Mode ──────────────────────────────────────
 
   if (view === 'watch' && plan && draft) {
+    const formatTime = (ms: number) => {
+      const s = Math.floor(ms / 1000);
+      return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    };
+
     return (
       <div className="green-room watch">
         <div className="watch-header">
           <button onClick={() => setView('editor')}>← Edit</button>
           <h2>{selectedChar?.name} — Rehearsal</h2>
+          <span className="runtime-badge">{runtimeStatus}</span>
         </div>
 
-        <div className="stage-container" id="stage-mount">
-          {/* StageRenderer mounts here */}
-          <div className="stage-placeholder">
-            <p>Stage renders here with three-vrm avatar</p>
-            <p>{plan.cue_count} motion cues, {plan.duration_ms / 1000}s</p>
-          </div>
+        <div className="stage-container" ref={stageContainerRef} id="stage-mount">
+          {/* StageRuntime mounts here — Three.js canvas + VRM avatar */}
         </div>
 
-        <div className="script-overlay">
-          {draft.script}
+        {/* Audio unlock overlay for iPhone */}
+        {audioLocked && (
+          <button
+            className="audio-unlock"
+            onClick={() => {
+              runtimeRef.current?.unlockAudio().catch(() => {});
+              setAudioLocked(false);
+            }}
+          >
+            TAP TO ENABLE AUDIO
+          </button>
+        )}
+
+        <div className="watch-overlay">
+          <div className="time-display">{formatTime(currentTimeMs)}</div>
+
+          {/* Highlighted word during playback */}
+          {highlightedWord >= 0 && draft.word_timings[highlightedWord] && (
+            <div className="word-highlight">
+              {draft.word_timings[highlightedWord].word}
+            </div>
+          )}
         </div>
 
-        <div className="watch-actions">
-          <button onClick={() => setIsPlaying(!isPlaying)}>
-            {isPlaying ? '⏸ Pause' : '▶ Play'}
+        <div className="watch-controls">
+          <button onClick={handlePlayPause} className="btn-play">
+            {isPlaying ? '⏸ PAUSE' : '▶ PLAY'}
           </button>
           <button onClick={enterShow} className="btn-primary">
-            🎬 ENTER TONIGHT'S SHOW
+            🎬 ENTER TONIGHT&apos;S SHOW
           </button>
         </div>
 
@@ -313,3 +451,5 @@ export default function GreenRoom() {
 
   return null;
 }
+
+export default GreenRoom;

@@ -12,20 +12,20 @@
     {
       "binding": "DB",
       "database_name": "freak-town",
-      "database_id": "placeholder"
+      "database_id": "a2221653-a6d6-4c13-aedc-9f64fa3cee93"
     }
   ],
   // Postgres (canonical durable truth) via Hyperdrive. Provision with:
   //   wrangler hyperdrive create freak-town-postgres --connection-string="..."
-  // then replace the placeholder id below. Until then, D1 serves ONLY
+  // then add the binding below. Until then, D1 serves ONLY
   // genuinely edge-local ephemeral data; business rows live in Postgres
   // via FastAPI. Do NOT add new business tables to D1.
-  "hyperdrive": [
-    {
-      "binding": "HYPERDRIVE",
-      "id": "placeholder"
-    }
-  ],
+  // "hyperdrive": [
+  //   {
+  //     "binding": "HYPERDRIVE",
+  //     "id": "placeholder"
+  //   }
+  // ],
   "durable_objects": {
     "bindings": [
       {
@@ -43,7 +43,7 @@
   "r2_buckets": [
     {
       "binding": "R2",
-      "bucket_name": "freak-town-assets"
+      "bucket_name": "freak-town"
     }
   ],
   "queues": {
@@ -61,7 +61,7 @@
   "kv_namespaces": [
     {
       "binding": "KV",
-      "id": "placeholder"
+      "id": "16ab1d1633154a06a8efb0362b669294"
     }
   ],
   "env": {
@@ -69,6 +69,7 @@
     "PRIVY_APP_SECRET": "",
     "OPENAI_API_KEY": "",
     "ANTHROPIC_API_KEY": "",
-    "ELEVENLABS_API_KEY": ""
+    "ELEVENLABS_API_KEY": "",
+    "STAGE_TOKEN_SECRET": "freak-town-dev-secret-change-in-prod"
   }
 }

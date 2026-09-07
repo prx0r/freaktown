@@ -43,7 +43,7 @@ class MediaStore:
         # Canonical bucket (matches Worker wrangler.jsonc R2 binding).
         # Two different defaults here vs there once meant two different
         # buckets in production — never again.
-        return os.getenv("R2_BUCKET", "freak-town-assets")
+        return os.getenv("R2_BUCKET", "freak-town")
 
     @property
     def configured(self) -> bool:
