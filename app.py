@@ -852,36 +852,351 @@ def randomize():
 
 @app.route("/f/<slug>")
 def watch_set(slug):
-    """Public watch page: freak.town/f/<slug>. Plays the set, unfurls on WhatsApp."""
+    """Public watch page: freak.town/f/<slug>. VRM stage, reactions, vote, remix loop."""
+    import html as _html
     slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
     bdir = FREAK_DIR / slug
     meta = _bundle_meta(slug)
     if not meta or not (bdir / "set.wav").exists():
         return "No such set (yet). Make one in the Black Room.", 404
     char = meta.get("character", {})
-    name = char.get("name", slug)
-    premise = char.get("premise", "")
+    name = _html.escape(char.get("name", slug))
+    premise = _html.escape(char.get("premise", ""))
     has_portrait = (bdir / "portrait.png").exists()
     img = f"/freaks/{slug}/portrait.png" if has_portrait else "/icon-512.png"
-    return f"""<!DOCTYPE html>
+    dur = meta.get("duration_s", 0)
+    # beat timeline for sync highlight (speech estimated at stage pace)
+    beats = []
+    try:
+        delivery = json.loads((bdir / "delivery.json").read_text())
+        t = 0
+        for b in delivery.get("beats", []):
+            words = len((b.get("text") or "").split())
+            speech = int(words / 2.82 * 1000)
+            pause = int(b.get("pause_after_ms", 300))
+            beats.append({"text": b.get("text", ""), "start": t,
+                          "end": t + speech,
+                          "face": (b.get("performance") or {}).get("expression", "neutral")})
+            t += speech + pause
+    except Exception:
+        pass
+    page = WATCH_TEMPLATE
+    for key, val in {
+        "__SLUG__": slug, "__NAME__": name, "__PREMISE__": premise,
+        "__IMG__": img, "__DUR__": str(dur),
+        "__BEATS__": json.dumps(beats),
+    }.items():
+        page = page.replace(key, val)
+    return page, 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
+WATCH_TEMPLATE = """<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{name} — Freak Town</title>
-<meta property="og:title" content="{name} — Freak Town">
-<meta property="og:description" content="{premise} ({meta.get('duration_s', 0)}s set)">
-<meta property="og:image" content="{img}">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>__NAME__ — Freak Town</title>
+<meta property="og:title" content="__NAME__ — Freak Town">
+<meta property="og:description" content="__PREMISE__ (__DUR__s set)">
+<meta property="og:image" content="__IMG__">
 <meta property="og:type" content="music.song">
 <meta name="theme-color" content="#ff2fa8">
-<style>body{{background:#0a0a0f;color:#eee;font-family:monospace;text-align:center;padding:40px 20px}}
-img{{max-width:280px;border-radius:12px}}button{{background:#ff2fa8;border:0;color:#fff;
-font-size:18px;padding:14px 40px;border-radius:30px;cursor:pointer;margin-top:16px}}</style>
+<script type="importmap">
+{"imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+  "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.3.0/lib/three-vrm.module.js"
+}}
+</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0f;color:#eee;font-family:monospace;text-align:center;min-height:100vh;display:flex;flex-direction:column}
+.top{padding:10px;font-size:12px;letter-spacing:2px;color:#ff2fa8;font-weight:bold}
+#stage{position:relative;flex-shrink:0}
+#vrmStage{width:100%;height:300px;display:none}
+#stageImg{max-width:240px;border-radius:12px;margin:0 auto;display:block}
+h1{font-size:22px;margin:8px 0 2px}
+.premise{color:#888;font-size:13px;margin-bottom:6px}
+#clock{font-size:13px;color:#555;font-variant-numeric:tabular-nums}
+#transcript{flex:1;overflow-y:auto;text-align:left;max-width:560px;margin:8px auto;padding:0 16px;font-size:15px;line-height:1.9;color:#555}
+.seg.spoken{color:#bbb}
+.seg.active{color:#ff2fa8}
+.controls{padding:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;border-top:1px solid #1a1a2e;background:#0c0c12;padding-bottom:calc(12px + env(safe-area-inset-bottom))}
+button{background:#1a1a2e;border:1px solid #333;color:#eee;padding:12px 22px;border-radius:24px;font-size:15px;cursor:pointer;font-family:inherit}
+button.big{background:#ff2fa8;border-color:#ff2fa8;color:#fff;min-height:52px}
+#endscreen{display:none;padding:20px}
+#endscreen.show{display:block}
+.vote{font-size:26px;padding:12px 26px;margin:4px}
+#stats{color:#888;font-size:13px;margin:10px 0}
+.cta{display:block;margin:8px auto;max-width:340px;width:100%;text-decoration:none}
+a.cta{color:#fff}
+.ghost{background:none}
+</style>
 </head><body>
-<h1>🎪 {name}</h1><p>{premise}</p>
-{"<img src='" + img + "'>" if has_portrait else ""}
-<br><audio id="a" src="/freaks/{slug}/set.wav" preload="auto"></audio>
-<br><button onclick="document.getElementById('a').play()">▶ PLAY THE SET</button>
-<p><small>freak.town — live talent show for artificial personalities</small></p>
-</body></html>""", 200, {"Content-Type": "text/html; charset=utf-8"}
+<div class="top">FREAK TOWN · LIVE</div>
+<div id="stage">
+  <canvas id="vrmStage"></canvas>
+  <img id="stageImg" src="__IMG__" alt="">
+</div>
+<h1>__NAME__</h1>
+<div class="premise">__PREMISE__</div>
+<div id="clock">00:00 / __DUR__s</div>
+<div id="transcript"></div>
+<div class="controls" id="liveControls">
+  <button class="big" id="playBtn">▶ PLAY</button>
+  <button id="laughBtn" disabled>😂 <span id="laughCount">0</span></button>
+  <button id="clapBtn" disabled>👏 <span id="clapCount">0</span></button>
+</div>
+<div id="endscreen">
+  <div id="stats"></div>
+  <div>
+    <button class="vote" onclick="vote('keep')">👍 KEEP</button>
+    <button class="vote" onclick="vote('cut')">👎 CUT</button>
+  </div>
+  <div id="voteMsg" style="color:#00d4ff;margin:8px;"></div>
+  <a class="cta" href="/edit?remix=__SLUG__"><button class="big" style="width:100%;">🎤 RESPOND WITH YOUR OWN SET</button></a>
+  <a class="cta" href="/"><button style="width:100%;">＋ MAKE YOUR OWN FREAK</button></a>
+  <button class="ghost cta" style="width:100%;" onclick="passItOn()">📤 PASS IT ON</button>
+</div>
+<audio id="a" src="/freaks/__SLUG__/set.wav" preload="auto"></audio>
+<script>
+const BEATS = __BEATS__;
+const SLUG = "__SLUG__";
+const Aud = document.getElementById('a');
+let timer = null, myLaughs = 0, myClaps = 0, voted = false;
+
+// transcript
+const tx = document.getElementById('transcript');
+BEATS.forEach((b, i) => {
+  const d = document.createElement('div');
+  d.className = 'seg'; d.id = 'seg' + i;
+  d.textContent = b.text;
+  tx.appendChild(d);
+});
+
+function fmt(t) {
+  t = Math.max(0, t);
+  return String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(Math.floor(t % 60)).padStart(2, '0');
+}
+
+async function play() {
+  try { await Aud.play(); } catch (e) {
+    document.getElementById('clock').textContent = 'tap PLAY again (browser blocked it)';
+    return;
+  }
+  document.getElementById('playBtn').style.display = 'none';
+  document.getElementById('laughBtn').disabled = false;
+  document.getElementById('clapBtn').disabled = false;
+  timer = setInterval(tick, 150);
+}
+document.getElementById('playBtn').onclick = play;
+
+function tick() {
+  const t = Aud.currentTime * 1000;
+  document.getElementById('clock').textContent = fmt(Aud.currentTime) + ' / __DUR__s';
+  let cur = -1;
+  BEATS.forEach((b, i) => {
+    const el = document.getElementById('seg' + i);
+    if (!el) return;
+    el.classList.toggle('spoken', t >= b.start);
+    const on = t >= b.start && t < b.end + 1200;
+    el.classList.toggle('active', on);
+    if (on) cur = i;
+  });
+  const act = cur >= 0 && document.getElementById('seg' + cur);
+  if (act) act.scrollIntoView({block: 'nearest'});
+  if (window.__vrmFace && cur >= 0) window.__vrmFace(BEATS[cur].face || 'neutral');
+  if (Aud.ended) endShow();
+}
+
+async function react(type) {
+  if (Aud.paused || Aud.ended) return;
+  if (type === 'laugh') { myLaughs++; document.getElementById('laughCount').textContent = myLaughs; }
+  else { myClaps++; document.getElementById('clapCount').textContent = myClaps; }
+  try {
+    await fetch('/api/react', {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({slug: SLUG, type, set_time_ms: Math.round(Aud.currentTime * 1000)})});
+  } catch (e) {}
+}
+
+document.getElementById('laughBtn').onclick = () => react('laugh');
+document.getElementById('clapBtn').onclick = () => react('clap');
+
+async function vote(v) {
+  if (voted) return;
+  voted = true;
+  try {
+    await fetch('/api/vote', {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({slug: SLUG, vote: v})});
+  } catch (e) {}
+  document.getElementById('voteMsg').textContent =
+    v === 'keep' ? 'Counted. They live to perform another night.' : 'Counted. Brutal. Ella approves.';
+}
+
+function endShow() {
+  clearInterval(timer);
+  document.getElementById('liveControls').style.display = 'none';
+  document.getElementById('endscreen').classList.add('show');
+  document.getElementById('stats').textContent =
+    `You laughed ${myLaughs}× and clapped ${myClaps}× · did they earn another night?`;
+  if (window.__vrmIdle) window.__vrmIdle();
+}
+
+async function passItOn() {
+  const url = location.href;
+  try {
+    if (navigator.share) { await navigator.share({title: document.title, url}); return; }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  try { await navigator.clipboard.writeText(url); } catch (e) {}
+}
+Aud.onended = endShow;
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { VRMLoaderPlugin } from '@pixiv/three-vrm';
+let vrm = null, analyser = null, freqData = null, audioCtx = null;
+let pAA = 0, pIH = 0, pOH = 0, nextBlink = 0;
+const clock = new THREE.Clock();
+const FACE = {grin: ['happy', 0.55], deadpan: ['relaxed', 0.7], annoyed: ['angry', 0.6],
+              confused: ['surprised', 0.35], surprised: ['surprised', 0.8], neutral: [null, 0]};
+window.__vrmFace = (face) => {
+  if (!vrm?.expressionManager) return;
+  for (const k of ['happy', 'relaxed', 'angry', 'surprised', 'sad']) {
+    try { vrm.expressionManager.setValue(k, 0); } catch (e) {}
+  }
+  const [slot, val] = FACE[face] || [null, 0];
+  if (slot) { try { vrm.expressionManager.setValue(slot, val); } catch (e) {} }
+};
+window.__vrmIdle = () => {
+  if (!vrm?.expressionManager) return;
+  for (const k of ['happy', 'relaxed', 'angry', 'surprised', 'sad']) {
+    try { vrm.expressionManager.setValue(k, 0); } catch (e) {}
+  }
+};
+try {
+  const canvas = document.getElementById('vrmStage');
+  const renderer = new THREE.WebGLRenderer({canvas, alpha: true, antialias: true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 20);
+  camera.position.set(0, 1.35, 2.6);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x332233, 1.2));
+  const key = new THREE.DirectionalLight(0xffffff, 1.6);
+  key.position.set(1, 2, 2);
+  scene.add(key);
+  const loader = new GLTFLoader();
+  loader.register(p => new VRMLoaderPlugin(p));
+  const gltf = await loader.loadAsync('/static/avatars/default-v1.vrm');
+  vrm = gltf.userData.vrm;
+  scene.add(vrm.scene);
+  const fit = () => {
+    const w = canvas.clientWidth || 300;
+    renderer.setSize(w, 300, false);
+    camera.aspect = w / 300;
+    camera.updateProjectionMatrix();
+  };
+  fit();
+  addEventListener('resize', fit);
+  document.getElementById('stageImg').style.display = 'none';
+  canvas.style.display = 'block';
+  const A = document.getElementById('a');
+  const ensureGraph = () => {
+    if (audioCtx) { if (audioCtx.state === 'suspended') audioCtx.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    audioCtx = new AC();
+    const src = audioCtx.createMediaElementSource(A);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.55;
+    freqData = new Uint8Array(analyser.frequencyBinCount);
+    src.connect(analyser);
+    analyser.connect(audioCtx.destination);
+  };
+  A.addEventListener('play', ensureGraph);
+  const band = (lo, hi) => {
+    if (!analyser) return 0;
+    analyser.getByteFrequencyData(freqData);
+    let s = 0, n = 0;
+    for (let i = lo; i < Math.min(hi, freqData.length); i++) { s += freqData[i]; n++; }
+    return n ? s / n : 0;
+  };
+  const sm = (p, t, k) => p + (t - p) * k;
+  (function animate() {
+    requestAnimationFrame(animate);
+    const dt = Math.min(clock.getDelta(), 0.05);
+    const t = clock.elapsedTime;
+    if (vrm?.expressionManager && analyser && !A.paused) {
+      pAA = sm(pAA, Math.min(1, band(0, 10) / 200), 0.5);
+      pIH = sm(pIH, Math.min(1, band(40, 80) / 180) * 0.7, 0.5);
+      pOH = sm(pOH, Math.min(1, band(10, 40) / 220) * 0.7, 0.5);
+      try {
+        vrm.expressionManager.setValue('aa', pAA);
+        vrm.expressionManager.setValue('ih', pIH);
+        vrm.expressionManager.setValue('oh', pOH);
+      } catch (e) {}
+    } else if (vrm?.expressionManager) {
+      pAA = sm(pAA, 0, 0.3); pIH = sm(pIH, 0, 0.3); pOH = sm(pOH, 0, 0.3);
+      try {
+        vrm.expressionManager.setValue('aa', pAA);
+        vrm.expressionManager.setValue('ih', pIH);
+        vrm.expressionManager.setValue('oh', pOH);
+      } catch (e) {}
+    }
+    if (vrm?.humanoid) {
+      const spine = vrm.humanoid.getNormalizedBoneNode('spine');
+      if (spine) spine.rotation.y = Math.sin(t * 0.6) * 0.04;
+    }
+    if (t > nextBlink) {
+      nextBlink = t + 2.5 + Math.random() * 2.5;
+      try {
+        vrm.expressionManager.setValue('blink', 1);
+        setTimeout(() => { try { vrm.expressionManager.setValue('blink', 0); } catch (e) {} }, 140);
+      } catch (e) {}
+    }
+    vrm.update(dt);
+    renderer.render(scene, camera);
+  })();
+} catch (e) {
+  console.error('vrm stage failed, portrait fallback showing', e);
+}
+</script>
+</body></html>"""
+
+
+@app.route("/api/react", methods=["POST"])
+def react_to_set():
+    """Audience reaction from a watch page: {slug, type, set_time_ms}.
+    Logged with server timestamp for laugh-curve training data."""
+    import time as _time
+    data = request.json or {}
+    slug = re.sub(r"[^a-z0-9_-]", "", str(data.get("slug", "")))[:45]
+    rtype = str(data.get("type", ""))
+    if not slug or rtype not in ("laugh", "clap", "crickets", "groan"):
+        return jsonify({"ok": False, "error": "bad reaction"}), 400
+    try:
+        with open(Path(__file__).parent / "reactions.jsonl", "a") as f:
+            f.write(json.dumps({"t": _time.time(), "slug": slug, "reaction": rtype,
+                                "set_time_ms": int(data.get("set_time_ms", 0))}) + "\n")
+    except Exception:
+        pass
+    return jsonify({"ok": True})
+
+
+@app.route("/api/vote", methods=["POST"])
+def vote_on_set():
+    """KEEP/CUT verdict from a watch page: {slug, vote}."""
+    import time as _time
+    data = request.json or {}
+    slug = re.sub(r"[^a-z0-9_-]", "", str(data.get("slug", "")))[:45]
+    vote = str(data.get("vote", ""))
+    if not slug or vote not in ("keep", "cut"):
+        return jsonify({"ok": False, "error": "bad vote"}), 400
+    try:
+        with open(Path(__file__).parent / "votes.jsonl", "a") as f:
+            f.write(json.dumps({"t": _time.time(), "slug": slug, "vote": vote}) + "\n")
+    except Exception:
+        pass
+    return jsonify({"ok": True})
 
 
 def _r2_client():

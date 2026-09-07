@@ -928,6 +928,18 @@ async function submitSet(slug) {
 
 loadTemplates();
 loadSets();
+(function () {
+  // Deep link from a watch page: /edit?remix=<slug> loads that freak to answer it.
+  try {
+    const slug = new URLSearchParams(location.search).get('remix');
+    if (slug && /^[a-z0-9_-]{1,45}$/.test(slug)) {
+      setTimeout(() => {
+        loadSet(slug);
+        status(`Remixing — answer them back, then SUBMIT yours too`);
+      }, 600);
+    }
+  } catch (e) {}
+})();
 if (loadDraft()) status('Draft restored');
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => {});
