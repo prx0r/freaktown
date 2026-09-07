@@ -17,3 +17,5 @@ portraits/
 beat_cache/
 emails/.state.json
 funnel.jsonl
+party_records.json
+party_rooms.json

@@ -21,7 +21,10 @@ from pathlib import Path
 
 from flask import Flask, send_from_directory, jsonify, request
 
+from party import party_bp
+
 app = Flask(__name__)
+app.register_blueprint(party_bp)
 
 AUDIO_DIR = Path(__file__).parent / "audio_output"
 AUDIO_DIR.mkdir(exist_ok=True)
@@ -536,12 +539,15 @@ def resolve_bundle(char_slug: str, set_slug: str) -> str | None:
 
 
 def canonical_url(slug: str) -> str:
-    """Public canonical URL for a bundle: /<character>/<set> when named, else /f/<slug>."""
+    """Public canonical URL: /@<character>/<set> when named, else /f/<slug>.
+    /f/<slug> is the immutable share alias, kept forever. The @ form is the
+    permanent human-readable identity (and protects /live /studio /api /f
+    from colliding with character names)."""
     meta = _bundle_meta(slug) or {}
     char = meta.get("character", {})
     named = re.sub(r"[^a-z0-9]+", "-", (meta.get("set_name") or "").lower()).strip("-")[:45]
     if named:
-        return f"https://freak.town/{_char_slug(char.get('name', ''))}/{named}"
+        return f"https://freak.town/@{_char_slug(char.get('name', ''))}/{named}"
     return f"https://freak.town/f/{slug}"
 
 
@@ -1158,10 +1164,15 @@ def watch_set(slug):
 
 @app.route("/<char>/<set>")
 def watch_character_set(char, set):
-    """Permanent spot: freak.town/thomas/fartingdog. Always plays that set."""
+    """Legacy non-@ spot: 301 to the canonical /@<char>/<set>.
+    Kept so already-shared links never die; @ protects /live /studio /api /f."""
+    from flask import redirect as _redirect
     slug = resolve_bundle(char, set)
     if not slug:
         return "No such set (yet). Make one in the Black Room.", 404
+    canon = canonical_url(slug).replace("https://freak.town", "")
+    if canon.startswith("/@"):
+        return _redirect(canon, code=301)
     return _render_watch(slug)
 
 
@@ -1288,8 +1299,9 @@ def og_card(slug):
 @app.route("/api/funnel", methods=["POST"])
 def funnel():
     """Share->watch->respond funnel events. Body: {event, slug, ...}.
-    Events: opened, play, p25, p50, p75, complete, tray_seen, respond_started,
-    generated, shared. Drives the K (responses per performance) metric."""
+    Events: opened, play, p25, p50, p75, complete, tray_seen, seed_changed,
+    edited, respond_started, generated, reply_watched, shared. Drives the K
+    (responses per performance) metric: complete -> respond -> generated -> share."""
     import time as _time
     data = request.json or {}
     event = re.sub(r"[^a-z0-9_]", "", str(data.get("event", "")))[:32]
@@ -1373,7 +1385,8 @@ def respond_idea():
 
 
 def _render_watch(slug):
-    """Shared watch page renderer for /f/<slug> and /<character>/<set>."""
+    """Shared watch page renderer for /f/<slug> and /@<character>/<set>.
+    The shared freak is a 60s challenge: TAP TO WATCH → YOUR TURN → RESPOND."""
     import html as _html
     bdir = FREAK_DIR / slug
     meta = _bundle_meta(slug)
@@ -1382,6 +1395,12 @@ def _render_watch(slug):
     char = meta.get("character", {})
     name = _html.escape(char.get("name", slug))
     premise = _html.escape(char.get("premise", ""))
+    char_slug = _char_slug(char.get("name", ""))
+    set_name = meta.get("set_name") or ""
+    set_label = _html.escape(set_name.replace("-", " ").upper() or "UNTITLED SET")
+    nreplies = sum(
+        1 for d in FREAK_DIR.iterdir() if d.is_dir() and
+        ((_bundle_meta(d.name) or {}).get("lineage") or {}).get("parent") == slug)
     has_portrait = (bdir / "portrait.png").exists()
     img = f"/freaks/{slug}/portrait.png" if has_portrait else "/icon-512.png"
     dur = meta.get("duration_s", 0)
@@ -1405,9 +1424,11 @@ def _render_watch(slug):
     page = WATCH_TEMPLATE
     for key, val in {
         "__SLUG__": slug, "__NAME__": name, "__PREMISE__": premise,
+        "__CHAR_SLUG__": char_slug, "__SET_LABEL__": set_label,
+        "__NREPLIES__": str(nreplies),
         "__IMG__": img, "__DUR__": str(dur),
         "__BEATS__": json.dumps(beats),
-        "__CARD__": f"/api/card/{slug}.png",
+        "__CARD__": f"https://freak.town/api/card/{slug}.png",
         "__CANON__": canonical_url(slug),
         "__REPLYBANNER__": (
             f"<div id='replybanner'>↩ replying to "
@@ -1444,14 +1465,21 @@ WATCH_TEMPLATE = """<!DOCTYPE html>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a0f;color:#eee;font-family:monospace;text-align:center;min-height:100vh;display:flex;flex-direction:column}
-.top{padding:10px;font-size:12px;letter-spacing:2px;color:#ff2fa8;font-weight:bold}
-.top .logo{font-size:16px}
+.top{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;font-size:11px;letter-spacing:2px;color:#777}
+.top .logo{color:#ff2fa8;font-weight:bold;font-size:11px;letter-spacing:2px}
+.top .share{color:#777;background:none;border:1px solid #282833;padding:6px 12px;border-radius:16px;font-size:12px;min-height:0}
 #stage{position:relative;flex-shrink:0}
 #vrmStage{width:100%;height:300px;display:none}
 #stageImg{max-width:240px;border-radius:12px;margin:0 auto;display:block}
 #popcard{background:#111116;border:1px solid #282833;border-radius:14px;margin:8px auto;max-width:560px;padding:10px 14px;text-align:left}
 #popcard h1{font-size:19px;margin:0}
 #popcard .premise{color:#888;font-size:12px;margin-top:2px}
+#popcard .setline{color:#555;font-size:11px;margin-top:4px;letter-spacing:1px}
+#popcard .setline a{color:#555;text-decoration:none}
+#popcard .replies{color:#00d4ff;font-size:11px;margin-top:4px}
+#popcard.playing .setline a{pointer-events:none;color:#333}
+#sendback{display:none;padding:16px;max-width:560px;margin:0 auto;width:100%}
+#sendback.show{display:block;animation:trayup .3s ease-out}
 #clock{font-size:13px;color:#555;font-variant-numeric:tabular-nums}
 #seekrow{display:flex;align-items:center;gap:8px;max-width:560px;margin:4px auto 0;padding:0 16px;font-size:11px;color:#555}
 #seek{flex:1;accent-color:#ff2fa8;cursor:pointer;height:3px}
@@ -1491,7 +1519,8 @@ a.cta{color:#fff}
 .ghost{background:none}
 </style>
 </head><body>
-<div class="top"><span class="logo">🎪 FREAK TOWN</span> · LIVE</div>
+<div class="top"><span class="logo">FREAK TOWN</span><button class="share" onclick="passItOn()">↗ share</button></div>
+__REPLYBANNER__
 <div id="stage">
   <canvas id="vrmStage"></canvas>
   <img id="stageImg" src="__IMG__" alt="">
@@ -1499,6 +1528,8 @@ a.cta{color:#fff}
 <div id="popcard">
   <h1>__NAME__</h1>
   <div class="premise">__PREMISE__</div>
+  <div class="setline">SET: __SET_LABEL__ · <a href="/@__CHAR_SLUG__">@__CHAR_SLUG__</a> · __DUR__s</div>
+  <div class="replies" id="replyCount"></div>
 </div>
 <div id="clock">00:00 / __DUR__s</div>
 <div id="seekrow"><input type="range" id="seek" min="0" max="1000" value="0" aria-label="seek"><span id="left">__DUR__s</span></div>
@@ -1512,35 +1543,45 @@ a.cta{color:#fff}
 <div id="endscreen">
   <div id="replybox">
     <div style="font-size:15px;font-weight:bold;margin-bottom:2px;">YOUR TURN</div>
+    <div style="font-size:12px;color:#555;margin-bottom:6px;" id="wellLine">…well?</div>
     <div id="idea">thinking of an angle…</div>
-    <textarea id="replyText" rows="3"></textarea>
+    <textarea id="replyText" rows="3" enterkeyhint="done"></textarea>
     <div class="modrow" id="modeRow">
       <button class="btn on" data-mode="roast" onclick="setMode('roast')">🔥 ROAST</button>
       <button class="btn" data-mode="yes_and" onclick="setMode('yes_and')">➕ YES-AND</button>
       <button class="btn" data-mode="random" onclick="setMode('random')">🎲 RANDOM</button>
     </div>
     <div class="replyrow">
-      <button class="btn btn-primary" style="flex:2;" onclick="sendResponse()">RESPOND ▶</button>
+      <button class="btn btn-primary big" style="flex:2;" onclick="sendResponse()">RESPOND ▶</button>
     </div>
-    <div id="respline"><a href="#" onclick="document.getElementById('replyText').focus();return false;" style="color:#888;">edit the idea</a> · <a href="/edit?remix=__SLUG__" style="color:#555;">full studio</a></div>
+    <div id="respline"><a href="#" onclick="document.getElementById('replyText').focus();return false;" style="color:#888;">edit the idea</a> · <a href="/edit?reply=__SLUG__" style="color:#555;">full studio</a></div>
     <div id="genline" style="display:none;font-size:13px;color:#888;"></div>
   </div>
+  <div id="sendback">
+    <div style="font-size:15px;font-weight:bold;">YOUR FREAK PERFORMED</div>
+    <div id="sendbackName" style="color:#888;font-size:13px;margin:4px 0 10px;"></div>
+    <button class="big" style="width:100%;" onclick="passItOn()">📤 SEND BACK</button>
+    <div style="display:flex;gap:8px;margin-top:8px;">
+      <button class="ghost" style="flex:1;" onclick="replayReply()">↻ replay</button>
+      <button class="ghost" style="flex:1;" id="fineTuneBtn">fine tune</button>
+    </div>
+  </div>
   <div id="stats"></div>
-  <div style="font-size:12px;color:#555;">Did it cook?
-    <button class="btn btn-small" onclick="vote('keep')">KEEP</button>
-    <button class="btn btn-small" onclick="vote('cut')">CUT</button>
+  <div style="font-size:11px;color:#444;margin-top:10px;">Did it cook?
+    <button class="btn btn-small ghost" onclick="vote('keep')">KEEP</button>
+    <button class="btn btn-small ghost" onclick="vote('cut')">CUT</button>
     <span id="voteMsg" style="color:#00d4ff;"></span>
   </div>
-  <a class="cta" href="/"><button style="width:100%;">＋ MAKE YOUR OWN FREAK</button></a>
-  <button class="ghost cta" style="width:100%;" onclick="passItOn()">📤 PASS IT ON</button>
+  <div style="margin-top:10px;"><a href="/" style="color:#444;font-size:12px;">＋ make your own freak</a></div>
 </div>
 <audio id="a" src="/freaks/__SLUG__/set.wav" preload="auto"></audio>
 <script>
 const BEATS = __BEATS__;
 let SLUG = "__SLUG__";
 const Aud = document.getElementById('a');
-let timer = null, myLaughs = 0, myClaps = 0, voted = false;
-let respMode = 'roast', respIdea = '', respMs = {}, respondedSlug = null;
+let timer = null, myLaughs = 0, voted = false;
+let respMode = 'roast';
+let NREPLIES = parseInt('__NREPLIES__' || '0', 10) || 0;
 
 // anonymous creator identity: own your freaks later, no account now
 function creatorId() {
@@ -1561,6 +1602,18 @@ function funnel(event, extra) {
   } catch (e) {}
 }
 funnel('opened');
+
+// reply count line under the trading card (lore without interrupting playback)
+try {
+  const rc = document.getElementById('replyCount');
+  if (rc && NREPLIES > 0) {
+    const a = document.createElement('a');
+    a.href = '/api/replies/' + encodeURIComponent(SLUG);
+    a.style.color = '#00d4ff'; a.style.textDecoration = 'none';
+    a.textContent = '↩ ' + NREPLIES + (NREPLIES === 1 ? ' reply' : ' replies');
+    rc.appendChild(a);
+  }
+} catch (e) {}
 
 // transcript
 const tx = document.getElementById('transcript');
@@ -1583,8 +1636,7 @@ async function play() {
   }
   document.getElementById('playBtn').style.display = 'none';
   document.getElementById('laughBtn').disabled = false;
-  const _cb = document.getElementById('clapBtn');
-  if (_cb) _cb.disabled = false;
+  document.getElementById('popcard').classList.add('playing');
   funnel('play');
   timer = setInterval(tick, 150);
 }
@@ -1634,7 +1686,6 @@ function tick() {
 async function react(type) {
   if (Aud.paused || Aud.ended) return;
   if (type === 'laugh') { myLaughs++; document.getElementById('laughCount').textContent = myLaughs; }
-  else { myClaps++; document.getElementById('clapCount').textContent = myClaps; }
   try {
     await fetch('/api/react', {method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({slug: SLUG, type, set_time_ms: Math.round(Aud.currentTime * 1000),
@@ -1643,8 +1694,6 @@ async function react(type) {
 }
 
 document.getElementById('laughBtn').onclick = () => react('laugh');
-const _clap = document.getElementById('clapBtn');
-if (_clap) _clap.onclick = () => react('clap');
 
 async function vote(v) {
   if (voted) return;
@@ -1661,21 +1710,29 @@ function endShow() {
   clearInterval(timer);
   funnel('complete');
   document.getElementById('liveControls').style.display = 'none';
+  document.getElementById('popcard').classList.remove('playing');
   document.getElementById('endscreen').classList.add('show');
   document.getElementById('stats').textContent =
-    `You laughed ${myLaughs}× and clapped ${myClaps}× · did they earn another night?`;
+    myLaughs > 0 ? `You laughed ${myLaughs}× · did they earn another night?` : '';
+  try {
+    const nm = (document.querySelector('#popcard h1') || {}).textContent || '';
+    document.getElementById('wellLine').textContent = nm ? `${nm} stares… …well?` : '…well?';
+  } catch (e) {}
   if (window.__vrmIdle) window.__vrmIdle();
   // YOUR TURN tray rises immediately; idea prefills below (stored seeds = instant)
   document.getElementById('replybox').classList.add('show');
+  document.getElementById('sendback').classList.remove('show');
   funnel('tray_seen');
   loadIdea();
 }
 
 let ideaMode = 'roast';
 function setMode(m) {
+  if (m === ideaMode) return;
   ideaMode = m;
   document.querySelectorAll('#modeRow .btn').forEach(b =>
     b.classList.toggle('on', b.dataset.mode === m));
+  funnel('seed_changed', {mode: m});
   loadIdea();
 }
 
@@ -1690,14 +1747,22 @@ async function loadIdea() {
     const data = await res.json();
     if (data.ok && data.idea) {
       el.textContent = '💡 ' + data.idea;
-      box.value = data.idea; // prefilled: tap RESPOND with zero writing
-      box.focus({preventScroll: true});
+      if (!box.dataset.edited) box.value = data.idea; // prefilled: tap RESPOND with zero writing
       window._idea = data.idea;
       return;
     }
   } catch (e) {}
   el.textContent = '';
 }
+
+// track human edits separately from seed prefills (no auto-focus: iOS
+// keyboards require a direct user gesture, so the big RESPOND is the gesture)
+try {
+  document.getElementById('replyText').addEventListener('input', (e) => {
+    e.target.dataset.edited = '1';
+    funnel('edited', {mode: ideaMode});
+  }, {once: true});
+} catch (e) {}
 
 function rerollIdea() {
   document.getElementById('replyText').value = '';
@@ -1742,6 +1807,8 @@ async function playReply(data) {
   document.querySelector('#popcard h1').textContent = c.name || 'Your Freak';
   document.querySelector('#popcard .premise').textContent =
     `answering ${prevName} · ${c.premise || ''}`;
+  const setline = document.querySelector('#popcard .setline');
+  if (setline) setline.style.display = 'none';
   Aud.src = data.audio;
   Aud.currentTime = 0;
   document.getElementById('endscreen').classList.remove('show');
@@ -1769,14 +1836,43 @@ async function playReply(data) {
   // swap slug so reactions/votes/ideas/share now target the reply
   SLUG = data.slug;
   window.__replyUrl = data.url;
-  myLaughs = 0; myClaps = 0; voted = false;
+  try {
+    const ft = document.getElementById('fineTuneBtn');
+    if (ft) ft.onclick = () => { location.href = '/edit?reply=' + encodeURIComponent(data.slug); };
+  } catch (e) {}
+  const sbName = document.getElementById('sendbackName');
+  if (sbName) sbName.textContent = (c.name ? c.name + ' · ' : '') + 'reply ready — send it back';
+  myLaughs = 0; voted = false;
   document.getElementById('laughCount').textContent = '0';
-  document.getElementById('clapCount').textContent = '0';
   document.getElementById('voteMsg').textContent = '';
+  // reply gets its own end-state: SEND BACK dominant (not another YOUR TURN loop)
+  Aud.onended = endReply;
   try { await Aud.play(); } catch (e) { return; }
   document.getElementById('playBtn').style.display = 'none';
+  document.getElementById('popcard').classList.add('playing');
   timer = setInterval(tick, 150);
   status('YOUR FREAK performs — SEND BACK when done');
+}
+
+function endReply() {
+  clearInterval(timer);
+  funnel('reply_watched', {slug: SLUG});
+  document.getElementById('liveControls').style.display = 'none';
+  document.getElementById('endscreen').classList.add('show');
+  document.getElementById('replybox').classList.remove('show');
+  document.getElementById('sendback').classList.add('show');
+  if (window.__vrmIdle) window.__vrmIdle();
+}
+
+function replayReply() {
+  document.getElementById('endscreen').classList.remove('show');
+  document.getElementById('liveControls').style.display = 'flex';
+  document.getElementById('playBtn').style.display = '';
+  Aud.currentTime = 0;
+  Aud.onended = endReply;
+  Aud.play().catch(() => {});
+  document.getElementById('playBtn').style.display = 'none';
+  timer = setInterval(tick, 150);
 }
 
 function status(msg) {
@@ -1938,7 +2034,8 @@ def react_to_set():
 
 @app.route("/api/vote", methods=["POST"])
 def vote_on_set():
-    """KEEP/CUT verdict from a watch page: {slug, vote}."""
+    """KEEP/CUT verdict from a watch page: {slug, vote}. Secondary signal;
+    the primary viral metric is replies, not votes."""
     import time as _time
     data = request.json or {}
     slug = re.sub(r"[^a-z0-9_-]", "", str(data.get("slug", "")))[:45]
@@ -1951,6 +2048,29 @@ def vote_on_set():
     except Exception:
         pass
     return jsonify({"ok": True})
+
+
+@app.route("/api/replies/<slug>", methods=["GET"])
+def list_replies(slug):
+    """Reply thread for a performance: {parent, replies:[{slug,name,premise,url}]}.
+    Powers the 'N replies' branch view and the 'Gerald responded to Peg'
+    notification hook — the viral object is the conversation, not the set."""
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    if not _bundle_meta(slug):
+        return jsonify({"ok": False, "error": "unknown set"}), 404
+    out = []
+    for d in sorted(FREAK_DIR.iterdir()):
+        if not d.is_dir():
+            continue
+        m = _bundle_meta(d.name) or {}
+        if (m.get("lineage") or {}).get("parent") == slug:
+            ch = m.get("character", {}) or {}
+            out.append({"slug": d.name, "name": ch.get("name", d.name),
+                        "premise": ch.get("premise", ""),
+                        "url": canonical_url(d.name).replace("https://freak.town", ""),
+                        "created_at": m.get("created_at", "")})
+    out.sort(key=lambda r: r["created_at"])
+    return jsonify({"ok": True, "parent": slug, "replies": out})
 
 
 def _r2_client():

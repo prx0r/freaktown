@@ -993,17 +993,20 @@ loadTemplates();
 loadSets();
 (function () {
   // Deep links from a watch page:
-  //   /edit?remix=<slug> — load that freak to answer it.
+  //   /edit?reply=<slug> — answer-back (RESPOND): new freak + new set linked
+  //     to the original as {relation: reply}. This is the viral path.
+  //   /edit?remix=<slug> — legacy alias for reply (kept; true fork/remix
+  //     of a character/delivery is a separate future action).
   //   /edit?respond_to=<slug>&premise=<text> — start a response set.
   try {
     const q = new URLSearchParams(location.search);
-    const remix = q.get('remix');
+    const reply = q.get('reply') || q.get('remix');
     const respondTo = q.get('respond_to');
     const premise = q.get('premise');
-    if (remix && /^[a-z0-9_-]{1,45}$/.test(remix)) {
+    if (reply && /^[a-z0-9_-]{1,45}$/.test(reply)) {
       setTimeout(() => {
-        loadSet(remix);
-        status(`Remixing — answer them back, then SUBMIT yours too`);
+        loadSet(reply);
+        status(`Replying — answer them back, then SUBMIT yours too`);
       }, 600);
     } else if (premise) {
       setTimeout(() => {
