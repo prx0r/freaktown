@@ -1,0 +1,313 @@
+#!/root/freaktown/.venv/bin/python
+"""freaktown — come on then funny bones.
+
+Usage:
+  freaktown                        # interactive Black Room
+  freaktown "gay dog, no sense of smell"   # one-shot premise
+  freaktown --no-play "premise"    # generate + beats, skip audio
+
+You direct. Free-tier AI writes. edge-tts speaks. Compositor owns timing.
+"""
+
+import asyncio
+import hashlib
+import io
+import json
+import os
+import re
+import struct
+import subprocess
+import sys
+import wave
+from pathlib import Path
+
+BASE = Path(__file__).resolve().parent
+AUDIO_DIR = BASE / "audio_output"
+AUDIO_DIR.mkdir(exist_ok=True)
+
+CYAN, YELLOW, RED = "\033[36m", "\033[33m", "\033[31m"
+GREEN, MAGENTA = "\033[32m", "\033[35m"
+DIM, BOLD, RESET = "\033[2m", "\033[1m", "\033[0m"
+
+SYSTEM_PROMPT = """You are a comedy writer for Freak Town, a live AI comedy club.
+Write a 60-second standup minute. Rules:
+- 80-150 words. First line IS the joke (no warmup, no "So...").
+- Escalating absurdity. Specific details (numbers, names). Killer closer under 10 words.
+- Direct audience address ("you"). Conversational, spontaneous tone.
+- Stay in the character's voice and worldview.
+
+Reply with STRICT JSON only, no other text:
+{"name": "character stage name", "species": "dog|human|robot|pigeon|etc",
+"premise": "one sentence", "vibe": "deadpan|manic|anxious|confident|paranoid",
+"minute": "the full set text"}"""
+
+CF_MODELS = [
+    "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    "@cf/mistralai/mistral-small-3.1-24b-instruct",
+    "@cf/meta/llama-3.1-8b-instruct-fp8",
+]
+
+TEMPLATES = [
+    "So I'm {premise}. You'd think that comes with advantages. It does not. "
+    "The main advantage I have is that nobody expects anything from me. Which is accurate. "
+    "My therapist says I should lean into my strengths. My strength is not dying. "
+    "That's it. That's the whole resume.",
+    "People ask me what it's like being {premise}. "
+    "I tell them it's like being color-blind, but for the one thing that defines your entire species. "
+    "Then they ask me to elaborate. I say no. Not because I can't. "
+    "Because the elaboration would take longer than my attention span. What were we talking about?",
+]
+
+
+def cf_creds():
+    tok = os.getenv("CLOUDFLARE_API_TOKEN", "").strip()
+    acct = os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip()
+    if tok and acct:
+        return tok, acct
+    try:
+        data = json.load(open("/root/.agent-vault/vault.json"))
+        return str(data.get("CLOUDFLARE_API_TOKEN", "")), str(data.get("CLOUDFLARE_ACCOUNT_ID", ""))
+    except Exception:
+        return "", ""
+
+
+def llm_minute(premise: str) -> dict | None:
+    """Character + minute via free-tier CF Workers AI. None on failure."""
+    import httpx
+    tok, acct = cf_creds()
+    if not tok or not acct:
+        return None
+    for model in CF_MODELS:
+        try:
+            r = httpx.post(
+                f"https://api.cloudflare.com/client/v4/accounts/{acct}/ai/run/{model}",
+                headers={"Authorization": f"Bearer {tok}", "Content-Type": "application/json"},
+                json={"messages": [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": f"Write the character and minute for: {premise}"}],
+                    "max_tokens": 500, "temperature": 0.9},
+                timeout=90)
+            if r.status_code != 200:
+                continue
+            raw = r.json()["result"]["response"]
+            m = re.search(r"\{.*\}", raw, re.S)
+            data = json.loads(m.group(0) if m else raw)
+            if data.get("minute"):
+                return data
+        except Exception:
+            continue
+    return None
+
+
+def fallback_minute(premise: str) -> dict:
+    import random
+    return {"name": "Unnamed Freak", "species": "unknown", "premise": premise,
+            "vibe": "deadpan", "minute": random.choice(TEMPLATES).format(premise=premise)}
+
+
+def detect_beats(text: str) -> list[dict]:
+    sents = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text.strip()) if s.strip()]
+    beats = []
+    for i, s in enumerate(sents):
+        wc = len(s.split())
+        t, p = "setup", 300
+        if i > 0 and wc < 8 and len(sents[i - 1].split()) > 15:
+            t, p = "punchline", 800
+        if i == len(sents) - 1:
+            t, p = "closer", 1200 if wc < 10 else 600
+        if i > 0 and beats and beats[-1]["type"] == "punchline" and wc < 12:
+            t, p = "tag", 400
+        beats.append({"id": f"b{i + 1}", "type": t, "text": s, "pause_after_ms": p,
+                      "word_count": wc})
+    return beats
+
+
+async def _tts_wav(text: str, voice: str) -> bytes:
+    import edge_tts
+    tag = hashlib.sha256(f"{voice}:{text}".encode()).hexdigest()[:10]
+    mp3, wav = AUDIO_DIR / f"_ft_{tag}.mp3", AUDIO_DIR / f"_ft_{tag}.wav"
+    await edge_tts.Communicate(text, voice).save(str(mp3))
+    subprocess.run(["ffmpeg", "-y", "-i", str(mp3), "-ar", "24000", "-ac", "1",
+                    "-f", "wav", str(wav)], capture_output=True, timeout=15)
+    data = wav.read_bytes() if wav.exists() else b""
+    mp3.unlink(missing_ok=True)
+    wav.unlink(missing_ok=True)
+    return data
+
+
+def _to_samples(wav: bytes) -> list[int]:
+    try:
+        with wave.open(io.BytesIO(wav), "rb") as w:
+            fr = w.readframes(w.getnframes())
+            return list(struct.unpack(f"<{len(fr) // 2}h", fr))
+    except Exception:
+        return []
+
+
+def compose(beats: list[dict], voice: str) -> Path:
+    async def go():
+        out: list[int] = []
+        for b in beats:
+            out.extend(_to_samples(await _tts_wav(b["text"], voice)))
+            out.extend([0] * int(24000 * b["pause_after_ms"] / 1000))
+        return out
+    samples = asyncio.run(go())
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(24000)
+        w.writeframes(struct.pack(f"<{len(samples)}h", *samples))
+    tag = hashlib.sha256(" ".join(b["text"] for b in beats).encode()).hexdigest()[:10]
+    p = AUDIO_DIR / f"freaktown_{tag}.wav"
+    p.write_bytes(buf.getvalue())
+    return p
+
+
+def play(path: Path):
+    for cmd in (["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet"],
+                ["mpv", "--no-video"], ["aplay"]):
+        try:
+            subprocess.run(cmd + [str(path)], timeout=180)
+            return
+        except FileNotFoundError:
+            continue
+    print(f"  {DIM}no audio player found — file at {path}{RESET}")
+
+
+def banner():
+    print(f"""{CYAN}{BOLD}
+  ███████╗██████╗ ██████╗ ███████╗██████╗  ██████╗
+  ██╔════╝██╔══██╗██╔══██╗██╔════╝██╔══██╗██╔═══██╗
+  █████╗  ██║  ██║██████╔╝█████╗  ██████╔╝██║   ██║
+  ██╔══╝  ██║  ██║██╔══██╗██╔══╝  ██╔══██╗██║   ██║
+  ██║     ██████╔╝██║  ██║███████╗██║  ██║╚██████╔╝
+  ╚═╝     ╚═════╝ ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+
+       ████████╗ ██████╗  ██████╗ ██╗   ██╗████████╗
+       ╚══██╔══╝██╔═══██╗██╔═══██╗██║   ██║╚══██╔══╝
+          ██║   ██║   ██║██║   ██║██║   ██║   ██║
+          ██║   ██║   ██║██║   ██║██║   ██║   ██║
+          ██║   ╚██████╔╝╚██████╔╝╚██████╔╝   ██║
+          ╚═╝    ╚═════╝  ╚═════╝  ╚═════╝    ╚═╝
+{RESET}""")
+
+
+def show_beats(beats: list[dict]):
+    icons = {"setup": "●", "punchline": "★", "closer": "■", "tag": "◆"}
+    for b in beats:
+        c = GREEN if b["word_count"] < 8 else YELLOW if b["word_count"] < 15 else DIM
+        print(f"  {BOLD}{icons.get(b['type'], '●')} {b['id']}{RESET} "
+              f"{b['type']:<10} {c}{b['text'][:58]}{RESET} {DIM}+{b['pause_after_ms']}ms{RESET}")
+    tot = sum(b["pause_after_ms"] for b in beats)
+    print(f"  {DIM}{'─' * 56}{RESET}")
+    print(f"  {DIM}{len(beats)} beats | {sum(b['word_count'] for b in beats)} words | "
+          f"~{(tot + len(beats) * 2000) // 1000}s{RESET}")
+
+
+def do_premise(premise: str, voice: str, no_play: bool) -> list[dict]:
+    print(f"\n  {DIM}writing...{RESET}")
+    data = llm_minute(premise) or fallback_minute(premise)
+    print(f"\n  {BOLD}{data.get('name', '')}{RESET} {DIM}"
+          f"{data.get('species', '')} · {data.get('vibe', '')}{RESET}")
+    print(f"  {DIM}{data.get('premise', '')}{RESET}\n")
+    beats = detect_beats(data["minute"])
+    show_beats(beats)
+    if not no_play:
+        print(f"\n  {DIM}composing...{RESET}")
+        path = compose(beats, voice)
+        print(f"  {GREEN}playing ({path.name}){RESET}\n")
+        play(path)
+    return beats
+
+
+def main():
+    args = [a for a in sys.argv[1:] if not a.startswith("-")]
+    no_play = "--no-play" in sys.argv[1:]
+    voice = "en-US-AriaNeural"
+    for a in sys.argv[1:]:
+        if a.startswith("--voice="):
+            voice = a.split("=", 1)[1]
+
+    banner()
+    beats: list[dict] = []
+
+    if args:
+        beats = do_premise(" ".join(args), voice, no_play)
+
+    while True:
+        try:
+            line = input(f"\n{MAGENTA}come on then funny bones > {RESET}").strip()
+        except (EOFError, KeyboardInterrupt):
+            print(f"\n{DIM}goodnight.{RESET}")
+            return
+        if not line:
+            continue
+        cmd, _, rest = line.partition(" ")
+        cmd = cmd.lower()
+
+        if cmd in ("quit", "q", "exit"):
+            print(f"{DIM}goodnight.{RESET}")
+            return
+        if cmd == "help":
+            print(f"  {DIM}type a premise to generate · edit <id> <text> · pause <id> <ms> · "
+                  f"play · play <id> · beats · voice <name> · quit{RESET}")
+            continue
+        if cmd == "beats":
+            show_beats(beats) if beats else print(f"  {DIM}no beats yet — give me a premise{RESET}")
+            continue
+        if cmd == "play" and not rest:
+            if not beats:
+                print(f"  {DIM}nothing to play — give me a premise first{RESET}")
+                continue
+            print(f"  {DIM}composing...{RESET}")
+            play(compose(beats, voice))
+            continue
+        if cmd == "play" and rest:
+            hit = [b for b in beats if b["id"] == rest]
+            if not hit:
+                print(f"  {RED}no beat {rest}{RESET}")
+                continue
+            b = hit[0]
+            play(compose([b], voice))
+            continue
+        if cmd == "edit":
+            bid, _, text = rest.partition(" ")
+            for b in beats:
+                if b["id"] == bid and text:
+                    b["text"] = text
+                    b["word_count"] = len(text.split())
+                    print(f"  updated {bid} — type 'play' to hear it")
+                    break
+            else:
+                print(f"  {RED}usage: edit <id> <new text>{RESET}")
+            continue
+        if cmd == "pause":
+            parts = rest.split()
+            if len(parts) == 2:
+                for b in beats:
+                    if b["id"] == parts[0]:
+                        try:
+                            b["pause_after_ms"] = max(0, int(parts[1]))
+                            print(f"  {b['id']} → {b['pause_after_ms']}ms")
+                        except ValueError:
+                            print(f"  {RED}ms must be a number{RESET}")
+                        break
+                else:
+                    print(f"  {RED}no beat {parts[0]}{RESET}")
+            else:
+                print(f"  {RED}usage: pause <id> <ms>{RESET}")
+            continue
+        if cmd == "voice":
+            if rest:
+                voice = rest
+                print(f"  voice → {voice}")
+            else:
+                print(f"  current: {voice}")
+            continue
+        # anything else = new premise
+        beats = do_premise(line, voice, no_play)
+
+
+if __name__ == "__main__":
+    main()
