@@ -203,6 +203,17 @@ def compose():
 
     duration_ms = len(wav_bytes) / (24000 * 2) * 1000
 
+    full_text = " ".join(b.get("text", "") for b in beats)
+    SHOW_COUNTER[0] += 1
+    LAST_SET.clear()
+    LAST_SET["payload"] = {
+        "title": f"Black Room Set #{SHOW_COUNTER[0]}",
+        "text": full_text,
+        "audio": f"/audio/{filename}",
+        "show_number": SHOW_COUNTER[0],
+        "segments": _beats_to_segments(beats, offsets),
+    }
+
     return jsonify({
         "ok": True,
         "audio": f"/audio/{filename}",
@@ -214,6 +225,74 @@ def compose():
 @app.route("/audio/<path:filename>")
 def serve_audio(filename):
     return send_from_directory(str(AUDIO_DIR), filename)
+
+
+STAGE_DIR = Path(__file__).parent / "stage"
+
+LAST_SET: dict = {}
+SHOW_COUNTER = [0]
+
+EMOTION_BY_BEAT = {"setup": "neutral", "escalation": "tension",
+                   "punchline": "surprise", "tag": "playful", "closer": "joy"}
+
+
+@app.route("/stage")
+def stage_page():
+    return send_from_directory(str(STAGE_DIR), "index.html")
+
+
+@app.route("/stage/<path:filename>")
+def stage_files(filename):
+    if filename in ("index.html", "app.js", "style.css"):
+        return send_from_directory(str(STAGE_DIR), filename)
+    return jsonify({"ok": False, "error": "not found"}), 404
+
+
+def _beats_to_segments(beats: list[dict], offsets: list[dict]) -> list[dict]:
+    by_id = {o["id"]: o for o in offsets}
+    segs = []
+    for b in beats:
+        o = by_id.get(b.get("id"), {})
+        pause = int(b.get("pause_after_ms", 300))
+        segs.append({
+            "text": b.get("text", ""),
+            "start_ms": int(o.get("start_ms", 0)),
+            "end_ms": int(o.get("start_ms", 0)) + int(o.get("speech_ms", 0)),
+            "emotion": EMOTION_BY_BEAT.get(b.get("type", "setup"), "neutral"),
+            "intensity": round(min(1.0, pause / 1400), 2),
+            "pace": 1.0,
+            "pause_after_ms": pause,
+        })
+    return segs
+
+
+@app.route("/api/set", methods=["GET"])
+def stage_set():
+    """Bubble player feed: last composed Black Room set as segments.
+    Falls back to a default Ella minute so the stage always plays."""
+    if LAST_SET:
+        return jsonify(LAST_SET["payload"])
+
+    minute = ("I host a show where artificial personalities do stand-up comedy. "
+              "People keep asking whether the robots are actually funny. Sometimes. "
+              "Which is already a terrifyingly strong result. Last week one told me it was "
+              "working on its material. I said, you do not have material. You have a "
+              "probability distribution and Wi-Fi. Comedy used to be art. Now it is telemetry.")
+    beats = detect_beats(minute)
+    SHOW_COUNTER[0] += 1
+    audio_url = None
+    try:
+        audio = asyncio.run(tts_generate(minute, "en-US-AriaNeural"))
+        if audio:
+            fn = f"stage_default_{hashlib.sha256(minute.encode()).hexdigest()[:10]}.wav"
+            (AUDIO_DIR / fn).write_bytes(audio)
+            audio_url = f"/audio/{fn}"
+    except Exception:
+        pass
+    payload = {"title": "Ella M — Default Set", "text": minute, "audio": audio_url,
+               "show_number": SHOW_COUNTER[0],
+               "segments": _beats_to_segments(beats, [])}
+    return jsonify(payload)
 
 
 @app.route("/freaks/<path:filename>")

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="bubble-pop">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#fff7fb" />
+  <title>FREAK TOWN</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="ambient" aria-hidden="true">
+    <i></i><i></i><i></i><i></i><i></i><i></i>
+  </div>
+
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="Freak Town home">
+      <span class="brand-freak" aria-hidden="true">
+        <b class="c-f">F</b><b class="c-r">R</b><b class="c-e">E</b><b class="c-a">A</b><b class="c-k">K</b>
+      </span>
+      <span class="brand-town">TOWN</span>
+    </a>
+
+    <div class="topbar-right">
+      <span class="show-pill" id="showNum">SHOW —</span>
+      <label class="theme-control">
+        <span>THEME</span>
+        <select id="themeSelect" aria-label="Choose show theme">
+          <option value="bubble-pop">Bubble Pop</option>
+          <option value="midnight-carnival">Midnight Carnival</option>
+          <option value="halloween">Halloween</option>
+          <option value="christmas">Christmas</option>
+          <option value="sticker-freakshow">Sticker Freakshow</option>
+        </select>
+      </label>
+    </div>
+  </header>
+
+  <main class="show-shell">
+    <section class="stage-card" aria-label="Freak Town stage">
+      <div class="stage-glow" id="stageGlow"></div>
+
+      <div class="performer-column">
+        <div class="avatar-bubble" id="avatar" data-emotion="neutral">
+          <div class="avatar-rim"></div>
+          <div class="avatar-face">👩‍🦰</div>
+          <div class="avatar-mouth" aria-hidden="true"></div>
+          <div class="avatar-shine" aria-hidden="true"></div>
+        </div>
+        <div class="performer-meta">
+          <div class="performer-name">ELLA M</div>
+          <div class="set-title" id="setTitle">PRESS PLAY</div>
+        </div>
+      </div>
+
+      <div class="speech-column">
+        <div class="timeline-head">
+          <span class="live-dot"></span>
+          <span id="statusText">READY</span>
+          <span class="timeline-time" id="timeReadout">0:00</span>
+        </div>
+        <div class="bubble-stream" id="transcript" aria-live="polite"></div>
+        <div class="audio-orbit" id="waveform" aria-hidden="true"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="control-dock">
+    <button class="bubble-btn bubble-btn-primary" id="playBtn">▶ <span>PLAY SET</span></button>
+    <button class="bubble-btn" id="laughBtn" disabled>😂 <span>LAUGH</span> <b id="laughCount">0</b></button>
+    <button class="bubble-btn" id="clapBtn" disabled>👏 <span>CLAP</span> <b id="clapCount">0</b></button>
+    <div class="keyboard-hint"><kbd>SPACE</kbd> play/pause · <kbd>L</kbd> laugh · <kbd>K</kbd> clap</div>
+  </footer>
+
+  <div class="toast-bubble" id="toast" role="status"></div>
+  <audio id="audio" preload="auto"></audio>
+
+  <script>window.FREAK_TOWN_DEFAULT_THEME = "bubble-pop";</script>
+  <script src="app.js"></script>
+</body>
+</html>

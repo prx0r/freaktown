@@ -1,0 +1,29 @@
+{
+  "name": "Freak Town Bubble System",
+  "version": "1.0.0",
+  "brandPalette": {
+    "F": "#0B1B3D",
+    "R": "#D48A17",
+    "E": "#1DB381",
+    "A": "#BD1E65",
+    "K": "#0D8EA6",
+    "TOWN": "#080C14"
+  },
+  "semanticEmotionMap": {
+    "deadpan": "F",
+    "warm": "R",
+    "joy": "R",
+    "playful": "E",
+    "tension": "A",
+    "surprise": "K",
+    "neutral": "K"
+  },
+  "bubbleEncoding": {
+    "color": "emotion",
+    "width": "speech pace",
+    "verticalGap": "pause after line",
+    "saturationAndGlow": "emotional intensity",
+    "revealTime": "segment start_ms/end_ms when supplied; inferred fallback otherwise"
+  },
+  "themes": ["bubble-pop", "midnight-carnival", "halloween", "christmas", "sticker-freakshow"]
+}
