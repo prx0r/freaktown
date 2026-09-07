@@ -362,6 +362,7 @@ async function playBeat(i) {
   if (data.ok) {
     const audio = document.getElementById('audio');
     audio.src = data.audio;
+    await unlockAudio();
     audio.play();
     setAvatarTalking(true);
     audio.onended = () => setAvatarTalking(false);
@@ -382,6 +383,7 @@ async function composePlay(opts = {}) {
   const audio = document.getElementById('audio');
   audio.src = data.audio;
   if (!opts.defer) {
+    await unlockAudio();
     audio.play();
     setAvatarTalking(true);
     clearHighlight();
@@ -466,6 +468,7 @@ async function playFromHere(i) {
   const id = beats[i].id;
   const audio = document.getElementById('audio');
   audio.currentTime = beatStartMs(id) / 1000;
+  await unlockAudio();
   audio.play();
   setAvatarTalking(true);
   clearHighlight();
@@ -529,10 +532,11 @@ async function genWalkout() {
     `${body.genre}/${body.mood} · ${data.cached ? 'cached' : 'fresh'} · saved with set`;
 }
 
-function playWalkout() {
+async function playWalkout() {
   if (!walkoutUrl) return status('Generate the walkout first');
   const a = document.getElementById('audio');
   a.src = walkoutUrl;
+  await unlockAudio();
   a.play();
   status('Walkout playing');
 }
@@ -571,6 +575,7 @@ async function togglePlay() {
     ? beatStartMs(currentBeatId)
     : beatStartMs(beat.id);
   audio.currentTime = target;
+  await unlockAudio();
   audio.play();
   clearHighlight();
   highlightTimer = setInterval(syncHighlight, 150);
@@ -787,6 +792,7 @@ function ensureAudioGraph() {
   }
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return;
+  // single graph per page: element -> analyser -> destination (never recreated)
   audioCtx = new AC();
   const src = audioCtx.createMediaElementSource(document.getElementById('audio'));
   analyser = audioCtx.createAnalyser();
@@ -795,6 +801,14 @@ function ensureAudioGraph() {
   freqData = new Uint8Array(analyser.frequencyBinCount);
   src.connect(analyser);
   analyser.connect(audioCtx.destination);
+}
+
+// Call FIRST inside every user-gesture play handler (iOS unlock).
+async function unlockAudio() {
+  ensureAudioGraph();
+  if (audioCtx && audioCtx.state === 'suspended') {
+    try { await audioCtx.resume(); } catch (e) {}
+  }
 }
 
 function band(lo, hi) {
