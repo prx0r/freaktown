@@ -859,27 +859,72 @@ async function saveSet() {
   loadSets();
 }
 
+function showShareLink(url) {
+  // Persistent, clickable link box — never auto-fades like status().
+  let box = document.getElementById('shareBox');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'shareBox';
+    box.style.cssText = 'margin-top:8px;padding:10px;border:1px solid #ff2fa8;' +
+      'border-radius:6px;font-size:13px;word-break:break-all;';
+    document.getElementById('stats').after(box);
+  }
+  box.innerHTML = '';
+  const a = document.createElement('a');
+  a.href = url;
+  a.textContent = url;
+  a.target = '_blank';
+  a.style.color = '#ff2fa8';
+  box.appendChild(a);
+  const btn = document.createElement('button');
+  btn.className = 'btn btn-small';
+  btn.style.marginLeft = '8px';
+  btn.textContent = 'COPY';
+  btn.onclick = async () => {
+    try { await navigator.clipboard.writeText(url); btn.textContent = 'COPIED ✓'; }
+    catch (e) { btn.textContent = 'SELECT + COPY MANUALLY'; }
+    setTimeout(() => { btn.textContent = 'COPY'; }, 2500);
+  };
+  box.appendChild(btn);
+}
+
 async function shareSet() {
   if (!beats.length) return status('Nothing to share — write something first');
-  status('Saving + uploading…');
-  await saveSet();
-  const slug = window._slug;
-  if (!slug) return status('Save failed, cannot share');
-  const res = await fetch(`/api/share/${slug}`, {method: 'POST'});
-  const data = await res.json();
-  if (!data.ok) return status(data.error || 'Share failed');
-  buzz('HEAVY');
+  const withTimeout = (ms) => {
+    const c = new AbortController();
+    const t = setTimeout(() => c.abort(), ms);
+    return {signal: c.signal, done: () => clearTimeout(t)};
+  };
   try {
-    const Share = window.Capacitor?.Plugins?.Share;
-    if (Share) { await Share.share({title: 'My Freak Town set', url: data.url}); return; }
-  } catch (e) {}
-  try {
-    if (navigator.share) { await navigator.share({title: 'My Freak Town set', url: data.url}); return; }
-  } catch (e) { if (e?.name === 'AbortError') return; }
-  try {
-    await navigator.clipboard.writeText(data.url);
-    status(`Link copied: ${data.url}`);
-  } catch (e) { status(data.url); }
+    status('Saving + uploading… (up to ~2 min for TTS)');
+    await saveSet();
+    const slug = window._slug;
+    if (!slug) return status('Save failed, cannot share');
+    const to = withTimeout(180000);
+    let res;
+    try {
+      res = await fetch(`/api/share/${slug}`, {method: 'POST', signal: to.signal});
+    } finally { to.done(); }
+    const data = await res.json();
+    if (!data.ok) return status(data.error || 'Share failed');
+    buzz('HEAVY');
+    // Link first: visible box + clipboard, so something ALWAYS happens.
+    showShareLink(data.url);
+    try { await navigator.clipboard.writeText(data.url); } catch (e) {}
+    status(`Link ready — copied to clipboard`);
+    try {
+      const Share = window.Capacitor?.Plugins?.Share;
+      if (Share) { await Share.share({title: 'My Freak Town set', url: data.url}); return; }
+    } catch (e) {}
+    try {
+      if (navigator.share) { await navigator.share({title: 'My Freak Town set', url: data.url}); return; }
+    } catch (e) { if (e?.name !== 'AbortError') status(`Link ready: ${data.url}`); }
+  } catch (e) {
+    console.error('share failed:', e);
+    status(e && e.name === 'AbortError'
+      ? 'Share timed out after 3 min — TTS is slow, retry (cache keeps progress)'
+      : `Share failed: ${(e && e.message) || e} — retry`);
+  }
 }
 
 async function loadSets() {
