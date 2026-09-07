@@ -58,6 +58,7 @@ input[type=range] { flex: 1; accent-color: #ff00aa; cursor: pointer; }
 
 <div class="main">
   <div class="stage">
+    <button class="btn btn-primary" style="width:100%;margin-bottom:10px;" onclick="createFreak()">🎲 CREATE A FREAK</button>
     <agent-3d id="avatar" body="https://three.ws/avatars/michelle.glb" mode="inline" kiosk eager clip="idle"><span style="color:#555;font-size:12px;">3D performer loading…</span></agent-3d>
     <div class="performer" id="performerName">—</div>
     <div class="premise-line" id="premiseLine">write a premise below to begin</div>
@@ -73,6 +74,26 @@ input[type=range] { flex: 1; accent-color: #ff00aa; cursor: pointer; }
     <div class="tempo-box">
       <h4>YOUR SETS</h4>
       <div id="setsList" style="font-size:11px;color:#555;">nothing saved yet</div>
+    </div>
+    <div class="tempo-box">
+      <h4>WALKOUT (8s sting)</h4>
+      <div style="display:flex;gap:6px;">
+        <select id="woGenre" style="flex:1;">
+          <option>funk</option><option>rock</option><option>electronic</option>
+          <option>jazz</option><option>orchestral</option><option>comedy</option>
+          <option>hip-hop</option><option>disco</option>
+        </select>
+        <select id="woMood" style="flex:1;">
+          <option>absurd</option><option>heroic</option><option>confident</option>
+          <option>menacing</option><option>chill</option><option>chaotic</option>
+          <option>melancholic</option><option>triumphant</option>
+        </select>
+      </div>
+      <div class="tempo-row" style="margin-top:6px;">
+        <button class="btn btn-small" onclick="genWalkout()">GENERATE</button>
+        <button class="btn btn-small" onclick="playWalkout()">▶ PLAY</button>
+      </div>
+      <div style="font-size:10px;color:#555;margin-top:4px;" id="woStatus"></div>
     </div>
     <div class="tempo-box">
       <h4>VOICE</h4>
@@ -309,6 +330,8 @@ async function playBeat(i) {
     const audio = document.getElementById('audio');
     audio.src = data.audio;
     audio.play();
+    setAvatarTalking(true);
+    audio.onended = () => setAvatarTalking(false);
   }
 }
 
@@ -325,16 +348,82 @@ async function composePlay() {
   const audio = document.getElementById('audio');
   audio.src = data.audio;
   audio.play();
+  setAvatarTalking(true);
   clearHighlight();
   highlightTimer = setInterval(syncHighlight, 150);
-  audio.onended = clearHighlight;
+  audio.onended = () => { clearHighlight(); setAvatarTalking(false); };
   status(`Playing (~${(data.duration_ms / 1000).toFixed(1)}s)`);
 }
 
 function stopAudio() {
   document.getElementById('audio').pause();
+  setAvatarTalking(false);
   clearHighlight();
   status('Stopped');
+}
+
+function setAvatarTalking(talking) {
+  const av = document.getElementById('avatar');
+  if (av && av.setAttribute) {
+    try { av.setAttribute('clip', talking ? 'talk' : 'idle'); } catch (e) {}
+  }
+}
+
+// ── Freak roller + walkout ──
+let walkoutUrl = null;
+window._walkout = null;
+
+async function createFreak() {
+  status('Rolling a freak…');
+  const res = await fetch('/api/randomize', {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'
+  });
+  const data = await res.json();
+  if (!data.ok) return status('Roll failed');
+  const c = data.character;
+  window._char = {name: c.name, species: `${c.species} (${c.job})`,
+                  premise: c.premise, vibe: data.character && c.vibe};
+  window._walkout = data.walkout;
+  document.getElementById('woGenre').value = data.walkout.genre;
+  document.getElementById('woMood').value = data.walkout.mood;
+  const voiceSel = document.getElementById('voice');
+  [...voiceSel.options].forEach(o => {
+    if (o.value === c.voice) voiceSel.value = c.voice;
+  });
+  document.getElementById('chat').value = data.prompt;
+  status(`Rolled ${c.name} — writing minute…`);
+  sendChat();
+}
+
+async function genWalkout() {
+  const body = {
+    genre: document.getElementById('woGenre').value,
+    mood: document.getElementById('woMood').value,
+    energy: 'high', shape: 'hit', duration: 8,
+    seed: (window._walkout && window._walkout.seed) || Math.floor(Math.random() * 99999)
+  };
+  document.getElementById('woStatus').textContent = 'generating…';
+  const res = await fetch('/api/walkout', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  if (!data.ok) {
+    document.getElementById('woStatus').textContent = 'failed';
+    return;
+  }
+  walkoutUrl = data.audio;
+  window._walkout = {...body, seed: data.seed};
+  document.getElementById('woStatus').textContent =
+    `${body.genre}/${body.mood} · ${data.cached ? 'cached' : 'fresh'} · saved with set`;
+}
+
+function playWalkout() {
+  if (!walkoutUrl) return status('Generate the walkout first');
+  const a = document.getElementById('audio');
+  a.src = walkoutUrl;
+  a.play();
+  status('Walkout playing');
 }
 
 // ── DAW mode: select box, space = pause/resume-from-box, tab = split ──
@@ -443,7 +532,8 @@ async function saveSet() {
     body: JSON.stringify({
       character: window._char || {name: document.getElementById('performerName').textContent || 'Guest Freak'},
       beats, voice: document.getElementById('voice').value,
-      style: document.getElementById('templateSel').value || ''
+      style: document.getElementById('templateSel').value || '',
+      walkout: window._walkout || null
     })
   });
   const data = await res.json();

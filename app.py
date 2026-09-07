@@ -309,12 +309,20 @@ def save_set():
     wav_bytes, offsets = compose_beats(beat_audios)
     (bdir / "set.wav").write_bytes(wav_bytes)
 
-    # 4. walkout.json (recipe for later generation; audio when available)
+    # 4. walkout.wav (generated now) + walkout.json (recipe)
     walkout = data.get("walkout") or {}
+    if walkout.get("genre"):
+        import sound_synth
+        recipe = {"genre": walkout.get("genre", "funk"), "mood": walkout.get("mood", "confident"),
+                  "energy": walkout.get("energy", "high"), "shape": walkout.get("shape", "hit"),
+                  "duration": 8}
+        seed = int(walkout.get("seed", 0))
+        (bdir / "walkout.wav").write_bytes(sound_synth.generate(recipe, seed))
     (bdir / "walkout.json").write_text(json.dumps({
         "genre": walkout.get("genre", ""), "mood": walkout.get("mood", ""),
         "energy": walkout.get("energy", ""), "shape": walkout.get("shape", "hit"),
-        "duration": 8, "audio": None,
+        "seed": int(walkout.get("seed", 0)),
+        "duration": 8, "audio": "walkout.wav" if (bdir / "walkout.wav").exists() else None,
     }, indent=2))
 
     words = sum(len(b.get("text", "").split()) for b in beats)
@@ -369,6 +377,83 @@ def submit_set(slug):
     meta["submitted_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
     (bdir / "meta.json").write_text(json.dumps(meta, indent=2))
     return jsonify({"ok": True, "slug": slug, "status": "queued"})
+
+
+@app.route("/api/walkout", methods=["POST"])
+def walkout():
+    """Generate (or fetch cached) walkout sting from a recipe.
+    Body: {"genre": "funk", "mood": "absurd", "energy": "high", "shape": "hit",
+           "duration": 8, "seed": 0} -> {audio, recipe, cached}"""
+    import sound_synth
+    data = request.json or {}
+    recipe = {
+        "genre": str(data.get("genre", "funk"))[:20],
+        "mood": str(data.get("mood", "confident"))[:20],
+        "energy": str(data.get("energy", "high"))[:20],
+        "shape": str(data.get("shape", "hit"))[:20],
+        "duration": min(11, max(2, float(data.get("duration", 8)))),
+    }
+    seed = int(data.get("seed", 0))
+    rid = sound_synth.recipe_id(recipe, seed)
+    wdir = AUDIO_DIR / "walkouts"
+    wdir.mkdir(exist_ok=True)
+    path = wdir / f"{rid}.wav"
+    cached = path.exists()
+    if not cached:
+        path.write_bytes(sound_synth.generate(recipe, seed))
+    return jsonify({"ok": True, "audio": f"/audio/walkouts/{rid}.wav",
+                    "recipe": recipe, "seed": seed, "cached": cached})
+
+
+FREAK_SPECIES = ["moth", "pigeon", "roomba", "dog", "toaster", "goblin",
+                 "goldfish", "skeleton", "traffic cone", "fax machine",
+                 "goldfish", "crab", "lamp", "elevator"]
+FREAK_JOBS = ["divorce lawyer", "driving instructor", "LinkedIn influencer",
+              "customer service rep", "landlord", "life coach", "bouncer",
+              "weatherman", "dentist", "mall cop", "podcaster", "notary"]
+FREAK_VIBES = ["dangerously optimistic", "paranoid", "exhausted",
+               "passive-aggressive", "overconfident", "melancholic"]
+FREAK_VOICES = {
+    "dangerously optimistic": "en-US-AriaNeural",
+    "paranoid": "en-US-GuyNeural",
+    "exhausted": "en-US-ChristopherNeural",
+    "passive-aggressive": "en-US-SamanthaNeural",
+    "overconfident": "en-US-TonyNeural",
+    "melancholic": "en-US-JoannaNeural",
+}
+FREAK_WALKOUT = {
+    "moth": ("disco", "chaotic"), "pigeon": ("funk", "menacing"),
+    "roomba": ("orchestral", "absurd"), "dog": ("funk", "confident"),
+    "toaster": ("electronic", "absurd"), "goblin": ("metal", "menacing"),
+    "goldfish": ("ambient", "melancholic"), "skeleton": ("rock", "menacing"),
+    "traffic cone": ("comedy", "absurd"), "fax machine": ("electronic", "melancholic"),
+    "crab": ("rock", "chaotic"), "lamp": ("jazz", "chill"),
+    "elevator": ("orchestral", "melancholic"),
+}
+FREAK_NAMES = ["Martin", "Bartholomew", "Nolan", "Gerald", "Priscilla",
+               "Doug", "Kevin", "Brenda", "Sal", "Margaret", "Todd", "Linda"]
+
+
+@app.route("/api/randomize", methods=["POST"])
+def randomize():
+    """Roll a complete freak: species, job, personality, voice, walkout.
+    Body (all optional locks): {"species": "pigeon", "vibe": "paranoid"}"""
+    import random as _r
+    data = request.json or {}
+    species = data.get("species") or _r.choice(FREAK_SPECIES)
+    job = data.get("job") or _r.choice(FREAK_JOBS)
+    vibe = data.get("vibe") or _r.choice(FREAK_VIBES)
+    name = data.get("name") or f"{_r.choice(FREAK_NAMES)}"
+    genre, mood = FREAK_WALKOUT.get(species, ("comedy", "absurd"))
+    voice = FREAK_VOICES.get(vibe, "en-US-AriaNeural")
+    premise = f"{vibe} {species} working as a {job}"
+    return jsonify({"ok": True,
+                    "character": {"name": name, "species": species, "job": job,
+                                  "premise": premise, "vibe": vibe, "voice": voice},
+                    "walkout": {"genre": genre, "mood": mood, "energy": "high",
+                                "shape": "hit", "duration": 8, "seed": _r.randint(0, 99999)},
+                    "prompt": f"Write a 60-second standup minute. The comedian is {name}, "
+                              f"a {vibe} {species} working as a {job}."})
 
 
 @app.route("/api/submissions", methods=["GET"])
