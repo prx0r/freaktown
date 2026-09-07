@@ -850,6 +850,73 @@ def randomize():
                               f"a {vibe} {species} working as a {job}."})
 
 
+@app.route("/f/<slug>")
+def watch_set(slug):
+    """Public watch page: freak.town/f/<slug>. Plays the set, unfurls on WhatsApp."""
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    bdir = FREAK_DIR / slug
+    meta = _bundle_meta(slug)
+    if not meta or not (bdir / "set.wav").exists():
+        return "No such set (yet). Make one in the Black Room.", 404
+    char = meta.get("character", {})
+    name = char.get("name", slug)
+    premise = char.get("premise", "")
+    has_portrait = (bdir / "portrait.png").exists()
+    img = f"/freaks/{slug}/portrait.png" if has_portrait else "/icon-512.png"
+    return f"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{name} — Freak Town</title>
+<meta property="og:title" content="{name} — Freak Town">
+<meta property="og:description" content="{premise} ({meta.get('duration_s', 0)}s set)">
+<meta property="og:image" content="{img}">
+<meta property="og:type" content="music.song">
+<meta name="theme-color" content="#ff2fa8">
+<style>body{{background:#0a0a0f;color:#eee;font-family:monospace;text-align:center;padding:40px 20px}}
+img{{max-width:280px;border-radius:12px}}button{{background:#ff2fa8;border:0;color:#fff;
+font-size:18px;padding:14px 40px;border-radius:30px;cursor:pointer;margin-top:16px}}</style>
+</head><body>
+<h1>🎪 {name}</h1><p>{premise}</p>
+{"<img src='" + img + "'>" if has_portrait else ""}
+<br><audio id="a" src="/freaks/{slug}/set.wav" preload="auto"></audio>
+<br><button onclick="document.getElementById('a').play()">▶ PLAY THE SET</button>
+<p><small>freak.town — live talent show for artificial personalities</small></p>
+</body></html>""", 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
+def _r2_client():
+    import boto3
+    with open("/root/.agent-vault/vault.json") as f:
+        v = json.load(f)
+    return boto3.client("s3", endpoint_url=v["CLOUDFLARE_R2_ENDPOINT"],
+                        aws_access_key_id=v["CLOUDFLARE_R2_ACCESS_KEY"],
+                        aws_secret_access_key=v["CLOUDFLARE_R2_SECRET_KEY"])
+
+
+@app.route("/api/share/<slug>", methods=["POST"])
+def share_set(slug):
+    """Mirror a freak bundle to R2 (f/<slug>/) for durability + future CDN.
+    Returns the public watch URL: https://freak.town/f/<slug>"""
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    bdir = FREAK_DIR / slug
+    meta = _bundle_meta(slug)
+    if not meta or not (bdir / "set.wav").exists():
+        return jsonify({"ok": False, "error": "nothing to share yet"}), 404
+    try:
+        s3 = _r2_client()
+        for fname, ctype in [("set.wav", "audio/wav"), ("portrait.png", "image/png"),
+                             ("character.json", "application/json"),
+                             ("delivery.json", "application/json"),
+                             ("meta.json", "application/json")]:
+            p = bdir / fname
+            if p.exists():
+                s3.upload_file(str(p), "freak-town", f"f/{slug}/{fname}",
+                               ExtraArgs={"ContentType": ctype})
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"r2 upload failed: {str(e)[:100]}"}), 502
+    return jsonify({"ok": True, "url": f"https://freak.town/f/{slug}"})
+
+
 @app.route("/api/submissions", methods=["GET"])
 def list_submissions():
     """Everything queued for the live show."""

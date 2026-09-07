@@ -200,6 +200,7 @@ input[type=range] { flex: 1; accent-color: #ff00aa; cursor: pointer; }
   <button class="btn" onclick="composePlay()">PLAY FULL SET</button>
   <button class="btn" onclick="saveSet()">SAVE SET</button>
   <button class="btn" onclick="shareClip()">SHARE</button>
+  <button class="btn btn-primary" onclick="shareSet()">SEND 📤</button>
   <button class="btn" onclick="stopAudio()">⏹</button>
 </div>
 
@@ -854,7 +855,31 @@ async function saveSet() {
   if (!data.ok) return status(data.error || 'Save failed');
   buzz('MEDIUM');
   status(`Saved "${data.meta.character.name}" (${data.meta.duration_s}s)`);
+  window._slug = data.slug || data.meta.slug;
   loadSets();
+}
+
+async function shareSet() {
+  if (!beats.length) return status('Nothing to share — write something first');
+  status('Saving + uploading…');
+  await saveSet();
+  const slug = window._slug;
+  if (!slug) return status('Save failed, cannot share');
+  const res = await fetch(`/api/share/${slug}`, {method: 'POST'});
+  const data = await res.json();
+  if (!data.ok) return status(data.error || 'Share failed');
+  buzz('HEAVY');
+  try {
+    const Share = window.Capacitor?.Plugins?.Share;
+    if (Share) { await Share.share({title: 'My Freak Town set', url: data.url}); return; }
+  } catch (e) {}
+  try {
+    if (navigator.share) { await navigator.share({title: 'My Freak Town set', url: data.url}); return; }
+  } catch (e) { if (e?.name === 'AbortError') return; }
+  try {
+    await navigator.clipboard.writeText(data.url);
+    status(`Link copied: ${data.url}`);
+  } catch (e) { status(data.url); }
 }
 
 async function loadSets() {
