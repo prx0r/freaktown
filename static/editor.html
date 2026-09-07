@@ -940,12 +940,30 @@ async function loadSets() {
     const badge = s.status === 'queued'
       ? '<span style="color:#00d4ff;">QUEUED FOR LIVE SHOW</span>'
       : `<button class="btn btn-small" onclick="submitSet('${s.slug}')">SUBMIT</button>`;
+    const nameline = s.set_name
+      ? `<div style="margin-top:2px;"><a style="color:#00d4ff;" href="${s.url}" target="_blank">🔗 ${s.url.replace('https://', '')}</a></div>`
+      : `<div style="margin-top:4px;"><button class="btn btn-small" onclick="nameSet('${s.slug}')">NAME IT → PERMANENT LINK</button></div>`;
     el.innerHTML = `
       <div style="color:#e0e0e0;cursor:pointer;" onclick="loadSet('${s.slug}')">▶ ${s.name}</div>
       <div style="margin-top:2px;">${s.beats} beats · ${s.duration_s}s${s.style ? ' · ' + s.style : ''}</div>
+      ${nameline}
       <div style="margin-top:4px;">${badge}</div>`;
     box.appendChild(el);
   });
+}
+
+async function nameSet(slug) {
+  const name = prompt('Name this set (becomes freak.town/<character>/' + 'name):');
+  if (!name) return;
+  const res = await fetch(`/api/sets/${slug}/name`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({set_name: name})
+  });
+  const data = await res.json();
+  if (!data.ok) return status(data.error || 'Name failed');
+  status(`Permanent link: ${data.url}`);
+  try { await navigator.clipboard.writeText(data.url); } catch (e) {}
+  loadSets();
 }
 
 async function loadSet(slug) {
@@ -974,13 +992,29 @@ async function submitSet(slug) {
 loadTemplates();
 loadSets();
 (function () {
-  // Deep link from a watch page: /edit?remix=<slug> loads that freak to answer it.
+  // Deep links from a watch page:
+  //   /edit?remix=<slug> — load that freak to answer it.
+  //   /edit?respond_to=<slug>&premise=<text> — start a response set.
   try {
-    const slug = new URLSearchParams(location.search).get('remix');
-    if (slug && /^[a-z0-9_-]{1,45}$/.test(slug)) {
+    const q = new URLSearchParams(location.search);
+    const remix = q.get('remix');
+    const respondTo = q.get('respond_to');
+    const premise = q.get('premise');
+    if (remix && /^[a-z0-9_-]{1,45}$/.test(remix)) {
       setTimeout(() => {
-        loadSet(slug);
+        loadSet(remix);
         status(`Remixing — answer them back, then SUBMIT yours too`);
+      }, 600);
+    } else if (premise) {
+      setTimeout(() => {
+        const chat = document.getElementById('chat');
+        if (chat) {
+          chat.value = premise;
+          status(respondTo
+            ? `Answering ${respondTo} — hit WRITE, make it meaner`
+            : `Premise loaded — hit WRITE`);
+          chat.focus();
+        }
       }, 600);
     }
   } catch (e) {}

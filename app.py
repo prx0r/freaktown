@@ -473,6 +473,40 @@ def _slug(name: str, text: str) -> str:
     return f"{base}-{digest}"
 
 
+def _char_slug(name: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", (name or "freak").lower()).strip("-")[:32] or "freak"
+
+
+def resolve_bundle(char_slug: str, set_slug: str) -> str | None:
+    """Map freak.town/<character>/<set> to a bundle dir.
+    Matches character slug + set_name slug (or bundle-dir suffix fallback)."""
+    char_slug = re.sub(r"[^a-z0-9-]", "", char_slug)[:32]
+    set_slug = re.sub(r"[^a-z0-9-]", "", set_slug)[:45]
+    for d in sorted(FREAK_DIR.iterdir()):
+        if not d.is_dir():
+            continue
+        meta = _bundle_meta(d.name)
+        if not meta:
+            continue
+        char = meta.get("character", {})
+        if _char_slug(char.get("name", "")) != char_slug:
+            continue
+        named = re.sub(r"[^a-z0-9]+", "-", (meta.get("set_name") or "").lower()).strip("-")[:45]
+        if named == set_slug or d.name == set_slug or d.name.endswith("-" + set_slug):
+            return d.name
+    return None
+
+
+def canonical_url(slug: str) -> str:
+    """Public canonical URL for a bundle: /<character>/<set> when named, else /f/<slug>."""
+    meta = _bundle_meta(slug) or {}
+    char = meta.get("character", {})
+    named = re.sub(r"[^a-z0-9]+", "-", (meta.get("set_name") or "").lower()).strip("-")[:45]
+    if named:
+        return f"https://freak.town/{_char_slug(char.get('name', ''))}/{named}"
+    return f"https://freak.town/f/{slug}"
+
+
 def _bundle_meta(slug: str) -> dict | None:
     meta_path = FREAK_DIR / slug / "meta.json"
     if not meta_path.exists():
@@ -497,6 +531,8 @@ def list_sets():
         out.append({
             "slug": d.name,
             "name": char.get("name", d.name),
+            "set_name": meta.get("set_name", ""),
+            "url": canonical_url(d.name),
             "premise": char.get("premise", ""),
             "beats": meta.get("beat_count", 0),
             "words": meta.get("word_count", 0),
@@ -628,7 +664,9 @@ def save_set():
     }, indent=2))
 
     words = sum(len(b.get("text", "").split()) for b in beats)
+    set_name = re.sub(r"[^a-z0-9]+", "-", str(data.get("set_name") or "").lower()).strip("-")[:45]
     meta = {"slug": slug,
+            "set_name": set_name,
             "character": {"name": name,
                           "species": (character.get("species") or "")[:60],
                           "premise": (character.get("premise") or "")[:300],
@@ -673,6 +711,21 @@ def get_set(slug):
                     "profile": delivery.get("profile", {}),
                     "style": meta.get("style", ""), "status": meta.get("status", "draft"),
                     "audio": f"/freaks/{slug}/set.wav" if (bdir / "set.wav").exists() else None})
+
+
+@app.route("/api/sets/<slug>/name", methods=["POST"])
+def name_set(slug):
+    """Give a set a permanent name: freak.town/<character>/<name>."""
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    meta = _bundle_meta(slug)
+    if not meta:
+        return jsonify({"ok": False, "error": "unknown set"}), 404
+    name = re.sub(r"[^a-z0-9]+", "-", str((request.json or {}).get("set_name", "")).lower()).strip("-")[:45]
+    if not name:
+        return jsonify({"ok": False, "error": "set_name required"}), 400
+    meta["set_name"] = name
+    (FREAK_DIR / slug / "meta.json").write_text(json.dumps(meta, indent=2))
+    return jsonify({"ok": True, "url": canonical_url(slug)})
 
 
 @app.route("/api/sets/<slug>/submit", methods=["POST"])
@@ -875,9 +928,80 @@ def randomize():
 
 @app.route("/f/<slug>")
 def watch_set(slug):
-    """Public watch page: freak.town/f/<slug>. VRM stage, reactions, vote, remix loop."""
-    import html as _html
+    """Short watch URL. Canonical is /<character>/<set> once named."""
     slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    return _render_watch(slug)
+
+
+@app.route("/<char>/<set>")
+def watch_character_set(char, set):
+    """Permanent spot: freak.town/thomas/fartingdog. Always plays that set."""
+    slug = resolve_bundle(char, set)
+    if not slug:
+        return "No such set (yet). Make one in the Black Room.", 404
+    return _render_watch(slug)
+
+
+@app.route("/api/respond_idea", methods=["POST"])
+def respond_idea():
+    """Preloaded funny response angle for a set. Body: {"slug": "..."}.
+    Returns {"idea": "..."} — a one-line premise to answer back with."""
+    import httpx
+    data = request.json or {}
+    slug = re.sub(r"[^a-z0-9_-]", "", str(data.get("slug", "")))[:45]
+    meta = _bundle_meta(slug)
+    if not meta:
+        return jsonify({"ok": False, "error": "unknown set"}), 404
+    char = meta.get("character", {})
+    context = f"{char.get('name', 'A comedian')} ({char.get('premise', '')})"
+    try:
+        delivery = json.loads((FREAK_DIR / slug / "delivery.json").read_text())
+        beats = delivery.get("beats", [])
+        closer = next((b.get("text", "") for b in reversed(beats)
+                       if b.get("type") in ("punchline", "closer")), "")
+    except Exception:
+        closer = ""
+    idea, engine = None, None
+    tok, acct = _cf_creds()
+    if tok and acct:
+        for model in CF_MODELS:
+            try:
+                r = httpx.post(
+                    f"https://api.cloudflare.com/client/v4/accounts/{acct}/ai/run/{model}",
+                    headers={"Authorization": f"Bearer {tok}",
+                             "Content-Type": "application/json"},
+                    json={"messages": [
+                        {"role": "system", "content": (
+                            "You write one-line comedy premises for response sets. "
+                            "One sentence, under 20 words, specific and roasty but "
+                            "playful. No quotes, no explanation, just the premise.")},
+                        {"role": "user", "content": (
+                            f"Write a response-set premise answering this act: {context}. "
+                            f"Their closer was: {closer}")}],
+                        "max_tokens": 60, "temperature": 1.0},
+                    timeout=60)
+                if r.status_code != 200:
+                    continue
+                idea = r.json()["result"]["response"].strip().strip('"')
+                engine = model.split("/")[-1]
+                break
+            except Exception:
+                continue
+    if not idea:
+        import random as _r
+        idea = _r.choice([
+            f"Answer {char.get('name', 'them')} back, but meaner",
+            f"Steal {char.get('name', 'their')} premise and do it better",
+            f"Play the character {char.get('name', 'they')} were roasting",
+            "Defend the indefensible part of that set",
+            f"Tell the same story from the other person's perspective",
+        ])
+    return jsonify({"ok": True, "idea": idea, "engine": engine or "fallback"})
+
+
+def _render_watch(slug):
+    """Shared watch page renderer for /f/<slug> and /<character>/<set>."""
+    import html as _html
     bdir = FREAK_DIR / slug
     meta = _bundle_meta(slug)
     if not meta or not (bdir / "set.wav").exists():
@@ -933,12 +1057,23 @@ WATCH_TEMPLATE = """<!DOCTYPE html>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a0f;color:#eee;font-family:monospace;text-align:center;min-height:100vh;display:flex;flex-direction:column}
 .top{padding:10px;font-size:12px;letter-spacing:2px;color:#ff2fa8;font-weight:bold}
+.top .logo{font-size:16px}
 #stage{position:relative;flex-shrink:0}
 #vrmStage{width:100%;height:300px;display:none}
 #stageImg{max-width:240px;border-radius:12px;margin:0 auto;display:block}
-h1{font-size:22px;margin:8px 0 2px}
-.premise{color:#888;font-size:13px;margin-bottom:6px}
+#popcard{background:#111116;border:1px solid #282833;border-radius:14px;margin:8px auto;max-width:560px;padding:10px 14px;text-align:left}
+#popcard h1{font-size:19px;margin:0}
+#popcard .premise{color:#888;font-size:12px;margin-top:2px}
 #clock{font-size:13px;color:#555;font-variant-numeric:tabular-nums}
+#seekrow{display:flex;align-items:center;gap:8px;max-width:560px;margin:2px auto 0;padding:0 16px;font-size:11px;color:#555}
+#seek{flex:1;accent-color:#ff2fa8;cursor:pointer}
+#replybox{display:none;padding:16px;max-width:560px;margin:0 auto;width:100%}
+#replybox.show{display:block}
+#replybox textarea{width:100%;background:#111;border:1px solid #333;color:#eee;border-radius:10px;padding:10px;font-family:inherit;font-size:14px;min-height:64px;resize:vertical}
+#replybox textarea:focus{outline:none;border-color:#ff2fa8}
+#idea{font-size:13px;color:#00d4ff;margin:8px 0;min-height:20px}
+.replyrow{display:flex;gap:8px;margin-top:8px}
+.replyrow .btn{flex:1}
 #transcript{flex:1;overflow-y:auto;text-align:left;max-width:560px;margin:8px auto;padding:0 16px;font-size:15px;line-height:1.9;color:#555}
 .seg.spoken{color:#bbb}
 .seg.active{color:#ff2fa8}
@@ -954,14 +1089,17 @@ a.cta{color:#fff}
 .ghost{background:none}
 </style>
 </head><body>
-<div class="top">FREAK TOWN · LIVE</div>
+<div class="top"><span class="logo">🎪 FREAK TOWN</span> · LIVE</div>
 <div id="stage">
   <canvas id="vrmStage"></canvas>
   <img id="stageImg" src="__IMG__" alt="">
 </div>
-<h1>__NAME__</h1>
-<div class="premise">__PREMISE__</div>
+<div id="popcard">
+  <h1>__NAME__</h1>
+  <div class="premise">__PREMISE__</div>
+</div>
 <div id="clock">00:00 / __DUR__s</div>
+<div id="seekrow"><span>▶</span><input type="range" id="seek" min="0" max="1000" value="0"><span id="left">__DUR__s left</span></div>
 <div id="transcript"></div>
 <div class="controls" id="liveControls">
   <button class="big" id="playBtn">▶ PLAY</button>
@@ -975,7 +1113,18 @@ a.cta{color:#fff}
     <button class="vote" onclick="vote('cut')">👎 CUT</button>
   </div>
   <div id="voteMsg" style="color:#00d4ff;margin:8px;"></div>
-  <a class="cta" href="/edit?remix=__SLUG__"><button class="big" style="width:100%;">🎤 RESPOND WITH YOUR OWN SET</button></a>
+  <div id="replybox">
+    <div style="font-size:13px;margin-bottom:4px;">🎤 Your turn — answer back:</div>
+    <div id="idea">thinking of an angle…</div>
+    <textarea id="replyText" placeholder="Write your response set…"></textarea>
+    <div class="replyrow">
+      <button class="btn" onclick="rerollIdea()">🎲 REROLL IDEA</button>
+      <button class="btn btn-primary" onclick="sendResponse()">SEND RESPONSE ▶</button>
+    </div>
+    <div class="replyrow">
+      <button class="btn ghost" style="flex:1;" onclick="location.href='/edit?remix=__SLUG__'">OPEN FULL STUDIO INSTEAD</button>
+    </div>
+  </div>
   <a class="cta" href="/"><button style="width:100%;">＋ MAKE YOUR OWN FREAK</button></a>
   <button class="ghost cta" style="width:100%;" onclick="passItOn()">📤 PASS IT ON</button>
 </div>
@@ -1012,9 +1161,24 @@ async function play() {
 }
 document.getElementById('playBtn').onclick = play;
 
+const seekEl = document.getElementById('seek');
+function fmtLeft(t) {
+  const left = Math.max(0, parseFloat('__DUR__') - t);
+  return `${Math.round(left)}s left`;
+}
+seekEl.addEventListener('input', () => {
+  if (!Aud.duration || !isFinite(Aud.duration)) return;
+  Aud.currentTime = (parseFloat(seekEl.value) / 1000) * Aud.duration;
+});
 function tick() {
   const t = Aud.currentTime * 1000;
   document.getElementById('clock').textContent = fmt(Aud.currentTime) + ' / __DUR__s';
+  if (Aud.duration && isFinite(Aud.duration)) {
+    if (document.activeElement !== seekEl) {
+      seekEl.value = Math.round((Aud.currentTime / Aud.duration) * 1000);
+    }
+    document.getElementById('left').textContent = fmtLeft(Aud.currentTime);
+  }
   let cur = -1;
   BEATS.forEach((b, i) => {
     const el = document.getElementById('seg' + i);
@@ -1061,6 +1225,43 @@ function endShow() {
   document.getElementById('stats').textContent =
     `You laughed ${myLaughs}× and clapped ${myClaps}× · did they earn another night?`;
   if (window.__vrmIdle) window.__vrmIdle();
+  // straight into the reply box: keyboard up, idea preloaded, zero friction
+  document.getElementById('replybox').classList.add('show');
+  loadIdea();
+  setTimeout(() => {
+    const box = document.getElementById('replyText');
+    if (box) box.focus({preventScroll: false});
+  }, 600);
+}
+
+async function loadIdea() {
+  const el = document.getElementById('idea');
+  el.textContent = 'thinking of an angle…';
+  try {
+    const res = await fetch('/api/respond_idea', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({slug: SLUG})});
+    const data = await res.json();
+    if (data.ok && data.idea) {
+      el.textContent = '💡 ' + data.idea;
+      window._idea = data.idea;
+      return;
+    }
+  } catch (e) {}
+  el.textContent = '';
+}
+
+function rerollIdea() {
+  document.getElementById('replyText').value = '';
+  loadIdea();
+}
+
+function sendResponse() {
+  const text = document.getElementById('replyText').value.trim();
+  const q = new URLSearchParams({respond_to: SLUG});
+  if (text) q.set('premise', text);
+  else if (window._idea) q.set('premise', window._idea);
+  location.href = '/edit?' + q.toString();
 }
 
 async function passItOn() {
@@ -1252,7 +1453,7 @@ def share_set(slug):
                                ExtraArgs={"ContentType": ctype})
     except Exception as e:
         return jsonify({"ok": False, "error": f"r2 upload failed: {str(e)[:100]}"}), 502
-    return jsonify({"ok": True, "url": f"https://freak.town/f/{slug}"})
+    return jsonify({"ok": True, "url": canonical_url(slug), "slug": slug})
 
 
 @app.route("/api/submissions", methods=["GET"])
