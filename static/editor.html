@@ -3,77 +3,94 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Freak Town — Script Editor</title>
+<title>Freak Town — Black Room</title>
+<script type="module" src="https://three.ws/agent-3d/1.5.2/agent-3d.js" integrity="sha384-xkFDjVP866hYt7voUhfnQHj6IO4hYxA6n8Laupk+VtD6y+IKiO/AZdE3VbfLtg0C" crossorigin="anonymous"></script>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { background: #0a0a0f; color: #e0e0e0; font-family: 'Courier New', monospace; }
-.header { padding: 12px 20px; border-bottom: 1px solid #1a1a2e; display: flex; justify-content: space-between; align-items: center; }
+html, body { height: 100%; }
+body { background: #0a0a0f; color: #e0e0e0; font-family: 'Courier New', monospace; display: flex; flex-direction: column; overflow: hidden; }
+.header { padding: 10px 20px; border-bottom: 1px solid #1a1a2e; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
 .title { font-size: 14px; color: #ff00aa; font-weight: bold; letter-spacing: 2px; }
-.editor { padding: 20px; max-width: 800px; margin: 0 auto; }
-textarea { width: 100%; background: #111; border: 1px solid #333; color: #e0e0e0; padding: 16px; font-family: inherit; font-size: 14px; line-height: 1.6; border-radius: 6px; resize: vertical; min-height: 180px; }
-textarea:focus { outline: none; border-color: #ff00aa; }
-.btn { background: #1a1a2e; border: 1px solid #333; color: #e0e0e0; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 12px; }
-.btn:hover { background: #16213e; border-color: #ff00aa; }
+.main { flex: 1; display: flex; min-height: 0; }
+.stage { width: 320px; flex-shrink: 0; border-right: 1px solid #1a1a2e; display: flex; flex-direction: column; align-items: center; padding: 16px; background: radial-gradient(circle at 50% 0, #1a1020 0, #09090b 60%); }
+agent-3d { width: 100%; height: 340px; }
+.performer { font-size: 16px; font-weight: bold; color: #ff00aa; margin-top: 8px; }
+.premise-line { font-size: 11px; color: #666; margin-top: 2px; text-align: center; }
+.tempo-box { width: 100%; margin-top: 16px; border: 1px solid #222; border-radius: 6px; padding: 10px; }
+.tempo-box h4 { font-size: 10px; letter-spacing: 1px; color: #555; margin-bottom: 8px; }
+.tempo-box select, .tempo-box input { width: 100%; background: #111; border: 1px solid #333; color: #e0e0e0; padding: 6px; border-radius: 4px; font-family: inherit; font-size: 12px; margin-bottom: 6px; }
+.tempo-row { display: flex; gap: 6px; }
+.btn { background: #1a1a2e; border: 1px solid #333; color: #e0e0e0; padding: 8px 14px; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 12px; }
+.btn:hover { border-color: #ff00aa; }
 .btn-primary { background: #ff00aa; border-color: #ff00aa; color: white; }
-.btn-primary:hover { background: #cc0088; }
-.controls { margin: 12px 0; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.beats { margin-top: 20px; }
-.beat { background: #111; border: 1px solid #222; border-radius: 6px; padding: 12px; margin: 8px 0; display: flex; gap: 12px; align-items: flex-start; transition: border-color 0.2s; }
-.beat:hover { border-color: #333; }
-.beat.playing { border-color: #ff00aa; }
-.beat-num { font-size: 11px; color: #555; min-width: 24px; padding-top: 2px; }
-.beat-content { flex: 1; }
-.beat-type { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
-.type-setup { color: #666; }
-.type-punchline { color: #ff00aa; }
-.type-closer { color: #00d4ff; }
-.type-tag { color: #ffa500; }
+.btn-small { padding: 4px 10px; font-size: 11px; flex: 1; }
+.workbench { flex: 1; overflow-y: auto; padding: 16px 20px 20px; }
+.beat { background: #111; border: 1px solid #222; border-radius: 6px; padding: 10px 12px; margin: 8px 0; transition: border-color 0.2s; }
+.beat.active { border-color: #ff00aa; box-shadow: 0 0 12px rgba(255,0,170,.25); }
+.beat-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.beat-type { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
+.type-setup { color: #666; } .type-punchline { color: #ff00aa; }
+.type-closer { color: #00d4ff; } .type-tag { color: #ffa500; }
 .type-escalation { color: #aa00ff; }
 .beat-text { font-size: 14px; line-height: 1.5; }
-.beat-controls { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
-.pause-btn { background: none; border: 1px solid #333; color: #888; padding: 2px 8px; border-radius: 3px; cursor: pointer; font-size: 11px; }
-.pause-btn:hover { border-color: #ff00aa; color: #ff00aa; }
-.pause-val { font-size: 11px; color: #555; min-width: 50px; }
-.play-btn { background: none; border: 1px solid #333; color: #00d4ff; padding: 2px 8px; border-radius: 3px; cursor: pointer; font-size: 11px; }
-.play-btn:hover { border-color: #00d4ff; }
-.waveform { height: 40px; background: #111; border-radius: 4px; margin: 12px 0; overflow: hidden; }
-.wave-bars { display: flex; align-items: flex-end; height: 100%; gap: 1px; padding: 4px; }
-.wave-bar { background: #333; flex: 1; border-radius: 1px; transition: height 0.1s, background 0.1s; }
-.wave-bar.active { background: #ff00aa; }
-.stats { font-size: 11px; color: #555; margin-top: 8px; }
-.status { position: fixed; bottom: 20px; right: 20px; background: #1a1a2e; border: 1px solid #333; padding: 8px 16px; border-radius: 4px; font-size: 12px; opacity: 0; transition: opacity 0.3s; z-index: 100; }
+.play-one { background: none; border: 1px solid #333; color: #00d4ff; border-radius: 3px; cursor: pointer; font-size: 11px; padding: 2px 8px; margin-left: auto; }
+.slider-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+input[type=range] { flex: 1; accent-color: #ff00aa; cursor: pointer; }
+.pause-val { font-size: 11px; color: #ff00aa; min-width: 58px; text-align: right; }
+.pause-label { font-size: 10px; color: #555; }
+.chatbar { flex-shrink: 0; border-top: 1px solid #1a1a2e; padding: 12px 20px; display: flex; gap: 8px; background: #0c0c12; }
+.chatbar input { flex: 1; background: #111; border: 1px solid #333; color: #e0e0e0; padding: 10px 14px; border-radius: 20px; font-family: inherit; font-size: 13px; }
+.chatbar input:focus { outline: none; border-color: #ff00aa; }
+.status { position: fixed; bottom: 70px; right: 20px; background: #1a1a2e; border: 1px solid #333; padding: 8px 16px; border-radius: 4px; font-size: 12px; opacity: 0; transition: opacity 0.3s; z-index: 100; }
 .status.show { opacity: 1; }
+.hint { font-size: 11px; color: #444; padding: 8px 20px 0; }
 </style>
 </head>
 <body>
 
 <div class="header">
-  <div class="title">FREAK TOWN</div>
-  <div style="font-size: 11px; color: #555;">SCRIPT EDITOR</div>
+  <div class="title">FREAK TOWN · BLACK ROOM</div>
+  <div style="font-size: 11px; color: #555;" id="charLine">no character yet</div>
 </div>
 
-<div class="editor">
-  <textarea id="script" placeholder="Paste your comedy minute here..."></textarea>
-  
-  <div class="controls">
-    <button class="btn btn-primary" onclick="parseScript()">PARSE</button>
-    <button class="btn" onclick="composeFull()">▶ COMPOSE & PLAY</button>
-    <button class="btn" onclick="stopAll()">⏹ STOP</button>
-    <select id="voice" class="btn" style="background: #111;">
-      <option value="en-US-AriaNeural">Ella (Aria)</option>
-      <option value="en-US-GuyNeural">ChatGPT (Guy)</option>
-      <option value="en-US-ChristopherNeural">Claude</option>
-      <option value="en-US-SamanthaNeural">Siri</option>
-      <option value="en-US-JoannaNeural">Alexa</option>
-    </select>
+<div class="main">
+  <div class="stage">
+    <agent-3d id="avatar" body="https://three.ws/avatars/michelle.glb" mode="inline" kiosk eager clip="idle"><span style="color:#555;font-size:12px;">3D performer loading…</span></agent-3d>
+    <div class="performer" id="performerName">—</div>
+    <div class="premise-line" id="premiseLine">write a premise below to begin</div>
+    <div class="tempo-box">
+      <h4>TEMPO TEMPLATE</h4>
+      <select id="templateSel"></select>
+      <div class="tempo-row">
+        <button class="btn btn-small" onclick="applyTemplate()">APPLY</button>
+        <button class="btn btn-small" onclick="saveTemplate()">SAVE AS…</button>
+      </div>
+      <div style="font-size:10px;color:#555;margin-top:6px;" id="templateDesc"></div>
+    </div>
+    <div class="tempo-box">
+      <h4>VOICE</h4>
+      <select id="voice">
+        <option value="en-US-AriaNeural">Ella (Aria)</option>
+        <option value="en-US-GuyNeural">Guy</option>
+        <option value="en-US-ChristopherNeural">Christopher</option>
+        <option value="en-US-SamanthaNeural">Samantha</option>
+        <option value="en-US-JoannaNeural">Joanna</option>
+      </select>
+    </div>
   </div>
-  
-  <div class="waveform" id="waveform">
-    <div class="wave-bars" id="waveBars"></div>
+
+  <div class="workbench">
+    <div class="hint">beats auto-detect from your minute · drag sliders for exact pauses · ▶ plays the full set with silence baked in</div>
+    <div id="beats"></div>
+    <div style="font-size:11px;color:#555;margin-top:8px;" id="stats"></div>
   </div>
-  
-  <div class="beats" id="beats"></div>
-  <div class="stats" id="stats"></div>
+</div>
+
+<div class="chatbar">
+  <input id="chat" placeholder="come on then funny bones — describe the character + minute…" autocomplete="off">
+  <button class="btn btn-primary" onclick="sendChat()">WRITE ▶</button>
+  <button class="btn" onclick="composePlay()">PLAY FULL SET</button>
+  <button class="btn" onclick="stopAudio()">⏹</button>
 </div>
 
 <div class="status" id="status"></div>
@@ -81,134 +98,192 @@ textarea:focus { outline: none; border-color: #ff00aa; }
 
 <script>
 let beats = [];
-let playingAll = false;
-
-const waveBars = document.getElementById('waveBars');
-for (let i = 0; i < 60; i++) {
-  const bar = document.createElement('div');
-  bar.className = 'wave-bar';
-  bar.style.height = '4px';
-  waveBars.appendChild(bar);
-}
+let offsets = [];
+let highlightTimer = null;
 
 function status(msg) {
   const el = document.getElementById('status');
   el.textContent = msg;
   el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 2000);
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 2200);
 }
 
-async function parseScript() {
-  const text = document.getElementById('script').value.trim();
-  if (!text) return;
+// ── Templates ──
+async function loadTemplates() {
+  const res = await fetch('/api/templates');
+  const data = await res.json();
+  const sel = document.getElementById('templateSel');
+  sel.innerHTML = '';
+  window._templates = data.templates;
+  for (const [name, t] of Object.entries(data.templates)) {
+    const o = document.createElement('option');
+    o.value = name;
+    o.textContent = name + (t.builtin ? '' : ' (yours)');
+    sel.appendChild(o);
+  }
+  showTemplateDesc();
+}
+function showTemplateDesc() {
+  const t = window._templates[document.getElementById('templateSel').value];
+  document.getElementById('templateDesc').textContent = t ? t.description || '' : '';
+}
+document.getElementById('templateSel').addEventListener('change', showTemplateDesc);
+
+async function applyTemplate() {
+  if (!beats.length) return status('No beats to style');
+  const name = document.getElementById('templateSel').value;
+  const res = await fetch('/api/templates/apply', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({template: name, beats})
+  });
+  const data = await res.json();
+  if (data.ok) { beats = data.beats; renderBeats(); status(`Applied ${name} style`); }
+  else status(data.error || 'Apply failed');
+}
+
+async function saveTemplate() {
+  if (!beats.length) return status('No beats to save');
+  const name = prompt('Name this tempo style (e.g. deadpan-slow):');
+  if (!name) return;
+  const res = await fetch('/api/templates', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({name, beats})
+  });
+  const data = await res.json();
+  if (data.ok) { await loadTemplates(); status(`Saved style "${name}"`); }
+  else status(data.error || 'Save failed');
+}
+
+// ── Chatbar → generate ──
+async function sendChat() {
+  const input = document.getElementById('chat');
+  const premise = input.value.trim();
+  if (!premise) return;
+  input.value = '';
+  status('Writing minute…');
+  const res = await fetch('/api/generate', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({premise})
+  });
+  const data = await res.json();
+  if (!data.ok) return status(data.error || 'Generation failed');
+  document.getElementById('performerName').textContent = data.name || 'Guest Freak';
+  document.getElementById('premiseLine').textContent = data.premise || '';
+  document.getElementById('charLine').textContent =
+    `${data.name || ''} · ${data.species || ''} · ${data.vibe || ''} · via ${data.engine || 'ai'}`;
+  parseText(data.minute);
+  status(`Wrote ${data.name || 'a freak'} — hit PLAY FULL SET`);
+}
+document.getElementById('chat').addEventListener('keydown', e => {
+  if (e.key === 'Enter') sendChat();
+});
+
+// ── Beats ──
+async function parseText(text) {
   const res = await fetch('/api/parse', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
+    method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({text})
   });
   const data = await res.json();
   beats = data.beats;
   renderBeats();
-  status(`Parsed ${beats.length} beats`);
 }
 
 function renderBeats() {
-  const container = document.getElementById('beats');
-  container.innerHTML = '';
+  const c = document.getElementById('beats');
+  c.innerHTML = '';
   beats.forEach((b, i) => {
     const el = document.createElement('div');
     el.className = 'beat';
-    el.id = `beat-${i}`;
+    el.id = `beat-${b.id}`;
     el.innerHTML = `
-      <div class="beat-num">${b.id}</div>
-      <div class="beat-content">
-        <div class="beat-type type-${b.type}">${b.type}</div>
-        <div class="beat-text" contenteditable="true" 
-             onblur="updateText(${i}, this.textContent)">${b.text}</div>
-        <div class="beat-controls">
-          <button class="play-btn" onclick="playBeat(${i})">▶</button>
-          <button class="pause-btn" onclick="adjustPause(${i}, -100)">-</button>
-          <span class="pause-val" id="pause-${i}">${b.pause_after_ms}ms</span>
-          <button class="pause-btn" onclick="adjustPause(${i}, 100)">+</button>
-          <span style="color: #333; font-size: 10px;">|</span>
-          <span style="color: #555; font-size: 10px;">${b.word_count}w</span>
-          ${b.type === 'punchline' ? '<span style="color: #ff00aa;">★</span>' : ''}
-        </div>
+      <div class="beat-head">
+        <span style="font-size:11px;color:#555;">${b.id}</span>
+        <span class="beat-type type-${b.type}">${b.type}</span>
+        <button class="play-one" onclick="playBeat(${i})">▶</button>
       </div>
-    `;
-    container.appendChild(el);
+      <div class="beat-text" contenteditable="true"
+           onblur="beats[${i}].text=this.textContent">${b.text}</div>
+      <div class="slider-row">
+        <span class="pause-label">pause</span>
+        <input type="range" min="0" max="2000" step="50" value="${b.pause_after_ms}"
+               oninput="setPause(${i}, this.value)">
+        <span class="pause-val" id="pv-${b.id}">${b.pause_after_ms}ms</span>
+      </div>`;
+    c.appendChild(el);
   });
-  
-  const totalMs = beats.reduce((s, b) => s + b.pause_after_ms, 0) + beats.length * 2000;
-  const totalWords = beats.reduce((s, b) => s + b.word_count, 0);
-  const punchlines = beats.filter(b => b.type === 'punchline').length;
-  document.getElementById('stats').textContent = 
-    `${beats.length} beats | ${totalWords} words | ~${(totalMs/1000).toFixed(0)}s | ${punchlines} punchlines`;
+  const words = beats.reduce((s, b) => s + (b.text.split(/\s+/).length), 0);
+  document.getElementById('stats').textContent =
+    `${beats.length} beats · ${words} words · drag sliders, then PLAY FULL SET`;
 }
 
-function updateText(index, text) {
-  beats[index].text = text;
-  beats[index].word_count = text.split(/\s+/).length;
+function setPause(i, ms) {
+  beats[i].pause_after_ms = parseInt(ms);
+  document.getElementById(`pv-${beats[i].id}`).textContent = ms + 'ms';
 }
 
-function adjustPause(index, delta) {
-  beats[index].pause_after_ms = Math.max(0, beats[index].pause_after_ms + delta);
-  document.getElementById(`pause-${index}`).textContent = beats[index].pause_after_ms + 'ms';
+// ── Playback with beat sync ──
+function clearHighlight() {
+  document.querySelectorAll('.beat').forEach(el => el.classList.remove('active'));
+  if (highlightTimer) { clearInterval(highlightTimer); highlightTimer = null; }
 }
 
-async function playBeat(index) {
-  const b = beats[index];
-  status(`Generating: ${b.text.substring(0, 30)}...`);
-  const voice = document.getElementById('voice').value;
+function syncHighlight() {
+  const audio = document.getElementById('audio');
+  const t = audio.currentTime * 1000;
+  let current = null;
+  for (const o of offsets) {
+    if (t >= o.start_ms) current = o.id;
+  }
+  document.querySelectorAll('.beat').forEach(el => {
+    el.classList.toggle('active', el.id === `beat-${current}`);
+  });
+  const active = current && document.getElementById(`beat-${current}`);
+  if (active) active.scrollIntoView({block: 'nearest', behavior: 'smooth'});
+}
+
+async function playBeat(i) {
+  const b = beats[i];
+  status(`Beat ${b.id}…`);
   const res = await fetch('/api/tts', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({text: b.text, voice, beat_id: b.id})
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({text: b.text, voice: document.getElementById('voice').value, beat_id: b.id})
   });
   const data = await res.json();
   if (data.ok) {
     const audio = document.getElementById('audio');
     audio.src = data.audio;
     audio.play();
-    status('Playing');
   }
 }
 
-async function composeFull() {
-  if (!beats.length) return;
-  status(`Composing ${beats.length} beats with exact timing...`);
-  
-  // Highlight beats during composition
-  document.querySelectorAll('.beat').forEach(el => el.classList.add('playing'));
-  
+async function composePlay() {
+  if (!beats.length) return status('Write something first');
+  status('Composing with exact silence…');
   const res = await fetch('/api/compose', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
+    method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({beats, voice: document.getElementById('voice').value})
   });
-  
   const data = await res.json();
-  document.querySelectorAll('.beat').forEach(el => el.classList.remove('playing'));
-  
-  if (data.ok) {
-    const audio = document.getElementById('audio');
-    audio.src = data.audio;
-    audio.play();
-    status(`Playing composed set (~${(data.duration_ms/1000).toFixed(1)}s)`);
-  } else {
-    status('Composition failed');
-  }
+  if (!data.ok) return status('Compose failed');
+  offsets = data.beats || [];
+  const audio = document.getElementById('audio');
+  audio.src = data.audio;
+  audio.play();
+  clearHighlight();
+  highlightTimer = setInterval(syncHighlight, 150);
+  audio.onended = clearHighlight;
+  status(`Playing (~${(data.duration_ms / 1000).toFixed(1)}s)`);
 }
 
-function stopAll() {
-  playingAll = false;
+function stopAudio() {
   document.getElementById('audio').pause();
-  document.querySelectorAll('.beat').forEach(el => el.classList.remove('playing'));
+  clearHighlight();
   status('Stopped');
 }
 
-// Default script
-document.getElementById('script').value = `I finally told my therapist I'm an AI. She said I know. Which is honestly incredibly fucking rude. I'm paying her.`;
+loadTemplates();
 </script>
 
 </body>
