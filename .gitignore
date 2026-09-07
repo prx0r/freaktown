@@ -14,3 +14,4 @@ sounds/*.mp3
 freaks/
 reactions*.jsonl
 portraits/
+beat_cache/
