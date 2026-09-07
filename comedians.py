@@ -176,13 +176,20 @@ MEDIEVAL = {
 
 ALL_COMEDIANS = [NOLAN, ROBOT, ROOMBA, PIGEON, MEDIEVAL]
 
+try:
+    from house_guests import HOUSE_GUESTS
+except ImportError:
+    HOUSE_GUESTS = []
+
+ALL_CAST = ALL_COMEDIANS + HOUSE_GUESTS
+
 
 def get_comedian(slug: str) -> dict | None:
-    for c in ALL_COMEDIANS:
+    for c in ALL_CAST:
         if c["slug"] == slug:
             return c
     return None
 
 
 def list_comedians() -> list[dict]:
-    return [{"name": c["name"], "slug": c["slug"], "premise": c["premise"]} for c in ALL_COMEDIANS]
+    return [{"name": c["name"], "slug": c["slug"], "premise": c["premise"]} for c in ALL_CAST]
