@@ -8,6 +8,13 @@ target/
 anchor-target/
 .DS_Store
 
+# Frontend build outputs
+apps/web/dist/
+apps/web/dist-worker/
+
+# Local-only Worker dev vars (never deployed; see .dev.vars.example)
+apps/web/.dev.vars
+
 # Large datasets (stored in R2)
 data/datasets/*.json
 .env

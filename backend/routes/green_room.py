@@ -29,6 +29,7 @@ from backend.services.motion_compiler import MotionSearch
 from backend.models.motion_assets import SEED_MOTIONS
 from backend.services.tts import tts_registry, get_adapter, list_providers, list_available
 from backend.services.tts.registry import preprocess_text
+from backend.services.edge_tts import edge_tts_service
 
 router = APIRouter()
 
@@ -525,7 +526,11 @@ async def enter_show(req: EnterShowRequest):
 
     # 1. Compile final TTS if not done
     if not draft.word_timings:
-        result = await edge_tts_service.synthesize(draft.script, draft.voice_id)
+        try:
+            adapter = get_adapter(getattr(draft, 'tts_provider', '') or None)
+            result = await adapter.synthesize(draft.script, draft.voice_id)
+        except Exception:
+            result = await edge_tts_service.synthesize(draft.script, draft.voice_id)
         draft.word_timings = result.word_timings
         draft.audio_duration_ms = result.duration_ms
 

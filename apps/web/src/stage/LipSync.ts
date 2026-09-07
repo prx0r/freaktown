@@ -20,7 +20,7 @@ export interface VisemeFrame {
 
 export class LipSyncAdapter {
   private analyser: AnalyserNode | null = null;
-  private dataArray: Uint8Array | null = null;
+  private dataArray: Uint8Array<ArrayBuffer> | null = null;
   private vrm: VRM | null = null;
 
   // Smoothing

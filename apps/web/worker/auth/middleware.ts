@@ -14,17 +14,17 @@ export type User = {
   role: string;
 };
 
-// Extend Hono context to include user
-declare module 'hono' {
-  interface ContextVariableMap {
-    user: User;
-  }
-}
+// Hono context carries the authenticated user via Variables
+// (set by the app generics, no module augmentation needed).
+export type AppBindings = {
+  Bindings: Env;
+  Variables: { user: User };
+};
 
 /**
  * Middleware that validates Privy session token and attaches user to context.
  */
-export async function authMiddleware(c: Context<{ Bindings: Env }>, next: Next) {
+export async function authMiddleware(c: Context<AppBindings>, next: Next) {
   const authHeader = c.req.header('Authorization');
   const apiKey = c.req.header('X-API-Key');
 
@@ -49,11 +49,11 @@ export async function authMiddleware(c: Context<{ Bindings: Env }>, next: Next) 
     }
 
     c.set('user', {
-      id: userResult.id,
+      id: String(userResult.id),
       privy_user_id: '',
-      handle: userResult.handle,
-      display_name: userResult.display_name,
-      role: userResult.role,
+      handle: String(userResult.handle),
+      display_name: String(userResult.display_name),
+      role: String(userResult.role),
     });
 
     return next();
@@ -102,11 +102,11 @@ export async function authMiddleware(c: Context<{ Bindings: Env }>, next: Next) 
         });
       } else {
         c.set('user', {
-          id: userResult.id,
-          privy_user_id: payload.sub,
-          handle: userResult.handle,
-          display_name: userResult.display_name,
-          role: userResult.role,
+          id: String(userResult.id),
+          privy_user_id: String(payload.sub ?? ''),
+          handle: String(userResult.handle),
+          display_name: String(userResult.display_name),
+          role: String(userResult.role),
         });
       }
 
@@ -122,7 +122,7 @@ export async function authMiddleware(c: Context<{ Bindings: Env }>, next: Next) 
 /**
  * Middleware that requires admin role.
  */
-export async function requireAdmin(c: Context<{ Bindings: Env }>, next: Next) {
+export async function requireAdmin(c: Context<AppBindings>, next: Next) {
   const user = c.get('user');
   if (!user || user.role !== 'admin') {
     return c.json({ error: 'Admin access required' }, 403);

@@ -3,10 +3,9 @@
  */
 
 import { Hono } from 'hono';
-import { authMiddleware, requireAdmin } from '../auth/middleware';
-import type { Env } from '../index';
+import { authMiddleware, requireAdmin, type AppBindings } from '../auth/middleware';
 
-const app = new Hono<{ Bindings: Env }>();
+const app = new Hono<AppBindings>();
 
 // ── Public Routes ─────────────────────────────────────────────────────
 

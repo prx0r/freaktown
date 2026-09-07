@@ -1,23 +1,23 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
     "moduleResolution": "bundler",
-    "lib": ["ES2022"],
-    "types": ["@cloudflare/workers-types"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "react-jsx",
-    "jsxImportSource": "react",
+    "esModuleInterop": true,
+    "allowImportingTsExtensions": true,
     "paths": {
-      "@freak-town/domain": ["../../packages/domain"],
-      "@freak-town/protocol": ["../../packages/protocol"]
+      "@/*": ["./src/*"]
     }
   },
-  "include": ["src/**/*", "worker/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "worker"]
 }

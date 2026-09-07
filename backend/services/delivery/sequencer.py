@@ -24,8 +24,10 @@ Schema:
 }
 """
 
+import asyncio
 import logging
 import re
+import shutil
 import uuid
 from dataclasses import dataclass, field
 
@@ -34,6 +36,12 @@ logger = logging.getLogger("freak_town.delivery")
 SCHEMA_VERSION = "freaktown.delivery.v1"
 
 BEAT_TYPES = ["setup", "escalation", "misdirect", "punchline", "tag", "callback", "actout", "closer"]
+
+# Canonical mix format: 16-bit PCM, mono, 24 kHz. Everything is decoded
+# to this before silence insertion, and the final WAV is encoded from it.
+CANONICAL_SAMPLE_RATE = 24000
+CANONICAL_CHANNELS = 1
+CANONICAL_SAMPWIDTH = 2
 
 
 @dataclass
@@ -134,11 +142,91 @@ def arrange(text: str) -> DeliveryScore:
 
 # ── Audio compositor: beats + TTS regions → final WAV with exact silence
 
+_FFMPEG: str | None = None
+_FFMPEG_CHECKED = False
+
+
+def _require_ffmpeg() -> str:
+    """Locate the ffmpeg binary. Raises loudly — never silently degrade."""
+    global _FFMPEG, _FFMPEG_CHECKED
+    if not _FFMPEG_CHECKED:
+        _FFMPEG = shutil.which("ffmpeg")
+        _FFMPEG_CHECKED = True
+    if not _FFMPEG:
+        raise RuntimeError(
+            "ffmpeg is required to decode provider audio (mp3/wav/ogg) to "
+            "canonical PCM. Install it: apt-get install ffmpeg"
+        )
+    return _FFMPEG
+
+
+async def _decode_to_canonical_pcm(audio: bytes, audio_format: str) -> bytes:
+    """Decode provider audio (mp3/wav/ogg/...) to canonical PCM16 mono 24kHz.
+
+    Uses the declared `audio_format` only for diagnostics; ffmpeg probes
+    the container itself. Returns raw PCM16LE frames (no WAV header).
+    """
+    ffmpeg = _require_ffmpeg()
+    proc = await asyncio.create_subprocess_exec(
+        ffmpeg, "-v", "error",
+        "-i", "pipe:0",
+        "-f", "s16le", "-ac", str(CANONICAL_CHANNELS), "-ar", str(CANONICAL_SAMPLE_RATE),
+        "pipe:1",
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    try:
+        out, err = await asyncio.wait_for(proc.communicate(audio), timeout=180)
+    except asyncio.TimeoutError:
+        try:
+            proc.kill()
+        except ProcessLookupError:
+            pass
+        raise RuntimeError(f"ffmpeg decode timed out (format={audio_format})")
+    if proc.returncode != 0:
+        detail = err.decode(errors="replace")[:300] if err else "unknown error"
+        raise RuntimeError(f"ffmpeg decode failed (format={audio_format}): {detail}")
+    if len(out) % 2:
+        out += b"\x00"
+    return out
+
+
+def _encode_wav(frames: bytes) -> bytes:
+    """Encode canonical PCM16 mono 24kHz frames as a valid WAV."""
+    import io
+    import wave
+
+    out = io.BytesIO()
+    with wave.open(out, "wb") as w:
+        w.setnchannels(CANONICAL_CHANNELS)
+        w.setsampwidth(CANONICAL_SAMPWIDTH)
+        w.setframerate(CANONICAL_SAMPLE_RATE)
+        w.writeframes(frames)
+    return out.getvalue()
+
+
 async def compose(score: DeliveryScore) -> bytes:
     """Render a DeliveryScore into final WAV.
 
-    Qwen/TTS generates each spoken beat; Freak Town inserts exact silence.
-    Returns WAV bytes (silence placeholder when TTS unavailable).
+    Pipeline (freaktown.delivery.v1 contract):
+
+        provider MP3/WAV/OGG
+                ↓ ffmpeg decode
+        canonical PCM16 mono 24kHz
+                ↓
+        insert exact silence (pause_before_ms / pause_after_ms)
+                ↓
+        encode final WAV
+
+    TTS adapters declare their container in `audio_format`; we never
+    assume raw PCM. pause_after_ms means EXACTLY that many ms of silence,
+    regardless of provider.
+
+    If TTS is unavailable the beats contribute silence, pause timing stays
+    exact, and the output is still a valid, decodable WAV of the correct
+    total duration. If ffmpeg itself is missing we raise — a corrupt or
+    fake file is worse than an error.
     """
     try:
         from backend.services.tts import get_adapter
@@ -146,56 +234,30 @@ async def compose(score: DeliveryScore) -> bytes:
     except Exception:
         adapter = None
 
-    segments: list[bytes] = []
-    sample_rate = 24000
+    if adapter is not None:
+        _require_ffmpeg()
+
+    pcm_segments: list[bytes] = []
 
     for beat in score.beats:
-        # pause_before
+        # pause_before (EXACT)
         if beat.pause_before_ms > 0:
-            segments.append(_silence(beat.pause_before_ms, sample_rate))
-        # spoken region
-        audio = b""
-        if adapter:
+            pcm_segments.append(_silence(beat.pause_before_ms, CANONICAL_SAMPLE_RATE))
+        # spoken region: synthesize, then decode to canonical PCM
+        if beat.text.strip() and adapter:
             try:
                 result = await adapter.synthesize(beat.text, score.voice_id)
-                audio = result.audio_bytes
+                pcm_segments.append(await _decode_to_canonical_pcm(result.audio_bytes, result.audio_format))
             except Exception as e:
-                logger.warning(f"Beat {beat.id} TTS failed: {e}")
-        segments.append(audio)
+                logger.warning(f"Beat {beat.id} TTS/decode failed, keeping silence: {e}")
         # pause_after (EXACT, regardless of provider)
         if beat.pause_after_ms > 0:
-            segments.append(_silence(beat.pause_after_ms, sample_rate))
+            pcm_segments.append(_silence(beat.pause_after_ms, CANONICAL_SAMPLE_RATE))
 
-    if not segments:
-        return _wav_header(sample_rate, 0)
-
-    # Concatenate: try proper WAV merge, fall back to raw silence placeholder
-    try:
-        import io, wave
-        out = io.BytesIO()
-        frames = b"".join(segments)
-        with wave.open(out, "wb") as w:
-            w.setnchannels(1)
-            w.setsampwidth(2)
-            w.setframerate(sample_rate)
-            w.writeframes(frames if len(frames) % 2 == 0 else frames + b"\x00")
-        return out.getvalue()
-    except Exception:
-        return _wav_header(sample_rate, sum(len(s) for s in segments))
+    return _encode_wav(b"".join(pcm_segments))
 
 
-def _silence(ms: int, sample_rate: int = 24000) -> bytes:
+def _silence(ms: int, sample_rate: int = CANONICAL_SAMPLE_RATE) -> bytes:
     """Exact silence: N ms of 16-bit PCM zeros."""
     frames = int(ms * sample_rate / 1000)
     return b"\x00\x00" * frames
-
-
-def _wav_header(sample_rate: int, n_bytes: int) -> bytes:
-    """Minimal WAV header for empty/placeholder output."""
-    import struct
-    data_len = n_bytes if n_bytes % 2 == 0 else n_bytes + 1
-    return struct.pack(
-        "<4sI4s4sIHHIIHH4sI",
-        b"RIFF", 36 + data_len, b"WAVE", b"fmt ", 16,
-        1, 1, sample_rate, sample_rate * 2, 2, 16, b"data", data_len,
-    ) + b"\x00" * data_len

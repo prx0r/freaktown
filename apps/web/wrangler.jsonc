@@ -14,22 +14,38 @@
       "database_id": "placeholder"
     }
   ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "EPISODE_ROOM",
+        "class_name": "EpisodeRoom"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_classes": ["EpisodeRoom"]
+    }
+  ],
   "r2_buckets": [
     {
       "binding": "R2",
       "bucket_name": "freak-town-assets"
     }
   ],
-  "queues": [
-    {
-      "queue_name": "tts-jobs",
-      "binding": "TTS_QUEUE"
-    },
-    {
-      "queue_name": "ai-jobs",
-      "binding": "AI_QUEUE"
-    }
-  ],
+  "queues": {
+    "producers": [
+      {
+        "queue": "tts-jobs",
+        "binding": "TTS_QUEUE"
+      },
+      {
+        "queue": "ai-jobs",
+        "binding": "AI_QUEUE"
+      }
+    ]
+  },
   "kv_namespaces": [
     {
       "binding": "KV",

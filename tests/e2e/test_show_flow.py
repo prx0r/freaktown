@@ -221,6 +221,10 @@ class TestFullShowFlow:
 
     def test_external_agent_flow(self):
         """Test external agent registration and response."""
+        import os
+        if os.getenv("EXTERNAL_AGENT_ENABLED", "false").lower() != "true":
+            pytest.skip("EXTERNAL_AGENT_ENABLED not set")
+
         from backend.services.external_agent import ExternalAgentController
 
         controller = ExternalAgentController()

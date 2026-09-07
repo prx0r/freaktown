@@ -76,7 +76,10 @@ export class StageRenderer {
 
   // Lip sync
   private analyser: AnalyserNode | null = null;
-  private lipSyncData: Uint8Array | null = null;
+  private lipSyncData: Uint8Array<ArrayBuffer> | null = null;
+
+  // Gaze target (persistent Object3D — vrm.lookAt.target must be an Object3D)
+  private gazeTarget: THREE.Object3D;
 
   constructor(container: HTMLElement, config: StageConfig) {
     // Scene
@@ -114,6 +117,11 @@ export class StageRenderer {
     // Clock
     this.clock = new THREE.Clock();
 
+    // Gaze target — VRM LookAt tracks this Object3D
+    this.gazeTarget = new THREE.Object3D();
+    this.gazeTarget.position.set(0, 1.5, 3);
+    this.scene.add(this.gazeTarget);
+
     // Resize handler
     window.addEventListener('resize', () => {
       this.camera.aspect = container.clientWidth / container.clientHeight;
@@ -141,6 +149,11 @@ export class StageRenderer {
           this.vrm = vrm;
           this.scene.add(vrm.scene);
           this.mixer = new THREE.AnimationMixer(vrm.scene);
+
+          // VRM LookAt tracks our persistent gaze target
+          if (vrm.lookAt) {
+            vrm.lookAt.target = this.gazeTarget;
+          }
 
           // Set default T-pose to rest pose
           vrm.humanoid?.resetNormalizedPose();
@@ -331,7 +344,7 @@ export class StageRenderer {
   private executeGaze(action: string, intensity: number): void {
     if (!this.vrm?.lookAt) return;
 
-    // Map gaze actions to lookAt targets
+    // Map gaze actions to lookAt target positions
     const targets: Record<string, THREE.Vector3> = {
       'gaze.audience': new THREE.Vector3(0, 1.5, 3),
       'gaze.ella': new THREE.Vector3(2, 1.5, 1),
@@ -345,7 +358,7 @@ export class StageRenderer {
 
     const target = targets[action];
     if (target) {
-      this.vrm.lookAt.target = target;
+      this.gazeTarget.position.copy(target);
     }
   }
 
@@ -372,11 +385,7 @@ export class StageRenderer {
     const em = this.vrm.expressionManager;
 
     // Reset all expressions first
-    em.setValue('happy', 0);
-    em.setValue('angry', 0);
-    em.setValue('sad', 0);
-    em.setValue('surprised', 0);
-    em.setValue('neutral', 0);
+    em.resetValues();
 
     // Map action to VRM expression
     const exprMap: Record<string, string> = {

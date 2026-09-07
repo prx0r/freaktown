@@ -1,0 +1,4 @@
+# LOCAL DEV ONLY. Copy to `.dev.vars` (gitignored, used by `wrangler dev`,
+# never deployed to production). Production MUST set the real secret via:
+#   wrangler secret put STAGE_TOKEN_SECRET
+STAGE_TOKEN_SECRET=dev-only-insecure-do-not-deploy-CHANGE-ME
