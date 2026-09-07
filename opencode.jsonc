@@ -1,0 +1,10 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "freaktown": {
+      "type": "local",
+      "command": ["/root/freaktown/.venv/bin/python", "/root/freaktown/mcp_server.py"],
+      "enabled": true
+    }
+  }
+}
