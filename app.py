@@ -770,6 +770,13 @@ def _save_bundle(data: dict):
     (bdir / "meta.json").write_text(json.dumps(meta, indent=2))
     # seed response ideas in background so YOUR TURN never spins
     _seed_responses_async(slug)
+    # guaranteed body: every saved freak walks on with a BASIC rig in
+    # milliseconds. MAKE THEM 3D can replace it with AI later.
+    try:
+        if _avatar_runtime(slug) is None:
+            _basic_build(slug, bdir, meta, "basic", [])
+    except Exception:
+        pass
     return slug, meta, offsets
 
 
@@ -1582,6 +1589,11 @@ def _render_watch(slug):
         pass
     lin = meta.get("lineage") or {}
     parent = lin.get("parent")
+    # Bundle body for the stage: manifest truth, glb or vrm. Empty when
+    # the freak is portrait-only (fallback chain handles it).
+    rt = _avatar_runtime(slug)
+    body_url = rt["uri"] if rt else ""
+    body_fmt = rt["format"] if rt else ""
     page = WATCH_TEMPLATE
     for key, val in {
         "__SLUG__": slug, "__NAME__": name, "__PREMISE__": premise,
@@ -1589,6 +1601,7 @@ def _render_watch(slug):
         "__NREPLIES__": str(nreplies),
         "__IMG__": img, "__DUR__": str(dur),
         "__BEATS__": json.dumps(beats),
+        "__BODY__": body_url, "__BODY_FORMAT__": body_fmt,
         "__CARD__": f"https://freak.town/api/card/{slug}.png",
         "__CANON__": canonical_url(slug),
         "__REPLYBANNER__": (
@@ -2096,9 +2109,44 @@ try {
   scene.add(key);
   const loader = new GLTFLoader();
   loader.register(p => new VRMLoaderPlugin(p));
-  const gltf = await loader.loadAsync('/static/avatars/default-v1.vrm');
-  vrm = gltf.userData.vrm;
-  scene.add(vrm.scene);
+  // Bundle body first (glb mesh or vrm), default rig as fallback.
+  // Mesh bodies get procedural sway + jaw-morph drive; VRM gets the
+  // full expression path. Portrait shows only if all 3D fails.
+  const BODY_URL = "__BODY__", BODY_FMT = "__BODY_FORMAT__";
+  let meshBody = null, meshJaw = null, meshJawP = 0;
+  let meshBaseY = 0, meshBaseRotY = 0;
+  try {
+    if (BODY_URL && BODY_FMT === 'glb') {
+      const g2 = await new GLTFLoader().loadAsync(BODY_URL);
+      const obj = g2.scene;
+      const box = new THREE.Box3().setFromObject(obj);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      const s = size.y > 0 ? 1.6 / size.y : 1;
+      obj.scale.setScalar(s);
+      obj.position.x -= center.x * s;
+      obj.position.z -= center.z * s;
+      obj.position.y -= box.min.y * s;
+      scene.add(obj);
+      meshBody = obj; meshBaseY = obj.position.y;
+      obj.traverse(o => {
+        if (o.isMesh && o.morphTargetDictionary && !meshJaw) {
+          const names = Object.keys(o.morphTargetDictionary);
+          const j = names.find(n => /^(jawOpen|jaw|mouthOpen)$/.test(n));
+          if (j) meshJaw = {mesh: o, idx: o.morphTargetDictionary[j]};
+        }
+      });
+    } else {
+      const gltf = await loader.loadAsync(BODY_URL || '/static/avatars/default-v1.vrm');
+      vrm = gltf.userData.vrm;
+      scene.add(vrm.scene);
+    }
+  } catch (e) {
+    console.error('bundle body failed, default rig', e);
+    const gltf = await loader.loadAsync('/static/avatars/default-v1.vrm');
+    vrm = gltf.userData.vrm;
+    scene.add(vrm.scene);
+  }
   const fit = () => {
     const w = canvas.clientWidth || 300;
     renderer.setSize(w, 300, false);
@@ -2157,6 +2205,20 @@ try {
       const spine = vrm.humanoid.getNormalizedBoneNode('spine');
       if (spine) spine.rotation.y = Math.sin(t * 0.6) * 0.04;
     }
+    if (meshBody) {
+      meshBody.rotation.y = meshBaseRotY + Math.sin(t * 0.5) * 0.12;
+      meshBody.position.y = meshBaseY + Math.sin(t * 1.1) * 0.03;
+      if (meshJaw && analyser && !A.paused) {
+        analyser.getByteFrequencyData(freqData);
+        let s = 0;
+        for (let i = 0; i < Math.min(10, freqData.length); i++) s += freqData[i];
+        meshJawP = sm(meshJawP, Math.min(1, (s / 10) / 200), 0.5);
+        try { meshJaw.mesh.morphTargetInfluences[meshJaw.idx] = meshJawP; } catch (e) {}
+      } else if (meshJaw) {
+        meshJawP = sm(meshJawP, 0, 0.3);
+        try { meshJaw.mesh.morphTargetInfluences[meshJaw.idx] = meshJawP; } catch (e) {}
+      }
+    }
     if (t > nextBlink) {
       nextBlink = t + 2.5 + Math.random() * 2.5;
       try {
@@ -2164,7 +2226,7 @@ try {
         setTimeout(() => { try { vrm.expressionManager.setValue('blink', 0); } catch (e) {} }, 140);
       } catch (e) {}
     }
-    vrm.update(dt);
+    if (vrm) vrm.update(dt);
     renderer.render(scene, camera);
   })();
 } catch (e) {
@@ -2254,12 +2316,22 @@ def share_set(slug):
         return jsonify({"ok": False, "error": "nothing to share yet"}), 404
     try:
         s3 = _r2_client()
-        for fname, ctype in [("set.wav", "audio/wav"), ("portrait.png", "image/png"),
-                             ("character.json", "application/json"),
-                             ("delivery.json", "application/json"),
-                             ("offsets.json", "application/json"),
-                             ("avatar.glb", "model/gltf-binary"),
-                             ("meta.json", "application/json")]:
+        mirror = [("set.wav", "audio/wav"), ("portrait.png", "image/png"),
+                  ("character.json", "application/json"),
+                  ("delivery.json", "application/json"),
+                  ("offsets.json", "application/json"),
+                  ("avatar.json", "application/json"),
+                  ("meta.json", "application/json")]
+        # Runtime body comes from the manifest, never a filename guess —
+        # a VRM body mirrors as avatar.vrm, a GLB as avatar.glb.
+        rt = _avatar_runtime(slug)
+        if rt is not None:
+            local = rt["uri"].split("/")[-1]
+            ctype = ("model/gltf-binary" if local.endswith(".glb")
+                     else "model/vrml" if local.endswith(".vrm")
+                     else "application/octet-stream")
+            mirror.append((local, ctype))
+        for fname, ctype in mirror:
             p = bdir / fname
             if p.exists():
                 s3.upload_file(str(p), "freak-town", f"f/{slug}/{fname}",
@@ -2599,11 +2671,21 @@ OCULUS_MOUTH = {
 def _sniff_glb(blob: bytes) -> dict:
     """Detect rig + facial capabilities from GLB bytes.
 
-    Returns {rigged, humanoid_skin, facial_morphs, lipsync, morph_names}.
-    Never raises — unknown bytes mean all-False (procedural motion).
+    Returns {rigged, has_skin, joint_count, has_morph_targets,
+    facial_morphs, lipsync, morph_names}. Never raises — unknown bytes
+    mean all-False (procedural motion).
+
+    Morph names come from mesh.extras.targetNames (the Khronos-blessed
+    convention), matched positionally against primitive target counts.
+    Primitive target KEYS are usually POSITION/NORMAL/TANGENT, never
+    expression names — reading them as names was a real bug.
+    `humanoid_skin` is kept as a legacy alias; prefer has_skin/joint_count
+    (a 32-joint spider is not human).
     """
-    caps = {"rigged": False, "humanoid_skin": False,
-            "facial_morphs": 0, "lipsync": False, "morph_names": []}
+    caps = {"rigged": False, "has_skin": False, "joint_count": 0,
+            "humanoid_skin": False, "has_morph_targets": False,
+            "facial_morphs": 0, "lipsync": False, "lipsync_profile": "none",
+            "morph_names": []}
     try:
         if len(blob) < 20 or blob[0:4] != b"glTF":
             return caps
@@ -2614,23 +2696,36 @@ def _sniff_glb(blob: bytes) -> dict:
         return caps
     try:
         skins = js.get("skins") or []
+        joints = max([len(s.get("joints", [])) for s in skins] or [0])
         caps["rigged"] = len(skins) > 0
-        caps["humanoid_skin"] = any(
-            len(s.get("joints", [])) >= 10 for s in skins)
+        caps["has_skin"] = len(skins) > 0
+        caps["joint_count"] = joints
+        caps["humanoid_skin"] = joints >= 10
         names: set = set()
+        any_targets = False
         for mesh in js.get("meshes", []):
-            for prim in mesh.get("primitives", []):
-                for t in prim.get("targets", []):
-                    names.update(t.keys())
-                ex = prim.get("extras", {})
-                if isinstance(ex, dict):
-                    tn = ex.get("targetNames", [])
-                    if isinstance(tn, list):
-                        names.update(str(x) for x in tn)
+            n_targets = max([len(p.get("targets", []))
+                             for p in mesh.get("primitives", [])] or [0])
+            if n_targets:
+                any_targets = True
+            extras = mesh.get("extras") or {}
+            tn = extras.get("targetNames") or []
+            if isinstance(tn, list) and len(tn) == n_targets and n_targets:
+                names.update(str(x) for x in tn)
+        caps["has_morph_targets"] = any_targets
         mouth = {n for n in names if n in ARKIT_MOUTH or n in OCULUS_MOUTH}
         caps["facial_morphs"] = len(mouth)
         caps["morph_names"] = sorted(mouth)[:24]
-        caps["lipsync"] = len(mouth) >= 4
+        # viseme: rich mouth rig (4+ known morphs). jaw: a single working
+        # jaw (BASIC bodies, some mascots) — analyser-driven and honest.
+        jaw = {n for n in names if n in ("jawOpen", "jaw", "mouthOpen")}
+        if len(mouth) >= 4:
+            caps["lipsync_profile"] = "viseme"
+        elif jaw:
+            caps["lipsync_profile"] = "jaw"
+        else:
+            caps["lipsync_profile"] = "none"
+        caps["lipsync"] = caps["lipsync_profile"] in ("viseme", "jaw")
     except Exception:
         pass
     return caps
@@ -2711,6 +2806,28 @@ def _avatar_record(slug: str) -> dict | None:
         return None
 
 
+def _avatar_runtime(slug: str) -> dict | None:
+    """Manifest is truth: {uri, format, sha256} of the runtime body, or None.
+    The filesystem is storage — never discover the body by filename.
+    Legacy fallback: a bare body file with no manifest still resolves
+    (inferred format), so pre-manifest bundles keep their bodies."""
+    rec = _avatar_record(slug)
+    if rec is not None and rec.get("status") == "done":
+        rt = ((rec.get("appearance") or {}).get("runtime") or {})
+        uri = rt.get("uri") or ""
+        local = uri.split("/")[-1] if uri else ""
+        if local and (FREAK_DIR / slug / local).exists():
+            return {"uri": uri, "format": rt.get("format", "glb"),
+                    "sha256": rt.get("sha256", "")}
+        return None
+    for fname in ("avatar.glb", "avatar.vrm"):
+        if (FREAK_DIR / slug / fname).exists():
+            fmt = "vrm" if fname.endswith(".vrm") else "glb"
+            return {"uri": f"/freaks/{slug}/{fname}", "format": fmt,
+                    "sha256": ""}
+    return None
+
+
 @app.route("/api/avatar", methods=["POST"])
 def avatar_submit():
     """Submit a 3D body job for a SAVED set. Body: {"slug": "..."}.
@@ -2723,10 +2840,11 @@ def avatar_submit():
     meta = _bundle_meta(slug)
     if meta is None or not bdir.is_dir():
         return jsonify({"ok": False, "error": "unknown set — SAVE SET first"}), 404
-    if (bdir / "avatar.glb").exists():
+    rt = _avatar_runtime(slug)
+    if rt is not None:
         rec = _avatar_record(slug) or {}
         return jsonify({"ok": True, "status": "done",
-                        "avatar_url": f"/freaks/{slug}/avatar.glb",
+                        "avatar_url": rt["uri"],
                         "job_id": rec.get("job_id")})
     char = meta.get("character", {})
     prompt = (f"{char.get('species') or 'creature'} character, "
@@ -2764,8 +2882,10 @@ def avatar_submit():
         job = _forge_submit(payload)
         attempted.append("forge_raw")
     except Exception as e:
-        return jsonify({"ok": False,
-                        "error": f"all avatar lanes failed ({'; '.join(attempted)}): {e}"[:220]}), 502
+        attempted.append(f"forge_raw: {str(e)[:100]}")
+        # Rung 3: FREAK BASIC. $0, instant, offline, known rig.
+        # AI can still replace it later via MAKE THEM 3D.
+        return _basic_finish(slug, bdir, mode, attempted)
     job_id = job.get("job_id", "")
     # Fast lane can finish synchronously.
     if job.get("status") == "done" and job.get("glb_url"):
@@ -2774,6 +2894,67 @@ def avatar_submit():
     return _avatar_record_running(
         slug, bdir, job_id, mode, "forge", payload.get("prompt", ""),
         attempted)
+
+
+def _basic_build(slug: str, bdir, meta: dict, mode: str,
+                 attempted: list | None = None) -> dict:
+    """Build + persist a BASIC body. Returns the manifest. Pure local,
+    milliseconds, never fails for provider reasons."""
+    import datetime
+    import basic_body
+    char = (meta or {}).get("character", {})
+    seed = int(hashlib.sha256(slug.encode()).hexdigest()[:8], 16)
+    blob, _ = basic_body.build(char.get("species", "human"),
+                               char.get("name", slug), seed)
+    (bdir / "avatar.glb").write_bytes(blob)
+    manifest = _character_manifest(slug, meta, origin="basic",
+                                   provider="freak-basic")
+    manifest.update({
+        "status": "done", "job_id": "", "mode": mode or "basic",
+        "glb": "avatar.glb", "mouth": "viseme",
+        "attempted": (attempted or []) + ["basic"],
+        "done_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    })
+    manifest["appearance"]["runtime"].update({
+        "sha256": hashlib.sha256(blob).hexdigest(),
+        "bytes": len(blob),
+    })
+    manifest["capabilities"].update({
+        "skeletal_animation": True, "facial_animation": True,
+        "lipsync": True, "gestures": True, "locomotion": True,
+    })
+    manifest["face_profile"] = {"morph_names": ["jawOpen"]}
+    (bdir / "avatar.json").write_text(json.dumps(manifest, indent=2))
+    return manifest
+
+
+def _basic_finish(slug: str, bdir, mode: str, attempted: list | None = None):
+    """FREAK BASIC guaranteed body: parametric rigged GLB with jawOpen,
+    built locally in milliseconds. Writes avatar.glb + manifest and
+    returns done. This rung NEVER fails for provider reasons."""
+    manifest = _basic_build(slug, bdir, _bundle_meta(slug) or {}, mode,
+                            attempted)
+    return jsonify({"ok": True, "status": "done",
+                    "avatar_url": f"/freaks/{slug}/avatar.glb",
+                    "job_id": "", "tier": "basic",
+                    "capabilities": manifest["capabilities"]})
+
+
+@app.route("/api/avatar/basic", methods=["POST"])
+def avatar_basic():
+    """Instant guaranteed body for a SAVED set. Body: {"slug": "..."}.
+    No provider, no queue, no key. AI upgrade via /api/avatar stays
+    available afterwards (same files, manifest rewritten)."""
+    data = request.json or {}
+    slug = re.sub(r"[^a-z0-9_-]", "", str(data.get("slug") or ""))[:45]
+    bdir = FREAK_DIR / slug
+    if _bundle_meta(slug) is None or not bdir.is_dir():
+        return jsonify({"ok": False, "error": "unknown set — SAVE SET first"}), 404
+    if _avatar_runtime(slug) is not None:
+        rt = _avatar_runtime(slug)
+        return jsonify({"ok": True, "status": "done",
+                        "avatar_url": rt["uri"], "tier": "existing"})
+    return _basic_finish(slug, bdir, "basic", [])
 
 
 def _character_manifest(slug: str, meta: dict, origin: str,
@@ -2887,9 +3068,10 @@ def avatar_status(slug):
     rec = _avatar_record(slug)
     if rec is None:
         return jsonify({"ok": False, "error": "no avatar job — MAKE THEM 3D first"}), 404
-    if rec.get("status") == "done" and (bdir / "avatar.glb").exists():
+    rt = _avatar_runtime(slug)
+    if rt is not None:
         return jsonify({"ok": True, "status": "done",
-                        "avatar_url": f"/freaks/{slug}/avatar.glb",
+                        "avatar_url": rt["uri"],
                         "job_id": rec.get("job_id"),
                         "capabilities": rec.get("capabilities", {})})
     transport = rec.get("transport", "forge")
@@ -2947,19 +3129,22 @@ def avatar_upload():
     if len(blob) < 1024 or blob[0:4] not in (b"glTF",):
         # VRM 1.x is glTF under the hood; VRM 0.x is also a glTF binary.
         return jsonify({"ok": False, "error": "not a .glb/.vrm binary"}), 400
-    (bdir / "avatar.glb").write_bytes(blob)
+    is_vrm = str(f.filename or "").lower().endswith(".vrm")
+    body_name = "avatar.vrm" if is_vrm else "avatar.glb"
+    (bdir / body_name).write_bytes(blob)
     caps = _sniff_glb(blob)
     manifest = _character_manifest(slug, meta, origin="uploaded")
     manifest.update({
         "status": "done", "job_id": "", "mode": "upload",
-        "glb": "avatar.glb",
+        "glb": body_name,
         "mouth": "viseme" if caps["lipsync"] else "none",
         "attempted": ["upload"],
         "done_at": datetime.datetime.now(
             datetime.timezone.utc).isoformat(),
     })
     manifest["appearance"]["runtime"].update({
-        "format": "vrm" if str(f.filename or "").lower().endswith(".vrm") else "glb",
+        "format": "vrm" if is_vrm else "glb",
+        "uri": f"/freaks/{slug}/{body_name}",
         "sha256": hashlib.sha256(blob).hexdigest(),
         "bytes": len(blob),
     })
@@ -2973,7 +3158,7 @@ def avatar_upload():
     manifest["face_profile"] = {"morph_names": caps.get("morph_names", [])}
     (bdir / "avatar.json").write_text(json.dumps(manifest, indent=2))
     return jsonify({"ok": True, "status": "done",
-                    "avatar_url": f"/freaks/{slug}/avatar.glb",
+                    "avatar_url": f"/freaks/{slug}/{body_name}",
                     "capabilities": manifest["capabilities"]})
 
 
