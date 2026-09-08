@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://freak.town/contracts/events.v1.schema.json",
+  "title": "freaktown.events.v1",
+  "description": "Live event envelope shared by EpisodeRoom and PartyRoom: persist-then-broadcast, server seq, reconnect via last_seq replay.",
+  "type": "object",
+  "required": ["seq", "type", "payload"],
+  "properties": {
+    "seq": {"type": "integer", "minimum": 0},
+    "type": {"type": "string", "minLength": 1},
+    "episode_id": {"type": "string"},
+    "performance_id": {"type": "string"},
+    "effective_at": {"type": "string"},
+    "created_at": {"type": "string"},
+    "actor": {"type": "string"},
+    "payload": {"type": "object"}
+  }
+}

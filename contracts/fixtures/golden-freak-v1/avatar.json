@@ -1,0 +1,12 @@
+{
+  "version": "freaktown.avatar.v1",
+  "format": "glb",
+  "asset": "avatar.glb",
+  "capabilities": {
+    "humanoid": true,
+    "skeleton": true,
+    "visemes": ["jawOpen"],
+    "blink": true,
+    "expressions": ["happy", "angry"]
+  }
+}

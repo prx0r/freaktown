@@ -1,0 +1,8 @@
+{
+  "version": "freaktown.offsets.v1",
+  "sample_rate": 24000,
+  "offsets": [
+    {"id": "b1", "start_ms": 0, "speech_ms": 2400, "pause_ms": 937},
+    {"id": "b2", "start_ms": 3337, "speech_ms": 1500, "pause_ms": 937}
+  ]
+}

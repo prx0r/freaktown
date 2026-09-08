@@ -1,0 +1,7 @@
+{
+  "name": "@freaktown/stage-runtime",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Framework-free stage renderer: data/events in, performance out.",
+  "main": "src/StageRuntime.ts"
+}

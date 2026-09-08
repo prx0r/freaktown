@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://freak.town/contracts/offsets.v1.schema.json",
+  "title": "freaktown.offsets.v1",
+  "description": "Measured compose timings: the ms-resolution source for cue/word-timing resolution.",
+  "type": "object",
+  "required": ["version", "offsets"],
+  "properties": {
+    "version": {"const": "freaktown.offsets.v1"},
+    "sample_rate": {"type": "integer"},
+    "offsets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "start_ms", "speech_ms"],
+        "properties": {
+          "id": {"type": "string"},
+          "start_ms": {"type": "integer", "minimum": 0},
+          "speech_ms": {"type": "integer", "minimum": 0},
+          "pause_ms": {"type": "integer", "minimum": 0}
+        }
+      }
+    }
+  }
+}

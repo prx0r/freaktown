@@ -771,6 +771,78 @@ def _save_bundle(data: dict):
     return slug, meta, offsets
 
 
+@app.route("/api/preload/<slug>", methods=["GET"])
+def preload_set(slug):
+    """StageRuntime preload spec for a bundle — the SAME shape rehearsal,
+    watch pages, and live all consume (PreloadSpec):
+    {avatarUrl|null, portrait, audioUrl, plan, wordTimings, walkoutUrl}.
+    Audio + performance are the READY gate; avatar is optional (§21):
+    portrait carries the show until 3D is ready. Never black."""
+    from backend.services.freaktown.bundle import (
+        build_performance_manifest, bundle_to_score, estimate_spans,
+        resolve_avatar, spans_from_offsets, words_from_beats,
+    )
+    from backend.services.freaktown.cues import resolve_cues
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    bdir = FREAK_DIR / slug
+    if not bdir.is_dir() or not (bdir / "set.wav").exists():
+        return jsonify({"ok": False, "error": "unknown set"}), 404
+    try:
+        character = json.loads((bdir / "character.json").read_text())
+        delivery = json.loads((bdir / "delivery.json").read_text())
+        meta = json.loads((bdir / "meta.json").read_text())
+    except Exception:
+        return jsonify({"ok": False, "error": "corrupt bundle"}), 500
+    try:
+        offsets = json.loads((bdir / "offsets.json").read_text()).get("offsets", [])
+    except Exception:
+        offsets = []
+    try:
+        score = bundle_to_score(delivery)
+    except ValueError as e:
+        return jsonify({"ok": False, "error": f"invalid delivery: {e}"}), 422
+    duration_ms = int(float(meta.get("duration_s", 0)) * 1000) or None
+    spans = spans_from_offsets(offsets) if offsets else estimate_spans(
+        delivery.get("beats", []), duration_ms)
+    words = words_from_beats(delivery.get("beats", []), spans)
+    by_id = {s.beat_id: s for s in spans}
+    manifest = build_performance_manifest(
+        f"local-{slug}", character, score, words, f"/freaks/{slug}/set.wav",
+        duration_ms or (spans[-1].end_ms if spans else 0))
+    cues = resolve_cues(manifest, offsets=offsets or None,
+                        duration_ms=duration_ms)
+    avatar_url, avatar_source = resolve_avatar(manifest)
+    if avatar_source == "sealed":  # local R2 refs aren't fetchable here
+        avatar_url, avatar_source = None, "none"
+    portrait = f"/freaks/{slug}/portrait.png" if (bdir / "portrait.png").exists() else None
+    walkout = None
+    for f in ("walkout.mp3", "walkout.wav"):
+        if (bdir / f).exists():
+            walkout = f"/freaks/{slug}/{f}"
+            break
+    return jsonify({
+        "ok": True, "slug": slug,
+        "avatarUrl": avatar_url if avatar_source != "default" else None,
+        "avatarSource": avatar_source,
+        "portrait": portrait,
+        "audioUrl": f"/freaks/{slug}/set.wav",
+        "plan": {"duration_ms": manifest["audio"]["duration_ms"],
+                 "cues": cues["motion"], "camera": cues["camera"],
+                 "sfx": cues["sfx"]},
+        "wordTimings": [{"word": w.word, "start_ms": w.start_ms,
+                         "end_ms": w.end_ms, "index": i}
+                        for i, w in enumerate(words)],
+        "beats": [{"text": b.get("text", ""),
+                   "start": by_id[b["id"]].start_ms,
+                   "end": by_id[b["id"]].start_ms + by_id[b["id"]].speech_ms,
+                   "face": (b.get("performance") or {}).get("expression", "neutral")}
+                  for b in delivery.get("beats", []) if b.get("id") in by_id],
+        "walkoutUrl": walkout,
+        "manifest_sha": manifest["sha256"],
+        "estimated": cues["estimated"],
+    })
+
+
 @app.route("/api/sets/<slug>", methods=["GET"])
 def get_set(slug):
     """Full bundle: character + beats + audio url."""
@@ -1479,19 +1551,31 @@ def _render_watch(slug):
     has_portrait = (bdir / "portrait.png").exists()
     img = f"/freaks/{slug}/portrait.png" if has_portrait else "/icon-512.png"
     dur = meta.get("duration_s", 0)
-    # beat timeline for sync highlight (speech estimated at stage pace)
+    # Beat timeline for sync highlight — SAME clock as /api/preload:
+    # measured offsets when present, else the shared estimator.
+    # (The old inline 2.82-wps estimator is gone; viewer and StageRuntime
+    # must never disagree about when a line lands.)
     beats = []
     try:
+        from backend.services.freaktown.bundle import (
+            estimate_spans, spans_from_offsets,
+        )
         delivery = json.loads((bdir / "delivery.json").read_text())
-        t = 0
+        try:
+            offsets = json.loads((bdir / "offsets.json").read_text()).get("offsets", [])
+        except Exception:
+            offsets = []
+        duration_ms = int(float(meta.get("duration_s", 0)) * 1000) or None
+        spans = spans_from_offsets(offsets) if offsets else estimate_spans(
+            delivery.get("beats", []), duration_ms)
+        by_id = {s.beat_id: s for s in spans}
         for b in delivery.get("beats", []):
-            words = len((b.get("text") or "").split())
-            speech = int(words / 2.82 * 1000)
-            pause = int(b.get("pause_after_ms", 300))
-            beats.append({"text": b.get("text", ""), "start": t,
-                          "end": t + speech,
+            s = by_id.get(b.get("id"))
+            if s is None:
+                continue
+            beats.append({"text": b.get("text", ""), "start": s.start_ms,
+                          "end": s.start_ms + s.speech_ms,
                           "face": (b.get("performance") or {}).get("expression", "neutral")})
-            t += speech + pause
     except Exception:
         pass
     lin = meta.get("lineage") or {}

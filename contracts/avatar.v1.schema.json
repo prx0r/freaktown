@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://freak.town/contracts/avatar.v1.schema.json",
+  "title": "freaktown.avatar.v1",
+  "description": "Avatar capability contract. Runtime asks what the avatar CAN do. Format is glb or vrm; portrait-only freaks carry no avatar block.",
+  "type": "object",
+  "required": ["version", "format", "asset"],
+  "properties": {
+    "version": {"const": "freaktown.avatar.v1"},
+    "format": {"enum": ["glb", "vrm"]},
+    "asset": {"type": "string", "minLength": 1},
+    "capabilities": {
+      "type": "object",
+      "properties": {
+        "humanoid": {"type": "boolean"},
+        "skeleton": {"type": "boolean"},
+        "blink": {"type": "boolean"},
+        "look_at": {"type": "boolean"},
+        "visemes": {"type": "array", "items": {"type": "string"}},
+        "expressions": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

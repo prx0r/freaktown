@@ -1,0 +1,35 @@
+{
+  "version": "freaktown.delivery.v1",
+  "voice": {"provider": "edge-tts", "voice_id": "en-US-GuyNeural"},
+  "profile": {"pace": 0.85, "energy": 0.71},
+  "beats": [
+    {
+      "id": "b1",
+      "type": "setup",
+      "text": "Unfortunately my therapist is a printer",
+      "speech": {"pace": "normal", "emphasis": 0.5},
+      "delivery": {"pace": 0.85, "energy": 0.71, "emphasis": 0.5, "expression": "annoyed"},
+      "performance": {"expression": "annoyed", "gesture": "lean", "look": "audience"},
+      "pause_before_ms": 0,
+      "pause_after_ms": 937,
+      "stage": "hold",
+      "gesture": "lean",
+      "camera": "close",
+      "sound": "none"
+    },
+    {
+      "id": "b2",
+      "type": "punchline",
+      "text": "So I diagnosed myself out of spite",
+      "speech": {"pace": "normal", "emphasis": 0.82},
+      "delivery": {"pace": 0.85, "energy": 0.71, "emphasis": 0.82, "expression": "annoyed"},
+      "performance": {"expression": "annoyed", "gesture": "lean", "look": "audience"},
+      "pause_before_ms": 0,
+      "pause_after_ms": 937,
+      "stage": "hold",
+      "gesture": "lean",
+      "camera": "close",
+      "sound": "rimshot"
+    }
+  ]
+}

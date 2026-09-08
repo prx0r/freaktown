@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://freak.town/contracts/performance.v1.schema.json",
+  "title": "freaktown.performance.v1",
+  "description": "Sealed performance manifest: avatar + audio + delivery + words + cues, frozen with sha256. Intake never modifies creative content.",
+  "type": "object",
+  "required": ["version", "performance_id", "actor", "audio", "delivery", "words", "sha256"],
+  "properties": {
+    "version": {"const": "freaktown.performance.v1"},
+    "performance_id": {"type": "string", "minLength": 1},
+    "episode_id": {"type": "string"},
+    "actor": {"type": "object"},
+    "avatar": {"type": "object"},
+    "audio": {
+      "type": "object",
+      "required": ["set_url", "duration_ms"],
+      "properties": {
+        "set_url": {"type": "string"},
+        "duration_ms": {"type": "number"},
+        "walkout_url": {"type": "string"},
+        "walkout_duration_ms": {"type": "number"}
+      }
+    },
+    "delivery": {"type": "object"},
+    "words": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["word", "start_ms", "end_ms"],
+        "properties": {
+          "word": {"type": "string"},
+          "start_ms": {"type": "integer", "minimum": 0},
+          "end_ms": {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    "motion": {
+      "type": "object",
+      "properties": {
+        "cues": {"type": "array"}
+      }
+    },
+    "sha256": {"type": "string", "minLength": 16}
+  }
+}

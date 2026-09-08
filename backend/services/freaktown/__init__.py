@@ -1,0 +1,59 @@
+"""Black Room adapter — freaktown artifacts in, killella performances out.
+
+Read-only with respect to the freaktown repo: schema authority stays
+freaktown.delivery.v1, we just accept the full schema here.
+"""
+
+from backend.services.freaktown.bundle import (
+    SCHEMA_VERSION,
+    PERFORMANCE_SCHEMA_VERSION,
+    AVATAR_SCHEMA_VERSION,
+    BEAT_TYPES,
+    SPECIES_MAP,
+    VRM_VISEMES,
+    VROID_DEFAULT_CAPABILITIES,
+    PANEL_SEATS,
+    JUDGE_AUTHORITIES,
+    BundleValidation,
+    BeatSpan,
+    species_to_body,
+    bundle_slug,
+    validate_delivery,
+    validate_bundle,
+    validate_avatar,
+    validate_modes,
+    avatar_capabilities,
+    can_viseme,
+    bundle_to_score,
+    spans_from_offsets,
+    estimate_spans,
+    words_from_beats,
+    build_performance_manifest,
+)
+
+__all__ = [
+    "SCHEMA_VERSION",
+    "PERFORMANCE_SCHEMA_VERSION",
+    "AVATAR_SCHEMA_VERSION",
+    "BEAT_TYPES",
+    "SPECIES_MAP",
+    "VRM_VISEMES",
+    "VROID_DEFAULT_CAPABILITIES",
+    "PANEL_SEATS",
+    "JUDGE_AUTHORITIES",
+    "BundleValidation",
+    "BeatSpan",
+    "species_to_body",
+    "bundle_slug",
+    "validate_delivery",
+    "validate_bundle",
+    "validate_avatar",
+    "validate_modes",
+    "avatar_capabilities",
+    "can_viseme",
+    "bundle_to_score",
+    "spans_from_offsets",
+    "estimate_spans",
+    "words_from_beats",
+    "build_performance_manifest",
+]
