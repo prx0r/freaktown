@@ -1,0 +1,59 @@
+{
+  "name": "freak-town",
+  "main": "worker/index.ts",
+  "compatibility_date": "2024-09-25",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "freak-town",
+      "database_id": "a2221653-a6d6-4c13-aedc-9f64fa3cee93"
+    }
+  ],
+  // Postgres (canonical durable truth) via Hyperdrive. Provision with:
+  //   wrangler hyperdrive create freak-town-postgres --connection-string="..."
+  // then add the binding below. Until then, D1 serves ONLY
+  // genuinely edge-local ephemeral data; business rows live in Postgres
+  // via FastAPI. Do NOT add new business tables to D1.
+  // "hyperdrive": [
+  //   {
+  //     "binding": "HYPERDRIVE",
+  //     "id": "placeholder"
+  //   }
+  // ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "EPISODE_ROOM",
+        "class_name": "EpisodeRoom"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_classes": ["EpisodeRoom"]
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "R2",
+      "bucket_name": "freak-town"
+    }
+  ],
+  // Queues/KV removed in migration: no producers or consumers existed.
+  // Re-add only with a consumer in the same commit.
+  "env": {
+    "PRIVY_APP_ID": "",
+    "PRIVY_APP_SECRET": "",
+    "OPENAI_API_KEY": "",
+    "ANTHROPIC_API_KEY": "",
+    "ELEVENLABS_API_KEY": "",
+    "STAGE_TOKEN_SECRET": "freak-town-dev-secret-change-in-prod"
+  }
+}
