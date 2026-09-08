@@ -2258,6 +2258,7 @@ def share_set(slug):
                              ("character.json", "application/json"),
                              ("delivery.json", "application/json"),
                              ("offsets.json", "application/json"),
+                             ("avatar.glb", "model/gltf-binary"),
                              ("meta.json", "application/json")]:
             p = bdir / fname
             if p.exists():
@@ -2520,6 +2521,462 @@ def serve_portrait(filename):
     if not re.fullmatch(r"[a-f0-9]{12}\.png", filename):
         return jsonify({"ok": False, "error": "not found"}), 404
     return send_from_directory(str(Path(__file__).parent / "portraits"), filename)
+
+
+# ── 3D Bodies: portrait → Forge → avatar.glb in the bundle ───────────
+# Forge makes STATIC meshes (no rig, no mouth morphs). The stage drives
+# them with procedural bob/sway — honest body motion, never a fake mouth.
+# Free draft/standard tiers, no key. ~60 generations/hour per IP.
+
+FORGE_BASE = "https://three.ws"
+
+
+def _forge_submit(payload: dict) -> dict:
+    """POST /api/forge with 429 backoff. Returns the job dict."""
+    import httpx
+    import time as _time
+    last: dict = {}
+    for _ in range(8):
+        r = httpx.post(f"{FORGE_BASE}/api/forge", json=payload, timeout=60)
+        if r.status_code == 429:
+            try:
+                wait = float(r.json().get("retry_after", 10))
+            except Exception:
+                wait = 10
+            _time.sleep(min(max(wait, 2), 60))
+            continue
+        r.raise_for_status()
+        return r.json()
+    raise RuntimeError(f"forge lane busy: {last}")
+
+
+def _forge_poll(job_id: str) -> dict:
+    import httpx
+    r = httpx.get(f"{FORGE_BASE}/api/forge", params={"job": job_id}, timeout=30)
+    r.raise_for_status()
+    return r.json()
+
+
+def _forge_upload(path, content_type: str) -> str:
+    """Presign + PUT a file for Forge photo jobs. Returns the public URL."""
+    import httpx
+    r = httpx.post(f"{FORGE_BASE}/api/forge-upload",
+                   json={"content_type": content_type,
+                         "size_bytes": Path(path).stat().st_size},
+                   timeout=30)
+    r.raise_for_status()
+    slot = r.json()
+    with open(path, "rb") as f:
+        put = httpx.put(slot["upload_url"], content=f.read(),
+                        headers=slot.get("headers", {}), timeout=180)
+    put.raise_for_status()
+    return slot["public_url"]
+
+
+MCP_STUDIO = "https://three.ws/api/mcp-studio"
+
+# ARKit-52 + Oculus mouth names. A generated body carrying enough of
+# these gets analyser-driven lipsync; anything else gets procedural
+# bob/sway. Detected from the GLB bytes at download, never assumed.
+ARKIT_MOUTH = {
+    "jawOpen", "mouthClose", "mouthFunnel", "mouthPucker",
+    "mouthLeft", "mouthRight", "mouthSmileLeft", "mouthSmileRight",
+    "mouthFrownLeft", "mouthFrownRight", "mouthDimpleLeft",
+    "mouthDimpleRight", "mouthStretchLeft", "mouthStretchRight",
+    "mouthRollLower", "mouthRollUpper", "mouthShrugLower",
+    "mouthShrugUpper", "mouthPressLeft", "mouthPressRight",
+    "mouthLowerDownLeft", "mouthLowerDownRight",
+    "mouthUpperUpLeft", "mouthUpperUpRight",
+}
+OCULUS_MOUTH = {
+    "viseme_aa", "viseme_E", "viseme_I", "viseme_O", "viseme_U",
+    "viseme_PP", "viseme_FF", "viseme_TH", "viseme_DD", "viseme_kk",
+    "viseme_CH", "viseme_SS", "viseme_nn", "viseme_RR", "viseme_sil",
+    "aa", "ih", "ou", "ee", "oh",
+}
+
+
+def _sniff_glb(blob: bytes) -> dict:
+    """Detect rig + facial capabilities from GLB bytes.
+
+    Returns {rigged, humanoid_skin, facial_morphs, lipsync, morph_names}.
+    Never raises — unknown bytes mean all-False (procedural motion).
+    """
+    caps = {"rigged": False, "humanoid_skin": False,
+            "facial_morphs": 0, "lipsync": False, "morph_names": []}
+    try:
+        if len(blob) < 20 or blob[0:4] != b"glTF":
+            return caps
+        import struct as _struct
+        clen = _struct.unpack("<I", blob[12:16])[0]
+        js = json.loads(blob[20:20 + clen].decode("utf-8"))
+    except Exception:
+        return caps
+    try:
+        skins = js.get("skins") or []
+        caps["rigged"] = len(skins) > 0
+        caps["humanoid_skin"] = any(
+            len(s.get("joints", [])) >= 10 for s in skins)
+        names: set = set()
+        for mesh in js.get("meshes", []):
+            for prim in mesh.get("primitives", []):
+                for t in prim.get("targets", []):
+                    names.update(t.keys())
+                ex = prim.get("extras", {})
+                if isinstance(ex, dict):
+                    tn = ex.get("targetNames", [])
+                    if isinstance(tn, list):
+                        names.update(str(x) for x in tn)
+        mouth = {n for n in names if n in ARKIT_MOUTH or n in OCULUS_MOUTH}
+        caps["facial_morphs"] = len(mouth)
+        caps["morph_names"] = sorted(mouth)[:24]
+        caps["lipsync"] = len(mouth) >= 4
+    except Exception:
+        pass
+    return caps
+
+
+def _mcp_call(tool: str, args: dict, timeout: int = 120) -> dict:
+    """Call a three.ws MCP Studio tool. Returns the parsed JSON-RPC result."""
+    import httpx
+    import uuid as _uuid
+    r = httpx.post(MCP_STUDIO,
+                   json={"jsonrpc": "2.0", "id": f"ft-{_uuid.uuid4().hex[:8]}",
+                         "method": "tools/call",
+                         "params": {"name": tool, "arguments": args}},
+                   timeout=timeout)
+    r.raise_for_status()
+    payload = r.json()
+    if payload.get("error"):
+        raise RuntimeError(str(payload["error"])[:200])
+    return payload.get("result", {})
+
+
+def _mcp_avatar_submit(image_url: str | None, prompt: str) -> dict:
+    """forge_avatar via MCP. Returns {glb_url?, job_id?, rigged?}.
+
+    Raises on transport failure; callers fall back to raw Forge.
+    Immediate-done and pending shapes are both normalized here.
+    """
+    args: dict = {}
+    if image_url:
+        args["image_url"] = image_url
+    else:
+        args["prompt"] = prompt
+    res = _mcp_call("forge_avatar", args)
+    sc = res.get("structuredContent") or {}
+    glb = sc.get("riggedGlbUrl") or sc.get("glbUrl") or sc.get("glb_url")
+    if glb:
+        return {"glb_url": glb, "rigged": bool(sc.get("rigged", True)),
+                "job_id": sc.get("job_id") or sc.get("jobId") or ""}
+    job_id = (sc.get("job_id") or sc.get("jobId") or sc.get("jobId")
+              or res.get("job_id") or "")
+    if job_id:
+        return {"glb_url": "", "rigged": False, "job_id": job_id}
+    # No URL, no job id: surface the text for diagnosis, then fall back.
+    text = ""
+    try:
+        text = (res.get("content") or [{}])[0].get("text", "")
+    except Exception:
+        pass
+    raise RuntimeError(f"forge_avatar gave no model: {text[:160]}")
+
+
+def _mcp_check_job(job_id: str) -> dict:
+    """Poll a pending MCP generation. Normalized to {status, glb_url}."""
+    res = _mcp_call("check_job", {"job_id": job_id}, timeout=60)
+    sc = res.get("structuredContent") or {}
+    glb = sc.get("riggedGlbUrl") or sc.get("glbUrl") or sc.get("glb_url")
+    st = str(sc.get("status") or res.get("status") or "running").lower()
+    if glb:
+        return {"status": "done", "glb_url": glb,
+                "rigged": bool(sc.get("rigged", True))}
+    if st in ("failed", "error"):
+        text = ""
+        try:
+            text = (res.get("content") or [{}])[0].get("text", "")
+        except Exception:
+            pass
+        return {"status": "failed", "error": text[:200] or "mcp job failed"}
+    return {"status": st or "running"}
+
+
+def _avatar_record(slug: str) -> dict | None:
+    p = FREAK_DIR / slug / "avatar.json"
+    if not p.exists():
+        return None
+    try:
+        return json.loads(p.read_text())
+    except Exception:
+        return None
+
+
+@app.route("/api/avatar", methods=["POST"])
+def avatar_submit():
+    """Submit a 3D body job for a SAVED set. Body: {"slug": "..."}.
+    Portrait → Forge image_to_3d (best likeness); falls back to a text
+    prompt from the character record when no portrait is locked.
+    Returns {ok, job_id, status}. Poll GET /api/avatar/<slug>."""
+    data = request.json or {}
+    slug = re.sub(r"[^a-z0-9_-]", "", str(data.get("slug") or ""))[:45]
+    bdir = FREAK_DIR / slug
+    meta = _bundle_meta(slug)
+    if meta is None or not bdir.is_dir():
+        return jsonify({"ok": False, "error": "unknown set — SAVE SET first"}), 404
+    if (bdir / "avatar.glb").exists():
+        rec = _avatar_record(slug) or {}
+        return jsonify({"ok": True, "status": "done",
+                        "avatar_url": f"/freaks/{slug}/avatar.glb",
+                        "job_id": rec.get("job_id")})
+    char = meta.get("character", {})
+    prompt = (f"{char.get('species') or 'creature'} character, "
+              f"{char.get('premise') or ''}, stylized 3D game asset, "
+              f"single full-body figure".strip())[:900]
+    portrait = bdir / "portrait.png"
+    portrait_url = ""
+    if portrait.exists():
+        try:
+            portrait_url = _forge_upload(portrait, "image/png")
+        except Exception:
+            portrait_url = ""
+    mode = "portrait" if portrait_url else "prompt"
+    attempted: list = []
+    # Rung 1: forge_avatar (generate + auto-rig + ARKit-52 in one call).
+    try:
+        mcp = _mcp_avatar_submit(portrait_url or None, prompt)
+        attempted.append("forge_avatar")
+        if mcp.get("glb_url"):
+            return _avatar_finish(slug, bdir, mcp.get("job_id", ""),
+                                  mode, mcp["glb_url"],
+                                  rigged=mcp.get("rigged", True),
+                                  attempted=attempted)
+        return _avatar_record_running(
+            slug, bdir, mcp.get("job_id", ""), mode, "mcp",
+            prompt, attempted)
+    except Exception as e:
+        attempted.append(f"forge_avatar: {str(e)[:100]}")
+    # Rung 2: raw Forge mesh (static — procedural motion downstream).
+    try:
+        if portrait_url:
+            payload: dict = {"image_urls": [portrait_url], "tier": "standard"}
+        else:
+            payload = {"prompt": prompt, "tier": "standard"}
+        job = _forge_submit(payload)
+        attempted.append("forge_raw")
+    except Exception as e:
+        return jsonify({"ok": False,
+                        "error": f"all avatar lanes failed ({'; '.join(attempted)}): {e}"[:220]}), 502
+    job_id = job.get("job_id", "")
+    # Fast lane can finish synchronously.
+    if job.get("status") == "done" and job.get("glb_url"):
+        return _avatar_finish(slug, bdir, job_id, mode, job["glb_url"],
+                              rigged=False, attempted=attempted)
+    return _avatar_record_running(
+        slug, bdir, job_id, mode, "forge", payload.get("prompt", ""),
+        attempted)
+
+
+def _character_manifest(slug: str, meta: dict, origin: str,
+                        provider: str = "") -> dict:
+    """Base freak.character/v1 manifest. Capabilities are filled in by
+    the producer (sniffed from bytes on import/generation, never assumed).
+    Rights default closed (no redistribution) until the creator says so."""
+    char = (meta or {}).get("character", {})
+    import datetime
+    return {
+        "schema": "freak.character/v1",
+        "id": slug,
+        "version": "1.0.0",
+        "identity": {
+            "name": char.get("name") or "Guest Freak",
+            "species": char.get("species") or "",
+            "premise": char.get("premise") or "",
+        },
+        "appearance": {
+            "portrait": "portrait.png",
+            "runtime": {"format": "glb", "uri": f"/freaks/{slug}/avatar.glb",
+                        "sha256": "", "bytes": 0},
+        },
+        "embodiment": {"kind": "custom"},
+        "capabilities": {"skeletal_animation": False,
+                         "facial_animation": False, "lipsync": False,
+                         "eye_gaze": False, "expressions": False,
+                         "gestures": False, "locomotion": False},
+        "voice": {"voice_id": char.get("voice") or meta.get("voice", ""),
+                  "provider": "edge-tts"},
+        "provenance": {"origin": origin, "provider": provider,
+                       "generated_at": datetime.datetime.now(
+                           datetime.timezone.utc).isoformat()},
+        "rights": {"ownership": "user_owned", "commercial_use": True,
+                   "modification": True, "redistribution": False},
+    }
+
+
+def _avatar_record_running(slug: str, bdir, job_id: str, mode: str,
+                           transport: str, prompt: str,
+                           attempted: list):
+    """Persist a running avatar job. Returns the running payload."""
+    import datetime
+    manifest = _character_manifest(slug, _bundle_meta(slug) or {},
+                                   origin="generated",
+                                   provider="three.ws-forge")
+    manifest.update({
+        "status": "running", "job_id": job_id, "mode": mode,
+        "transport": transport, "prompt": prompt, "glb": None,
+        "mouth": "none", "attempted": attempted,
+        "created_at": datetime.datetime.now(
+            datetime.timezone.utc).isoformat(),
+    })
+    (bdir / "avatar.json").write_text(json.dumps(manifest, indent=2))
+    return jsonify({"ok": True, "status": "running", "job_id": job_id,
+                    "mode": mode, "transport": transport})
+
+
+def _avatar_finish(slug: str, bdir, job_id: str, mode: str, glb_url: str,
+                   rigged: bool = False, attempted: list | None = None):
+    """Download a finished GLB into the bundle, sniffing capabilities
+    from the bytes (rigged? facial morphs? lipsync-safe?). The stage
+    reads avatar.json — never assumes what a lane promised."""
+    import datetime
+    import httpx
+    try:
+        r = httpx.get(glb_url, timeout=180)
+        r.raise_for_status()
+        blob = r.content
+        if len(blob) < 1024 or not blob.startswith(b"glTF"):
+            return jsonify({"ok": False, "error": "bad glb from forge"}), 502
+        (bdir / "avatar.glb").write_bytes(blob)
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"glb download: {e}"[:160]}), 502
+    caps = _sniff_glb(blob)
+    caps["rigged"] = caps["rigged"] or rigged
+    manifest = _character_manifest(slug, _bundle_meta(slug) or {},
+                                   origin="generated",
+                                   provider="three.ws-forge")
+    manifest.update({
+        "status": "done", "job_id": job_id, "mode": mode, "glb": "avatar.glb",
+        "mouth": "viseme" if caps["lipsync"] else "none",
+        "attempted": attempted or [],
+        "done_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    })
+    manifest["appearance"]["runtime"].update({
+        "sha256": hashlib.sha256(blob).hexdigest(),
+        "bytes": len(blob),
+    })
+    manifest["capabilities"].update({
+        "skeletal_animation": caps["rigged"],
+        "facial_animation": caps["facial_morphs"] > 0,
+        "lipsync": caps["lipsync"],
+        "gestures": caps["rigged"],
+        "locomotion": caps["humanoid_skin"],
+    })
+    manifest["face_profile"] = {
+        "morph_names": caps.get("morph_names", []),
+    }
+    (bdir / "avatar.json").write_text(json.dumps(manifest, indent=2))
+    return jsonify({"ok": True, "status": "done",
+                    "avatar_url": f"/freaks/{slug}/avatar.glb",
+                    "job_id": job_id, "capabilities": manifest["capabilities"]})
+
+
+@app.route("/api/avatar/<slug>", methods=["GET"])
+def avatar_status(slug):
+    """Poll a body job. Drives running → done (downloads avatar.glb)."""
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    bdir = FREAK_DIR / slug
+    rec = _avatar_record(slug)
+    if rec is None:
+        return jsonify({"ok": False, "error": "no avatar job — MAKE THEM 3D first"}), 404
+    if rec.get("status") == "done" and (bdir / "avatar.glb").exists():
+        return jsonify({"ok": True, "status": "done",
+                        "avatar_url": f"/freaks/{slug}/avatar.glb",
+                        "job_id": rec.get("job_id"),
+                        "capabilities": rec.get("capabilities", {})})
+    transport = rec.get("transport", "forge")
+    try:
+        if transport == "mcp":
+            job = _mcp_check_job(rec.get("job_id", ""))
+        else:
+            raw = _forge_poll(rec.get("job_id", ""))
+            job = {"status": raw.get("status", "running"),
+                   "glb_url": raw.get("glb_url", ""),
+                   "rigged": False,
+                   "backend": raw.get("backend", ""),
+                   "error": raw.get("error", "")}
+    except Exception as e:
+        return jsonify({"ok": True, "status": "running",
+                        "job_id": rec.get("job_id"),
+                        "note": f"poll: {e}"[:120]})
+    st = job.get("status", "running")
+    if st == "done" and job.get("glb_url"):
+        return _avatar_finish(slug, bdir, rec.get("job_id", ""),
+                              rec.get("mode", "prompt"), job["glb_url"],
+                              rigged=bool(job.get("rigged", False)),
+                              attempted=rec.get("attempted", []))
+    if st == "failed":
+        rec["status"] = "failed"
+        rec["error"] = str(job.get("error", "forge failed"))[:200]
+        (bdir / "avatar.json").write_text(json.dumps(rec, indent=2))
+        return jsonify({"ok": False, "status": "failed", "error": rec["error"]})
+    return jsonify({"ok": True, "status": st, "job_id": rec.get("job_id"),
+                    "backend": job.get("backend", "")})
+
+
+@app.route("/api/avatar/upload", methods=["POST"])
+def avatar_upload():
+    """Universal escape hatch: bring your own body.
+
+    Multipart `file` (.glb or .vrm, ≤50MB) + `slug` field. The bytes are
+    sniffed for rig + facial capabilities (never assumed from extension),
+    stored as avatar.glb alongside a freak.character/v1 manifest.
+    Works today, no external service, no key.
+    """
+    import datetime
+    slug = re.sub(r"[^a-z0-9_-]", "",
+                  str(request.form.get("slug") or ""))[:45]
+    bdir = FREAK_DIR / slug
+    meta = _bundle_meta(slug)
+    if meta is None or not bdir.is_dir():
+        return jsonify({"ok": False, "error": "unknown set — SAVE SET first"}), 404
+    f = request.files.get("file")
+    if f is None:
+        return jsonify({"ok": False, "error": "multipart file required"}), 400
+    blob = f.read(52 * 1024 * 1024 + 1)
+    if len(blob) > 50 * 1024 * 1024:
+        return jsonify({"ok": False, "error": "file over 50MB"}), 400
+    if len(blob) < 1024 or blob[0:4] not in (b"glTF",):
+        # VRM 1.x is glTF under the hood; VRM 0.x is also a glTF binary.
+        return jsonify({"ok": False, "error": "not a .glb/.vrm binary"}), 400
+    (bdir / "avatar.glb").write_bytes(blob)
+    caps = _sniff_glb(blob)
+    manifest = _character_manifest(slug, meta, origin="uploaded")
+    manifest.update({
+        "status": "done", "job_id": "", "mode": "upload",
+        "glb": "avatar.glb",
+        "mouth": "viseme" if caps["lipsync"] else "none",
+        "attempted": ["upload"],
+        "done_at": datetime.datetime.now(
+            datetime.timezone.utc).isoformat(),
+    })
+    manifest["appearance"]["runtime"].update({
+        "format": "vrm" if str(f.filename or "").lower().endswith(".vrm") else "glb",
+        "sha256": hashlib.sha256(blob).hexdigest(),
+        "bytes": len(blob),
+    })
+    manifest["capabilities"].update({
+        "skeletal_animation": caps["rigged"],
+        "facial_animation": caps["facial_morphs"] > 0,
+        "lipsync": caps["lipsync"],
+        "gestures": caps["rigged"],
+        "locomotion": caps["humanoid_skin"],
+    })
+    manifest["face_profile"] = {"morph_names": caps.get("morph_names", [])}
+    (bdir / "avatar.json").write_text(json.dumps(manifest, indent=2))
+    return jsonify({"ok": True, "status": "done",
+                    "avatar_url": f"/freaks/{slug}/avatar.glb",
+                    "capabilities": manifest["capabilities"]})
+
+
 
 
 @app.route("/api/match_style", methods=["POST"])

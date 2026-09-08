@@ -9,8 +9,8 @@
 ```text
 freaks/<slug>/
   character.json       # identity, persona, voice, performance profile (REQUIRED: name)
-  avatar.vrm           # canonical performer body (optional)
-  avatar.json          # capability contract, REQUIRED if avatar.vrm present
+  avatar.glb           # performer body, glb or vrm bytes (optional)
+  avatar.json          # capability manifest, freak.character/v1 (REQUIRED if avatar.glb present)
   voice_reference.wav  # cloning source, 3-10s clean speech (optional)
   portrait.png         # 2D concept art (optional)
   visual.json          # portrait recipe: model, seed, prompt, traits (optional)
@@ -22,8 +22,12 @@ freaks/<slug>/
 ```
 
 Rules:
-- `avatar.vrm` is canonical. `avatar.glb` is accepted as a legacy import
-  and should be converted, never required.
+- The canonical object is the manifest (`avatar.json`,
+  `freak.character/v1`). There is no canonical vendor or 3D format.
+- `avatar.glb` and `avatar.vrm` are both accepted runtime bodies, as-is.
+  Never convert between them just to satisfy the schema (conversion can
+  destroy VRM semantics or GLB morphs). The stage reads capabilities,
+  not file extensions.
 - No field may contain secrets. Keys live in env/vault, never in packs.
 - `meta.json` is written by tooling, not by hand.
 

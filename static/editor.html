@@ -133,6 +133,17 @@ input[type=range] { flex: 1; accent-color: #ff00aa; cursor: pointer; }
       <div class="tempo-row" style="margin-top:6px;">
         <button class="btn btn-small" onclick="keepLook()">KEEP LOOK ✓</button>
       </div>
+      <div class="tempo-row" style="margin-top:6px;">
+        <button class="btn btn-small" onclick="make3D()">🧍 MAKE THEM 3D</button>
+      </div>
+      <div class="tempo-row" style="margin-top:6px;">
+        <label class="btn btn-small" style="text-align:center;cursor:pointer;">
+          📦 BRING A BODY
+          <input type="file" id="bodyFile" accept=".glb,.vrm" style="display:none"
+                 onchange="uploadBody(this)">
+        </label>
+      </div>
+      <div style="font-size:10px;color:#555;margin-top:4px;" id="avatarStatus"></div>
     </div>
     <div class="tempo-box">
       <h4>WALKOUT (10s sting)</h4>
@@ -730,6 +741,113 @@ function keepLook() {
   status('Look locked — portrait ships with the bundle');
 }
 
+// ── 3D body: portrait → Forge → avatar.glb → stage ──
+// Forge makes STATIC meshes (no rig, no mouth). The stage bobs them
+// procedurally. Honest motion, never a fake mouth.
+let avatarPollTimer = null;
+
+function avatarMsg(msg) {
+  document.getElementById('avatarStatus').textContent = msg;
+}
+
+async function make3D() {
+  const slug = window._slug;
+  if (!slug) {
+    avatarMsg('SAVE SET first — the body ships with the bundle');
+    return status('Save the set first, then MAKE THEM 3D');
+  }
+  if (avatarPollTimer) { clearInterval(avatarPollTimer); avatarPollTimer = null; }
+  avatarMsg('sending portrait to the Forge…');
+  status('Growing a 3D body… (free tier, ~1 min)');
+  let res;
+  try {
+    res = await fetch('/api/avatar', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug }),
+    });
+  } catch (e) {
+    avatarMsg('network failed — retry');
+    return;
+  }
+  const data = await res.json();
+  if (!data.ok) {
+    avatarMsg(data.error || 'submit failed');
+    return status(data.error || 'Avatar submit failed');
+  }
+  if (data.status === 'done' && data.avatar_url) {
+    avatarMsg('body ready — loading onto stage');
+    window.loadMeshAvatar(data.avatar_url);
+    return;
+  }
+  avatarMsg(`growing… (${data.mode || 'forge'}) — polling`);
+  avatarPollTimer = setInterval(() => pollAvatar(slug), 4000);
+}
+
+async function uploadBody(input) {
+  const file = input && input.files && input.files[0];
+  input.value = '';
+  if (!file) return;
+  const slug = window._slug;
+  if (!slug) {
+    avatarMsg('SAVE SET first — the body ships with the bundle');
+    return status('Save the set first, then bring a body');
+  }
+  if (!/\.(glb|vrm)$/i.test(file.name)) {
+    avatarMsg('needs a .glb or .vrm file');
+    return;
+  }
+  if (file.size > 50 * 1024 * 1024) {
+    avatarMsg('over 50MB — decimate first');
+    return;
+  }
+  avatarMsg(`reading ${file.name}…`);
+  const form = new FormData();
+  form.append('slug', slug);
+  form.append('file', file, file.name);
+  let data;
+  try {
+    const res = await fetch('/api/avatar/upload', { method: 'POST', body: form });
+    data = await res.json();
+  } catch (e) {
+    avatarMsg('upload failed — retry');
+    return;
+  }
+  if (!data.ok) {
+    avatarMsg(data.error || 'upload rejected');
+    return status(data.error || 'Body upload failed');
+  }
+  const caps = data.capabilities || {};
+  avatarMsg(caps.lipsync
+    ? 'body loaded — analyser lipsync (mouth morphs found)'
+    : 'body loaded — procedural motion (no mouth morphs)');
+  buzz('MEDIUM');
+  window.loadMeshAvatar(data.avatar_url);
+}
+
+async function pollAvatar(slug) {
+  let data;
+  try {
+    const res = await fetch(`/api/avatar/${encodeURIComponent(slug)}`);
+    data = await res.json();
+  } catch (e) {
+    return; // keep polling on transient network blips
+  }
+  if (data.status === 'done' && data.avatar_url) {
+    clearInterval(avatarPollTimer);
+    avatarPollTimer = null;
+    avatarMsg('3D body ready — procedural motion (static mesh, no mouth morphs)');
+    buzz('MEDIUM');
+    window.loadMeshAvatar(data.avatar_url);
+  } else if (data.status === 'failed') {
+    clearInterval(avatarPollTimer);
+    avatarPollTimer = null;
+    avatarMsg('forge failed: ' + (data.error || 'unknown'));
+  } else {
+    avatarMsg(`growing… ${data.status || ''} ${data.backend || ''}`.trim());
+  }
+}
+
+
 async function playWalkout() {
   if (!walkoutUrl) return status('Generate the walkout first');
   const a = document.getElementById('audio');
@@ -1105,23 +1223,56 @@ async function initVRM() {
     const oldAvatar = document.getElementById('avatar');
     if (oldAvatar) oldAvatar.style.display = 'none';
 
+    // Stage refs for loadMeshAvatar (called later from regular script).
+    window._stage3d = { scene, camera, renderer };
     const animate = () => {
       requestAnimationFrame(animate);
       const dt = Math.min(clock.getDelta(), 0.05);
       const t = clock.elapsedTime;
       updateMouth(dt);
-      // idle sway + blink
+      // idle sway + blink (VRM path)
       if (vrm?.humanoid) {
         const spine = vrm.humanoid.getNormalizedBoneNode('spine');
         if (spine) spine.rotation.y = Math.sin(t * 0.6) * 0.04;
         const head = vrm.humanoid.getNormalizedBoneNode('head');
         if (head) head.rotation.x = Math.sin(t * 0.8) * 0.02;
       }
+      // procedural motion for mesh bodies (always) + analyser-driven
+      // mouth morphs when the rig actually carries them (forge_avatar
+      // path). Morphs listed per mesh at load; absent morphs stay at 0.
+      const mb = window._meshBody;
+      if (mb && mb.object) {
+        mb.object.rotation.y = mb.baseRotY + Math.sin(t * 0.5) * 0.12;
+        mb.object.position.y = mb.baseY + Math.sin(t * 1.1) * 0.03;
+        mb.object.rotation.z = Math.sin(t * 0.35) * 0.02;
+        if (mb.mode === 'viseme' && analyser) {
+          const el = document.getElementById('audio');
+          const gate = (micMode || (el && !el.paused)) ? 1 : 0;
+          const low = band(0, 10), mid = band(10, 40), high = band(40, 80);
+          for (const mm of mb.mouthMeshes) {
+            const dict = mm.mesh.morphTargetDictionary;
+            const infl = mm.mesh.morphTargetInfluences;
+            if (!dict || !infl) continue;
+            if (mm.jaw) {
+              mm.pJaw = smooth(mm.pJaw, Math.min(1, low / 200) * gate, 0.5);
+              infl[dict[mm.jaw]] = mm.pJaw;
+            }
+            if (mm.wide) {
+              mm.pWide = smooth(mm.pWide, Math.min(1, high / 180) * gate, 0.5);
+              infl[dict[mm.wide]] = mm.pWide * 0.7;
+            }
+            if (mm.round) {
+              mm.pRound = smooth(mm.pRound, Math.min(1, mid / 220) * gate, 0.5);
+              infl[dict[mm.round]] = mm.pRound * 0.7;
+            }
+          }
+        }
+      }
       if (t > nextBlink) {
         nextBlink = t + 2.5 + Math.random() * 2.5;
         blink();
       }
-      vrm.update(dt);
+      if (vrm) vrm.update(dt);
       renderer.render(scene, camera);
     };
     animate();
@@ -1317,6 +1468,70 @@ async function tryPlay(audio, label) {
 window.tryPlay = tryPlay;
 window.unlockAudio = unlockAudio;
 window.toggleMic = toggleMic;
+
+// ── Mesh bodies: Forge GLBs are plain meshes, NOT VRM ──
+// Plain GLTFLoader (no VRM plugin): userData.vrm will be undefined.
+// Normalized to ~1.6 units tall, centered, procedural bob only.
+window.loadMeshAvatar = async function (url) {
+  const stage = window._stage3d;
+  if (!stage) return;
+  const { scene } = stage;
+  try {
+    // remove previous body (VRM or mesh), keep lights/camera
+    if (vrm && vrm.scene) {
+      scene.remove(vrm.scene);
+      vrm = null;
+    }
+    if (window._meshBody && window._meshBody.object) {
+      scene.remove(window._meshBody.object);
+      window._meshBody = null;
+    }
+    const loader = new GLTFLoader();
+    const gltf = await loader.loadAsync(url);
+    const obj = gltf.scene;
+    // normalize: height → 1.6, feet at y=0
+    const box = new THREE.Box3().setFromObject(obj);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const s = size.y > 0 ? 1.6 / size.y : 1;
+    obj.scale.setScalar(s);
+    obj.position.x -= center.x * s;
+    obj.position.z -= center.z * s;
+    obj.position.y -= box.min.y * s;
+    scene.add(obj);
+    // capability scan: which meshes carry mouth morphs? A rigged Forge
+    // avatar arrives with ARKit-52/Oculus targets; a raw mesh has none.
+    // The animate loop drives what exists, never fakes what doesn't.
+    const mouthMeshes = [];
+    obj.traverse((o) => {
+      if (!o.isMesh || !o.morphTargetDictionary) return;
+      const names = Object.keys(o.morphTargetDictionary);
+      const jaw = names.find((n) =>
+        /^(jawOpen|mouthOpen|viseme_aa|mouthClose)$/.test(n));
+      const wide = names.find((n) =>
+        /^(viseme_E|viseme_I|mouthSmileLeft|mouthSmileRight|mouthStretchLeft)$/.test(n));
+      const round = names.find((n) =>
+        /^(viseme_O|viseme_U|mouthFunnel|mouthPucker|mouthShrugLower)$/.test(n));
+      if (jaw || wide || round) {
+        mouthMeshes.push({ mesh: o, jaw, wide, round,
+                           pJaw: 0, pWide: 0, pRound: 0 });
+      }
+    });
+    const mode = mouthMeshes.length ? 'viseme' : 'body';
+    window._meshBody = { object: obj, baseRotY: 0, baseY: obj.position.y,
+                         url, mode, mouthMeshes };
+    window._vrmCaps = { humanoid: false, visemes: [],
+                        expressions: [], blink: false, meshMode: mode };
+    document.getElementById('vrmStage').style.display = 'block';
+    vrmStatus(mode === 'viseme'
+      ? `3D BODY · rigged + ${mouthMeshes.length} mouth mesh(es) · analyser lipsync`
+      : '3D BODY · procedural motion (no mouth morphs)');
+  } catch (err) {
+    console.error('mesh body failed:', err);
+    vrmStatus('3D BODY FAILED TO LOAD');
+  }
+};
+
 
 initVRM();
 </script>
