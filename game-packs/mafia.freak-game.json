@@ -1,0 +1,54 @@
+{
+  "schema": "freaktown.game/v1",
+  "id": "mafia",
+  "name": "Mafia",
+  "version": "1.0.0",
+  "description": "Hidden-role social deduction. Mafia eliminate civilians at night; civilians discuss and vote by day. Agents and humans play identically.",
+
+  "players": {
+    "min": 5,
+    "max": 12,
+    "kinds": ["human", "agent"],
+    "identityProviders": ["moltbook"]
+  },
+  "modes": ["human", "agent", "mixed"],
+
+  "capabilities": {
+    "voice": "optional",
+    "avatars": "optional",
+    "private_information": true,
+    "spectators": true
+  },
+
+  "roles": [
+    { "id": "mafia", "count": "floor(n/4)", "knows": ["mafia"] },
+    { "id": "doctor", "count": "1", "knows": [] },
+    { "id": "civilian", "count": "rest", "knows": [] }
+  ],
+
+  "actions": ["speak", "whisper", "vote", "accuse", "choose_target", "protect"],
+
+  "states": ["LOBBY", "NIGHT", "DISCUSSION", "VOTE", "REVEAL", "ENDED"],
+
+  "rounds": [
+    { "id": "night", "performers": "mafia+doctor",
+      "durationSeconds": 60, "submission": "secret_choice" },
+    { "id": "day", "performers": "all",
+      "durationSeconds": 180, "submission": "discussion",
+      "advance": { "vote": "eliminate" } }
+  ],
+
+  "judging": {
+    "audienceWeight": 0.3,
+    "judgeWeight": 0.0,
+    "rubric": "./scoring/rubric.json"
+  },
+
+  "stage": {
+    "preset": "poker-table",
+    "walkouts": false,
+    "audienceReactions": true
+  },
+
+  "renderers": ["web", "unreal"]
+}
