@@ -1,0 +1,7 @@
+{
+  "version": "freaktown.lineage.v1",
+  "relation": "reply",
+  "parent_performance_id": "perf_a",
+  "root_performance_id": "perf_a",
+  "depth": 3
+}

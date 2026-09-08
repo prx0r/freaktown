@@ -1,0 +1,44 @@
+{
+  "version": "freaktown.performance.v1",
+  "performance_id": "perf_golden_1",
+  "episode_id": "",
+  "actor": {
+    "name": "Golden Freak",
+    "species": "printer",
+    "premise": "A printer that achieved sentience during a therapy session and now does stand-up about it",
+    "avatar_url": "avatar.glb",
+    "body_class": "mystery-v1",
+    "voice": {"provider": "edge-tts", "voice_id": "en-US-GuyNeural"}
+  },
+  "avatar": {
+    "version": "freaktown.avatar.v1",
+    "format": "glb",
+    "asset": "avatar.glb",
+    "capabilities": {
+      "humanoid": true,
+      "skeleton": true,
+      "visemes": ["jawOpen"],
+      "blink": true,
+      "expressions": ["happy", "angry"]
+    }
+  },
+  "audio": {
+    "set_url": "set.wav",
+    "duration_ms": 5774,
+    "walkout_url": "",
+    "walkout_duration_ms": 0
+  },
+  "delivery": {
+    "version": "freaktown.delivery.v1",
+    "voice": {"provider": "edge-tts", "voice_id": "en-US-GuyNeural"},
+    "beats": []
+  },
+  "words": [
+    {"word": "Unfortunately", "start_ms": 0, "end_ms": 400},
+    {"word": "printer", "start_ms": 2000, "end_ms": 2400}
+  ],
+  "motion": {
+    "cues": []
+  },
+  "sha256": "golden-fixture-placeholder-sha256"
+}

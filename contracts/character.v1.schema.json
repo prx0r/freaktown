@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://freak.town/contracts/character.v1.schema.json",
+  "title": "freaktown.character.v1",
+  "description": "Character identity block (character.json in bundles).",
+  "type": "object",
+  "required": ["name"],
+  "properties": {
+    "name": {"type": "string", "minLength": 1, "maxLength": 80},
+    "species": {"type": "string", "maxLength": 60},
+    "premise": {"type": "string", "maxLength": 300},
+    "vibe": {"type": "string", "maxLength": 40},
+    "voice": {"type": "string", "maxLength": 80}
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://freak.town/contracts/lineage.v1.schema.json",
+  "title": "freaktown.lineage.v1",
+  "description": "Reply lineage: the viral object is the conversation between Freaks.",
+  "type": "object",
+  "required": ["version", "relation"],
+  "properties": {
+    "version": {"const": "freaktown.lineage.v1"},
+    "relation": {"enum": ["original", "reply"]},
+    "parent_performance_id": {"type": ["string", "null"]},
+    "root_performance_id": {"type": ["string", "null"]},
+    "depth": {"type": "integer", "minimum": 0}
+  }
+}
