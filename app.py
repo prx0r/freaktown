@@ -1069,14 +1069,20 @@ def walkout():
     Cache key covers provider + model + prompt version + recipe + seed."""
     import sound_synth
     data = request.json or {}
+    seed = int(data.get("seed", 0))
+    mode = str(data.get("mode", "instant")).lower()
+    # synth voice: "pattern" (default riff engine) or "melody" (seeded tune).
+    # Explicit `melody` param wins; engine-mode "melody" is an accepted alias.
+    _mel = str(data.get("melody", "") or "").lower()
+    if _mel not in ("melody", "pattern"):
+        _mel = "melody" if mode == "melody" else "pattern"
     recipe = {
         "genre": str(data.get("genre", "funk"))[:20],
         "mood": str(data.get("mood", "confident"))[:20],
         "energy": str(data.get("energy", "high"))[:20],
         "shape": str(data.get("shape", "hit"))[:20],
+        "mode": _mel,
     }
-    seed = int(data.get("seed", 0))
-    mode = str(data.get("mode", "instant")).lower()
 
     wdir = AUDIO_DIR / "walkouts"
     wdir.mkdir(exist_ok=True)
