@@ -95,6 +95,7 @@ input[type=range] { flex: 1; accent-color: #ff00aa; cursor: pointer; }
 <div class="header">
   <div class="title">FREAK TOWN · BLACK ROOM</div>
   <div style="font-size: 11px; color: #555;" id="charLine">no character yet</div>
+  <div style="font-size: 10px; color: #333; font-family: monospace;" id="buildSha" title="deployed build">BUILD …</div>
 </div>
 
 <div class="main">
@@ -176,14 +177,6 @@ input[type=range] { flex: 1; accent-color: #ff00aa; cursor: pointer; }
       <button class="btn btn-small" id="tabRehearse" onclick="setMode('rehearse')">REHEARSE</button>
       <span id="lockState" style="margin-left:auto;align-self:center;cursor:pointer;" onclick="toggleLock()" title="lock audio, perform visually">🔓 audio open</span>
     </div>
-    <div id="rehearseBar">
-      <div id="rehearseClock">00:00</div>
-      <div style="margin-top:8px;display:flex;gap:8px;justify-content:center;">
-        <button class="btn btn-small" onclick="composePlay()">◀ REHEARSE AGAIN</button>
-        <button class="btn btn-small" onclick="setMode('edit')">EDIT SET ▶</button>
-      </div>
-      <div id="rehearseStats"></div>
-    </div>
     <div id="beats"></div>
     <div style="font-size:11px;color:#555;margin-top:8px;" id="stats"></div>
     <div style="font-size:12px;margin-top:6px;display:none;" id="styleMatch">
@@ -192,6 +185,15 @@ input[type=range] { flex: 1; accent-color: #ff00aa; cursor: pointer; }
       <button class="btn btn-small" style="margin-left:8px;" onclick="applyMatchedStyle()">APPLY STYLE</button>
     </div>
   </div>
+</div>
+
+<div id="rehearseBar">
+  <div id="rehearseClock">00:00</div>
+  <div style="margin-top:8px;display:flex;gap:8px;justify-content:center;">
+    <button class="btn btn-small" onclick="composePlay()">◀ REHEARSE AGAIN</button>
+    <button class="btn btn-small" onclick="setMode('edit')">EDIT SET ▶</button>
+  </div>
+  <div id="rehearseStats"></div>
 </div>
 
 <div class="chatbar">
@@ -356,13 +358,13 @@ function renderBeats() {
           ${['slow','normal','fast','rush'].map(p =>
             `<option ${((b.pace||'normal')===p)?'selected':''}>${p}</option>`).join('')}
         </select></label>
-        <label>FACE<select onchange="setPerf(${i},'face',this.value)">
+        <label>FACE<select onchange="setPerf(${i},'expression',this.value)">
           ${['neutral','deadpan','grin','annoyed','confused','surprised'].map(f =>
-            `<option ${(((b.performance||{}).face||'neutral')===f)?'selected':''}>${f}</option>`).join('')}
+            `<option ${(((b.performance||{}).expression||(b.performance||{}).face||'neutral')===f)?'selected':''}>${f}</option>`).join('')}
         </select></label>
-        <label>BODY<select onchange="setPerf(${i},'body',this.value)">
+        <label>BODY<select onchange="setPerf(${i},'gesture',this.value)">
           ${['normal','hold still','lean in','look left','look right','shrug','small gesture','big gesture'].map(g =>
-            `<option ${(((b.performance||{}).body||'normal')===g)?'selected':''}>${g}</option>`).join('')}
+            `<option ${(((b.performance||{}).gesture||(b.performance||{}).body||'normal')===g)?'selected':''}>${g}</option>`).join('')}
         </select></label>
       </div>`;
     c.appendChild(el);
@@ -593,7 +595,7 @@ function loadDraft() {
 
 // ── Play from box ──
 let lastComposeSig = '';
-const sig = () => JSON.stringify(beats.map(b => [b.text, b.pause_after_ms]));
+const sig = () => JSON.stringify(beats.map(b => [b.text, b.pause_after_ms, b.pace || 'normal'])) + '|' + document.getElementById('voice').value;
 
 async function playFromHere(i) {
   if (!beats.length) return;
@@ -1023,6 +1025,16 @@ loadSets();
   } catch (e) {}
 })();
 if (loadDraft()) status('Draft restored');
+// BUILD SHA: fetch from server, display tiny in header.
+// When desktop and phone disagree, this tells us instantly.
+fetch('/api/health').then(r => r.json()).then(h => {
+  const el = document.getElementById('buildSha');
+  if (el && h.build) el.textContent = 'BUILD ' + h.build;
+  else if (el) el.textContent = 'BUILD ?';
+}).catch(() => {
+  const el = document.getElementById('buildSha');
+  if (el) el.textContent = 'BUILD ?';
+});
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => {});
 }
@@ -1257,14 +1269,15 @@ function updateMouth(dt) {
   em.setValue('aa', prevAA);
   em.setValue('ih', prevIH * 0.7);
   em.setValue('oh', prevOH * 0.7);
-  // face channel: per-beat performance.face, independent of mouth/blink.
+  // face channel: per-beat performance.expression (legacy .face also read),
+  // independent of mouth/blink.
   // mouth = analyser, face = semantic beat, blink = timer. Never reset all.
   const activeEl = document.querySelector('.beat.active');
   let face = 'neutral';
   if (activeEl) {
     const m = (activeEl.id || '').match(/^beat-(.+)$/);
     const b = m && beats.find(x => String(x.id) === m[1]);
-    face = ((b && b.performance && b.performance.face) || 'neutral').toLowerCase();
+    face = (((b && b.performance && (b.performance.expression || b.performance.face))) || 'neutral').toLowerCase();
   }
   const targets = {happy: 0, relaxed: 0, angry: 0, surprised: 0, sad: 0};
   if (face === 'grin') targets.happy = 0.55;
@@ -1297,6 +1310,13 @@ async function tryPlay(audio, label) {
       : (err && err.message) || err}`);
   }
 }
+
+// Scope bridge: plain-script callers (composePlay/playBeat/playFromHere) and
+// inline onclick resolve globals via window. Module-scope functions are
+// invisible to them → ReferenceError → total audio silence.
+window.tryPlay = tryPlay;
+window.unlockAudio = unlockAudio;
+window.toggleMic = toggleMic;
 
 initVRM();
 </script>

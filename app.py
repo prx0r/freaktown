@@ -669,8 +669,10 @@ def _save_bundle(data: dict):
             "speech": {"pace": b.get("pace", "normal"),
                        "emphasis": float(b.get("emphasis", 0.5))},
             "performance": {
-                "expression": perf.get("expression", "neutral"),
-                "gesture": perf.get("gesture", "normal"),
+                # contract fields, with legacy face/body fallback so old
+                # drafts don't lose directing work on save.
+                "expression": perf.get("expression") or perf.get("face", "neutral"),
+                "gesture": perf.get("gesture") or perf.get("body", "normal"),
                 "look": perf.get("look", "audience"),
             },
             "pause_after_ms": int(b.get("pause_after_ms", 300)),
@@ -1169,7 +1171,7 @@ def _cf_chat(system: str, user: str, max_tokens: int = 500,
                 timeout=90)
             if r.status_code != 200:
                 continue
-            return r.json()["result"]["response"], model.split("/")[-1]
+            return _ai_text(r.json()), model.split("/")[-1]
         except Exception:
             continue
     return None, None
@@ -1514,7 +1516,7 @@ def respond_idea():
                     timeout=60)
                 if r.status_code != 200:
                     continue
-                idea = r.json()["result"]["response"].strip().strip('"')
+                idea = _ai_text(r.json()).strip().strip('"')
                 engine = model.split("/")[-1]
                 break
             except Exception:
@@ -2313,6 +2315,47 @@ def _cf_creds():
         return "", ""
 
 
+def _ai_text(payload: dict) -> str:
+    """Extract generated text from a Workers AI response.
+
+    Handles both envelopes: legacy `{result: {response: ...}}` and the
+    OpenAI-compatible `{result: {choices: [{message: {content: ...}}]}}`
+    that current models return.
+    """
+    result = (payload.get("result") or {}) if isinstance(payload, dict) else {}
+    if isinstance(result.get("response"), str):
+        return result["response"]
+    try:
+        return result["choices"][0]["message"]["content"] or ""
+    except Exception:
+        return ""
+
+
+def _build_id() -> str:
+    if os.getenv("BUILD_SHA"):
+        return os.getenv("BUILD_SHA", "")[:12]
+    try:
+        import subprocess as _sp
+        out = _sp.run(["git", "rev-parse", "--short", "HEAD"],
+                      capture_output=True, timeout=5,
+                      cwd=Path(__file__).parent)
+        if out.returncode == 0:
+            return out.stdout.decode().strip()[:12]
+    except Exception:
+        pass
+    return "dev"
+
+
+BUILD_ID = _build_id()
+
+
+@app.route("/api/health", methods=["GET"])
+def health():
+    """Build id + status. The Black Room header shows BUILD <id> so
+    phone-vs-desktop mismatches are instantly diagnosable."""
+    return jsonify({"ok": True, "build": BUILD_ID, "service": "freaktown"})
+
+
 @app.route("/api/generate", methods=["POST"])
 def generate():
     """Write character + minute from a premise via free-tier CF AI."""
@@ -2324,27 +2367,42 @@ def generate():
 
     tok, acct = _cf_creds()
     if tok and acct:
+        best = None
         for model in CF_MODELS:
-            try:
-                r = httpx.post(
-                    f"https://api.cloudflare.com/client/v4/accounts/{acct}/ai/run/{model}",
-                    headers={"Authorization": f"Bearer {tok}", "Content-Type": "application/json"},
-                    json={"messages": [
-                        {"role": "system", "content": GEN_SYSTEM},
-                        {"role": "user", "content": f"Write the character and minute for: {premise}"}],
-                        "max_tokens": 500, "temperature": 0.9},
-                    timeout=90)
-                if r.status_code != 200:
-                    continue
-                raw = r.json()["result"]["response"]
-                m = re.search(r"\{.*\}", raw, re.S)
-                out = json.loads(m.group(0) if m else raw)
-                if out.get("minute"):
+            for attempt in range(2):
+                try:
+                    sys = GEN_SYSTEM
+                    if attempt == 1:
+                        sys += ("\nSTRICT LENGTH CHECK: your minute MUST be "
+                                "80-150 words. Count before replying. "
+                                "A one-liner is a FAILED response.")
+                    r = httpx.post(
+                        f"https://api.cloudflare.com/client/v4/accounts/{acct}/ai/run/{model}",
+                        headers={"Authorization": f"Bearer {tok}", "Content-Type": "application/json"},
+                        json={"messages": [
+                            {"role": "system", "content": sys},
+                            {"role": "user", "content": f"Write the character and minute for: {premise}"}],
+                            "max_tokens": 500, "temperature": 0.9},
+                        timeout=90)
+                    if r.status_code != 200:
+                        break
+                    raw = _ai_text(r.json())
+                    m = re.search(r"\{.*\}", raw, re.S)
+                    out = json.loads(m.group(0) if m else raw)
+                    if not out.get("minute"):
+                        continue
+                    wc = len(out["minute"].split())
                     out["ok"] = True
                     out["engine"] = model.split("/")[-1]
-                    return jsonify(out)
-            except Exception:
-                continue
+                    out["word_count"] = wc
+                    if 100 <= wc <= 220:
+                        return jsonify(out)
+                    if best is None or wc > best["word_count"]:
+                        best = out
+                except Exception:
+                    break
+        if best is not None:
+            return jsonify(best)
     return jsonify({"ok": False, "error": "generation unavailable (no CF creds or all models failed)"}), 502
 
 
