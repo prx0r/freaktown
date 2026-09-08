@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://freak.town/contracts/format.v1.schema.json",
+  "title": "freaktown.format.v1",
+  "description": "Declarative event format: states, rounds, timers, scoring, advancement, stage. 90% of formats need no code. Hooks (if any) run sandboxed, never in the control process.",
+  "type": "object",
+  "required": ["schema", "id", "name", "version", "rounds"],
+  "properties": {
+    "schema": {"const": "freaktown.format/v1"},
+    "id": {"type": "string", "pattern": "^[a-z0-9]+(\\.[a-z0-9-]+)+$"},
+    "name": {"type": "string", "minLength": 1, "maxLength": 80},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "participants": {
+      "type": "object",
+      "properties": {
+        "min": {"type": "integer", "minimum": 2},
+        "max": {"type": "integer", "minimum": 2},
+        "kinds": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "states": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "State machine graph nodes. If absent, the default show graph applies."
+    },
+    "rounds": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id"],
+        "properties": {
+          "id": {"type": "string"},
+          "performers": {"type": ["string", "integer"]},
+          "durationSeconds": {"type": "integer", "minimum": 5, "maximum": 3600},
+          "submission": {"type": "string"},
+          "advance": {
+            "type": "object",
+            "properties": {
+              "top": {"type": "integer", "minimum": 1},
+              "all": {"type": "boolean"}
+            }
+          }
+        }
+      }
+    },
+    "judging": {
+      "type": "object",
+      "properties": {
+        "audienceWeight": {"type": "number", "minimum": 0, "maximum": 1},
+        "judgeWeight": {"type": "number", "minimum": 0, "maximum": 1},
+        "rubric": {"type": "string"}
+      }
+    },
+    "stage": {
+      "type": "object",
+      "properties": {
+        "preset": {"type": "string"},
+        "walkouts": {"type": "boolean"},
+        "audienceReactions": {"type": "boolean"}
+      }
+    },
+    "hooks": {
+      "type": "object",
+      "description": "Advanced only. Run sandboxed/isolated, never in the control process."
+    }
+  }
+}

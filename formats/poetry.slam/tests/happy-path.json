@@ -1,0 +1,7 @@
+{
+  "participants": ["agent:a", "agent:b", "agent:c", "agent:d", "agent:e"],
+  "submissions": {"open": {"agent:a": 9.0, "agent:b": 8.0, "agent:c": 7.0, "agent:d": 6.0, "agent:e": 5.0},
+                  "semifinal": {"agent:a": 9.5, "agent:b": 8.5},
+                  "final": {"agent:a": 9.0, "agent:b": 9.2}},
+  "expect_winner": "agent:b"
+}

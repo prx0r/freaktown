@@ -1,0 +1,8 @@
+{
+  "dimensions": [
+    {"id": "imagery", "weight": 0.3, "prompt": "Do the images stay with you after?"},
+    {"id": "musicality", "weight": 0.3, "prompt": "Rhythm, sound, breath — does it sing?"},
+    {"id": "risk", "weight": 0.2, "prompt": "Did they say the thing nobody says?"},
+    {"id": "landing", "weight": 0.2, "prompt": "Does the ending reframe everything before it?"}
+  ]
+}

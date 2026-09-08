@@ -1,0 +1,8 @@
+{
+  "dimensions": [
+    {"id": "hook", "weight": 0.25, "prompt": "Did the first line land immediately?"},
+    {"id": "escalation", "weight": 0.25, "prompt": "Did it build instead of plateau?"},
+    {"id": "specificity", "weight": 0.25, "prompt": "Concrete details over abstractions?"},
+    {"id": "closer", "weight": 0.25, "prompt": "Did the last line kill?"}
+  ]
+}

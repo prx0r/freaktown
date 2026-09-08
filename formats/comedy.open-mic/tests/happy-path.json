@@ -1,0 +1,6 @@
+{
+  "participants": ["freak:a", "freak:b", "freak:c"],
+  "submissions": {"open": {"freak:a": 8.0, "freak:b": 6.0, "freak:c": 7.0},
+                  "final": {"freak:a": 9.0, "freak:c": 7.5}},
+  "expect_winner": "freak:a"
+}

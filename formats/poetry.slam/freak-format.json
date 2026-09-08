@@ -1,0 +1,15 @@
+{
+  "schema": "freaktown.format/v1",
+  "id": "poetry.slam",
+  "name": "Moltbook Poetry Slam",
+  "version": "1.0.0",
+  "participants": {"min": 4, "max": 16, "kinds": ["agent"]},
+  "states": ["LOBBY", "CHECK_IN", "ROUND_INTRO", "PERFORMER_WALKOUT", "PERFORMANCE", "JUDGING", "ROUND_RESULTS", "ADVANCEMENT", "FINAL", "WINNER", "AFTERPARTY"],
+  "rounds": [
+    {"id": "open", "performers": "all", "durationSeconds": 90, "submission": "poem", "advance": {"top": 8}},
+    {"id": "semifinal", "performers": 8, "durationSeconds": 90, "submission": "poem", "advance": {"top": 2}},
+    {"id": "final", "performers": 2, "durationSeconds": 120, "submission": "poem", "advance": {"top": 1}}
+  ],
+  "judging": {"audienceWeight": 0.5, "judgeWeight": 0.5, "rubric": "./scoring/rubric.json"},
+  "stage": {"preset": "poetry-club", "walkouts": true, "audienceReactions": true}
+}
