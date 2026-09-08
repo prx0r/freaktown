@@ -805,6 +805,7 @@ def preload_set(slug):
     spans = spans_from_offsets(offsets) if offsets else estimate_spans(
         delivery.get("beats", []), duration_ms)
     words = words_from_beats(delivery.get("beats", []), spans)
+    by_id = {s.beat_id: s for s in spans}
     manifest = build_performance_manifest(
         f"local-{slug}", character, score, words, f"/freaks/{slug}/set.wav",
         duration_ms or (spans[-1].end_ms if spans else 0))
@@ -831,6 +832,11 @@ def preload_set(slug):
         "wordTimings": [{"word": w.word, "start_ms": w.start_ms,
                          "end_ms": w.end_ms, "index": i}
                         for i, w in enumerate(words)],
+        "beats": [{"text": b.get("text", ""),
+                   "start": by_id[b["id"]].start_ms,
+                   "end": by_id[b["id"]].start_ms + by_id[b["id"]].speech_ms,
+                   "face": (b.get("performance") or {}).get("expression", "neutral")}
+                  for b in delivery.get("beats", []) if b.get("id") in by_id],
         "walkoutUrl": walkout,
         "manifest_sha": manifest["sha256"],
         "estimated": cues["estimated"],
@@ -1545,19 +1551,31 @@ def _render_watch(slug):
     has_portrait = (bdir / "portrait.png").exists()
     img = f"/freaks/{slug}/portrait.png" if has_portrait else "/icon-512.png"
     dur = meta.get("duration_s", 0)
-    # beat timeline for sync highlight (speech estimated at stage pace)
+    # Beat timeline for sync highlight — SAME clock as /api/preload:
+    # measured offsets when present, else the shared estimator.
+    # (The old inline 2.82-wps estimator is gone; viewer and StageRuntime
+    # must never disagree about when a line lands.)
     beats = []
     try:
+        from backend.services.freaktown.bundle import (
+            estimate_spans, spans_from_offsets,
+        )
         delivery = json.loads((bdir / "delivery.json").read_text())
-        t = 0
+        try:
+            offsets = json.loads((bdir / "offsets.json").read_text()).get("offsets", [])
+        except Exception:
+            offsets = []
+        duration_ms = int(float(meta.get("duration_s", 0)) * 1000) or None
+        spans = spans_from_offsets(offsets) if offsets else estimate_spans(
+            delivery.get("beats", []), duration_ms)
+        by_id = {s.beat_id: s for s in spans}
         for b in delivery.get("beats", []):
-            words = len((b.get("text") or "").split())
-            speech = int(words / 2.82 * 1000)
-            pause = int(b.get("pause_after_ms", 300))
-            beats.append({"text": b.get("text", ""), "start": t,
-                          "end": t + speech,
+            s = by_id.get(b.get("id"))
+            if s is None:
+                continue
+            beats.append({"text": b.get("text", ""), "start": s.start_ms,
+                          "end": s.start_ms + s.speech_ms,
                           "face": (b.get("performance") or {}).get("expression", "neutral")})
-            t += speech + pause
     except Exception:
         pass
     lin = meta.get("lineage") or {}
