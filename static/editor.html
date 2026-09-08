@@ -135,6 +135,7 @@ input[type=range] { flex: 1; accent-color: #ff00aa; cursor: pointer; }
       </div>
       <div class="tempo-row" style="margin-top:6px;">
         <button class="btn btn-small" onclick="make3D()">🧍 MAKE THEM 3D</button>
+        <button class="btn btn-small" onclick="make3D(true)">🎲 AGAIN</button>
       </div>
       <div class="tempo-row" style="margin-top:6px;">
         <label class="btn btn-small" style="text-align:center;cursor:pointer;">
@@ -750,7 +751,7 @@ function avatarMsg(msg) {
   document.getElementById('avatarStatus').textContent = msg;
 }
 
-async function make3D() {
+async function make3D(force) {
   const slug = window._slug;
   if (!slug) {
     avatarMsg('SAVE SET first — the body ships with the bundle');
@@ -763,7 +764,7 @@ async function make3D() {
   try {
     res = await fetch('/api/avatar', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slug }),
+      body: JSON.stringify({ slug, force: !!force }),
     });
   } catch (e) {
     avatarMsg('network failed — retry');

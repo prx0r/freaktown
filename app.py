@@ -2846,6 +2846,14 @@ def avatar_submit():
     meta = _bundle_meta(slug)
     if meta is None or not bdir.is_dir():
         return jsonify({"ok": False, "error": "unknown set — SAVE SET first"}), 404
+    if data.get("force"):
+        # AGAIN: trash the current body (any format) and grow a new one.
+        # Manifest goes too — capabilities describe the new bytes, never old.
+        for f in ("avatar.glb", "avatar.vrm", "avatar.json"):
+            try:
+                (bdir / f).unlink(missing_ok=True)
+            except Exception:
+                pass
     rt = _avatar_runtime(slug)
     if rt is not None:
         rec = _avatar_record(slug) or {}
