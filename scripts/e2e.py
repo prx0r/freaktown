@@ -1,0 +1,128 @@
+#!/usr/bin/env python3
+"""End-to-end: Black Room -> viral reply -> party, against a live server.
+
+Usage: python3 scripts/e2e.py [base_url]  (default http://localhost:8090)
+Logs every step with timings to var/e2e/e2e_<ts>.log. Exit 1 on any FAIL.
+"""
+
+import json
+import sys
+import time
+import urllib.request
+from datetime import datetime, timezone
+from pathlib import Path
+
+BASE = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8090"
+ROOT = Path(__file__).parent.parent
+LOGDIR = ROOT / "var" / "e2e"
+LOGDIR.mkdir(parents=True, exist_ok=True)
+LOG = LOGDIR / f"e2e_{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}.log"
+
+results = []
+
+
+def log(msg):
+    line = f"[{datetime.now(timezone.utc):%H:%M:%S}] {msg}"
+    print(line, flush=True)
+    with open(LOG, "a") as f:
+        f.write(line + "\n")
+
+
+def req(method, path, body=None, timeout=120):
+    t0 = time.time()
+    r = urllib.request.Request(
+        BASE + path, data=json.dumps(body).encode() if body is not None else None,
+        headers={"Content-Type": "application/json"}, method=method)
+    try:
+        with urllib.request.urlopen(r, timeout=timeout) as resp:
+            out = resp.read().decode()
+            dt = time.time() - t0
+            try:
+                return resp.status, json.loads(out), dt
+            except Exception:
+                return resp.status, out, dt
+    except Exception as e:
+        return -1, str(e), time.time() - t0
+
+
+def check(name, cond, detail=""):
+    results.append((name, bool(cond)))
+    log(f"{'PASS' if cond else 'FAIL'} {name} {detail}")
+
+
+log(f"e2e start base={BASE}")
+
+# 1. health/build
+s, d, dt = req("GET", "/api/health", timeout=15)
+check("health", s == 200 and d.get("ok"), f"{dt:.1f}s build={d.get('build') if isinstance(d, dict) else d}")
+
+# 2. Black Room: generate -> parse -> compose -> save -> preload -> watch
+s, g, dt = req("POST", "/api/generate", {"premise": "e2e test: a toaster that files taxes"}, timeout=180)
+ok = s == 200 and g.get("ok") and len(g.get("minute", "").split()) >= 60
+check("generate minute", ok, f"{dt:.1f}s words={len(g.get('minute','').split()) if isinstance(g,dict) else 0}")
+if not ok:
+    log("ABORT: no minute, downstream steps skipped")
+    sys.exit(1)
+
+s, p, dt = req("POST", "/api/parse", {"text": g["minute"]}, timeout=30)
+beats = p.get("beats", []) if isinstance(p, dict) else []
+for b in beats:
+    b.setdefault("pace", "normal")
+check("parse beats", s == 200 and len(beats) >= 2, f"{dt:.1f}s n={len(beats)}")
+
+s, c, dt = req("POST", "/api/compose", {"beats": beats, "voice": "en-US-GuyNeural"}, timeout=600)
+check("compose audio", s == 200 and c.get("ok"), f"{dt:.1f}s dur={c.get('duration_ms') if isinstance(c,dict) else 0}ms")
+
+s, sv, dt = req("POST", "/api/sets", {
+    "character": {"name": "E2E Bot", "species": "toaster",
+                  "premise": "e2e test toaster", "vibe": "manic"},
+    "beats": beats, "voice": "en-US-GuyNeural"}, timeout=600)
+slug = sv.get("slug") if isinstance(sv, dict) else None
+check("save set", s == 200 and bool(slug), f"{dt:.1f}s slug={slug}")
+
+s, pre, dt = req("GET", f"/api/preload/{slug}", timeout=30)
+check("preload spec", s == 200 and pre.get("ok") and len(pre.get("wordTimings", [])) > 0,
+      f"{dt:.1f}s words={len(pre.get('wordTimings', [])) if isinstance(pre, dict) else 0}")
+
+s, html, dt = req("GET", f"/f/{slug}", timeout=30)
+check("watch page", s == 200 and "YOUR TURN" in html, f"{dt:.1f}s")
+
+# 3. Viral reply: idea -> respond -> reply watch + lineage
+s, idea, dt = req("POST", "/api/respond_idea", {"slug": slug, "mode": "roast"}, timeout=120)
+check("respond idea", s == 200 and idea.get("ok"), f"{dt:.1f}s")
+
+s, rep, dt = req("POST", "/api/respond",
+                 {"parent_slug": slug, "mode": "roast", "creator": "e2e"}, timeout=600)
+child = rep.get("slug") if isinstance(rep, dict) else None
+check("respond reply", s == 200 and bool(child), f"{dt:.1f}s child={child}")
+if child:
+    meta = json.loads((ROOT / "freaks" / child / "meta.json").read_text())
+    lin = meta.get("lineage", {})
+    check("reply lineage", lin.get("parent") == slug, f"depth={lin.get('depth')}")
+    s, _, dt = req("GET", f"/f/{child}", timeout=30)
+    check("reply watch", s == 200, f"{dt:.1f}s")
+
+# 4. Party: create -> join x3 -> lock -> start -> play -> scores
+s, room, dt = req("POST", "/party/create", {}, timeout=15)
+code, host = room.get("code"), room.get("host_token")
+check("party create", s == 200 and bool(code), f"{dt:.1f}s room={code}")
+toks = []
+for i in range(3):
+    s, j, _ = req("POST", f"/party/{code}/join",
+                  {"name": f"E2E{i}", "freak": f"E2EFreak{i}"}, timeout=15)
+    toks.append(j.get("seat_token"))
+check("party join x3", all(toks), "")
+req("POST", f"/party/{code}/host", {"host_token": host, "cmd": "lock"}, timeout=15)
+s, st, dt = req("POST", f"/party/{code}/host",
+                {"host_token": host, "cmd": "start", "mode": "freaktionary"}, timeout=15)
+check("party start", s == 200 and st.get("ok"), f"{dt:.1f}s")
+s, v, dt = req("GET", f"/party/{code}/view?seat_token={toks[1]}", timeout=15)
+check("party view (no leak check structural)", s == 200 and v.get("ok"), f"{dt:.1f}s")
+
+# 5. Submit local
+s, sub, dt = req("POST", f"/api/sets/{slug}/submit", {}, timeout=30)
+check("submit local", s == 200 and sub.get("status") == "queued", f"{dt:.1f}s")
+
+npass = sum(1 for _, ok in results if ok)
+log(f"e2e done: {npass}/{len(results)} passed -> {LOG}")
+sys.exit(0 if npass == len(results) else 1)
