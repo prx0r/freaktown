@@ -72,6 +72,34 @@ check("parse beats", s == 200 and len(beats) >= 2, f"{dt:.1f}s n={len(beats)}")
 
 s, c, dt = req("POST", "/api/compose", {"beats": beats, "voice": "en-US-GuyNeural"}, timeout=600)
 check("compose audio", s == 200 and c.get("ok"), f"{dt:.1f}s dur={c.get('duration_ms') if isinstance(c,dict) else 0}ms")
+if s == 200 and c.get("ok"):
+    # audio QA: no clipping, no dead air, no silent lead
+    import struct
+    import urllib.request as _url
+    import wave as _wave
+    try:
+        with _url.urlopen(BASE + c["audio"], timeout=60) as resp:
+            blob = resp.read()
+        with open("/tmp/e2e_qa.wav", "wb") as f:
+            f.write(blob)
+        w = _wave.open("/tmp/e2e_qa.wav")
+        fr = w.readframes(w.getnframes())
+        samp = [x / 32768 for x in struct.unpack(f"<{len(fr)//2}h", fr)]
+        sr = w.getframerate()
+        peak = max(abs(x) for x in samp)
+        clipped = sum(1 for x in samp if abs(x) > 0.99) / len(samp)
+        win = sr // 10
+        nrg = [sum(x * x for x in samp[i:i + win]) / win
+               for i in range(0, len(samp), win)]
+        lead = next((i for i, e in enumerate(nrg) if e > 0.0004), len(nrg)) / 10
+        run = best = 0
+        for e in nrg:
+            run = run + 1 if e < 0.0004 else 0
+            best = max(best, run)
+        check("audio qa", peak < 0.99 and clipped < 0.001 and lead < 1.0 and best / 10 < 3.0,
+              f"peak={peak:.2f} clip={clipped:.4f} lead={lead:.1f}s gap={best/10:.1f}s")
+    except Exception as e:
+        check("audio qa", False, str(e)[:100])
 
 s, sv, dt = req("POST", "/api/sets", {
     "character": {"name": "E2E Bot", "species": "toaster",

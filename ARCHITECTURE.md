@@ -1,25 +1,26 @@
 # Freak Town Architecture Spec
 
-> From peer review + agent analysis. Canonical reference for build decisions.
+> Canonical reference for build decisions. Truth as of Checkpoint 1:
+> what prod actually runs, not what was planned. Aspirations live in
+> devplan.md, not here.
 
-## Stack Decision
+## Stack Decision (prod reality)
 
 | Layer | Pick | Why |
 |-------|------|-----|
-| Avatars | three.ws-generated/rigged GLBs | Portable, lipsync built-in |
-| Animation | Three.js AnimationMixer + visemes | Standard, well-supported |
+| Avatars | BASIC rigged GLB (guaranteed) → three.ws forge_avatar (AI upgrade) → user upload | $0 instant base; provider-neutral manifest |
+| Avatar truth | `avatar.json` (freak.character/v1), capabilities sniffed from bytes | Stage reads capabilities, never extensions |
+| Animation | Procedural sway + analyser jaw morphs; VRM expressions where rig has them | Honest motion, never faked mouths |
 | Cameras | Multiple PerspectiveCamera presets | One renderer, four cuts |
 | Audio | Web Audio API | Browser-native, no plugins |
-| TTS now | MiniMax Speech 2.8 Turbo | Performance tokens (laughs, chuckle, breath) |
-| TTS quality | MiniMax Speech 2.8 HD | Keep clips worth |
-| Open-source TTS | Qwen3-TTS 0.6B Base | Apache-2.0, 2.5GB, voice cloning |
-| Quality ceiling | ElevenLabs | Voice changer, emotional delivery |
-| Music | MiniMax Music 2.6 | Walkout stings, band sounds |
-| Backend | FastAPI | Python, async, WebSocket support |
-| Data | SQLite + canonical JSON | Simple, portable |
-| Assets | filesystem initially; R2 later | Start simple |
-| Deployment | Docker Compose | No Kubernetes |
-| GPU | separate optional worker | Not on main VPS |
+| TTS | edge-tts (free) + espeak fallback | Compositor owns silence; measured offsets |
+| Music | Procedural synth: pattern riffs + seeded melody mode | Deterministic per (recipe, seed) |
+| Product backend | Flask (`app.py`, strangler) | Serves everything live today |
+| Infra backend | FastAPI + Postgres (imported, not yet serving) | Future durable truth |
+| Live state | PartyRoom SSE / EpisodeRoom DO (imported) | Persist-then-broadcast |
+| Data now | Filesystem bundles + JSONL | Portable; repository interfaces ready |
+| Assets | Filesystem + R2 mirror on share | `freak-town` bucket, manifest-driven |
+| Deployment | systemd unit (`deploy/`) | Auto-restart; CI gates on push |
 
 ## TTS Provider Interface (build this first)
 
@@ -41,8 +42,8 @@ Switching providers should require zero frontend changes.
 freaks/
   conspiracy-pigeon/
     character.json      # identity, persona, voice, profile, actions
-    avatar.vrm          # canonical performer (VRM)
-    avatar.json         # capability contract (required with avatar.vrm)
+    avatar.glb / avatar.vrm  # performer body, either format as-is (optional)
+    avatar.json          # capability manifest, freak.character/v1 (REQUIRED if body present)
     voice_reference.wav # cloning source (optional)
     portrait.png        # 2D concept (optional)
     delivery.json       # performance score v1 (optional until first set)
