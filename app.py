@@ -789,7 +789,8 @@ def preload_set(slug):
     portrait carries the show until 3D is ready. Never black."""
     from backend.services.freaktown.bundle import (
         build_performance_manifest, bundle_to_score, estimate_spans,
-        resolve_avatar, spans_from_offsets, words_from_beats,
+        performance_avatar, resolve_avatar, spans_from_offsets,
+        words_from_beats,
     )
     from backend.services.freaktown.cues import resolve_cues
     slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
@@ -817,7 +818,8 @@ def preload_set(slug):
     by_id = {s.beat_id: s for s in spans}
     manifest = build_performance_manifest(
         f"local-{slug}", character, score, words, f"/freaks/{slug}/set.wav",
-        duration_ms or (spans[-1].end_ms if spans else 0))
+        duration_ms or (spans[-1].end_ms if spans else 0),
+        avatar=performance_avatar(_avatar_record(slug)))
     cues = resolve_cues(manifest, offsets=offsets or None,
                         duration_ms=duration_ms)
     avatar_url, avatar_source = resolve_avatar(manifest)
@@ -831,7 +833,7 @@ def preload_set(slug):
             break
     return jsonify({
         "ok": True, "slug": slug,
-        "avatarUrl": avatar_url if avatar_source != "default" else None,
+        "avatarUrl": avatar_url if avatar_source in ("local", "provided") else None,
         "avatarSource": avatar_source,
         "portrait": portrait,
         "audioUrl": f"/freaks/{slug}/set.wav",

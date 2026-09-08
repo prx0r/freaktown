@@ -230,3 +230,30 @@ class TestAvatarBattery:
             assert "YOUR TURN" in html
         finally:
             _rm(slug)
+
+
+class TestBasicTopology:
+    def test_joint_tree_is_two_legged(self):
+        import basic_body
+        for child, parent in basic_body.PARENT.items():
+            assert child in basic_body.JOINTS and parent in basic_body.JOINTS
+        # each knee hangs off its own side's hip
+        assert basic_body.PARENT["kneeL"] == "hipL"
+        assert basic_body.PARENT["kneeR"] == "hipR"
+        # tree reaches every joint from hips exactly once (no cycles/orphans)
+        seen = set()
+        def walk(j):
+            assert j not in seen, f"cycle at {j}"
+            seen.add(j)
+            for c, p in basic_body.PARENT.items():
+                if p == j:
+                    walk(c)
+        walk("hips")
+        assert seen == set(basic_body.JOINTS)
+
+    def test_basic_glb_matches_topology(self):
+        import basic_body
+        from app import _sniff_glb
+        blob, caps = basic_body.build("pigeon", "Topo", 3)
+        assert caps["joint_count"] == len(basic_body.JOINTS) == 11
+        assert _sniff_glb(blob)["joint_count"] == 11

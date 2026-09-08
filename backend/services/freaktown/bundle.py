@@ -248,8 +248,8 @@ def validate_avatar(avatar: dict) -> BundleValidation:
         return BundleValidation(False, ["avatar must be an object"])
     if avatar.get("version", AVATAR_SCHEMA_VERSION) != AVATAR_SCHEMA_VERSION:
         errors.append(f"avatar version must be {AVATAR_SCHEMA_VERSION}")
-    if avatar.get("format") != "vrm":
-        errors.append("avatar format must be vrm (canonical performer format)")
+    if avatar.get("format") not in ("vrm", "glb"):
+        errors.append("avatar format must be vrm or glb (both accepted as-is, never converted)")
     if not (avatar.get("asset") or "").strip():
         errors.append("avatar asset required (key, URL, or inline ref)")
     caps = avatar.get("capabilities", {})
@@ -286,6 +286,48 @@ def can_viseme(avatar: dict | None, viseme: str) -> bool:
     return viseme in avatar_capabilities(avatar).get("visemes", [])
 
 
+def translate_capabilities(body_caps: dict) -> dict:
+    """freak.character/v1 capabilities → freaktown.avatar.v1 capabilities.
+    Declared-only: unknown means False (never assume a mouth)."""
+    body_caps = body_caps if isinstance(body_caps, dict) else {}
+    expressions = (body_caps.get("face_profile", {}) or {}).get("morph_names", [])
+    if not expressions and body_caps.get("facial_animation"):
+        expressions = ["happy", "angry", "sad", "surprised"]
+    visemes = [m for m in expressions
+               if m in ("jawOpen", "jaw", "mouthOpen", "aa", "ih", "ou",
+                        "ee", "oh") or m.startswith("viseme_")]
+    return {
+        "humanoid": bool(body_caps.get("skeletal_animation", False)),
+        "blink": False,
+        "look_at": bool(body_caps.get("eye_gaze", False)),
+        "visemes": visemes,
+        "expressions": (["happy", "angry", "sad", "surprised"]
+                        if body_caps.get("facial_animation") else []),
+    }
+
+
+def performance_avatar(body_manifest: dict | None) -> dict | None:
+    """Compatibility adapter: product-side freak.character/v1 manifest →
+    bridge-side freaktown.avatar.v1 block. ONE place where the two
+    realities meet — no other code translates between them."""
+    if not isinstance(body_manifest, dict):
+        return None
+    rt = ((body_manifest.get("appearance") or {}).get("runtime") or {})
+    uri = rt.get("uri") or ""
+    if not uri:
+        return None
+    fmt = rt.get("format", "glb")
+    return {
+        "version": AVATAR_SCHEMA_VERSION,
+        "format": fmt if fmt in ("vrm", "glb") else "glb",
+        "asset": uri,
+        "capabilities": translate_capabilities({
+            **(body_manifest.get("capabilities") or {}),
+            "face_profile": body_manifest.get("face_profile", {}),
+        }),
+    }
+
+
 # Default stage avatar: always available, never black. Known limitation:
 # michelle.glb ships zero morph targets, so fallback performances move
 # but don't lipsync (the three.ws forge pipeline is the real fix —
@@ -297,7 +339,8 @@ def resolve_avatar(manifest: dict) -> tuple[str, str]:
     """Sealed manifest → (url_or_ref, source). Never empty.
 
     source is "sealed" (R2 ref, caller must sign), "provided" (absolute
-    http URL, redirect directly), or "default" (stage fallback).
+    http URL, redirect directly), "local" (same-origin bundle asset,
+    fetchable as-is), or "default" (stage fallback).
     """
     m = manifest if isinstance(manifest, dict) else {}
     asset = ((m.get("avatar") or {}).get("asset", "")
@@ -306,6 +349,8 @@ def resolve_avatar(manifest: dict) -> tuple[str, str]:
         return asset, "sealed"
     if asset.startswith("http://") or asset.startswith("https://"):
         return asset, "provided"
+    if asset.startswith("/freaks/"):
+        return asset, "local"
     return DEFAULT_STAGE_AVATAR, "default"
 
 
@@ -380,7 +425,8 @@ def build_performance_manifest(
             cues.append({"at": "beat", "beat_id": b.id, "type": "sfx", "value": b.sound})
     avatar_block: dict = {
         "version": AVATAR_SCHEMA_VERSION,
-        "format": "vrm",
+        "format": (avatar or {}).get("format")
+        if (avatar or {}).get("format") in ("vrm", "glb") else "vrm",
         "asset": (avatar or {}).get("asset", "") or character.get("avatar_url", ""),
         "capabilities": avatar_capabilities(avatar),
     }

@@ -32,7 +32,7 @@ LOCAL_T = {
 }
 PARENT = {"spine": "hips", "head": "spine",
           "shL": "hips", "elL": "shL", "shR": "hips", "elR": "shR",
-          "hipL": "hips", "kneeL": "hipL", "hipR": "hips", "kneeR": "hipL"}
+          "hipL": "hips", "kneeL": "hipL", "hipR": "hips", "kneeR": "hipR"}
 
 SPECIES = {
     "human":   {"head": 1.0, "body": 1.0, "leggy": 1.0,
