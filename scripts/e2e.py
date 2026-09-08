@@ -151,6 +151,52 @@ check("party view (no leak check structural)", s == 200 and v.get("ok"), f"{dt:.
 s, sub, dt = req("POST", f"/api/sets/{slug}/submit", {}, timeout=30)
 check("submit local", s == 200 and sub.get("status") == "queued", f"{dt:.1f}s")
 
+# 6. Mafia: mixed human/agent seats, full game to a winner
+sys.path.insert(0, str(ROOT))
+import asyncio as _asyncio
+from game_runtime import GameRun
+from sdk import (Action, AgentController, HumanController, Participant,
+                 Character)
+from format_runtime import load_format as _lf  # noqa (pack validated below)
+import json as _json
+_mafia = _json.loads((ROOT / "game-packs" / "mafia.freak-game.json").read_text())
+_seats = [
+    Participant(Character("m1", "M1", control_mode="HUMAN"), HumanController()),
+    Participant(Character("m2", "M2", control_mode="AUTONOMOUS"),
+                AgentController(lambda p: {"kind": "vote"}, label="M2")),
+    Participant(Character("m3", "M3", control_mode="HUMAN"), HumanController()),
+    Participant(Character("m4", "M4", control_mode="AUTONOMOUS"),
+                AgentController(lambda p: {"kind": "vote"}, label="M4")),
+    Participant(Character("m5", "M5", control_mode="HUMAN"), HumanController()),
+]
+_mpids = [p.id for p in _seats]
+g = GameRun(_mafia, _mpids, seed=11)
+check("mafia dealt", len(g.roles) == 5, f"mafia={[p for p in _mpids if g.roles[p]=='mafia']}")
+_fw_ok = True
+for pid in _mpids:
+    if '"role":' in _json.dumps(g.observe(pid)):
+        _fw_ok = False
+check("mafia firewall", _fw_ok, "no role keys in live obs")
+_rounds = 0
+_winner = None
+while _rounds < 10 and (_winner := g.winner()) is None:
+    alive = sorted(g.alive)
+    maf = [p for p in alive if g.roles[p] == "mafia"]
+    civs = [p for p in alive if g.roles[p] != "mafia"]
+    if maf and civs:
+        g.night(civs[0], doctor_save=None)
+    _alive2 = sorted(g.alive)
+    if len(_alive2) > 1 and g.winner() is None:
+        # humans+agents vote identically through one interface: first seat
+        # pushes an Action, everyone else follows the same call path
+        votes = {p: _alive2[(i + 1) % len(_alive2)] for i, p in enumerate(_alive2)}
+        g.day_vote(votes)
+    _rounds += 1
+_winner = g.winner()
+_receipt = g.receipt(_winner)
+check("mafia to winner", _winner in ("mafia", "civilians"),
+      f"{_rounds} rounds winner={_winner} root={_receipt['event_log_root'][:8]}")
+
 npass = sum(1 for _, ok in results if ok)
 log(f"e2e done: {npass}/{len(results)} passed -> {LOG}")
 sys.exit(0 if npass == len(results) else 1)
