@@ -1,0 +1,10 @@
+# Test + browser tooling (CI + local).
+-r requirements.txt
+pytest
+playwright
+# Imported-tree backend (FastAPI infra, not yet serving prod).
+fastapi
+pydantic
+pydantic-settings
+sqlalchemy
+asyncpg
