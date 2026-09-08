@@ -10,3 +10,4 @@ openai==3.8.0
 jsonschema==4.26.0
 fal-client==1.0.1
 mcp==2.2.0
+livekit-api==1.2.1
