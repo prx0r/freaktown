@@ -65,6 +65,91 @@ VIBE_SCALES = {
 }
 DEFAULT_SCALE = [0, 2, 4, 7, 9]
 
+SCALE_NAMES = {
+    "paranoid": "tritone-heavy Locrian-ish", "menacing": "Phrygian-ish",
+    "mysterious": "enigmatic", "melancholic": "minor pentatonic",
+    "chaotic": "chromatic-leaning", "absurd": "whole-tone-leaning",
+    "sleazy": "minor blues-ish", "chill": "major pentatonic",
+    "confident": "major pentatonic", "heroic": "major pentatonic",
+    "triumphant": "lydian-leaning", "dark": "aeolian-leaning",
+    "spooky": "Locrian-leaning", "playful": "major pentatonic",
+    "romantic": "major-leaning", "epic": "lydian-major",
+}
+
+NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F",
+              "F#", "G", "G#", "A", "A#", "B"]
+
+
+def _motif(rng, scale):
+    """Seeded 1-bar motif: stepwise markov walk over scale degrees + the
+    euclidean placement mask. THE single source of truth — renderer and
+    describer both consume this, so agents read the notes actually played."""
+    deg = rng.randrange(len(scale))
+    motif = []
+    for _ in range(8):
+        motif.append(deg)
+        step = rng.choices([-2, -1, -1, 0, 1, 1, 2, -4, 4],
+                           weights=[8, 18, 18, 10, 18, 18, 8, 1, 1])[0]
+        deg = max(0, min(11, deg + step))
+    return motif, _euclidean(5, 8)
+
+
+def _degree_name(degree: int, scale: list, root_shift: int) -> str:
+    semi = scale[degree % len(scale)] + 12 * (degree // len(scale))
+    midi = 45 + root_shift + semi  # root 110Hz concert pitch naming
+    return f"{NOTE_NAMES[midi % 12]}{(midi // 12) - 1}"
+
+
+def describe(recipe: dict, seed: int = 0) -> dict:
+    """Agent-readable score: key, scale, motif notes, sections, arc.
+    Deterministic — same (recipe, seed) describes the exact tune rendered.
+    Pattern mode describes the riff engine instead of a motif."""
+    genre = (recipe or {}).get("genre", "funk")
+    g = GENRES.get(genre, GENRES["funk"])
+    mood = (recipe or {}).get("mood", "confident")
+    energy = (recipe or {}).get("energy", "high")
+    mode = (recipe or {}).get("mode", "pattern")
+    duration = min(11, max(2, float((recipe or {}).get("duration", 8))))
+    root_shift = MOOD_ROOT.get(mood, 0)
+    out = {"mode": mode, "bpm": g["bpm"], "drums": g["drums"],
+           "duration_s": duration, "energy": energy, "mood": mood}
+    if mode != "melody":
+        out.update({"kind": "riff-groove",
+                    "bass_pattern": [x + root_shift for x in g["bass"]],
+                    "text": (f"{g['bpm']} BPM {genre} groove in a loop, "
+                             f"bass riff {g['bass']}, {energy} energy.")})
+        return out
+    scale = VIBE_SCALES.get(mood, DEFAULT_SCALE)
+    rng = random.Random(
+        f"{genre}|{mood}|{energy}|{(recipe or {}).get('shape', 'hit')}|melody|{seed}")
+    motif, mask = _motif(rng, scale)
+    notes = [_degree_name(d, scale, root_shift) for d in motif]
+    sounded = [n for n, on in zip(notes, mask) if on]
+    n_bars = max(1, int(duration / ((60.0 / g["bpm"]) * 4)))
+    roles = ["repeat", "repeat", "lift", "resolve"]
+    sections = [roles[i % 4] for i in range(n_bars)]
+    bass_root = _degree_name(motif[0], scale, root_shift)
+    out.update({
+        "kind": "seeded-tune",
+        "scale": SCALE_NAMES.get(mood, "major pentatonic"),
+        "scale_degrees": scale,
+        "motif": notes,
+        "motif_sounded": sounded,
+        "bass_root": bass_root,
+        "sections": sections,
+        "text": (f"{g['bpm']} BPM {SCALE_NAMES.get(mood, 'major pentatonic')} tune "
+                 f"in {mood} mood. Motif: {' '.join(sounded)}. "
+                 f"Bass sits on {bass_root}. "
+                 f"It repeats, lifts, then resolves home. {energy} energy, {duration:g}s."),
+    })
+    return out
+
+
+def music_event(recipe: dict, seed: int = 0, participant: str = "") -> dict:
+    """FreakEvent-shaped music.started payload: agents observe this."""
+    d = describe(recipe, seed)
+    return {"type": "music.started", "payload": {**d, "participant": participant}}
+
 
 def _euclidean(pulses: int, steps: int) -> list[bool]:
     """Bjorklund-style rhythm mask, downbeat always sounds."""
@@ -176,17 +261,9 @@ def _render_melody(samples, g, mood, root_shift, beat, duration, env, rng):
     """Seeded tune: markov 1-bar motif, repeat/lift/resolve phrasing,
     euclidean placement, bass on motif roots."""
     scale = VIBE_SCALES.get(mood, DEFAULT_SCALE)
-    span = 12  # two-octave wander range, in scale degrees
 
-    # 1-bar motif: 8 eighth-slots of scale degrees via stepwise markov walk
-    deg = rng.randrange(len(scale))
-    motif = []
-    for _ in range(8):
-        motif.append(deg)
-        step = rng.choices([-2, -1, -1, 0, 1, 1, 2, -4, 4],
-                           weights=[8, 18, 18, 10, 18, 18, 8, 1, 1])[0]
-        deg = max(0, min(span - 1, deg + step))
-    mask = _euclidean(5, 8)
+    # 1-bar motif + placement mask from the single source of truth
+    motif, mask = _motif(rng, scale)
     slot = beat / 2
     n_bars = max(1, int(duration / (beat * 4)))
 

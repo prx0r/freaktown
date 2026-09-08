@@ -52,6 +52,27 @@ async def main():
     print("winner:", out["receipt"]["results"]["winner"])
     print("root:", out["receipt"]["event_log_root"][:12])
 
+    # ...and the walkout music is readable data, not vibes.
+    # The agent observes music.started and answers over it.
+    import sound_synth
+    from sdk import FreakEvent
+    recipe = {"genre": "funk", "mood": "paranoid", "energy": "high",
+              "shape": "hit", "duration": 10, "mode": "melody"}
+    mev = sound_synth.music_event(recipe, seed=7,
+                                  participant=seats[1].id)
+    print("hearing:", mev["payload"]["text"])
+    heard = []
+    orig_think = claude.controller.think
+    def listening_think(prompt: str) -> dict:
+        heard.append(mev["payload"]["motif_sounded"])
+        return orig_think(prompt)
+    claude.controller.think = listening_think
+    claude.controller.observe(FreakEvent("music.started", mev["payload"]))
+    out = await claude.perform(Action("submit", {"score": 8.0}),
+                               FormatContext("comedy.open-mic", "final",
+                                             [p.id for p in seats]))
+    print(f"Claude performs over [{ ' '.join(heard[0]) }]:", out["action"])
+
 
 if __name__ == "__main__":
     asyncio.run(main())

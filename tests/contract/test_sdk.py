@@ -106,3 +106,26 @@ class TestCharacter:
     def test_control_modes(self):
         assert Character("x", "X", control_mode="HUMAN").control_mode == "HUMAN"
         assert Character("y", "Y").control_mode == "AUTONOMOUS"
+
+
+class TestMusicReading:
+    def test_describe_matches_render(self):
+        import sound_synth
+        r = {"genre": "funk", "mood": "paranoid", "energy": "high",
+             "shape": "hit", "duration": 10, "mode": "melody"}
+        d = sound_synth.describe(r, 7)
+        assert set(d["motif_sounded"]) <= set(d["motif"])
+        assert len(d["motif"]) == 8 and len(d["motif_sounded"]) == 5
+        assert d["bass_root"] == d["motif"][0]
+        assert "118 BPM" in d["text"] and "Locrian" in d["text"]
+
+    def test_event_shape(self):
+        import sound_synth
+        ev = sound_synth.music_event({"mood": "confident"}, seed=1)
+        assert ev["type"] == "music.started"
+        assert ev["payload"]["kind"] == "riff-groove"  # default mode
+
+    def test_pattern_mode_described(self):
+        import sound_synth
+        d = sound_synth.describe({"genre": "funk", "mood": "absurd"}, 3)
+        assert d["kind"] == "riff-groove" and "118 BPM" in d["text"]
