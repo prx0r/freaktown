@@ -2308,7 +2308,8 @@ window.THREE = THREE;
 const BODY_URL = "__BODY__", BODY_FMT = "__BODY_FORMAT__", SLUG = "__SLUG__";
 const status = (t) => { document.getElementById('status').textContent = t; };
 let avatar = null, jawTargets = [], vrm = null, audioCtx = null, analyser = null, audioEl = null;
-let placed = false, playing = false, baseY = 0;
+let placed = false, playing = false, energy = 0, nextBlink = 3;
+let freqData = null, baseY = 0;
 
 function collectJaw(root) {
   const out = [];
@@ -2386,6 +2387,7 @@ window.XR8 ? onxrloaded() : window.addEventListener('xrloaded', onxrloaded);
 document.getElementById('placeBtn').onclick = () => {
   if (!avatar) { status('Still loading the body…'); return; }
   avatar.visible = true; placed = true;
+  try { baseY = avatar.position.y; } catch (err) {}
   document.getElementById('placeBtn').style.display = 'none';
   document.getElementById('playBtn').style.display = 'inline-block';
   document.getElementById('hint').textContent = 'There they are. Tap PLAY.';
@@ -2396,6 +2398,45 @@ document.getElementById('playBtn').onclick = async () => {
   playing = true;
   try {
     audioEl = document.getElementById('a');
+    audioEl.onerror = () => { status('Audio file failed to load.'); };
+    const clock = new THREE.Clock();
+    const alive = () => {
+      requestAnimationFrame(alive);
+      const dt = Math.min(0.05, clock.getDelta());
+      const t = clock.elapsedTime;
+      if (!placed || !avatar) return;
+      // idle life, always on: sway + bob + blink
+      avatar.rotation.z = Math.sin(t * 0.9) * 0.03;
+      avatar.position.y = baseY + Math.abs(Math.sin(t * 2.2)) * 0.02;
+      if (vrm) {
+        try {
+          if (t > nextBlink) {
+            nextBlink = t + 2.5 + Math.random() * 2.5;
+            vrm.expressionManager.setValue('blink', 1);
+            setTimeout(() => { try { vrm.expressionManager.setValue('blink', 0); } catch (err) {} }, 140);
+          }
+          vrm.update(dt);
+        } catch (err) {}
+      }
+      // speaking: analyser energy -> jaw + bop
+      let w = 0;
+      if (playing && analyser) {
+        analyser.getByteFrequencyData(freqData);
+        let e = 0;
+        for (let i = 1; i < 12; i++) e += freqData[i];
+        w = Math.min(1, e / (12 * 160));
+      }
+      energy += (w - energy) * 0.4;
+      for (const j of jawTargets) {
+        try { j.mesh.morphTargetInfluences[j.idx] = energy; } catch (err) {}
+      }
+      try { vrm && vrm.expressionManager.setValue('aa', energy); } catch (err) {}
+      if (avatar) {
+        avatar.position.y = baseY + Math.abs(Math.sin(t * 2.2)) * 0.02 + energy * 0.03;
+        avatar.rotation.y += energy * 0.01;
+      }
+    };
+    alive();
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
     const src = audioCtx.createMediaElementSource(audioEl);
     analyser = audioCtx.createAnalyser(); analyser.fftSize = 256;
@@ -2404,21 +2445,7 @@ document.getElementById('playBtn').onclick = async () => {
     await audioEl.play();
     document.getElementById('playBtn').style.display = 'none';
     document.getElementById('hint').textContent = '🎤 live from your floor';
-    const data = new Uint8Array(analyser.frequencyBinCount);
-    const tick = () => {
-      if (!playing) return;
-      analyser.getByteFrequencyData(data);
-      let e = 0;
-      for (let i = 1; i < 12; i++) e += data[i];
-      const w = Math.min(1, e / (12 * 160));
-      for (const j of jawTargets) {
-        try { j.mesh.morphTargetInfluences[j.idx] = w; } catch (err) {}
-      }
-      try { vrm && vrm.expressionManager.setValue('aa', w); } catch (err) {}
-      if (avatar) avatar.rotation.y += 0.0015;
-      requestAnimationFrame(tick);
-    };
-    tick();
+    freqData = new Uint8Array(analyser.frequencyBinCount);
     audioEl.onended = () => { playing = false; };
   } catch (e) { status('Audio blocked — tap again.'); playing = false; }
 };
