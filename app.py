@@ -1132,7 +1132,7 @@ def walkout():
 
 FREAK_SPECIES = ["moth", "pigeon", "roomba", "dog", "toaster", "goblin",
                  "goldfish", "skeleton", "traffic cone", "fax machine",
-                 "goldfish", "crab", "lamp", "elevator"]
+                 "goldfish", "crab", "lamp", "elevator", "monkey", "ape"]
 FREAK_JOBS = ["divorce lawyer", "driving instructor", "LinkedIn influencer",
               "customer service rep", "landlord", "life coach", "bouncer",
               "weatherman", "dentist", "mall cop", "podcaster", "notary"]
@@ -1612,6 +1612,10 @@ def _render_watch(slug):
     rt = _avatar_runtime(slug)
     body_url = rt["uri"] if rt else ""
     body_fmt = rt["format"] if rt else ""
+    arbtn = (f"<a href='/ar/{slug}' style='display:block;margin:8px auto;max-width:340px,"
+             "text-align:center;text-decoration:none' class='cta ghost'>"
+             "<button style='width:100%'>📍 place in your room</button></a>"
+             if rt else "")
     page = WATCH_TEMPLATE
     for key, val in {
         "__SLUG__": slug, "__NAME__": name, "__PREMISE__": premise,
@@ -1620,6 +1624,7 @@ def _render_watch(slug):
         "__IMG__": img, "__DUR__": str(dur),
         "__BEATS__": json.dumps(beats),
         "__BODY__": body_url, "__BODY_FORMAT__": body_fmt,
+        "__ARBTN__": arbtn,
         "__CARD__": f"https://freak.town/api/card/{slug}.png",
         "__CANON__": canonical_url(slug),
         "__REPLYBANNER__": (
@@ -1731,6 +1736,7 @@ __REPLYBANNER__
 <div class="controls" id="liveControls">
   <button class="big" id="playBtn">▶ TAP TO WATCH</button>
   <button id="laughBtn" disabled>😂 <span id="laughCount">0</span></button>
+  __ARBTN__
 </div>
 <div id="endscreen">
   <div id="replybox">
@@ -2252,6 +2258,197 @@ try {
 }
 </script>
 </body></html>"""
+
+
+AR_TEMPLATE = """<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>__NAME__ in your room — Freak Town</title>
+<meta name="theme-color" content="#ff2fa8">
+<script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
+<script src="https://cdn.jsdelivr.net/npm/@8thwall/xrextras@1/dist/xrextras.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@8thwall/landing-page@1/dist/landing-page.js" crossorigin="anonymous"></script>
+<script type="importmap">
+{"imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+  "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.3.0/lib/three-vrm.module.js"
+}}
+</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:monospace}
+#camerafeed{position:fixed;inset:0;width:100%;height:100%}
+#ui{position:fixed;left:0;right:0;bottom:0;padding:14px;text-align:center;z-index:5;
+background:linear-gradient(transparent,rgba(0,0,0,.72));padding-bottom:calc(14px + env(safe-area-inset-bottom))}
+#ui h1{color:#fff;font-size:16px}
+#ui p{color:#aaa;font-size:12px;margin:4px 0 10px}
+button{background:#ff2fa8;border:1px solid #ff2fa8;color:#fff;padding:14px 26px;border-radius:26px;font-size:16px;cursor:pointer;font-family:inherit}
+button.ghost{background:rgba(20,20,30,.8);border-color:#555}
+#back{position:fixed;top:10px;left:10px;z-index:5;color:#fff;background:rgba(20,20,30,.7);
+border:1px solid #444;border-radius:18px;padding:8px 14px;font-size:13px;text-decoration:none}
+#status{color:#8f8;font-size:12px;margin-top:8px;min-height:16px}
+</style>
+</head><body>
+<canvas id="camerafeed"></canvas>
+<a id="back" href="/f/__SLUG__">← __NAME__</a>
+<div id="ui">
+  <h1>__NAME__ in your room</h1>
+  <p id="hint">Point at the floor. Tap PLACE, then PLAY.</p>
+  <button id="placeBtn">📍 PLACE</button>
+  <button id="playBtn" style="display:none">▶ PLAY MINUTE</button>
+  <div id="status"></div>
+</div>
+<audio id="a" src="__AUDIO__" preload="auto" crossorigin="anonymous"></audio>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
+window.THREE = THREE;
+const BODY_URL = "__BODY__", BODY_FMT = "__BODY_FORMAT__", SLUG = "__SLUG__";
+const status = (t) => { document.getElementById('status').textContent = t; };
+let avatar = null, jawTargets = [], vrm = null, audioCtx = null, analyser = null, audioEl = null;
+let placed = false, playing = false, baseY = 0;
+
+function collectJaw(root) {
+  const out = [];
+  root.traverse((o) => {
+    if (o.morphTargetDictionary && o.morphTargetInfluences) {
+      for (const n of ["jawOpen", "mouthOpen", "aa", "oh"]) {
+        if (n in o.morphTargetDictionary) out.push({ mesh: o, idx: o.morphTargetDictionary[n] });
+      }
+    }
+  });
+  return out;
+}
+
+const freakModule = () => ({
+  name: 'freak-ar',
+  onStart: async ({ canvas }) => {
+    const { scene, camera, renderer } = XR8.Threejs.xrScene();
+    renderer.shadowMap.enabled = true;
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x334455, 0.9));
+    const sun = new THREE.DirectionalLight(0xfff2dd, 1.2);
+    sun.position.set(3, 6, 4); sun.castShadow = true;
+    scene.add(sun);
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(30, 30),
+      new THREE.ShadowMaterial({ opacity: 0.35 }));
+    ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true;
+    scene.add(ground);
+    camera.position.set(0, 1.6, 0.1);
+    XR8.XrController.updateCameraProjectionMatrix({ origin: camera.position, facing: camera.quaternion });
+    canvas.addEventListener('touchstart', (e) => {
+      if (e.target.closest('#ui') || e.target.closest('#back')) return;
+      if (e.touches.length === 1 && placed) XR8.XrController.recenter();
+    }, true);
+    try {
+      const loader = new GLTFLoader();
+      if (BODY_FMT === 'vrm') loader.register((p) => new VRMLoaderPlugin(p, { autoUpdateHumanBones: true }));
+      const gltf = await loader.loadAsync(BODY_URL);
+      avatar = gltf.scene;
+      if (BODY_FMT === 'vrm') {
+        vrm = gltf.userData.vrm;
+        VRMUtils.removeUnnecessaryVertices(avatar);
+        VRMUtils.removeUnnecessaryJoints(avatar);
+      }
+      const box = new THREE.Box3().setFromObject(avatar);
+      const h = Math.max(0.5, box.max.y - box.min.y);
+      const s = 1.6 / h;
+      avatar.scale.setScalar(s);
+      avatar.position.set(0, -box.min.y * s, -1.4);
+      avatar.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+      avatar.visible = false;
+      scene.add(avatar);
+      jawTargets = vrm ? [] : collectJaw(avatar);
+      status('Avatar loaded. Point at the floor, tap PLACE.');
+    } catch (e) {
+      status('Could not load avatar body.');
+    }
+  },
+});
+
+const onxrloaded = () => {
+  XR8.addCameraPipelineModules([
+    XR8.GlTextureRenderer.pipelineModule(),
+    XR8.Threejs.pipelineModule(),
+    XR8.XrController.pipelineModule(),
+    LandingPage.pipelineModule(),
+    XRExtras.FullWindowCanvas.pipelineModule(),
+    XRExtras.Loading.pipelineModule(),
+    XRExtras.RuntimeError.pipelineModule(),
+    freakModule(),
+  ]);
+  XR8.run({ canvas: document.getElementById('camerafeed') });
+};
+window.XR8 ? onxrloaded() : window.addEventListener('xrloaded', onxrloaded);
+
+document.getElementById('placeBtn').onclick = () => {
+  if (!avatar) { status('Still loading the body…'); return; }
+  avatar.visible = true; placed = true;
+  document.getElementById('placeBtn').style.display = 'none';
+  document.getElementById('playBtn').style.display = 'inline-block';
+  document.getElementById('hint').textContent = 'There they are. Tap PLAY.';
+  status('');
+};
+document.getElementById('playBtn').onclick = async () => {
+  if (playing || !placed) return;
+  playing = true;
+  try {
+    audioEl = document.getElementById('a');
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const src = audioCtx.createMediaElementSource(audioEl);
+    analyser = audioCtx.createAnalyser(); analyser.fftSize = 256;
+    src.connect(analyser); analyser.connect(audioCtx.destination);
+    await audioCtx.resume();
+    await audioEl.play();
+    document.getElementById('playBtn').style.display = 'none';
+    document.getElementById('hint').textContent = '🎤 live from your floor';
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    const tick = () => {
+      if (!playing) return;
+      analyser.getByteFrequencyData(data);
+      let e = 0;
+      for (let i = 1; i < 12; i++) e += data[i];
+      const w = Math.min(1, e / (12 * 160));
+      for (const j of jawTargets) {
+        try { j.mesh.morphTargetInfluences[j.idx] = w; } catch (err) {}
+      }
+      try { vrm && vrm.expressionManager.setValue('aa', w); } catch (err) {}
+      if (avatar) avatar.rotation.y += 0.0015;
+      requestAnimationFrame(tick);
+    };
+    tick();
+    audioEl.onended = () => { playing = false; };
+  } catch (e) { status('Audio blocked — tap again.'); playing = false; }
+};
+</script>
+</body></html>"""
+
+
+@app.route("/ar/<slug>", methods=["GET"])
+def watch_ar(slug):
+    """AR view: place the freak in your room (8th Wall WebAR) and play the set."""
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    bdir = FREAK_DIR / slug
+    meta = _bundle_meta(slug)
+    if not meta or not (bdir / "set.wav").exists():
+        return "No such set (yet). Make one in the Black Room.", 404
+    import html as _html
+    char = meta.get("character", {})
+    name = _html.escape(char.get("name", slug))
+    rt = _avatar_runtime(slug)
+    if not rt:
+        return ("This freak has no 3D body yet — open the watch page to "
+                "give it one, then come back.", 404)
+    page = AR_TEMPLATE
+    for key, val in {
+        "__SLUG__": slug, "__NAME__": name,
+        "__BODY__": rt["uri"], "__BODY_FORMAT__": rt["format"],
+        "__AUDIO__": f"/freaks/{slug}/set.wav",
+    }.items():
+        page = page.replace(key, val)
+    return page, 200, {"Content-Type": "text/html; charset=utf-8"}
 
 
 @app.route("/api/react", methods=["POST"])
