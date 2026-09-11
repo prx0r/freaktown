@@ -22,6 +22,7 @@ from pathlib import Path
 from flask import Flask, send_from_directory, jsonify, request
 
 from party import party_bp
+from face_profiles import detect_face_profile, to_pog_face
 
 app = Flask(__name__)
 app.register_blueprint(party_bp)
@@ -831,10 +832,19 @@ def preload_set(slug):
         if (bdir / f).exists():
             walkout = f"/freaks/{slug}/{f}"
             break
+    face_prof = {"profile": "NONE", "pog_face_v1": []}
+    try:
+        _fp = (json.loads((bdir / "avatar.json").read_text())
+               .get("face_profile", {}) or {})
+        face_prof = {"profile": _fp.get("profile", "NONE"),
+                     "pog_face_v1": _fp.get("pog_face_v1", [])}
+    except Exception:
+        pass
     return jsonify({
         "ok": True, "slug": slug,
         "avatarUrl": avatar_url if avatar_source in ("local", "provided") else None,
         "avatarSource": avatar_source,
+        "face_profile": face_prof,
         "portrait": portrait,
         "audioUrl": f"/freaks/{slug}/set.wav",
         "plan": {"duration_ms": manifest["audio"]["duration_ms"],
@@ -2721,13 +2731,34 @@ def _sniff_glb(blob: bytes) -> dict:
             if isinstance(tn, list) and len(tn) == n_targets and n_targets:
                 names.update(str(x) for x in tn)
         caps["has_morph_targets"] = any_targets
+        # VRM 1.0 expressions live in extensions.VRMC_vrm, not mesh
+        # targetNames — semantically facial morphs all the same.
+        vrm_presets: set = set()
+        try:
+            _vrm = ((js.get("extensions") or {}).get("VRMC_vrm") or {})
+            _presets = ((_vrm.get("expressions") or {}).get("preset") or {})
+            if isinstance(_presets, dict):
+                vrm_presets = {str(k) for k in _presets.keys()}
+        except Exception:
+            vrm_presets = set()
+        caps["vrm_expressions"] = sorted(vrm_presets)
+        names |= vrm_presets
+        caps["all_morph_names"] = sorted(names)
+        try:
+            caps["face_profile"] = detect_face_profile(names)
+        except Exception:
+            caps["face_profile"] = "CUSTOM" if names else "NONE"
         mouth = {n for n in names if n in ARKIT_MOUTH or n in OCULUS_MOUTH}
-        caps["facial_morphs"] = len(mouth)
+        caps["facial_morphs"] = len(mouth | vrm_presets)
         caps["morph_names"] = sorted(mouth)[:24]
         # viseme: rich mouth rig (4+ known morphs). jaw: a single working
         # jaw (BASIC bodies, some mascots) — analyser-driven and honest.
+        # vrm: VRM expression presets carrying speech visemes (aa/ee/ih/oh/ou).
         jaw = {n for n in names if n in ("jawOpen", "jaw", "mouthOpen")}
+        vrm_vis = {n for n in names if n in ("aa", "ee", "ih", "oh", "ou")}
         if len(mouth) >= 4:
+            caps["lipsync_profile"] = "viseme"
+        elif len(vrm_vis) >= 3:
             caps["lipsync_profile"] = "viseme"
         elif jaw:
             caps["lipsync_profile"] = "jaw"
@@ -2939,7 +2970,9 @@ def _basic_build(slug: str, bdir, meta: dict, mode: str,
         "skeletal_animation": True, "facial_animation": True,
         "lipsync": True, "gestures": True, "locomotion": True,
     })
-    manifest["face_profile"] = {"morph_names": ["jawOpen"]}
+    manifest["face_profile"] = {"morph_names": ["jawOpen"],
+                                  "profile": "JAW",
+                                  "pog_face_v1": ["jaw_open", "mouth_open"]}
     (bdir / "avatar.json").write_text(json.dumps(manifest, indent=2))
     return manifest
 
@@ -3069,6 +3102,12 @@ def _avatar_finish(slug: str, bdir, job_id: str, mode: str, glb_url: str,
     })
     manifest["face_profile"] = {
         "morph_names": caps.get("morph_names", []),
+        "profile": caps.get("face_profile", "CUSTOM"),
+        "pog_face_v1": sorted(
+            to_pog_face(
+                caps.get("all_morph_names", caps.get("morph_names", [])),
+                (manifest.get("appearance", {}).get("runtime", {})
+                 .get("format", "glb")))["intents"]),
     }
     (bdir / "avatar.json").write_text(json.dumps(manifest, indent=2))
     return jsonify({"ok": True, "status": "done",
@@ -3171,7 +3210,14 @@ def avatar_upload():
         "gestures": caps["rigged"],
         "locomotion": caps["humanoid_skin"],
     })
-    manifest["face_profile"] = {"morph_names": caps.get("morph_names", [])}
+    manifest["face_profile"] = {"morph_names": caps.get("morph_names", []),
+                                  "profile": caps.get("face_profile", "CUSTOM"),
+                                  "pog_face_v1": sorted(
+                                      to_pog_face(
+                                          caps.get("all_morph_names",
+                                                   caps.get("morph_names", [])),
+                                          "vrm" if str(body_name).endswith(".vrm")
+                                          else "glb")["intents"])}
     (bdir / "avatar.json").write_text(json.dumps(manifest, indent=2))
     return jsonify({"ok": True, "status": "done",
                     "avatar_url": f"/freaks/{slug}/{body_name}",
