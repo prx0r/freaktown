@@ -1615,6 +1615,9 @@ def _render_watch(slug):
     arbtn = (f"<a href='/ar/{slug}' style='display:block;margin:8px auto;max-width:340px,"
              "text-align:center;text-decoration:none' class='cta ghost'>"
              "<button style='width:100%'>📍 place in your room</button></a>"
+             f"<a href='/record/{slug}' style='display:block;margin:8px auto;max-width:340px,"
+             "text-align:center;text-decoration:none' class='cta ghost'>"
+             "<button style='width:100%'>🎭 become them — record</button></a>"
              if rt else "")
     page = WATCH_TEMPLATE
     for key, val in {
@@ -2516,6 +2519,260 @@ def watch_ar(slug):
     }.items():
         page = page.replace(key, val)
     return page, 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
+RECORD_TEMPLATE = """<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Record as __NAME__ — Freak Town</title>
+<meta name="theme-color" content="#ff2fa8">
+<script type="importmap">
+{"imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+  "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.3.0/lib/three-vrm.module.js",
+  "@mediapipe/tasks-vision": "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+}}
+</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#0a0a0f;color:#eee;font-family:monospace}
+#stage{position:fixed;inset:0}
+#stage canvas{width:100%;height:100%;display:block}
+#self{position:fixed;right:10px;top:10px;width:96px;border-radius:10px;border:1px solid #444;z-index:5;transform:scaleX(-1)}
+#ui{position:fixed;left:0;right:0;bottom:0;padding:12px;text-align:center;z-index:5;
+background:linear-gradient(transparent,rgba(0,0,0,.78));padding-bottom:calc(12px + env(safe-area-inset-bottom))}
+#ui h1{font-size:15px} #ui p{color:#aaa;font-size:12px;margin:4px 0 10px}
+button{background:#ff2fa8;border:1px solid #ff2fa8;color:#fff;padding:13px 24px;border-radius:26px;font-size:15px;cursor:pointer;font-family:inherit;margin:2px}
+button.ghost{background:rgba(20,20,30,.8);border-color:#555}
+button:disabled{opacity:.4}
+#status{color:#8f8;font-size:12px;margin-top:8px;min-height:16px}
+#back{position:fixed;top:10px;left:10px;z-index:5;color:#fff;background:rgba(20,20,30,.7);border:1px solid #444;border-radius:18px;padding:8px 14px;font-size:13px;text-decoration:none}
+#share{margin-top:8px;font-size:13px}
+#share a{color:#00d4ff}
+</style>
+</head><body>
+<div id="stage"></div>
+<video id="self" autoplay playsinline muted></video>
+<a id="back" href="/f/__SLUG__">← __NAME__</a>
+<div id="ui">
+  <h1>Become __NAME__</h1>
+  <p id="hint">1. Allow camera &amp; mic &nbsp;2. Hit RECORD &nbsp;3. Perform &amp; stop → share link</p>
+  <button id="recBtn" disabled>⏺ RECORD</button>
+  <button id="stopBtn" disabled class="ghost">⏹ STOP</button>
+  <div id="status">loading face tracker…</div>
+  <div id="share"></div>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
+import { FaceLandmarker, FilesetResolver } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs';
+const BODY_URL = "__BODY__", BODY_FMT = "__BODY_FORMAT__", SLUG = "__SLUG__";
+const status = (t) => { document.getElementById('status').textContent = t; };
+let vrm = null, jawMeshes = [], landmarker = null, video = null, stream = null;
+let renderer, scene, camera, recording = false, recorder = null, chunks = [], micStream = null;
+
+// --- stage ---
+renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+document.getElementById('stage').appendChild(renderer.domElement);
+scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0a0f);
+camera = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.1, 50);
+camera.position.set(0, 1.45, 2.6);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x334455, 1.0));
+const key = new THREE.DirectionalLight(0xfff2dd, 1.6);
+key.position.set(2, 4, 3); key.castShadow = true;
+scene.add(key);
+const floor = new THREE.Mesh(new THREE.CircleGeometry(3, 40),
+  new THREE.MeshStandardMaterial({ color: 0x14141c, roughness: 0.9 }));
+floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true;
+scene.add(floor);
+
+async function loadBody() {
+  const loader = new GLTFLoader();
+  if (BODY_FMT === 'vrm') loader.register((p) => new VRMLoaderPlugin(p, { autoUpdateHumanBones: false }));
+  const gltf = await loader.loadAsync(BODY_URL);
+  const root = gltf.scene;
+  if (BODY_FMT === 'vrm') {
+    vrm = gltf.userData.vrm;
+    VRMUtils.removeUnnecessaryVertices(root);
+    VRMUtils.removeUnnecessaryJoints(root);
+  } else {
+    root.traverse((o) => {
+      if (o.morphTargetDictionary && o.morphTargetInfluences) {
+        for (const n of ["jawOpen", "mouthOpen", "aa", "oh"])
+          if (n in o.morphTargetDictionary) jawMeshes.push({ mesh: o, idx: o.morphTargetDictionary[n] });
+      }
+    });
+  }
+  const box = new THREE.Box3().setFromObject(root);
+  const h = Math.max(0.5, box.max.y - box.min.y);
+  root.scale.setScalar(1.6 / h);
+  root.position.set(0, -box.min.y * (1.6 / h), 0);
+  root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  scene.add(root);
+  return true;
+}
+
+// --- face tracking: MediaPipe outputs 52 ARKit blendshapes, we map direct ---
+async function initTracker() {
+  const vision = await FilesetResolver.forVisionTasks(
+    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+  landmarker = await FaceLandmarker.createFromOptions(vision, {
+    baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task", delegate: "GPU" },
+    outputFaceBlendshapes: true, outputFacialTransformationMatrixes: true,
+    runningMode: "VIDEO", numFaces: 1,
+  });
+}
+
+function applyFace(res) {
+  if (!res || !res.faceBlendshapes || !res.faceBlendshapes.length) return;
+  const cats = {};
+  for (const c of res.faceBlendshapes[0].categories) cats[c.categoryName] = c.score;
+  const setV = (name, v) => {
+    try { vrm && vrm.expressionManager.setValue(name, Math.min(1, Math.max(0, v))); } catch (e) {}
+  };
+  // visemes + smile + blink straight onto VRM presets
+  for (const v of ["aa", "ee", "ih", "oh", "ou"]) setV(v, cats[v] || 0);
+  setV('blink', Math.max(cats['eyeBlinkLeft'] || 0, cats['eyeBlinkRight'] || 0));
+  setV('happy', cats['mouthSmileLeft'] || 0);
+  // head pose from matrix
+  try {
+    const m = res.facialTransformationMatrixes[0].data;
+    const yaw = Math.atan2(m[8], m[10]), pitch = Math.asin(Math.max(-1, Math.min(1, -m[9])));
+    const head = vrm ? vrm.humanoid.getNormalizedBoneNode('head') : null;
+    if (head) { head.rotation.y += (yaw * 0.6 - head.rotation.y) * 0.4; head.rotation.x += (pitch * 0.5 - head.rotation.x) * 0.4; }
+  } catch (e) {}
+  // GLB morph fallback: jaw from mouth openness
+  const open = Math.max(cats['jawOpen'] || 0, cats['mouthOpen'] || 0, cats['aa'] || 0);
+  for (const j of jawMeshes) {
+    try { j.mesh.morphTargetInfluences[j.idx] = open; } catch (e) {}
+  }
+}
+
+let lastT = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t - lastT) / 1000 || 0.016);
+  lastT = t;
+  try {
+    if (landmarker && video && video.readyState >= 2 && video.currentTime > 0) {
+      const res = landmarker.detectForVideo(video, performance.now());
+      applyFace(res);
+    }
+  } catch (e) {}
+  try { vrm && vrm.update(dt); } catch (e) {}
+  renderer.render(scene, camera);
+}
+
+document.getElementById('recBtn').onclick = async () => {
+  if (recording) return;
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (e) { status('Mic blocked: allow microphone, then reload.'); return; }
+  chunks = [];
+  try {
+    const cs = renderer.domElement.captureStream(30);
+    if (micStream) micStream.getAudioTracks().forEach((tr) => cs.addTrack(tr));
+    recorder = new MediaRecorder(cs, { mimeType: 'video/webm' });
+  } catch (e) { status('Recording unsupported in this browser.'); return; }
+  recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+  recorder.onstop = async () => {
+    const blob = new Blob(chunks, { type: 'video/webm' });
+    const fd = new FormData();
+    fd.append('file', blob, 'take.webm');
+    status('Uploading ' + Math.round(blob.size / 1024) + ' KB…');
+    try {
+      const r = await fetch('/api/record/' + SLUG, { method: 'POST', body: fd });
+      const j = await r.json();
+      if (j.ok) {
+        document.getElementById('share').innerHTML =
+          '🔗 <a href="' + j.url + '">share this take</a> — send it to your friend';
+        status('Saved. That take now lives at the link above.');
+      } else status('Save failed: ' + (j.error || r.status));
+    } catch (e) { status('Upload failed — video lost. Sorry.'); }
+    document.getElementById('recBtn').disabled = false;
+    document.getElementById('stopBtn').disabled = true;
+  };
+  recorder.start(1000);
+  recording = true;
+  document.getElementById('recBtn').disabled = true;
+  document.getElementById('stopBtn').disabled = false;
+  status('● REC — perform! Your face drives ' + document.title.split(' ')[0] + '.');
+};
+document.getElementById('stopBtn').onclick = () => {
+  if (recorder && recording) { recording = false; recorder.stop(); status('Stopping…'); }
+};
+
+(async () => {
+  try {
+    await loadBody();
+    status('Body loaded. Starting camera…');
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: 640 }, audio: false });
+    video = document.getElementById('self');
+    video.srcObject = stream;
+    await video.play();
+    await initTracker();
+    document.getElementById('recBtn').disabled = false;
+    status('Live. Your face is the puppet strings — nothing leaves your phone until you share.');
+    requestAnimationFrame(loop);
+  } catch (e) {
+    status('Need camera access (Chrome/Safari, not chat-app viewer). ' + String(e).slice(0, 80));
+  }
+})();
+</script>
+</body></html>"""
+
+
+@app.route("/record/<slug>", methods=["GET"])
+def watch_record(slug):
+    """RECORD mode: become the freak. Webcam drives the VRM face live;
+    canvas + mic capture to a shareable take. All tracking on-device."""
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    bdir = FREAK_DIR / slug
+    meta = _bundle_meta(slug)
+    if not meta or not (bdir / "set.wav").exists():
+        return "No such set (yet). Make one in the Black Room.", 404
+    import html as _html
+    char = meta.get("character", {})
+    name = _html.escape(char.get("name", slug))
+    rt = _avatar_runtime(slug)
+    if not rt:
+        return "This freak needs a 3D body first.", 404
+    page = RECORD_TEMPLATE
+    for key, val in {
+        "__SLUG__": slug, "__NAME__": name,
+        "__BODY__": rt["uri"], "__BODY_FORMAT__": rt["format"],
+    }.items():
+        page = page.replace(key, val)
+    return page, 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
+@app.route("/api/record/<slug>", methods=["POST"])
+def save_take(slug):
+    """Save a recorded take (webm) into the freak bundle. Returns share URL."""
+    import datetime
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    bdir = FREAK_DIR / slug
+    if _bundle_meta(slug) is None or not bdir.is_dir():
+        return jsonify({"ok": False, "error": "unknown set"}), 404
+    f = request.files.get("file")
+    if f is None:
+        return jsonify({"ok": False, "error": "multipart file required"}), 400
+    blob = f.read(64 * 1024 * 1024 + 1)
+    if len(blob) > 64 * 1024 * 1024 or len(blob) < 1024:
+        return jsonify({"ok": False, "error": "bad file (1KB–64MB webm)"}), 400
+    rdir = bdir / "takes"
+    rdir.mkdir(exist_ok=True)
+    stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d-%H%M%S")
+    (rdir / f"take-{stamp}.webm").write_bytes(blob)
+    return jsonify({"ok": True,
+                    "url": f"/freaks/{slug}/takes/take-{stamp}.webm"})
 
 
 @app.route("/api/react", methods=["POST"])
