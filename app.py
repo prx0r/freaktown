@@ -2294,12 +2294,13 @@ border:1px solid #444;border-radius:18px;padding:8px 14px;font-size:13px;text-de
 <a id="back" href="/f/__SLUG__">← __NAME__</a>
 <div id="ui">
   <h1>__NAME__ in your room</h1>
-  <p id="hint">Point at the floor. Tap PLACE, then PLAY.</p>
+  <p id="hint">Open in <b>Chrome / Safari</b> (not inside WhatsApp or X) — AR needs your camera.</p>
   <button id="placeBtn">📍 PLACE</button>
   <button id="playBtn" style="display:none">▶ PLAY MINUTE</button>
-  <div id="status"></div>
+  <div id="status">starting…</div>
 </div>
 <audio id="a" src="__AUDIO__" preload="auto" crossorigin="anonymous"></audio>
+<audio id="w" src="__WALKOUT__" preload="auto" crossorigin="anonymous"></audio>
 <script type="module">
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -2309,7 +2310,7 @@ const BODY_URL = "__BODY__", BODY_FMT = "__BODY_FORMAT__", SLUG = "__SLUG__";
 const status = (t) => { document.getElementById('status').textContent = t; };
 let avatar = null, jawTargets = [], vrm = null, audioCtx = null, analyser = null, audioEl = null;
 let placed = false, playing = false, energy = 0, nextBlink = 3;
-let freqData = null, baseY = 0;
+let freqData = null, baseY = 0, entranceT = 1, walkoutEl = null;
 
 function collectJaw(root) {
   const out = [];
@@ -2327,7 +2328,11 @@ const freakModule = () => ({
   name: 'freak-ar',
   onStart: async ({ canvas }) => {
     const { scene, camera, renderer } = XR8.Threejs.xrScene();
-    renderer.shadowMap.enabled = true;
+    try {
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFShadowMap;
+    } catch (err) {}
     scene.add(new THREE.HemisphereLight(0xffffff, 0x334455, 0.9));
     const sun = new THREE.DirectionalLight(0xfff2dd, 1.2);
     sun.position.set(3, 6, 4); sun.castShadow = true;
@@ -2357,6 +2362,7 @@ const freakModule = () => ({
       const h = Math.max(0.5, box.max.y - box.min.y);
       const s = 1.6 / h;
       avatar.scale.setScalar(s);
+      avatar.userData.baseScale = s;
       avatar.position.set(0, -box.min.y * s, -1.4);
       avatar.traverse((o) => { if (o.isMesh) o.castShadow = true; });
       avatar.visible = false;
@@ -2370,7 +2376,18 @@ const freakModule = () => ({
 });
 
 const onxrloaded = () => {
-  XR8.addCameraPipelineModules([
+  const ua = navigator.userAgent || "";
+  if (/wv|WebView|FBAN|FBAV|Twitter|WhatsApp|Line\//i.test(ua)) {
+    status('In-app browser detected: tap ⋯ and "Open in Chrome/Safari" or the camera stays black.');
+  }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    status('This browser exposes no camera. Use Chrome/Safari with HTTPS.');
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then((stream) => {
+    stream.getTracks().forEach((t) => t.stop());
+    status('Camera OK. Starting room tracking — move the phone slowly.');
+    XR8.addCameraPipelineModules([
     XR8.GlTextureRenderer.pipelineModule(),
     XR8.Threejs.pipelineModule(),
     XR8.XrController.pipelineModule(),
@@ -2381,6 +2398,10 @@ const onxrloaded = () => {
     freakModule(),
   ]);
   XR8.run({ canvas: document.getElementById('camerafeed') });
+  }).catch(() => {
+    status('Camera blocked: allow camera access in the browser, then reload. ' +
+           'On iPhone use Safari; on Android use Chrome — not the chat-app viewer.');
+  });
 };
 window.XR8 ? onxrloaded() : window.addEventListener('xrloaded', onxrloaded);
 
@@ -2388,6 +2409,14 @@ document.getElementById('placeBtn').onclick = () => {
   if (!avatar) { status('Still loading the body…'); return; }
   avatar.visible = true; placed = true;
   try { baseY = avatar.position.y; } catch (err) {}
+  entranceT = 0;
+  try {
+    walkoutEl = document.getElementById('w');
+    if (walkoutEl && walkoutEl.getAttribute('src')) {
+      walkoutEl.play().catch(() => {});
+      document.getElementById('hint').textContent = '🎺 __NAME__ takes the stage!';
+    }
+  } catch (err) {}
   document.getElementById('placeBtn').style.display = 'none';
   document.getElementById('playBtn').style.display = 'inline-block';
   document.getElementById('hint').textContent = 'There they are. Tap PLAY.';
@@ -2405,7 +2434,12 @@ document.getElementById('playBtn').onclick = async () => {
       const dt = Math.min(0.05, clock.getDelta());
       const t = clock.elapsedTime;
       if (!placed || !avatar) return;
-      // idle life, always on: sway + bob + blink
+      // idle life, always on: entrance rise, sway + bob + blink
+      if (entranceT < 1) entranceT = Math.min(1, entranceT + dt / 1.4);
+      const e = 1 - entranceT;
+      const back = 1 + 2.0 * e * e * e - 1.2 * e * e;
+      const bs = avatar.userData.baseScale || 1;
+      avatar.scale.setScalar(Math.max(0.01, bs * (entranceT < 1 ? back : 1)));
       avatar.rotation.z = Math.sin(t * 0.9) * 0.03;
       avatar.position.y = baseY + Math.abs(Math.sin(t * 2.2)) * 0.02;
       if (vrm) {
@@ -2468,11 +2502,17 @@ def watch_ar(slug):
     if not rt:
         return ("This freak has no 3D body yet — open the watch page to "
                 "give it one, then come back.", 404)
+    walkout = ""
+    for f in ("walkout.mp3", "walkout.wav"):
+        if (bdir / f).exists():
+            walkout = f"/freaks/{slug}/{f}"
+            break
     page = AR_TEMPLATE
     for key, val in {
         "__SLUG__": slug, "__NAME__": name,
         "__BODY__": rt["uri"], "__BODY_FORMAT__": rt["format"],
         "__AUDIO__": f"/freaks/{slug}/set.wav",
+        "__WALKOUT__": walkout,
     }.items():
         page = page.replace(key, val)
     return page, 200, {"Content-Type": "text/html; charset=utf-8"}
