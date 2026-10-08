@@ -20,14 +20,20 @@ No subsystem may recreate another subsystem's responsibility.
 
 | | prx0r/pogtown | prx0r/freaktown (this repo) |
 |---|---|---|
-| Owns | game truth: packs, runtime, protocol, rooms API, director, sealed-bundle import | product: Studio, stage, party UX, media, performance contracts |
+| Owns | game truth: packs, runtime, protocol, rooms API, director, sealed-bundle import, gift packs, order state machine, the five gift tools, media providers, channel reference | product: Studio, stage, party UX, media, performance contracts, avatar pipeline, delivery, Ella |
 | Serves | Pog API (Docker, Postgres) | Flask app (live site), later FastAPI strangler |
-| Never | product UI, media, TTS, avatars | game-truth reimplementation (see `archive/`) |
+| Never | product UI, avatars, voices as store of record | game-truth reimplementation (see `archive/`) |
 
 Import direction: freaktown consumes the pog protocol via the stage-adapter
 (pog side) and `backend/services/freaktown/`. Pogtown never imports freaktown
 runtime code — only validates its bundles. The dormant Python game engine was
 archived for exactly this reason (`archive/README.md`).
+
+Gift packs: pogtown owns the spec, the validator, and the state machine
+(briefed → generating → qa → delivered). Freaktown owns the avatar pipeline
+that generates the actual assets (portrait, video, voice, walkout). The
+shared key is the freak pack identity. Nothing crosses the boundary except
+bundles and events. See `pogtown-mvp/packages/gift-pack/` for the spec.
 
 ## 1. New vs old (in this repo)
 

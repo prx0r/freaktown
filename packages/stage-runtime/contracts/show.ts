@@ -138,3 +138,39 @@ export interface CharacterModesV1 {
   performer?: Record<string, unknown> | null;
   judge?: JudgeModeV1 | null;
 }
+
+// Runtime validator for camera-cut payloads (no zod dependency by design:
+// this file must stay dependency-free so every consumer shares it).
+// EpisodeRoom drops unknown cameras here — never persisted, never broadcast.
+export function validateCameraCut(input: unknown):
+  | { ok: true; value: CameraCutPayloadV1 }
+  | { ok: false; error: string } {
+  if (typeof input !== "object" || input === null) {
+    return { ok: false, error: "not an object" };
+  }
+  const o = input as Record<string, unknown>;
+  if (typeof o.camera !== "string" || !CAMERA_NAMES.includes(o.camera as CameraPresetV1)) {
+    return { ok: false, error: "unknown camera" };
+  }
+  const performance_id = o.performance_id ?? null;
+  if (performance_id !== null && typeof performance_id !== "string") {
+    return { ok: false, error: "bad performance_id" };
+  }
+  const set_time_ms = o.set_time_ms ?? null;
+  if (set_time_ms !== null && typeof set_time_ms !== "number") {
+    return { ok: false, error: "bad set_time_ms" };
+  }
+  const source = o.source ?? null;
+  if (source !== null && typeof source !== "string") {
+    return { ok: false, error: "bad source" };
+  }
+  return {
+    ok: true,
+    value: {
+      camera: o.camera as CameraPresetV1,
+      performance_id: performance_id as string | null | undefined,
+      set_time_ms: set_time_ms as number | null | undefined,
+      source: (source as string) ?? "unknown",
+    },
+  };
+}

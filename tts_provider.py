@@ -148,6 +148,46 @@ class QwenTTSProvider(TTSProvider):
         ]
 
 
+class KokoroProvider(TTSProvider):
+    """Kokoro 82M — free, local, CPU realtime, Apache 2.0. No cloning;
+    fixed voice presets (quality lane above edge-tts, below bank clones)."""
+
+    VOICES = [
+        {"id": "af_heart", "name": "Heart (warm female)", "gender": "female"},
+        {"id": "af_bella", "name": "Bella (bright female)", "gender": "female"},
+        {"id": "am_adam", "name": "Adam (deep male)", "gender": "male"},
+        {"id": "am_michael", "name": "Michael (steady male)", "gender": "male"},
+    ]
+
+    _pipes = {}
+
+    @classmethod
+    def _pipe(cls, lang="a"):
+        if lang not in cls._pipes:
+            from kokoro import KPipeline
+            cls._pipes[lang] = KPipeline(lang_code=lang)
+        return cls._pipes[lang]
+
+    async def generate(self, text: str, voice: str = "af_heart", **kwargs) -> bytes:
+        import io as _io
+        import soundfile as _sf
+        vid = str(voice).split(":", 1)[-1]
+        if not any(v["id"] == vid for v in self.VOICES):
+            vid = "af_heart"
+        chunks = []
+        for _, _, audio in self._pipe("a")(text, voice=vid):
+            chunks.append(audio)
+        if not chunks:
+            raise RuntimeError("kokoro returned no audio")
+        import numpy as _np
+        buf = _io.BytesIO()
+        _sf.write(buf, _np.concatenate(chunks), 24000, format="WAV")
+        return buf.getvalue()
+
+    def list_voices(self) -> list[dict]:
+        return self.VOICES
+
+
 class MagicTTSProvider(TTSProvider):
     """MAGIC-TTS backend with explicit token-level pause control.
 
@@ -205,6 +245,7 @@ def get_provider(name: str) -> TTSProvider:
     """Provider factory. Compositor owns timing in all cases."""
     providers = {
         "edge": EdgeTTSProvider,
+        "kokoro": KokoroProvider,
         "qwen": QwenTTSProvider,
         "magic": MagicTTSProvider,
     }

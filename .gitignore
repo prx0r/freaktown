@@ -20,3 +20,5 @@ funnel.jsonl
 party_records.json
 party_rooms.json
 var/
+
+data/

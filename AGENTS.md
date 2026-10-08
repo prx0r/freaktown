@@ -1,8 +1,31 @@
 # AGENTS.md — freaktown
 
-New agent: read `HANDOVER.md` first (current state + blockers), then
-`docs/README.md`, then `docs/BOUNDARIES.md`. That order. Do not build until
+New agent: read in order: `HANDOVER-2026-09-12.md` (latest state), then
+`docs/BOUNDARIES.md` (what lives where), then this file. Do not build until
 you have read all three.
+
+## What freaktown owns
+
+Product and stage. The live site, studio, party UX, performance contracts,
+the full avatar pipeline (face profiles, VRM, takes, revoice, walkout, record
+modes, Blender factory, intake), voice bank, Ella as character and judge, and
+the episode room for live broadcast coordination.
+
+What it does NOT own: game truth. Game state lives in pogtown and is consumed
+through an adapter, never reimplemented. The retired Python game engine in
+`archive/` is the closed chapter.
+
+## Boundary with pogtown
+
+pogtown = runtime, protocol, rooms API, gift packs, order state machine,
+the five gift tools, media providers, channel reference.
+freaktown = product, studio, avatar pipeline, performance contracts,
+delivery, Ella, the live site.
+Shared key = the freak pack identity. Server is truth.
+
+Gift packs: pogtown owns the spec and state machine. freaktown generates
+the portrait, video, voice, and walkout. Nothing crosses the boundary
+except bundles and events.
 
 ## Binding rules
 
@@ -17,15 +40,14 @@ you have read all three.
 4. **Strangler, not rewrite.** `app.py`/`party.py` serve live traffic. Extract
    gradually, behavior identical. No second Studio/watch/party implementation
    (see `docs/BOUNDARIES.md` + `devplan.md` §2).
-5. **Game truth lives in pogtown.** Never reimplement it here (`archive/` is
-   the closed chapter). This repo consumes via adapter.
+5. **Game truth lives in pogtown.** Never reimplement it here. This repo
+   consumes via adapter. The archive is read-only.
 6. **Face/rig changes are additive.** New `face_profiles.py` profiles and
    manifest keys only; never rename/remove a field. Sniffer never invents a
    morph name that isn't in the bytes.
-7. **Small diffs, tested each step.** Python: `pytest tests/contract
-   tests/unit -q` (13 pre-existing env failures: espeak/fastapi/livekit —
-   not yours unless you add a 14th). Party sim runs as script:
-   `python3 test_party.py`, never under pytest.
+7. **Small diffs, tested each step.** Python: `pytest tests/contract -q`
+   (1 pre-existing env failure: livekit not configured). Party sim runs as
+   script: `python3 test_party.py`, never under pytest.
 8. **Kill by exact PID, never pattern-kill.** (`pkill -f app.py` matches your
    own shell. Read `/proc` cmdlines and kill the PID.)
 9. **Background servers fight sandboxes.** Prefer in-process Flask test
@@ -33,7 +55,26 @@ you have read all three.
 
 ## Where things are
 
-`HANDOVER.md` (now) · `NORTHSTAR.md` (avatar doctrine) ·
-`docs/TRIAL_STAGE1_PLAN.md` · `docs/HANDOFF_STABLE_AUDIO.md` ·
-`docs/vendors/` + `docs/avataroptions.md` (renderer research) ·
-`contracts/` (schema authority) · `archive/` (retired engine, read-only).
+`HANDOVER-2026-09-12.md` (latest) · `NORTHSTAR.md` (avatar doctrine) ·
+`docs/` (index below) · `contracts/` (schema authority) ·
+`backend/services/` (delivery, audio, ella, judge, scoring, bundles) ·
+`packages/stage-runtime/` (live performer) ·
+`edge/worker/` (episode room + ella live) ·
+`apps/live/` (web client) ·
+`freaks/` (bundle storage, gitignored) ·
+`archive/` (retired engine, read-only).
+
+## Commands
+
+```bash
+source /home/ubuntu/.venvs/freaktown/bin/activate
+pytest tests/contract -q      # contract suite (46/47 pass, 1 env failure)
+python3 test_party.py         # party sim (script, never pytest)
+python3 app.py                # Flask dev server (live traffic, need .env)
+```
+
+## Known failures
+
+`test_livekit.py` fails because `livekit` module is not installed in the
+venv. This is an environmental dependency, not a code bug. Do not mark it
+as broken without installing the module first.

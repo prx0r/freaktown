@@ -59,9 +59,14 @@ SPECIES = {
     "monster": {"head": 1.2, "body": 1.15, "leggy": 0.9,
                 "palette": [(0.50, 0.25, 0.65), (0.20, 0.70, 0.30), (0.05, 0.05, 0.05)],
                 "hat": 0.3, "glasses": 0.05},
+    "monkey":  {"head": 1.25, "body": 0.85, "leggy": 0.7,
+                "palette": [(0.45, 0.32, 0.20), (0.72, 0.58, 0.42), (0.10, 0.08, 0.06)],
+                "hat": 0.1, "glasses": 0.05},
 }
 
 SPECIES_KEYS = {"dog": "dog", "pup": "dog", "hound": "dog",
+                "monkey": "monkey", "ape": "monkey", "chimp": "monkey",
+                "gorilla": "monkey", "baboon": "monkey",
                 "bird": "bird", "pigeon": "bird", "crow": "bird",
                 "parrot": "bird", "moth": "bird",
                 "robot": "robot", "droid": "robot", "toaster": "object",

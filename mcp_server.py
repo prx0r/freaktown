@@ -8,7 +8,7 @@ The LLM driver writes the comedy. MCP does the stage work:
 - list_voices / list_comedians / get_inspiration
 
 Run via opencode MCP config (stdio):
-  command: ["/root/freaktown/.venv/bin/python", "/root/freaktown/mcp_server.py"]
+  command: ["/home/ubuntu/.venvs/freaktown/bin/python", "/home/ubuntu/freaktown/mcp_server.py"]
 
 No API keys required. edge-tts is free. Timing is owned by the compositor.
 """

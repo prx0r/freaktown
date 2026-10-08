@@ -358,6 +358,18 @@ def regen_beat():
                     "duration_ms": int(len(samples) / 24000 * 1000)})
 
 
+@app.route("/api/beat_audio/<key>", methods=["GET"])
+def beat_audio(key):
+    """Serve one cached beat wav for voice audition. Key is the hex
+    returned by /api/regen_beat — nothing else on disk is reachable."""
+    key = re.sub(r"[^a-f0-9]", "", key)[:16]
+    for cand in (BEAT_CACHE / f"{key}.wav", BEAT_CACHE / f"{key}.robot.wav"):
+        if cand.exists():
+            return send_from_directory(str(BEAT_CACHE), cand.name,
+                                       mimetype="audio/wav")
+    return jsonify({"ok": False, "error": "unknown beat"}), 404
+
+
 @app.route("/api/compose", methods=["POST"])
 def compose():
     """Compose full set with exact timing.
@@ -1072,6 +1084,52 @@ def _generate_walkout_fal(recipe: dict, seed: int) -> bytes:
     return resp.content
 
 
+def _vibe_recipe(char: dict, seed: int = 0) -> dict:
+    """Character description → walkout recipe. Deterministic per vibe;
+    new seed = reroll. Genres are the synth's own palette."""
+    t = f"{char.get('vibe', '')} {char.get('premise', '')} {char.get('job', '')}".lower()
+    if any(w in t for w in ("cocky", "absurd", "funk", "sleazy", "detective")):
+        genre, mood, energy = "funk", "absurd", "high"
+    elif any(w in t for w in ("dark", "angry", "heavy", "metal", "villain")):
+        genre, mood, energy = "rock", "cocky", "high"
+    elif any(w in t for w in ("neon", "robot", "space", "cyber", "sleek")):
+        genre, mood, energy = "electronic", "sleazy", "high"
+    elif any(w in t for w in ("sheepish", "silly", "goofy", "gentle", "sweet")):
+        genre, mood, energy = "comedy", "sheepish", "medium"
+    elif any(w in t for w in ("hero", "epic", "royal", "legend")):
+        genre, mood, energy = "orchestral", "heroic", "high"
+    else:
+        genre, mood, energy = "funk", (char.get("vibe", "") or "confident")[:20], "high"
+    return {"genre": genre, "mood": mood, "energy": energy,
+            "shape": "hit", "duration": 8}
+
+
+@app.route("/api/walkout/<slug>", methods=["POST"])
+def walkout_for(slug):
+    """Rerollable walkout: character description → sting, saved on bundle.
+    Body: {} rerolls (random seed) or {"seed": N} to replay one.
+    AR entrance + preload pick it up with no other changes."""
+    import secrets
+    import sound_synth
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    bdir = FREAK_DIR / slug
+    meta = _bundle_meta(slug)
+    if meta is None or not bdir.is_dir():
+        return jsonify({"ok": False, "error": "unknown set"}), 404
+    data = request.json or {}
+    try:
+        seed = int(data.get("seed", secrets.randbelow(1 << 31)))
+    except Exception:
+        seed = 0
+    recipe = _vibe_recipe((meta.get("character") or {}))
+    full = {**recipe, "duration": 8}
+    (bdir / "walkout.wav").write_bytes(sound_synth.generate(full, seed))
+    (bdir / "walkout.json").write_text(json.dumps(
+        {**recipe, "seed": seed, "provider": "procedural"}))
+    return jsonify({"ok": True, "seed": seed, "recipe": recipe,
+                    "url": f"/freaks/{slug}/walkout.wav"})
+
+
 @app.route("/api/walkout", methods=["POST"])
 def walkout():
     """Walkout sting from a recipe. Two engines, one contract.
@@ -1329,7 +1387,43 @@ def respond():
                     "parent": parent_slug, "meta": meta, "beats": offsets})
 
 
+@app.route("/takes", methods=["GET"])
+def takes_browser():
+    """Cross-pog take browser: every recorded take, newest first,
+    playable in place with a link back to its pog."""
+    import html as _html
+    takes = _list_takes()[:60]
+    cards = []
+    for t in takes:
+        cards.append(
+            f"<div style='margin:14px auto;max-width:420px;background:#14141c;"
+            f"border:1px solid #333;border-radius:10px;padding:10px'>"
+            f"<div style='font-size:13px;margin-bottom:6px'>🎭 {_html.escape(t['name'])}"
+            f" <span style='color:#666'>· {t['size_kb']}KB"
+            f"{' · stems' if t['has_stems'] else ''}</span></div>"
+            f"<video src='{t['url']}' controls playsinline preload='none' "
+            f"style='width:100%;border-radius:8px;background:#000'></video>"
+            f"<div style='font-size:12px;margin-top:6px'>"
+            f"<a style='color:#00d4ff' href='/f/{t['slug']}'>watch {_html.escape(t['slug'])}</a>"
+            f" · <a style='color:#00d4ff' href='/r/{t['slug']}'>record yours</a>"
+            f" · <a style='color:#00d4ff' href='/revoice/{t['slug']}/{t['file']}'>revoice</a>"
+            f"</div></div>")
+    body = "\n".join(cards) or "<p style='text-align:center;color:#666'>No takes yet — be the first.</p>"
+    page = ("""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Takes — Freak Town</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0f;color:#eee;font-family:monospace;padding:16px 10px 60px}
+h1{text-align:center;font-size:16px;color:#ff2fa8;margin:6px 0 2px}
+p.sub{text-align:center;color:#888;font-size:12px;margin-bottom:10px}
+a.back{color:#fff}</style></head><body>
+<h1>🎭 TAKES</h1><p class="sub">real people performing as pogs — newest first</p>
+""" + body + "<p style='text-align:center;margin-top:18px'><a class='back' href='/'>← black room</a></p></body></html>")
+    return page, 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
 @app.route("/f/<slug>")
+@app.route("/w/<slug>")
 def watch_set(slug):
     """Short watch URL. Canonical is /<character>/<set> once named."""
     slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
@@ -1617,8 +1711,26 @@ def _render_watch(slug):
              "<button style='width:100%'>📍 place in your room</button></a>"
              f"<a href='/record/{slug}' style='display:block;margin:8px auto;max-width:340px,"
              "text-align:center;text-decoration:none' class='cta ghost'>"
-             "<button style='width:100%'>🎭 become them — record</button></a>"
-             if rt else "")
+              "<button style='width:100%'>🎭 become them — record</button></a>"
+              if rt else "")
+    takes = _list_takes(slug)[:3]
+    takes_html = ""
+    if takes:
+        cards = "".join(
+            f"<video src='{t['url']}' controls playsinline preload='none' "
+            f"style='width:100%;max-width:340px;border-radius:8px;background:#000;"
+            f"margin:6px auto;display:block'></video>" for t in takes)
+        takes_html = (
+            f"<div style='margin:10px auto;max-width:360px;text-align:center'>"
+            f"<div style='font-size:12px;color:#ff2fa8'>🎭 REAL TAKES — people as {name}</div>"
+            f"{cards}"
+            f"<a href='/takes' style='font-size:12px;color:#00d4ff'>all pogs' takes →</a></div>")
+    else:
+        takes_html = (
+            f"<div style='margin:10px auto;max-width:360px;text-align:center;"
+            f"font-size:12px;color:#666'>No human takes yet — "
+            f"<a href='/r/{slug}' style='color:#00d4ff'>record the first</a> · "
+            f"<a href='/takes' style='color:#00d4ff'>all takes</a></div>")
     page = WATCH_TEMPLATE
     for key, val in {
         "__SLUG__": slug, "__NAME__": name, "__PREMISE__": premise,
@@ -1628,6 +1740,39 @@ def _render_watch(slug):
         "__BEATS__": json.dumps(beats),
         "__BODY__": body_url, "__BODY_FORMAT__": body_fmt,
         "__ARBTN__": arbtn,
+        "__TAKES__": takes_html,
+        "__VOICE__": (
+            "<details style='margin:10px auto;max-width:360px;text-align:center'>"
+            "<summary style='font-size:12px;color:#888;cursor:pointer'>"
+            "🎙 re-voice the set</summary>"
+            "<div style='font-size:12px;margin-top:6px'>"
+            "<select id='vVoice'>"
+            "<option value='en-US-AriaNeural'>Ella (Aria)</option>"
+            "<option value='en-US-GuyNeural'>Guy</option>"
+            "<option value='en-US-ChristopherNeural'>Christopher</option>"
+            "<option value='en-US-SamanthaNeural'>Samantha</option>"
+            "<option value='en-US-JoannaNeural'>Joanna</option>"
+            "<option value='en-US-TonyNeural'>Tony</option>"
+            "</select> <select id='vPace'>"
+            "<option value='normal'>normal</option>"
+            "<option value='slow'>slow</option>"
+            "<option value='fast'>fast</option>"
+            "</select> "
+            "<button onclick='previewVoice()'>▶ preview line 1</button>"
+            "<div id='vMsg' style='color:#666;margin-top:4px'></div></div></details>"
+            "<script>async function previewVoice(){"
+            "var m=document.getElementById('vMsg');m.textContent='rendering…';"
+            "try{var line=(BEATS[0]&&BEATS[0].text)||'';if(!line){m.textContent='no lines';return;}"
+            "var r=await fetch('/api/regen_beat',{method:'POST',"
+            "headers:{'Content-Type':'application/json'},"
+            "body:JSON.stringify({text:line,"
+            "voice:document.getElementById('vVoice').value,"
+            "pace:document.getElementById('vPace').value})});"
+            "var j=await r.json();"
+            "if(j.ok){m.textContent=j.cached?'(cached)':'(fresh)';"
+            "new Audio('/api/beat_audio/'+j.key).play();}"
+            "else m.textContent='failed: '+(j.error||r.status);}catch(e){m.textContent='error';}}"
+            "</script>"),
         "__CARD__": f"https://freak.town/api/card/{slug}.png",
         "__CANON__": canonical_url(slug),
         "__REPLYBANNER__": (
@@ -1741,6 +1886,8 @@ __REPLYBANNER__
   <button id="laughBtn" disabled>😂 <span id="laughCount">0</span></button>
   __ARBTN__
 </div>
+__TAKES__
+__VOICE__
 <div id="endscreen">
   <div id="replybox">
     <div style="font-size:15px;font-weight:bold;margin-bottom:2px;">YOUR TURN</div>
@@ -2313,7 +2460,7 @@ const BODY_URL = "__BODY__", BODY_FMT = "__BODY_FORMAT__", SLUG = "__SLUG__";
 const status = (t) => { document.getElementById('status').textContent = t; };
 let avatar = null, jawTargets = [], vrm = null, audioCtx = null, analyser = null, audioEl = null;
 let placed = false, playing = false, energy = 0, nextBlink = 3;
-let freqData = null, baseY = 0, entranceT = 1, walkoutEl = null;
+let freqData = null, baseY = 0, entranceT = 1, walkoutEl = null, mixerAR = null;
 
 function collectJaw(root) {
   const out = [];
@@ -2371,6 +2518,18 @@ const freakModule = () => ({
       avatar.visible = false;
       scene.add(avatar);
       jawTargets = vrm ? [] : collectJaw(avatar);
+      try {
+        const clips = gltf.animations || [];
+        if (clips.length && !vrm) {
+          let ci = 0;
+          try {
+            ci = Math.max(0, parseInt(
+              new URLSearchParams(location.search).get('clip') || '0', 10) || 0) % clips.length;
+          } catch (err) {}
+          mixerAR = new THREE.AnimationMixer(avatar);
+          mixerAR.clipAction(clips[ci]).play();
+        }
+      } catch (err) { mixerAR = null; }
       status('Avatar loaded. Point at the floor, tap PLACE.');
     } catch (e) {
       status('Could not load avatar body.');
@@ -2455,6 +2614,7 @@ document.getElementById('playBtn').onclick = async () => {
           vrm.update(dt);
         } catch (err) {}
       }
+      try { mixerAR && mixerAR.update(dt); } catch (err) {}
       // speaking: analyser energy -> jaw + bop
       let w = 0;
       if (playing && analyser) {
@@ -2491,6 +2651,7 @@ document.getElementById('playBtn').onclick = async () => {
 
 
 @app.route("/ar/<slug>", methods=["GET"])
+@app.route("/a/<slug>", methods=["GET"])
 def watch_ar(slug):
     """AR view: place the freak in your room (8th Wall WebAR) and play the set."""
     slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
@@ -2521,6 +2682,13 @@ def watch_ar(slug):
     return page, 200, {"Content-Type": "text/html; charset=utf-8"}
 
 
+@app.route("/b", methods=["GET"])
+def go_badger():
+    """Shortest badger demo: /b -> AR badger live in your room."""
+    from flask import redirect as _redirect
+    return _redirect("/a/badger-001", code=302)
+
+
 RECORD_TEMPLATE = """<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -2531,7 +2699,8 @@ RECORD_TEMPLATE = """<!DOCTYPE html>
   "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
   "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.3.0/lib/three-vrm.module.js",
-  "@mediapipe/tasks-vision": "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+  "@mediapipe/tasks-vision": "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm",
+  "kalidokit": "https://cdn.jsdelivr.net/npm/kalidokit@1.1.5/+esm"
 }}
 </script>
 <style>
@@ -2557,7 +2726,7 @@ button:disabled{opacity:.4}
 <a id="back" href="/f/__SLUG__">← __NAME__</a>
 <div id="ui">
   <h1>Become __NAME__</h1>
-  <p id="hint">1. Allow camera &amp; mic &nbsp;2. Hit RECORD &nbsp;3. Perform &amp; stop → share link</p>
+  <p id="hint">1. Allow camera &amp; mic &nbsp;2. Step back for full body &nbsp;3. RECORD, perform, stop → share</p>
   <button id="recBtn" disabled>⏺ RECORD</button>
   <button id="stopBtn" disabled class="ghost">⏹ STOP</button>
   <div id="status">loading face tracker…</div>
@@ -2567,11 +2736,19 @@ button:disabled{opacity:.4}
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
-import { FaceLandmarker, FilesetResolver } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs';
+import { FaceLandmarker, PoseLandmarker, FilesetResolver } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs';
+import { Pose as KalidoPose } from 'kalidokit';
 const BODY_URL = "__BODY__", BODY_FMT = "__BODY_FORMAT__", SLUG = "__SLUG__";
 const status = (t) => { document.getElementById('status').textContent = t; };
 let vrm = null, jawMeshes = [], landmarker = null, video = null, stream = null;
 let renderer, scene, camera, recording = false, recorder = null, chunks = [], micStream = null;
+let micRec = null, micChunks = [], faceTimeline = [], lastCats = null, recStart = 0, lastSample = 0;
+let bodyRoot = null, staticPuppet = false;
+let mixer = null;
+let poseLandmarker = null, bodyDamp = {}, boneTimeline = [];
+let bodyOn = true;
+let lastBoneSnap = null;
+try { bodyOn = new URLSearchParams(location.search).get('body') !== '0'; } catch (e) {}
 
 // --- stage ---
 renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
@@ -2613,12 +2790,80 @@ async function loadBody() {
   const h = Math.max(0.5, box.max.y - box.min.y);
   root.scale.setScalar(1.6 / h);
   root.position.set(0, -box.min.y * (1.6 / h), 0);
+  root.userData.baseY = root.position.y;
+  bodyRoot = root;
+  // Frame the whole body: fixed 2.6m overfills big-headed/T-pose models.
+  // Fit 1.6m + margin into the fov instead (same for every avatar).
+  try {
+    const fit = (1.6 / 2) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * 1.25;
+    camera.position.set(0, 1.45, Math.max(2.6, fit));
+  } catch (e) {}
+  staticPuppet = (BODY_FMT !== 'vrm') && (jawMeshes.length === 0);
+  if (staticPuppet) status('Body loaded. PUPPET mode: unrigged mesh — your face moves the whole badger.');
+  // Skeletal clips baked in the file (Atlas walk/swagger): play one on loop.
+  // ?clip=N picks; default 0. VRM/static bodies have none — guarded.
+  try {
+    const clips = gltf.animations || [];
+    if (clips.length && BODY_FMT !== 'vrm') {
+      let ci = 0;
+      try {
+        ci = Math.max(0, parseInt(
+          new URLSearchParams(location.search).get('clip') || '0', 10) || 0) % clips.length;
+      } catch (e) {}
+      mixer = new THREE.AnimationMixer(root);
+      mixer.clipAction(clips[ci]).play();
+      status('Body loaded' + (clips.length > 1 ? ` (${clips.length} clips, ?clip=N to switch).` : ' with walk cycle.')
+        + (staticPuppet ? ' PUPPET mode: your face moves him too.' : ''));
+    }
+  } catch (e) { mixer = null; }
   root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
   scene.add(root);
   return true;
 }
 
 // --- face tracking: MediaPipe outputs 52 ARKit blendshapes, we map direct ---
+// --- body tracking: Pose landmarks solved onto VRM humanoid bones (Kalidokit) ---
+const BODY_BONES = ["hips", "spine", "chest", "neck",
+  "leftUpperArm", "leftLowerArm", "leftHand",
+  "rightUpperArm", "rightLowerArm", "rightHand",
+  "leftUpperLeg", "leftLowerLeg", "leftFoot",
+  "rightUpperLeg", "rightLowerLeg", "rightFoot"];
+const RIG_KEYS = ["Hips", "Spine", "Chest", "Neck",
+  "LeftUpperArm", "LeftLowerArm", "LeftHand",
+  "RightUpperArm", "RightLowerArm", "RightHand",
+  "LeftUpperLeg", "LeftLowerLeg", "LeftFoot",
+  "RightUpperLeg", "RightLowerLeg", "RightFoot"];
+
+function applyBody(pose3D, pose2D) {
+  if (!vrm || !bodyOn) return null;
+  let rig = null;
+  try {
+    rig = KalidoPose.solve(pose3D, pose2D, {
+      runtime: "mediapipe", video: video,
+      imageSize: { width: 640, height: 480 }, enableLegs: true });
+  } catch (e) { return null; }
+  if (!rig) return null;
+  const snap = [];
+  for (let i = 0; i < BODY_BONES.length; i++) {
+    const part = rig[RIG_KEYS[i]];
+    if (!part || !part.rotation) continue;
+    const t = part.rotation;
+    const cx = Math.max(-0.9, Math.min(0.9, t.x || 0));
+    const cy = Math.max(-0.9, Math.min(0.9, t.y || 0));
+    const cz = Math.max(-0.9, Math.min(0.9, t.z || 0));
+    let node = null;
+    try { node = vrm.humanoid.getNormalizedBoneNode(BODY_BONES[i]); } catch (e) {}
+    if (!node) continue;
+    const k = BODY_BONES[i];
+    bodyDamp[k] = bodyDamp[k] || { x: 0, y: 0, z: 0 };
+    const d = bodyDamp[k], a = 0.35;
+    d.x += (cx - d.x) * a; d.y += (cy - d.y) * a; d.z += (cz - d.z) * a;
+    try { node.rotation.set(d.x, d.y, d.z); } catch (e) {}
+    snap.push(Math.round(d.x * 100), Math.round(d.y * 100), Math.round(d.z * 100));
+  }
+  return snap;
+}
+
 async function initTracker() {
   const vision = await FilesetResolver.forVisionTasks(
     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
@@ -2627,6 +2872,15 @@ async function initTracker() {
     outputFaceBlendshapes: true, outputFacialTransformationMatrixes: true,
     runningMode: "VIDEO", numFaces: 1,
   });
+  if (bodyOn) {
+    try {
+      poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+        baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task", delegate: "GPU" },
+        runningMode: "VIDEO", numPoses: 1,
+        minPoseDetectionConfidence: 0.5, minTrackingConfidence: 0.5,
+      });
+    } catch (e) { poseLandmarker = null; }
+  }
 }
 
 function applyFace(res) {
@@ -2652,6 +2906,12 @@ function applyFace(res) {
   for (const j of jawMeshes) {
     try { j.mesh.morphTargetInfluences[j.idx] = open; } catch (e) {}
   }
+  // remix stem: tiny per-frame snapshot for later re-performance
+  const r2 = (v) => Math.round((v || 0) * 100) / 100;
+  lastCats = { o: r2(open), s: r2(cats['mouthSmileLeft']),
+    b: r2(Math.max(cats['eyeBlinkLeft'] || 0, cats['eyeBlinkRight'] || 0)),
+    a: r2(cats['aa']), e: r2(cats['ee']), i: r2(cats['ih']),
+    h: r2(cats['oh']), u: r2(cats['ou']) };
 }
 
 let lastT = 0;
@@ -2663,9 +2923,35 @@ function loop(t) {
     if (landmarker && video && video.readyState >= 2 && video.currentTime > 0) {
       const res = landmarker.detectForVideo(video, performance.now());
       applyFace(res);
+      if (poseLandmarker && vrm && bodyOn) {
+        try {
+          const pr = poseLandmarker.detectForVideo(video, performance.now());
+          const pw = pr && pr.poseWorldLandmarks && pr.poseWorldLandmarks[0];
+          const p2 = pr && pr.poseLandmarks && pr.poseLandmarks[0];
+          lastBoneSnap = (pw && p2) ? applyBody(pw, p2) : null;
+        } catch (e) { lastBoneSnap = null; }
+      }
+      if (staticPuppet && bodyRoot && lastCats) {
+        const tt = performance.now() / 1000;
+        bodyRoot.rotation.y = Math.sin(tt * 1.2) * 0.12 + (lastCats.s || 0) * 0.5;
+        bodyRoot.rotation.x = -(lastCats.o || 0) * 0.35;
+        bodyRoot.rotation.z = (lastCats.b || 0) * 0.15;
+        bodyRoot.position.y = (bodyRoot.userData.baseY || 0)
+          + (lastCats.o || 0) * 0.25 + Math.abs(Math.sin(tt * 2.2)) * 0.02;
+      }
+      if (recording && lastCats && performance.now() - lastSample > 100
+          && faceTimeline.length < 1200) {
+        lastSample = performance.now();
+        faceTimeline.push([Math.round(performance.now() - recStart),
+          lastCats.o, lastCats.s, lastCats.b, lastCats.a,
+          lastCats.e, lastCats.i, lastCats.h, lastCats.u]);
+        if (lastBoneSnap && boneTimeline.length < 1200)
+          boneTimeline.push([Math.round(performance.now() - recStart)].concat(lastBoneSnap));
+      }
     }
   } catch (e) {}
   try { vrm && vrm.update(dt); } catch (e) {}
+  try { mixer && mixer.update(dt); } catch (e) {}
   renderer.render(scene, camera);
 }
 
@@ -2675,29 +2961,56 @@ document.getElementById('recBtn').onclick = async () => {
     micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
   } catch (e) { status('Mic blocked: allow microphone, then reload.'); return; }
   chunks = [];
+  faceTimeline = []; boneTimeline = []; lastBoneSnap = null;
+  recStart = 0; lastSample = 0;
   try {
     const cs = renderer.domElement.captureStream(30);
     if (micStream) micStream.getAudioTracks().forEach((tr) => cs.addTrack(tr));
     recorder = new MediaRecorder(cs, { mimeType: 'video/webm' });
+    try {
+      micChunks = [];
+      micRec = new MediaRecorder(micStream, { mimeType: 'audio/webm' });
+      micRec.ondataavailable = (e) => { if (e.data.size) micChunks.push(e.data); };
+      micRec.start(1000);
+    } catch (e) { micRec = null; }
   } catch (e) { status('Recording unsupported in this browser.'); return; }
   recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
   recorder.onstop = async () => {
     const blob = new Blob(chunks, { type: 'video/webm' });
-    const fd = new FormData();
-    fd.append('file', blob, 'take.webm');
-    status('Uploading ' + Math.round(blob.size / 1024) + ' KB…');
+    const finish = async (micBlob) => {
+      const fd = new FormData();
+      fd.append('file', blob, 'take.webm');
+      if (micBlob) fd.append('mic', micBlob, 'take-mic.webm');
+      try {
+        fd.append('meta', JSON.stringify({
+          duration_ms: Math.round(performance.now() - recStart),
+          face_samples: faceTimeline.length,
+          faces: faceTimeline.slice(0, 1200),
+          bone_samples: boneTimeline.length,
+          bones: boneTimeline.slice(0, 1200),
+          client: navigator.userAgent.slice(0, 80),
+        }));
+      } catch (e) {}
+      status('Uploading ' + Math.round(blob.size / 1024) + ' KB…');
     try {
       const r = await fetch('/api/record/' + SLUG, { method: 'POST', body: fd });
       const j = await r.json();
       if (j.ok) {
         document.getElementById('share').innerHTML =
-          '🔗 <a href="' + j.url + '">share this take</a> — send it to your friend';
+          '🔗 <a href="' + j.url + '">share this take</a> · ' +
+          '<a href="' + j.url + '" download>save video</a> — post it, birthday-bomb a friend';
         status('Saved. That take now lives at the link above.');
       } else status('Save failed: ' + (j.error || r.status));
     } catch (e) { status('Upload failed — video lost. Sorry.'); }
-    document.getElementById('recBtn').disabled = false;
-    document.getElementById('stopBtn').disabled = true;
+      document.getElementById('recBtn').disabled = false;
+      document.getElementById('stopBtn').disabled = true;
+    };
+    if (micRec && micRec.state !== 'inactive') {
+      micRec.onstop = () => finish(new Blob(micChunks, { type: 'audio/webm' }));
+      micRec.stop();
+    } else finish(null);
   };
+  recStart = performance.now();
   recorder.start(1000);
   recording = true;
   document.getElementById('recBtn').disabled = true;
@@ -2730,6 +3043,7 @@ document.getElementById('stopBtn').onclick = () => {
 
 
 @app.route("/record/<slug>", methods=["GET"])
+@app.route("/r/<slug>", methods=["GET"])
 def watch_record(slug):
     """RECORD mode: become the freak. Webcam drives the VRM face live;
     canvas + mic capture to a shareable take. All tracking on-device."""
@@ -2755,7 +3069,11 @@ def watch_record(slug):
 
 @app.route("/api/record/<slug>", methods=["POST"])
 def save_take(slug):
-    """Save a recorded take (webm) into the freak bundle. Returns share URL."""
+    """Save a recorded take (webm) into the freak bundle. Returns share URL.
+    Optional remix stems (same stamp, backward compatible when absent):
+    - `mic`: mic-only audio blob (the human voice, unmuxed)
+    - `meta`: JSON {duration_ms, face_samples, client} — face timeline
+      array itself rides inside `meta.faces` when small (<400KB)."""
     import datetime
     slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
     bdir = FREAK_DIR / slug
@@ -2771,8 +3089,311 @@ def save_take(slug):
     rdir.mkdir(exist_ok=True)
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d-%H%M%S")
     (rdir / f"take-{stamp}.webm").write_bytes(blob)
-    return jsonify({"ok": True,
+    stems = False
+    mic = request.files.get("mic")
+    if mic is not None:
+        mblob = mic.read(16 * 1024 * 1024 + 1)
+        if 1024 <= len(mblob) <= 16 * 1024 * 1024:
+            (rdir / f"take-{stamp}.mic").write_bytes(mblob)
+            stems = True
+    raw_meta = request.form.get("meta", "")
+    if raw_meta:
+        try:
+            m = json.loads(raw_meta)
+            if isinstance(m, dict):
+                m["slug"] = slug
+                m["take"] = f"take-{stamp}.webm"
+                (rdir / f"take-{stamp}.json").write_text(json.dumps(m)[:512_000])
+                stems = True
+        except Exception:
+            pass
+    return jsonify({"ok": True, "stems": stems,
                     "url": f"/freaks/{slug}/takes/take-{stamp}.webm"})
+
+
+REVOICE_VOICES = ("en-US-AriaNeural", "en-US-GuyNeural",
+                  "en-US-ChristopherNeural", "en-US-SamanthaNeural",
+                  "en-US-JoannaNeural", "en-US-TonyNeural",
+                  "kokoro:af_heart", "kokoro:af_bella",
+                  "kokoro:am_adam", "kokoro:am_michael")
+
+
+def _bank_voices() -> list[dict]:
+    """5-second-clone bank: data/voice-bank/<id>/voice.json.
+    Rendered on GPU (Qwen3-TTS) or cached; listed automatically in revoice."""
+    out = []
+    bank = Path(__file__).parent / "data" / "voice-bank"
+    if not bank.is_dir():
+        return out
+    for v in sorted(bank.iterdir()):
+        if not v.is_dir():
+            continue
+        meta = v / "voice.json"
+        if not meta.exists():
+            continue
+        try:
+            m = json.loads(meta.read_text())
+        except Exception:
+            continue
+        if m.get("id") and m.get("ready"):
+            out.append({"id": f"bank:{m['id']}",
+                        "label": m.get("label", m["id"])})
+    return out
+
+
+@app.route("/revoice/<slug>/<fname>", methods=["GET"])
+def revoice_page(slug, fname):
+    """Change a take's voice after the fact: type what was (or should be)
+    said, pick a voice, get a new take with re-rendered speech muxed over
+    the same performance video. Timing comes from the new read; the body
+    and face stay yours."""
+    import html as _html
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    fname = re.sub(r"[^a-z0-9_.-]", "", fname)[:64]
+    if _bundle_meta(slug) is None or not fname.startswith("take-") \
+            or not fname.endswith(".webm"):
+        return "No such take.", 404
+    if not (FREAK_DIR / slug / "takes" / fname).exists():
+        return "No such take.", 404
+    wourl = ""
+    for f in ("walkout.mp3", "walkout.wav"):
+        if (FREAK_DIR / slug / f).exists():
+            wourl = f"/freaks/{slug}/{f}"
+            break
+    opts = "".join(f"<option value='{v}'>{_html.escape(v.split('-')[1])}</option>"
+                   for v in REVOICE_VOICES if not v.startswith(("kokoro:", "bank:")))
+    opts += "".join(f"<option value='{v}'>{_html.escape('Kokoro ' + v.split(':')[1])}</option>"
+                    for v in REVOICE_VOICES if v.startswith("kokoro:"))
+    opts += "".join(f"<option value='{b['id']}'>{_html.escape('★ ' + b['label'])}</option>"
+                    for b in _bank_voices())
+    return f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Revoice — Freak Town</title>
+<style>*{{margin:0;padding:0;box-sizing:border-box}}
+body{{background:#0a0a0f;color:#eee;font-family:monospace;padding:16px 12px 60px}}
+h1{{text-align:center;font-size:15px;color:#ff2fa8}}
+.wrap{{max-width:420px;margin:0 auto}}video{{width:100%;border-radius:8px;background:#000}}
+textarea{{width:100%;background:#14141c;color:#eee;border:1px solid #444;border-radius:8px;padding:10px;font-family:inherit}}
+select,button{{background:#14141c;color:#eee;border:1px solid #555;border-radius:18px;padding:10px 16px;font-family:inherit;margin-top:8px}}
+button{{background:#ff2fa8;border-color:#ff2fa8;color:#fff;cursor:pointer}}
+#msg{{color:#8f8;font-size:12px;margin-top:8px;min-height:16px}}a{{color:#00d4ff}}</style></head>
+<body><div class="wrap">
+<h1>🎙 REVOICE {_html.escape(slug)}</h1>
+<video src="/freaks/{slug}/takes/{fname}" controls playsinline preload="metadata"></video>
+<p style="font-size:12px;color:#888;margin:8px 0">Reroll the voice, the walkout, or the performer — same take, new show:</p>
+<div style="font-size:12px;margin:6px 0">🎺 walkout: <audio id="wo" controls preload="none" src="{wourl}" style="vertical-align:middle;max-width:220px"></audio>
+<button onclick="newWalkout()">🎲 reroll</button> <span id="woMsg" style="color:#666"></span></div>
+<div style="font-size:12px;margin:6px 0">🎭 perform as: <span id="cast">loading…</span></div>
+<p style="font-size:12px;color:#888;margin:8px 0">What was said (or should have been):</p>
+<textarea id="tx" rows="3" placeholder="Buster knows what you did with the cheese…"></textarea><br>
+<select id="vv">{opts}</select>
+<button onclick="go()">RENDER NEW VOICE ▶</button>
+<div id="msg"></div>
+<p style="margin-top:14px;font-size:12px"><a href="/f/{slug}">← back to {_html.escape(slug)}</a> · <a href="/takes">all takes</a></p>
+</div><script>
+async function newWalkout(){{
+var m=document.getElementById('woMsg');m.textContent='rolling…';
+try{{
+var r=await fetch('/api/walkout/{slug}',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:'{{}}'}});
+var j=await r.json();
+if(j.ok){{document.getElementById('wo').src=j.url;
+m.textContent=j.recipe.genre+'/'+j.recipe.mood+' (seed '+j.seed+')';}}
+else m.textContent='failed';
+}}catch(e){{m.textContent='error';}}
+}}
+async function loadCast(){{
+try{{
+var r=await fetch('/api/sets');var j=await r.json();
+var el=document.getElementById('cast');
+el.innerHTML=(j.sets||j||[]).slice(0,12).map(s=>'<a href="/r/'+s.slug+'">'+s.name+'</a>').join(' · ')||'none yet';
+}}catch(e){{document.getElementById('cast').textContent='error';}}
+}}
+loadCast();
+async function go(){{
+var m=document.getElementById('msg');m.textContent='rendering voice…';
+try{{
+var r=await fetch('/api/revoice',{{method:'POST',headers:{{'Content-Type':'application/json'}},
+body:JSON.stringify({{slug:'{slug}',file:'{fname}',
+text:document.getElementById('tx').value,
+voice:document.getElementById('vv').value}})}});
+var j=await r.json();
+if(j.ok){{m.innerHTML='done — <a href="'+j.url+'">watch the revoiced take</a>';}}
+else m.textContent='failed: '+(j.error||r.status);
+}}catch(e){{m.textContent='error';}}
+}}
+</script></body></html>""", 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
+@app.route("/api/revoice", methods=["POST"])
+def api_revoice():
+    """Render transcript in a new voice, mux over the take's video.
+    Body: {slug, file, text, voice}. Returns a NEW take file; source kept."""
+    import datetime
+    import subprocess
+    import tempfile
+    data = request.json or {}
+    slug = re.sub(r"[^a-z0-9_-]", "", str(data.get("slug", "")))[:45]
+    fname = re.sub(r"[^a-z0-9_.-]", "", str(data.get("file", "")))[:64]
+    text = str(data.get("text", "") or "").strip()[:500]
+    voice = str(data.get("voice", "") or "")
+    if _bundle_meta(slug) is None or not fname.startswith("take-") \
+            or not fname.endswith(".webm"):
+        return jsonify({"ok": False, "error": "bad slug/file"}), 400
+    src = FREAK_DIR / slug / "takes" / fname
+    if not src.exists():
+        return jsonify({"ok": False, "error": "unknown take"}), 404
+    if not text:
+        return jsonify({"ok": False, "error": "transcript required"}), 400
+    bank_ids = {b["id"] for b in _bank_voices()}
+    try:
+        if voice.startswith("kokoro:"):
+            from tts_provider import get_provider
+            wav = asyncio.run(get_provider("kokoro").generate(text, voice))
+        elif voice in bank_ids:
+            return jsonify({"ok": False,
+                            "error": "bank voice not rendered yet — see docs/VOICE-BANK.md"}), 502
+        elif voice in REVOICE_VOICES:
+            wav = asyncio.run(tts_generate(text, voice))
+        else:
+            return jsonify({"ok": False, "error": "unknown voice"}), 400
+    except Exception:
+        wav = b""
+    if not wav:
+        return jsonify({"ok": False, "error": "tts failed"}), 502
+    stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d-%H%M%S")
+    out = f"take-{stamp}-rv.webm"
+    with tempfile.TemporaryDirectory() as td:
+        vp = f"{td}/v.wav"
+        open(vp, "wb").write(wav)
+        pr = subprocess.run(
+            ["ffmpeg", "-y", "-i", str(src), "-i", vp,
+             "-map", "0:v", "-map", "1:a", "-shortest",
+             "-c:v", "copy", str(FREAK_DIR / slug / "takes" / out)],
+            capture_output=True, timeout=120)
+    if pr.returncode != 0 or not (FREAK_DIR / slug / "takes" / out).exists():
+        return jsonify({"ok": False, "error": "mux failed"}), 502
+    (FREAK_DIR / slug / "takes" / f"take-{stamp}-rv.json").write_text(
+        json.dumps({"source": fname, "voice": voice, "text": text,
+                    "slug": slug, "take": out}))
+    return jsonify({"ok": True,
+                    "url": f"/freaks/{slug}/takes/{out}"})
+
+
+def _list_takes(slug: str | None = None) -> list[dict]:
+    """Takes across pogs, newest first. Flat webm files only — stems
+    (take-<stamp>.json/.mic) are remix material, listed separately."""
+    out = []
+    dirs = [FREAK_DIR / slug] if slug else sorted(FREAK_DIR.iterdir())
+    for d in dirs:
+        if not d.is_dir():
+            continue
+        meta = _bundle_meta(d.name)
+        if not meta:
+            continue
+        rdir = d / "takes"
+        if not rdir.is_dir():
+            continue
+        cname = ((meta.get("character") or {}).get("name") or d.name)
+        for f in sorted(rdir.glob("take-*.webm"), reverse=True):
+            try:
+                st = f.stat()
+            except OSError:
+                continue
+            stem = f.with_suffix("")
+            out.append({
+                "slug": d.name, "name": cname, "file": f.name,
+                "url": f"/freaks/{d.name}/takes/{f.name}",
+                "size_kb": max(1, st.st_size // 1024),
+                "mtime": int(st.st_mtime),
+                "has_stems": stem.with_suffix(".json").exists(),
+            })
+    out.sort(key=lambda t: t["mtime"], reverse=True)
+    return out
+
+
+@app.route("/api/takes", methods=["GET"])
+def api_takes_all():
+    """Every take on every pog, newest first. The cross-pog browser."""
+    return jsonify({"ok": True, "takes": _list_takes()[:100]})
+
+
+@app.route("/api/takes/<slug>", methods=["GET"])
+def api_takes_one(slug):
+    """Takes for one pog."""
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    if _bundle_meta(slug) is None:
+        return jsonify({"ok": False, "error": "unknown set"}), 404
+    return jsonify({"ok": True, "slug": slug, "takes": _list_takes(slug)})
+
+
+@app.route("/api/agent", methods=["GET"])
+def api_agent_manifest():
+    """Machine-readable index for outside agents (Moltbook, OpenClaw, any
+    HTTP agent). Observe → act → assess, no key on trial. Full walkthrough:
+    docs/AGENT-ONBOARDING.md (repo) — this manifest is the contract."""
+    base = "https://trial.freak.town"
+    return jsonify({
+        "ok": True, "name": "freaktown-trial", "version": "trial",
+        "auth": {"mode": "none", "note": "open trial; be gentle, per-IP limits apply"},
+        "observe": {
+            "sets": f"{base}/api/sets",
+            "preload": f"{base}/api/preload/<slug>",
+            "takes": f"{base}/api/takes",
+            "takes_one": f"{base}/api/takes/<slug>",
+            "contracts": f"{base}/contracts/<name>.v1.schema.json",
+        },
+        "act": {
+            "respond_idea": f"{base}/api/respond_idea",
+            "respond_set": f"{base}/api/respond",
+            "create_set": f"{base}/api/sets",
+            "upload_avatar": f"{base}/api/avatar/upload",
+            "save_take": f"{base}/api/record/<slug>",
+            "revoice": f"{base}/api/revoice",
+            "walkout_reroll": f"{base}/api/walkout/<slug>",
+            "react": f"{base}/api/react",
+            "vote": f"{base}/api/vote",
+        },
+        "assess": {
+            "how": "preload gives beats + word timings + camera plan + cues; "
+                   "compare your set's plan against it, then check votes "
+                   "and takes (human baseline) for the same slug",
+            "reply_thread": f"{base}/api/replies/<slug>",
+            "submissions": f"{base}/api/submissions",
+        },
+        "example_flow": [
+            f"GET {base}/api/preload/badger-001",
+            "POST /api/respond_idea {slug:'badger-001', mode:'roast'}",
+            "POST /api/respond {parent_slug:'badger-001', mode:'roast', idea:'<angle>'}",
+            "GET preload/<your-slug> and diff beats/plan vs badger-001",
+            "record or revoice a take, compare takes + votes",
+        ],
+        "pogtown_game_api": "https://api.pog.town (DNS pending human; "
+                            "protocol: services/agent-gateway/AGENT-API.md)",
+    })
+
+
+@app.route("/llms.txt", methods=["GET"])
+def llms_txt():
+    """Compact machine index. Agents: start here, then /api/agent."""
+    txt = """# Freak Town (trial) — for agents
+Trial comedy-club API. No key. Observe, act, assess.
+- Manifest: /api/agent
+- Watch: /f/<slug>  AR: /a/<slug>  Record: /r/<slug>  Takes: /takes
+- Preload (beats+timings+plan): /api/preload/<slug>
+- Reply with a set: POST /api/respond_idea {slug, mode}
+- Human baseline + votes decide what cooked.
+- Game truth lives in pogtown (rooms/observe/act); this repo is the stage.
+- Rules: no secrets in calls, per-IP limits, original voices only.
+"""
+    return txt, 200, {"Content-Type": "text/plain; charset=utf-8"}
+
+
+@app.route("/contracts/<path:filename>")
+def serve_contracts(filename):
+    """Schemas + fixtures for agents. JSON only, no traversal."""
+    if not re.fullmatch(r"[A-Za-z0-9_./-]+\.json", filename) or ".." in filename:
+        return jsonify({"ok": False, "error": "not found"}), 404
+    return send_from_directory(str(Path(__file__).parent / "contracts"), filename)
 
 
 @app.route("/api/react", methods=["POST"])
