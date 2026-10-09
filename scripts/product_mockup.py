@@ -70,9 +70,7 @@ def main():
         sc.world = bpy.data.worlds.new("World")
     sc.world.use_nodes = True
     sc.world.node_tree.nodes["Background"].inputs[0].default_value = (1, 1, 1, 1)
-    sc.world.node_tree.nodes["Background"].inputs[1].default_value = 1.2
-    sc.view_settings.view_transform = "Standard"
-    sc.view_settings.exposure = 0.0
+    sc.world.node_tree.nodes["Background"].inputs[1].default_value = 2.0
     # ground shadow catcher
     bpy.ops.mesh.primitive_plane_add(size=5, location=(0, 0, 0))
     ground = bpy.context.object
@@ -182,16 +180,20 @@ def main():
         raise SystemExit("unknown product " + p)
 
     # frame it
-    dist = max(0.1, H * 1.1)
+    dist = max(0.03, H * 0.9)
     bpy.ops.object.camera_add(location=(dist * 0.35, -dist, H * 0.75),
                               rotation=(math.radians(72), 0, math.radians(10)))
     cam = bpy.context.object
     cam.data.lens = 40
-    from mathutils import Vector
-    focus_pt = Vector((0, 0, H * 0.42))
-    cam.location = Vector((dist * 0.35, -dist, H * 0.75))
-    cam.rotation_euler = (focus_pt - cam.location).to_track_quat("-Z", "Y").to_euler()
-    sc.camera = cam
+    cam.data.clip_start = 0.001
+    cam.data.clip_end = 100.0
+    tgt = cam.constraints.new("TRACK_TO")
+    empty = bpy.data.objects.new("focus", None)
+    sc.collection.objects.link(empty)
+    empty.location = (0, 0, H * 0.42)
+    tgt.target = empty
+    tgt.track_axis = "TRACK_NEGATIVE_Z"
+    tgt.up_axis = "UP_Y"
     sc.camera = cam
     sc.render.resolution_x = a.size
     sc.render.resolution_y = a.size
