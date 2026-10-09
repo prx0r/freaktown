@@ -1,0 +1,24 @@
+{
+ "schema": "pog.puppet-rig.v1",
+ "character_id": "pog.miss-muffetson",
+ "mesh_r2_key": "character-meshes/quaternius_cc0-spider-1368.glb",
+ "inspected_at": "2026-10-08",
+ "rig_bones": 59,
+ "actions_available": [
+  "Spider_Idle",
+  "Spider_Walk",
+  "Spider_Attack"
+ ],
+ "face": {
+  "jaw_bone": null,
+  "mouth_morphs": []
+ },
+ "controls": {
+  "speech_base": "Spider_Idle looped",
+  "mouth": "NO jaw/morph -> coupled-motion fallback + cue track",
+  "emphasis": "Head dip + root hop (rigged) / lean + rock (static)",
+  "entrance": "Walk action + slide (rigged) / slide-in (static)"
+ },
+ "suggested_family": "articulated",
+ "validation": "structural pass (factory report); rigged 59 bones, spider+wasp action sets"
+}

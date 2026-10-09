@@ -1,0 +1,22 @@
+{
+ "schema": "pog.puppet-rig.v1",
+ "character_id": "pog.dr-peel",
+ "mesh_r2_key": "character-meshes/nyilonelycompany-chimp-4562.glb",
+ "inspected_at": "2026-10-08",
+ "rig_bones": 42,
+ "actions_available": [
+  "Idle"
+ ],
+ "face": {
+  "jaw_bone": "Jaw_M",
+  "mouth_morphs": []
+ },
+ "controls": {
+  "speech_base": "Idle looped",
+  "mouth": "Jaw_M driven from mouth_cues.json",
+  "emphasis": "Head dip + root hop (rigged) / lean + rock (static)",
+  "entrance": "Walk action + slide (rigged) / slide-in (static)"
+ },
+ "suggested_family": "articulated",
+ "validation": "structural pass (factory report); rigged 42 bones incl Jaw_M/Tongue, Idle"
+}

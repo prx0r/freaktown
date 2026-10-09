@@ -1,0 +1,27 @@
+{
+ "schema": "pog.motion-style.v1",
+ "character_id": "pog.dr-peel",
+ "family": "articulated",
+ "cadence": {
+  "body_pose_fps": 12,
+  "mouth_pose_fps": 16
+ },
+ "temperament": {
+  "energy": 0.85,
+  "confidence": 0.9,
+  "nervousness": 0.25,
+  "theatricality": 0.8
+ },
+ "signature": {
+  "primary_control": "courtroom point",
+  "gesture_frequency": "high",
+  "preferred_pose": "thunder with ook-breaks",
+  "reaction_delay_ms": 150,
+  "signature_action": "gavel-slam"
+ },
+ "physicality": {
+  "settle": 0.2,
+  "overshoot": 0.12,
+  "idle_breath": 0.015
+ }
+}

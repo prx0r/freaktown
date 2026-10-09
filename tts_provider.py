@@ -264,6 +264,7 @@ class AudioChunk:
     beat_id: str
     beat_type: str
     pause_after_ms: int
+    pause_before_ms: int = 0
     sample_rate: int = 24000
 
 
@@ -293,6 +294,10 @@ class AudioCompositor:
         all_samples = []
         
         for chunk in chunks:
+            # Exact silence BEFORE the beat (pre-punch pause etc.)
+            pre = int(self.sample_rate * getattr(chunk, "pause_before_ms", 0) / 1000)
+            all_samples.extend([0] * pre)
+
             # Add speech samples
             if chunk.audio:
                 samples = self._wav_to_samples(chunk.audio)
@@ -346,6 +351,7 @@ class AudioCompositor:
                 beat_id=beat["id"],
                 beat_type=beat["type"],
                 pause_after_ms=beat.get("pause_after_ms", 300),
+                pause_before_ms=beat.get("pause_before_ms", 0),
             ))
         
         return self.compose(chunks)
