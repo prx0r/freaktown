@@ -100,6 +100,15 @@ def main():
         o.location.z -= zmin
     bpy.context.view_layer.update()
     cx = sum(o.location.x for o in roots) / max(1, len(roots))
+    # measured bounds AFTER normalize: cameras frame the actual performer
+    # (FT-11 — fixed positions silently fail on odd-sized meshes).
+    allz = [(o.matrix_world @ v.co).z for o in bpy.context.scene.objects
+            if o.type == "MESH" for v in o.data.vertices]
+    allx = [(o.matrix_world @ v.co).x for o in bpy.context.scene.objects
+            if o.type == "MESH" for v in o.data.vertices]
+    zhi, zlo = max(allz), min(allz)
+    h_meas = max(0.2, zhi - zlo)
+    cx = sum(allx) / max(1, len(allx))
 
     sc = bpy.context.scene
     sc.render.engine = "BLENDER_WORKBENCH"
@@ -148,12 +157,13 @@ def main():
     bpy.ops.mesh.primitive_uv_sphere_add(radius=0.07, location=(0.45, -0.55, 1.45))
 
     # --- cameras: wide / medium / close ------------------------------------
-    h = a.height_m
-    # head-height aim keeps close-ups from decapitating (was: track root).
-    bpy.ops.object.empty_add(location=(0, 0, 0.75 * h))
+    # Positions derive from MEASURED performer bounds (h_meas ~1.1 normally):
+    # identical framing for a giraffe, a chimp and a cat.
+    u = h_meas / 1.1
+    bpy.ops.object.empty_add(location=(cx, 0, zlo + 0.85 * h_meas))
     aim_head = bpy.context.object
     aim_head.name = "AIM_HEAD"
-    bpy.ops.object.empty_add(location=(0, 0, 0.55 * h))
+    bpy.ops.object.empty_add(location=(cx, 0, zlo + 0.55 * h_meas))
     aim_mid = bpy.context.object
     aim_mid.name = "AIM_MID"
     cams = {}
@@ -170,9 +180,9 @@ def main():
         t.up_axis = "UP_Y"
         return c
 
-    add_cam("CAM_WIDE", (0, -4.2, 1.3), (math.radians(78), 0, 0))
-    add_cam("CAM_MEDIUM", (0.3, -2.7, 1.15), (math.radians(82), 0, 0), aim_mid)
-    add_cam("CAM_CLOSE", (-0.3, -2.2, 1.3), (math.radians(84), 0, 0), aim_head)
+    add_cam("CAM_WIDE", (cx, -4.2 * u, zlo + 1.3 * u), (math.radians(78), 0, 0))
+    add_cam("CAM_MEDIUM", (cx + 0.3 * u, -2.7 * u, zlo + 1.15 * u), (math.radians(82), 0, 0), aim_mid)
+    add_cam("CAM_CLOSE", (cx - 0.3 * u, -2.2 * u, zlo + 1.3 * u), (math.radians(84), 0, 0), aim_head)
     # face the audience: yaw the whole performer (default 0 = untouched)
     if a.face_yaw:
         for o in roots:
@@ -187,7 +197,12 @@ def main():
     actions = {act.name: act for act in bpy.data.actions}
     idle = (actions.get("Idle_2") or actions.get("Idle") or actions.get("Anim_GiraffeIdle")
             or actions.get("Spider_Idle") or actions.get("Pixabay_International_Cat"))
+    if idle is None:
+        idle = next((v for k, v in actions.items() if "idle" in k.lower()), None)
     walk = actions.get("Walk") or actions.get("Anim_GiraffeWalkForward") or actions.get("Spider_Walk")
+    if walk is None:
+        walk = next((v for k, v in actions.items()
+                     if "walk" in k.lower() and v is not idle), None)
     movers = [arm] if arm else roots
     # entrance: slide in from stage left over first 3s
     for m in movers:
@@ -314,9 +329,17 @@ def main():
         cuts.append((f, cam.name))
         f1 = ms_to_frame(timeline[i + 1]["start_ms"], fps) - 1 if i + 1 < len(timeline) else end_frame
         segments.append((f, f1, cam))
-    cuts.sort()
+    import math as _m
+    cover_est = {}
+    for f0, f1, cam in segments:
+        sc.camera = cam
+        bpy.context.view_layer.update()
+        dist = (cam.location - aim_mid.location).length
+        ang = float(cam.data.angle) if hasattr(cam.data, "angle") else 0.7
+        cover_est[cam.name] = round(h_meas / max(0.01, 2 * dist * _m.tan(ang / 2)), 3)
     json.dump([{"frame": f0, "camera": c.name,
                 "beat_id": timeline[i]["beat_id"], "beat_type": timeline[i]["type"],
+                "cover_est": cover_est.get(c.name),
                 "mechanism": TYPE2MECH.get(timeline[i]["type"], "escalation"),
                 "acting": direction.get(TYPE2MECH.get(timeline[i]["type"], "escalation"), {}).get("acting", [])}
                for i, (f0, _, c) in enumerate(segments)],
