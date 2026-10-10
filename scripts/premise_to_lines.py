@@ -209,7 +209,7 @@ def judge_draft(lines, mechanism):
                              "repeat_variation": "callback",
                              "displace_emphasis": "misdirection"}.get(mechanism, "absurd")}
     pred = e_predict(grammar)
-    score = pred["predicted_laugh"]
+    score = pred["structural_prior_score"]
     fail = []
     if not feats["has_punch"]:
         fail.append("weak_punchline")
