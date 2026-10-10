@@ -36,13 +36,23 @@ def read_log(path):
 
 
 def summarize(set_id, reacts, feeds, timeline):
-    reacts = [r for r in reacts if r.get("set_id") == set_id]
+    # Audience-only: rehearsal presses are reported separately and never
+    # enter rates or bits. Origin is client-claimed (unverified) until
+    # session auth lands; rates divide by feedback-backed viewers only.
+    aud = [r for r in reacts if r.get("set_id") == set_id and r.get("origin", "audience") == "audience"]
+    reh = [r for r in reacts if r.get("set_id") == set_id and r.get("origin") == "rehearsal"]
     feeds = [f for f in feeds if f.get("set_id") == set_id]
-    viewers = sorted({r.get("viewer") for r in reacts} | {f.get("viewer") for f in feeds})
+    seen, deduped = set(), []
+    for r in aud:
+        key = (r.get("viewer"), r.get("beat_id"), r.get("kind"))
+        if key not in seen:
+            seen.add(key)
+            deduped.append(r)
+    viewers = sorted({r.get("viewer") for r in deduped} | {f.get("viewer") for f in feeds})
     eligible = sorted({f.get("viewer") for f in feeds})
     pog_by_beat: dict = {}
     kinds: dict = {}
-    for r in reacts:
+    for r in deduped:
         kinds[r.get("kind")] = kinds.get(r.get("kind"), 0) + 1
         if r.get("kind") == "POG":
             b = r.get("beat_id") or "between"
@@ -56,9 +66,13 @@ def summarize(set_id, reacts, feeds, timeline):
             verdicts[f["verdict"]] = verdicts.get(f["verdict"], 0) + 1
     n_views = len(eligible)
     rate = round(sum(pog_by_beat.values()) / n_views, 3) if n_views else None
-    return {"presses": len(reacts), "by_kind": kinds, "viewers": viewers,
+    has_evidence = bool(deduped) or bool(feeds)
+    return {"presses": len(deduped), "rehearsal_presses": len(reh),
+            "by_kind": kinds, "viewers": viewers,
             "eligible_views": n_views, "strong_bits": strong, "weak_bits": weak,
-            "verdicts": verdicts, "pog_per_view": rate, "pog_by_beat": pog_by_beat}
+            "verdicts": verdicts, "pog_per_view": rate, "pog_by_beat": pog_by_beat,
+            "has_evidence": has_evidence,
+            "origin_note": "origins client-claimed, unverified; rehearsal excluded"}
 
 
 def main():
@@ -81,27 +95,34 @@ def main():
         nb_path = os.path.join(d, "notebook.json")
         nb = json.load(open(nb_path)) if os.path.exists(nb_path) else {"character_id": p.get("character")}
         nb["objective_facts"] = {
-            "status": "human evidence" if (reacts or feeds) else nb.get("objective_facts", {}).get("status", "rehearsal only, no audience"),
+            "status": "human evidence" if summ["has_evidence"] else nb.get("objective_facts", {}).get("status", "rehearsal only, no audience"),
             "presses": summ["presses"], "eligible_views": summ["eligible_views"],
             "strong_bits": summ["strong_bits"], "weak_bits": summ["weak_bits"],
-            "verdicts": summ["verdicts"],
+            "verdicts": summ["verdicts"], "origin_note": summ["origin_note"],
         }
         json.dump(nb, open(nb_path, "w"), indent=1)
         pol_path = os.path.join(d, "policy.json")
         if os.path.exists(pol_path):
             pol = json.load(open(pol_path))
             ev = pol.get("evidence", [])
-            if not any(e.get("set") == s and e.get("source") == "p0_studio" for e in ev):
-                ev.append({"date": today, "set": s, "source": "p0_studio",
-                           "mechanisms": list((plan.get("mechanisms") or {}).keys())
-                           if isinstance(plan.get("mechanisms"), dict) else (plan.get("mechanisms") or []),
-                           "observed": {"pog_per_view": summ["pog_per_view"],
-                                        "views": summ["eligible_views"],
-                                        "pog_by_beat": summ["pog_by_beat"]},
-                           "human_laughter": summ["pog_per_view"],
-                           "note": "p0 studio audience; critic QA is not laughter."})
-                pol["evidence"] = ev
-                json.dump(pol, open(pol_path, "w"), indent=1)
+            row = {"date": today, "set": s, "source": "p0_studio",
+                   "mechanisms": list((plan.get("mechanisms") or {}).keys())
+                   if isinstance(plan.get("mechanisms"), dict) else (plan.get("mechanisms") or []),
+                   "observed": {"pog_per_view": summ["pog_per_view"],
+                                "views": summ["eligible_views"],
+                                "presses": summ["presses"],
+                                "rehearsal_presses": summ["rehearsal_presses"],
+                                "pog_by_beat": summ["pog_by_beat"]},
+                   "human_laughter": summ["pog_per_view"],
+                   "origin_note": summ["origin_note"],
+                   "note": "p0 studio audience-claimed; critic QA is not laughter."}
+            old = next((e for e in ev if e.get("set") == s and e.get("source") == "p0_studio"), None)
+            if old is not None:
+                ev[ev.index(old)] = row  # recompute, never freeze stale aggregates
+            else:
+                ev.append(row)
+            pol["evidence"] = ev
+            json.dump(pol, open(pol_path, "w"), indent=1)
     if not a.apply:
         print("(dry run — pass --apply to write notebooks/policies)")
 

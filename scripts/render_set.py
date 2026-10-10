@@ -49,7 +49,9 @@ def ms_to_frame(ms, fps):
 
 def set_stepped():
     """PogMotion stepped sampler: CONSTANT interpolation on every fcurve
-    (12Hz-placed keys hold; camera/scene untouched)."""
+    (12Hz-placed keys hold; camera/scene untouched) — EXCEPT jaw and morph
+    channels, which stay smooth so speech never looks broken (FT-10)."""
+    jaw_hits = ("jaw", "mouth", "morph", "viseme", "lipsync")
     for act in bpy.data.actions:
         bags = []
         try:
@@ -67,8 +69,9 @@ def set_stepped():
             pass
         for fcs in bags:
             for fc in fcs:
+                smooth = any(h in (fc.data_path or "").lower() for h in jaw_hits)
                 for kp in fc.keyframe_points:
-                    kp.interpolation = "CONSTANT"
+                    kp.interpolation = "BEZIER" if smooth else "CONSTANT"
 
 
 def main():
@@ -212,10 +215,11 @@ def main():
             if head and t["dur_ms"] > 1200:
                 f0 = ms_to_frame(t["start_ms"], fps)
                 amp = 0.06 + 0.06 * float(t.get("energy", 0.9) or 0.9)
-                for k, frac in ((0.3, -1.0), (0.55, 0.6)):
-                    f = f0 + int(t["dur_ms"] / 1000.0 * fps * frac // 2 * 2)
+                span = int(t["dur_ms"] / 1000.0 * fps)
+                for pos, direction in ((0.30, -1.0), (0.55, 1.0)):
+                    f = max(f0 + 2, f0 + int(round(span * pos)))
                     head.rotation_mode = "XYZ"
-                    head.rotation_euler = (amp, 0, 0)
+                    head.rotation_euler = (amp * direction, 0, 0)
                     head.keyframe_insert("rotation_euler", frame=f)
                     head.rotation_euler = (0.0, 0, 0)
                     head.keyframe_insert("rotation_euler", frame=f + 4)
@@ -243,16 +247,18 @@ def main():
                 break
         if jaw and getattr(a, "mouth", ""):
             try:
-                cues = json.load(open(a.mouth))
+                mouth_doc = json.load(open(a.mouth))
             except Exception:
-                cues = []
+                mouth_doc = []
+            cues = mouth_doc.get("cues", mouth_doc) if isinstance(mouth_doc, dict) else mouth_doc
             jaw.rotation_mode = "XYZ"
             for c in cues:
                 f0 = ms_to_frame(c["start_ms"], fps)
                 f1 = ms_to_frame(c["end_ms"], fps)
+                ang = float(c.get("angle", -0.35))  # pose angle or legacy flap
                 jaw.rotation_euler = (0.0, 0, 0)
                 jaw.keyframe_insert("rotation_euler", frame=max(1, f0 - 1))
-                jaw.rotation_euler = (-0.35, 0, 0)
+                jaw.rotation_euler = (ang, 0, 0)
                 jaw.keyframe_insert("rotation_euler", frame=f0 + 1)
                 jaw.rotation_euler = (0.0, 0, 0)
                 jaw.keyframe_insert("rotation_euler", frame=f1)

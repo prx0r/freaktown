@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """Freak Town Comedy Generator — Evolutionary Set Writing.
 
+DEPRECATED on trial/avatar-flow: superseded by scripts/premise_to_lines.py
+(theory operators + pregates + closed-vocab judge + director validation).
+Kept for reference; new material must not originate here.
+"""
+
 The loop:
 1. Generate a set (Ella voice, random topic constraint)
 2. Score it with ML model

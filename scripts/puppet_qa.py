@@ -213,6 +213,37 @@ def main():
         mouth.paste(th.crop((0, hh // 4, hw, hh // 4 + hh // 3)), ((i % 4) * hw, (i // 4) * (hh // 3)))
     mouth.save(os.path.join(a.outdir, "mouth_sheet.png"))
 
+    # PUBLISH verdict (FT-07): technical pass is not a publish pass. A speaking
+    # performer must show a controlled mouth that moves with speech cues and
+    # rests in holds. Human approval stays a separate, explicit key.
+    def band_diff(fa, fb):
+        try:
+            A = Image.open(frames[min(len(frames) - 1, max(0, fa - 1))]).convert("L")
+            B = Image.open(frames[min(len(frames) - 1, max(0, fb - 1))]).convert("L")
+            return frame_diff(A, B, (0, H // 4, W, H // 4 + H // 3))
+        except Exception:
+            return 0.0
+
+    def ms_to_f(ms):
+        return 1 + int(ms / 1000.0 * a.fps)
+
+    open_m, hold_m = [], []
+    for c in cues[:40]:
+        open_m.append(band_diff(ms_to_f(c["start_ms"]), ms_to_f(c["end_ms"])))
+    for t in tl:
+        if t.get("pause_after_ms", 0) >= 500:
+            hold_m.append(band_diff(ms_to_f(t["end_ms"]), ms_to_f(t["end_ms"] + t["pause_after_ms"])))
+    open_avg = sum(open_m) / len(open_m) if open_m else 0.0
+    hold_avg = sum(hold_m) / len(hold_m) if hold_m else 0.0
+    jaw_controlled = not rig.get("controls", {}).get("mouth", "").startswith("NO") \
+        and len(cues) > 0
+    speaking = bool(jaw_controlled and open_avg > 0.002 and open_avg > hold_avg * 1.5)
+    rep["metrics"]["mouth_band"] = {"open_avg": round(open_avg, 4),
+                                    "hold_avg": round(hold_avg, 4)}
+    rep["publish"] = {"speaking_face": speaking, "jaw_controlled": bool(jaw_controlled),
+                      "human_approved": None,
+                      "publish_ready_technical": bool(speaking and rep["pass"])}
+
     rep["metrics"]["hashes"] = {"set_wav": sha(a.audio)[:16], "timeline": sha(a.timeline)[:16]}
     rep["pass"] = not rep["failures"]
     json.dump(rep, open(os.path.join(a.outdir, "qa-report.json"), "w"), indent=1)

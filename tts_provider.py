@@ -79,14 +79,18 @@ class EdgeTTSProvider(TTSProvider):
     async def generate(self, text: str, voice: str = "en-US-AriaNeural", **kwargs) -> bytes:
         """Generate speech as WAV bytes."""
         import edge_tts
-        
+        import hashlib
+
+        # Stable content key: provider + voice + text (process hash() is
+        # salted per run and collides across concurrent jobs).
+        key = hashlib.sha256(f"edge|{voice}|{text}".encode()).hexdigest()[:16]
         # Generate MP3 first
-        tmp_mp3 = AUDIO_DIR / f"_tmp_{hash(text) % 100000}.mp3"
+        tmp_mp3 = AUDIO_DIR / f"_tmp_{key}.mp3"
         communicate = edge_tts.Communicate(text, voice)
         await communicate.save(str(tmp_mp3))
-        
+
         # Convert to WAV
-        tmp_wav = AUDIO_DIR / f"_tmp_{hash(text) % 100000}.wav"
+        tmp_wav = AUDIO_DIR / f"_tmp_{key}.wav"
         subprocess.run([
             "ffmpeg", "-y", "-i", str(tmp_mp3),
             "-ar", "24000", "-ac", "1", "-f", "wav",
@@ -283,19 +287,35 @@ class AudioCompositor:
     
     def compose(self, chunks: list[AudioChunk], effects: dict = None) -> bytes:
         """Compose audio chunks with exact silence gaps.
-        
+
         Args:
             chunks: List of AudioChunk with audio and timing
             effects: {beat_id: effect_audio_bytes} for sound effects
-        
+
         Returns:
             Final WAV as bytes
         """
+        wav, _ = self.compose_with_spans(chunks, effects)
+        return wav
+
+    def compose_with_spans(self, chunks: list[AudioChunk], effects: dict = None):
+        """Compose and return (wav_bytes, spans) with ONE clock.
+
+        Spans are measured from the actual composed sample positions, so the
+        timeline derived here agrees with the finished WAV by construction
+        (FT-03: never predict durations the compositor may alter). Each span:
+        {beat_id, start_ms, dur_ms, end_ms, pause_before_ms, pause_after_ms}
+        where start/end bound the trimmed speech itself.
+        """
         all_samples = []
-        
+        spans = []
+        sr = self.sample_rate
+
+        def ms(n):
+            return int(round(n / sr * 1000))
+
         for chunk in chunks:
-            # Exact silence BEFORE the beat (pre-punch pause etc.)
-            pre = int(self.sample_rate * getattr(chunk, "pause_before_ms", 0) / 1000)
+            pre = int(sr * getattr(chunk, "pause_before_ms", 0) / 1000)
             all_samples.extend([0] * pre)
 
             # Add speech samples (TTS chunks carry their own leading/trailing
@@ -303,21 +323,28 @@ class AudioCompositor:
             if chunk.audio:
                 samples = self._wav_to_samples(chunk.audio)
                 samples = self._trim_silence(samples)
+                start = len(all_samples)
                 all_samples.extend(samples)
-            
+                spans.append({"beat_id": chunk.beat_id,
+                              "start_ms": ms(start),
+                              "dur_ms": ms(len(samples)),
+                              "end_ms": ms(start + len(samples)),
+                              "pause_before_ms": int(getattr(chunk, "pause_before_ms", 0) or 0),
+                              "pause_after_ms": int(chunk.pause_after_ms or 0)})
+
             # Add exact silence after beat
-            silence_samples = int(self.sample_rate * chunk.pause_after_ms / 1000)
+            silence_samples = int(sr * chunk.pause_after_ms / 1000)
             all_samples.extend([0] * silence_samples)
-            
+
             # Add sound effect if specified
             if effects and chunk.beat_id in effects:
                 effect_samples = self._wav_to_samples(effects[chunk.beat_id])
                 all_samples.extend(effect_samples)
                 # Short pause after effect
-                all_samples.extend([0] * int(self.sample_rate * 0.2))
-        
+                all_samples.extend([0] * int(sr * 0.2))
+
         # Convert to WAV
-        return self._samples_to_wav(all_samples)
+        return self._samples_to_wav(all_samples), spans
     
     def _trim_silence(self, samples: list[int], threshold: int = 400,
                       keep_ms: int = 80) -> list[int]:

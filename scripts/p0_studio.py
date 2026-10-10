@@ -89,6 +89,21 @@ def _load_perfs():
         perfs.append({"character": "pog.sergeant-sled", "dir": "data/pilot-sergeant-sled",
                       "set": "sergeant-sled", "status": "AUDITIONING",
                       "voice": "pilot", "qa_pass": True})
+    # Guest takes: foundry ingests + expressive proofs (A10). Audio-only
+    # takes list with has_video False until rendered.
+    takes = HERE / "data" / "takes"
+    if takes.is_dir():
+        for manifest in sorted(takes.glob("*/take_manifest.json")):
+            try:
+                m = json.load(open(manifest))
+            except Exception:
+                continue
+            slug = manifest.parent.name
+            if any(p.get("set") == slug for p in perfs):
+                continue
+            perfs.append({"character": m.get("character", slug), "dir": f"data/takes/{slug}",
+                          "set": slug, "status": "GUEST",
+                          "voice": m.get("voice"), "qa_pass": None})
     return perfs
 
 
@@ -119,7 +134,13 @@ def _load_json(path, default=None):
 
 
 def _plan(p):
-    return _load_json(HERE / p["dir"] / "set_plan.json", {}) or {}
+    plan = _load_json(HERE / p["dir"] / "set_plan.json", {}) or {}
+    if not plan:
+        m = _load_json(HERE / p["dir"] / "take_manifest.json", {}) or {}
+        if m:
+            plan = {"premise": "canon:" + str(m.get("canon_root", "?")),
+                    "mechanisms": {}, "lines": []}
+    return plan
 
 
 def _timeline(p):

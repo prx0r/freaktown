@@ -56,7 +56,11 @@ def predict(grammar: dict, rhythm: dict | None = None, profile: dict | None = No
     # mechanism clarity: named mechanism lifts confidence
     if grammar.get("mechanism") in ("callback", "misdirection"):
         score += 0.05
-    return {"predicted_laugh": round(_clamp01(score), 2),
+    return {"structural_prior_score": round(_clamp01(score), 2),
+            # NOT audience evidence: no calibrated model exists yet. The old
+            # predicted_laugh key is kept for compatibility; treat it as prior.
+            "predicted_laugh": round(_clamp01(score), 2),
+            "calibration": "uncalibrated-structural-prior",
             "predicted_groan": round(_clamp01(0.15 - 0.1 * (score - 0.5)), 2),
             "confidence": 0.6,
             "reasons": reasons}
