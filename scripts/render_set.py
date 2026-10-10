@@ -37,6 +37,8 @@ def parse():
     ap.add_argument("--fps", type=int, default=24)
     ap.add_argument("--height_m", type=float, default=1.1)
     ap.add_argument("--mouth", default="", help="mouth_cues.json for jaw drive (optional)")
+    ap.add_argument("--face-yaw", type=float, default=0.0,
+                    help="rotate performer so front faces camera (deg, e.g. 180 for backwards models)")
     ap.add_argument("--from-frame", type=int, default=1, help="resume: skip segments ending before this frame")
     return ap.parse_args(argv)
 
@@ -144,24 +146,35 @@ def main():
 
     # --- cameras: wide / medium / close ------------------------------------
     h = a.height_m
+    # head-height aim keeps close-ups from decapitating (was: track root).
+    bpy.ops.object.empty_add(location=(0, 0, 0.75 * h))
+    aim_head = bpy.context.object
+    aim_head.name = "AIM_HEAD"
+    bpy.ops.object.empty_add(location=(0, 0, 0.55 * h))
+    aim_mid = bpy.context.object
+    aim_mid.name = "AIM_MID"
     cams = {}
 
-    def add_cam(name, loc, rot):
+    def add_cam(name, loc, rot, target=None):
         bpy.ops.object.camera_add(location=loc, rotation=rot)
         c = bpy.context.object
         c.name = name
         c.data.lens = 50
         cams[name] = c
+        t = c.constraints.new("TRACK_TO")
+        t.target = target or perf
+        t.track_axis = "TRACK_NEGATIVE_Z"
+        t.up_axis = "UP_Y"
         return c
 
     add_cam("CAM_WIDE", (0, -4.2, 1.3), (math.radians(78), 0, 0))
-    add_cam("CAM_MEDIUM", (0.3, -2.4, 1.05), (math.radians(82), 0, 0))
-    add_cam("CAM_CLOSE", (-0.25, -1.3, 1.15), (math.radians(84), 0, 0))
-    for c in cams.values():
-        t = c.constraints.new("TRACK_TO")
-        t.target = perf
-        t.track_axis = "TRACK_NEGATIVE_Z"
-        t.up_axis = "UP_Y"
+    add_cam("CAM_MEDIUM", (0.3, -2.7, 1.15), (math.radians(82), 0, 0), aim_mid)
+    add_cam("CAM_CLOSE", (-0.3, -2.2, 1.3), (math.radians(84), 0, 0), aim_head)
+    # face the audience: yaw the whole performer (default 0 = untouched)
+    if a.face_yaw:
+        for o in roots:
+            o.rotation_euler[2] += math.radians(a.face_yaw)
+    bpy.context.view_layer.update()
 
     # --- puppet motion ------------------------------------------------------
     # PogMotion v1: NLA clips where present; procedural stepped layer for
@@ -264,15 +277,15 @@ def main():
     order = {"CAM_MEDIUM": 0}
 
     def pick_cam(beat, i):
+        # close-ups are earned: punchline only. Everything else plays
+        # medium (closer goes wide). The old alternating MEDIUM/CLOSE
+        # rhythm decapitated performers mid-thought.
         t = beat["type"]
-        if t == "setup":
-            return "CAM_MEDIUM"
         if t == "punchline":
             return "CAM_CLOSE"
         if t == "closer":
             return "CAM_WIDE"
-        order["CAM_MEDIUM"] += 1
-        return "CAM_MEDIUM" if order["CAM_MEDIUM"] % 2 else "CAM_CLOSE"
+        return "CAM_MEDIUM"
 
     cuts = []  # (start_frame, cam_obj)
     sc.camera = cams["CAM_WIDE"]

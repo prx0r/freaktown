@@ -298,9 +298,11 @@ class AudioCompositor:
             pre = int(self.sample_rate * getattr(chunk, "pause_before_ms", 0) / 1000)
             all_samples.extend([0] * pre)
 
-            # Add speech samples
+            # Add speech samples (TTS chunks carry their own leading/trailing
+            # silence ~1s; trim it so planned pauses == measured pauses)
             if chunk.audio:
                 samples = self._wav_to_samples(chunk.audio)
+                samples = self._trim_silence(samples)
                 all_samples.extend(samples)
             
             # Add exact silence after beat
@@ -317,6 +319,22 @@ class AudioCompositor:
         # Convert to WAV
         return self._samples_to_wav(all_samples)
     
+    def _trim_silence(self, samples: list[int], threshold: int = 400,
+                      keep_ms: int = 80) -> list[int]:
+        """Strip TTS-chunk edge silence; keep a short padding so breaths survive."""
+        if not samples:
+            return samples
+        keep = int(self.sample_rate * keep_ms / 1000)
+        n = len(samples)
+        lo, hi = 0, n
+        while lo < n and abs(samples[lo]) < threshold:
+            lo += 1
+        while hi > lo and abs(samples[hi - 1]) < threshold:
+            hi -= 1
+        lo = max(0, lo - keep)
+        hi = min(n, hi + keep)
+        return samples[lo:hi] if hi > lo else samples
+
     def _wav_to_samples(self, wav_bytes: bytes) -> list[int]:
         """Extract samples from WAV bytes."""
         try:
