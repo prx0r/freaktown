@@ -1,0 +1,162 @@
+{
+  "season_overline": "One fictional event crosses every SPLAT: discussed on podcasts, denied in interviews, confronted on carpets, performed at the Store.",
+  "splats": [
+    {
+      "cast_size": "1 + audience",
+      "engine": "JokeBlock -> SetBuilder -> Performance -> Audience scoring",
+      "id": "comedy_store",
+      "label": "The Comedy Store",
+      "rules": [
+        "one puppet, one microphone",
+        "hecklers allowed",
+        "experimental material welcome"
+      ],
+      "layers": {
+        "spz": "marble .spz (background/architecture)",
+        "collision": "marble collision mesh (navigation/bounds)",
+        "props_glb": "separate .glb set dressing (chairs, mics, doors)"
+      },
+      "anchors": [
+        "stage_center",
+        "mic_01",
+        "camera_closeup",
+        "entrance"
+      ]
+    },
+    {
+      "cast_size": "2-4",
+      "engine": "CharacterGraph -> Dialogue -> Interruptions -> Callbacks",
+      "id": "podcast_room",
+      "label": "The Podcast Room",
+      "rules": [
+        "incompatible worldviews required",
+        "no moderator saves them"
+      ],
+      "layers": {
+        "spz": "marble .spz (background/architecture)",
+        "collision": "marble collision mesh (navigation/bounds)",
+        "props_glb": "separate .glb set dressing (chairs, mics, doors)"
+      },
+      "anchors": [
+        "host_chair",
+        "guest_chair",
+        "mic_01",
+        "mic_02",
+        "camera_wide"
+      ]
+    },
+    {
+      "cast_size": "1+1",
+      "engine": "secrets -> escalation -> contradictions -> reveal",
+      "id": "interview",
+      "label": "The Interview",
+      "rules": [
+        "interviewer has an agenda",
+        "guest has something to conceal"
+      ],
+      "layers": {
+        "spz": "marble .spz (background/architecture)",
+        "collision": "marble collision mesh (navigation/bounds)",
+        "props_glb": "separate .glb set dressing (chairs, mics, doors)"
+      },
+      "anchors": [
+        "host_chair",
+        "guest_chair",
+        "camera_closeup",
+        "camera_wide",
+        "entrance"
+      ]
+    },
+    {
+      "cast_size": "ensemble",
+      "engine": "reputation -> persona -> scandal -> reaction",
+      "id": "red_carpet",
+      "label": "The Red Carpet",
+      "rules": [
+        "arrivals matter",
+        "scandals persist across episodes"
+      ],
+      "layers": {
+        "spz": "marble .spz (background/architecture)",
+        "collision": "marble collision mesh (navigation/bounds)",
+        "props_glb": "separate .glb set dressing (chairs, mics, doors)"
+      },
+      "anchors": [
+        "entrance",
+        "pose_point",
+        "press_row",
+        "camera_closeup"
+      ]
+    },
+    {
+      "cast_size": "ensemble",
+      "engine": "management vs labour vs consultants",
+      "id": "santas_workshop",
+      "label": "Santa's Workshop",
+      "season": "christmas",
+      "rules": [
+        "workplace sitcom physics",
+        "Popeye may unionise"
+      ],
+      "layers": {
+        "spz": "marble .spz (background/architecture)",
+        "collision": "marble collision mesh (navigation/bounds)",
+        "props_glb": "separate .glb set dressing (chairs, mics, doors)"
+      },
+      "anchors": [
+        "stage_center",
+        "workbench",
+        "throne_desk",
+        "entrance"
+      ]
+    },
+    {
+      "cast_size": "full ensemble",
+      "engine": "dynamics -> arguments -> alliances -> revelations",
+      "id": "christmas_dinner",
+      "label": "Christmas Dinner",
+      "season": "christmas",
+      "rules": [
+        "one table",
+        "no one leaves early"
+      ],
+      "layers": {
+        "spz": "marble .spz (background/architecture)",
+        "collision": "marble collision mesh (navigation/bounds)",
+        "props_glb": "separate .glb set dressing (chairs, mics, doors)"
+      },
+      "anchors": [
+        "table_center",
+        "head_chair",
+        "camera_wide"
+      ]
+    },
+    {
+      "cast_size": "ensemble + host",
+      "engine": "voting -> speeches -> upsets",
+      "id": "christmas_awards",
+      "label": "The Christmas Awards",
+      "season": "christmas",
+      "rules": [
+        "wizard host, increasingly intoxicated",
+        "Algorithm may win humanitarian"
+      ],
+      "layers": {
+        "spz": "marble .spz (background/architecture)",
+        "collision": "marble collision mesh (navigation/bounds)",
+        "props_glb": "separate .glb set dressing (chairs, mics, doors)"
+      },
+      "anchors": [
+        "stage_center",
+        "podium",
+        "camera_closeup",
+        "entrance"
+      ]
+    }
+  ],
+  "times": {
+    "label": "The Pogtown Times",
+    "role": "in-world publication generating scandals, grudges and running jokes"
+  },
+  "presentation": "Marble SPLAT + Spark + Rapier + Three.js; worlds are presentation adapters, not authority"
+}

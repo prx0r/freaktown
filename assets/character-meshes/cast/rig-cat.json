@@ -1,0 +1,22 @@
+{
+ "schema": "pog.puppet-rig.v1",
+ "character_id": "pog.chairman-meow",
+ "mesh_r2_key": "character-meshes/nyilonelycompany-cat-2058.glb",
+ "inspected_at": "2026-10-08",
+ "rig_bones": 57,
+ "actions_available": [
+  "Pixabay_International_Cat"
+ ],
+ "face": {
+  "jaw_bone": "Wolf_Head_JawSHJnt",
+  "mouth_morphs": []
+ },
+ "controls": {
+  "speech_base": "Pixabay_International_Cat looped",
+  "mouth": "Wolf_Head_JawSHJnt driven from mouth_cues.json",
+  "emphasis": "Head dip + root hop (rigged) / lean + rock (static)",
+  "entrance": "Walk action + slide (rigged) / slide-in (static)"
+ },
+ "suggested_family": "articulated",
+ "validation": "structural pass (factory report); rigged 57 bones incl Jaw, 1 action"
+}

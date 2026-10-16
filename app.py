@@ -22,6 +22,7 @@ from pathlib import Path
 from flask import Flask, send_from_directory, jsonify, request
 
 from party import party_bp
+from face_profiles import detect_face_profile, to_pog_face
 
 app = Flask(__name__)
 app.register_blueprint(party_bp)
@@ -355,6 +356,18 @@ def regen_beat():
     samples = wav_to_samples(audio)
     return jsonify({"ok": True, "key": key, "cached": cached,
                     "duration_ms": int(len(samples) / 24000 * 1000)})
+
+
+@app.route("/api/beat_audio/<key>", methods=["GET"])
+def beat_audio(key):
+    """Serve one cached beat wav for voice audition. Key is the hex
+    returned by /api/regen_beat — nothing else on disk is reachable."""
+    key = re.sub(r"[^a-f0-9]", "", key)[:16]
+    for cand in (BEAT_CACHE / f"{key}.wav", BEAT_CACHE / f"{key}.robot.wav"):
+        if cand.exists():
+            return send_from_directory(str(BEAT_CACHE), cand.name,
+                                       mimetype="audio/wav")
+    return jsonify({"ok": False, "error": "unknown beat"}), 404
 
 
 @app.route("/api/compose", methods=["POST"])
@@ -831,10 +844,19 @@ def preload_set(slug):
         if (bdir / f).exists():
             walkout = f"/freaks/{slug}/{f}"
             break
+    face_prof = {"profile": "NONE", "pog_face_v1": []}
+    try:
+        _fp = (json.loads((bdir / "avatar.json").read_text())
+               .get("face_profile", {}) or {})
+        face_prof = {"profile": _fp.get("profile", "NONE"),
+                     "pog_face_v1": _fp.get("pog_face_v1", [])}
+    except Exception:
+        pass
     return jsonify({
         "ok": True, "slug": slug,
         "avatarUrl": avatar_url if avatar_source in ("local", "provided") else None,
         "avatarSource": avatar_source,
+        "face_profile": face_prof,
         "portrait": portrait,
         "audioUrl": f"/freaks/{slug}/set.wav",
         "plan": {"duration_ms": manifest["audio"]["duration_ms"],
@@ -1062,6 +1084,52 @@ def _generate_walkout_fal(recipe: dict, seed: int) -> bytes:
     return resp.content
 
 
+def _vibe_recipe(char: dict, seed: int = 0) -> dict:
+    """Character description → walkout recipe. Deterministic per vibe;
+    new seed = reroll. Genres are the synth's own palette."""
+    t = f"{char.get('vibe', '')} {char.get('premise', '')} {char.get('job', '')}".lower()
+    if any(w in t for w in ("cocky", "absurd", "funk", "sleazy", "detective")):
+        genre, mood, energy = "funk", "absurd", "high"
+    elif any(w in t for w in ("dark", "angry", "heavy", "metal", "villain")):
+        genre, mood, energy = "rock", "cocky", "high"
+    elif any(w in t for w in ("neon", "robot", "space", "cyber", "sleek")):
+        genre, mood, energy = "electronic", "sleazy", "high"
+    elif any(w in t for w in ("sheepish", "silly", "goofy", "gentle", "sweet")):
+        genre, mood, energy = "comedy", "sheepish", "medium"
+    elif any(w in t for w in ("hero", "epic", "royal", "legend")):
+        genre, mood, energy = "orchestral", "heroic", "high"
+    else:
+        genre, mood, energy = "funk", (char.get("vibe", "") or "confident")[:20], "high"
+    return {"genre": genre, "mood": mood, "energy": energy,
+            "shape": "hit", "duration": 8}
+
+
+@app.route("/api/walkout/<slug>", methods=["POST"])
+def walkout_for(slug):
+    """Rerollable walkout: character description → sting, saved on bundle.
+    Body: {} rerolls (random seed) or {"seed": N} to replay one.
+    AR entrance + preload pick it up with no other changes."""
+    import secrets
+    import sound_synth
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    bdir = FREAK_DIR / slug
+    meta = _bundle_meta(slug)
+    if meta is None or not bdir.is_dir():
+        return jsonify({"ok": False, "error": "unknown set"}), 404
+    data = request.json or {}
+    try:
+        seed = int(data.get("seed", secrets.randbelow(1 << 31)))
+    except Exception:
+        seed = 0
+    recipe = _vibe_recipe((meta.get("character") or {}))
+    full = {**recipe, "duration": 8}
+    (bdir / "walkout.wav").write_bytes(sound_synth.generate(full, seed))
+    (bdir / "walkout.json").write_text(json.dumps(
+        {**recipe, "seed": seed, "provider": "procedural"}))
+    return jsonify({"ok": True, "seed": seed, "recipe": recipe,
+                    "url": f"/freaks/{slug}/walkout.wav"})
+
+
 @app.route("/api/walkout", methods=["POST"])
 def walkout():
     """Walkout sting from a recipe. Two engines, one contract.
@@ -1122,7 +1190,7 @@ def walkout():
 
 FREAK_SPECIES = ["moth", "pigeon", "roomba", "dog", "toaster", "goblin",
                  "goldfish", "skeleton", "traffic cone", "fax machine",
-                 "goldfish", "crab", "lamp", "elevator"]
+                 "goldfish", "crab", "lamp", "elevator", "monkey", "ape"]
 FREAK_JOBS = ["divorce lawyer", "driving instructor", "LinkedIn influencer",
               "customer service rep", "landlord", "life coach", "bouncer",
               "weatherman", "dentist", "mall cop", "podcaster", "notary"]
@@ -1319,7 +1387,43 @@ def respond():
                     "parent": parent_slug, "meta": meta, "beats": offsets})
 
 
+@app.route("/takes", methods=["GET"])
+def takes_browser():
+    """Cross-pog take browser: every recorded take, newest first,
+    playable in place with a link back to its pog."""
+    import html as _html
+    takes = _list_takes()[:60]
+    cards = []
+    for t in takes:
+        cards.append(
+            f"<div style='margin:14px auto;max-width:420px;background:#14141c;"
+            f"border:1px solid #333;border-radius:10px;padding:10px'>"
+            f"<div style='font-size:13px;margin-bottom:6px'>🎭 {_html.escape(t['name'])}"
+            f" <span style='color:#666'>· {t['size_kb']}KB"
+            f"{' · stems' if t['has_stems'] else ''}</span></div>"
+            f"<video src='{t['url']}' controls playsinline preload='none' "
+            f"style='width:100%;border-radius:8px;background:#000'></video>"
+            f"<div style='font-size:12px;margin-top:6px'>"
+            f"<a style='color:#00d4ff' href='/f/{t['slug']}'>watch {_html.escape(t['slug'])}</a>"
+            f" · <a style='color:#00d4ff' href='/r/{t['slug']}'>record yours</a>"
+            f" · <a style='color:#00d4ff' href='/revoice/{t['slug']}/{t['file']}'>revoice</a>"
+            f"</div></div>")
+    body = "\n".join(cards) or "<p style='text-align:center;color:#666'>No takes yet — be the first.</p>"
+    page = ("""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Takes — Freak Town</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0f;color:#eee;font-family:monospace;padding:16px 10px 60px}
+h1{text-align:center;font-size:16px;color:#ff2fa8;margin:6px 0 2px}
+p.sub{text-align:center;color:#888;font-size:12px;margin-bottom:10px}
+a.back{color:#fff}</style></head><body>
+<h1>🎭 TAKES</h1><p class="sub">real people performing as pogs — newest first</p>
+""" + body + "<p style='text-align:center;margin-top:18px'><a class='back' href='/'>← black room</a></p></body></html>")
+    return page, 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
 @app.route("/f/<slug>")
+@app.route("/w/<slug>")
 def watch_set(slug):
     """Short watch URL. Canonical is /<character>/<set> once named."""
     slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
@@ -1602,6 +1706,31 @@ def _render_watch(slug):
     rt = _avatar_runtime(slug)
     body_url = rt["uri"] if rt else ""
     body_fmt = rt["format"] if rt else ""
+    arbtn = (f"<a href='/ar/{slug}' style='display:block;margin:8px auto;max-width:340px,"
+             "text-align:center;text-decoration:none' class='cta ghost'>"
+             "<button style='width:100%'>📍 place in your room</button></a>"
+             f"<a href='/record/{slug}' style='display:block;margin:8px auto;max-width:340px,"
+             "text-align:center;text-decoration:none' class='cta ghost'>"
+              "<button style='width:100%'>🎭 become them — record</button></a>"
+              if rt else "")
+    takes = _list_takes(slug)[:3]
+    takes_html = ""
+    if takes:
+        cards = "".join(
+            f"<video src='{t['url']}' controls playsinline preload='none' "
+            f"style='width:100%;max-width:340px;border-radius:8px;background:#000;"
+            f"margin:6px auto;display:block'></video>" for t in takes)
+        takes_html = (
+            f"<div style='margin:10px auto;max-width:360px;text-align:center'>"
+            f"<div style='font-size:12px;color:#ff2fa8'>🎭 REAL TAKES — people as {name}</div>"
+            f"{cards}"
+            f"<a href='/takes' style='font-size:12px;color:#00d4ff'>all pogs' takes →</a></div>")
+    else:
+        takes_html = (
+            f"<div style='margin:10px auto;max-width:360px;text-align:center;"
+            f"font-size:12px;color:#666'>No human takes yet — "
+            f"<a href='/r/{slug}' style='color:#00d4ff'>record the first</a> · "
+            f"<a href='/takes' style='color:#00d4ff'>all takes</a></div>")
     page = WATCH_TEMPLATE
     for key, val in {
         "__SLUG__": slug, "__NAME__": name, "__PREMISE__": premise,
@@ -1610,6 +1739,40 @@ def _render_watch(slug):
         "__IMG__": img, "__DUR__": str(dur),
         "__BEATS__": json.dumps(beats),
         "__BODY__": body_url, "__BODY_FORMAT__": body_fmt,
+        "__ARBTN__": arbtn,
+        "__TAKES__": takes_html,
+        "__VOICE__": (
+            "<details style='margin:10px auto;max-width:360px;text-align:center'>"
+            "<summary style='font-size:12px;color:#888;cursor:pointer'>"
+            "🎙 re-voice the set</summary>"
+            "<div style='font-size:12px;margin-top:6px'>"
+            "<select id='vVoice'>"
+            "<option value='en-US-AriaNeural'>Ella (Aria)</option>"
+            "<option value='en-US-GuyNeural'>Guy</option>"
+            "<option value='en-US-ChristopherNeural'>Christopher</option>"
+            "<option value='en-US-SamanthaNeural'>Samantha</option>"
+            "<option value='en-US-JoannaNeural'>Joanna</option>"
+            "<option value='en-US-TonyNeural'>Tony</option>"
+            "</select> <select id='vPace'>"
+            "<option value='normal'>normal</option>"
+            "<option value='slow'>slow</option>"
+            "<option value='fast'>fast</option>"
+            "</select> "
+            "<button onclick='previewVoice()'>▶ preview line 1</button>"
+            "<div id='vMsg' style='color:#666;margin-top:4px'></div></div></details>"
+            "<script>async function previewVoice(){"
+            "var m=document.getElementById('vMsg');m.textContent='rendering…';"
+            "try{var line=(BEATS[0]&&BEATS[0].text)||'';if(!line){m.textContent='no lines';return;}"
+            "var r=await fetch('/api/regen_beat',{method:'POST',"
+            "headers:{'Content-Type':'application/json'},"
+            "body:JSON.stringify({text:line,"
+            "voice:document.getElementById('vVoice').value,"
+            "pace:document.getElementById('vPace').value})});"
+            "var j=await r.json();"
+            "if(j.ok){m.textContent=j.cached?'(cached)':'(fresh)';"
+            "new Audio('/api/beat_audio/'+j.key).play();}"
+            "else m.textContent='failed: '+(j.error||r.status);}catch(e){m.textContent='error';}}"
+            "</script>"),
         "__CARD__": f"https://freak.town/api/card/{slug}.png",
         "__CANON__": canonical_url(slug),
         "__REPLYBANNER__": (
@@ -1721,7 +1884,10 @@ __REPLYBANNER__
 <div class="controls" id="liveControls">
   <button class="big" id="playBtn">▶ TAP TO WATCH</button>
   <button id="laughBtn" disabled>😂 <span id="laughCount">0</span></button>
+  __ARBTN__
 </div>
+__TAKES__
+__VOICE__
 <div id="endscreen">
   <div id="replybox">
     <div style="font-size:15px;font-weight:bold;margin-bottom:2px;">YOUR TURN</div>
@@ -2244,6 +2410,992 @@ try {
 </body></html>"""
 
 
+AR_TEMPLATE = """<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>__NAME__ in your room — Freak Town</title>
+<meta name="theme-color" content="#ff2fa8">
+<script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
+<script src="https://cdn.jsdelivr.net/npm/@8thwall/xrextras@1/dist/xrextras.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@8thwall/landing-page@1/dist/landing-page.js" crossorigin="anonymous"></script>
+<script type="importmap">
+{"imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+  "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.3.0/lib/three-vrm.module.js"
+}}
+</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:monospace}
+#camerafeed{position:fixed;inset:0;width:100%;height:100%}
+#ui{position:fixed;left:0;right:0;bottom:0;padding:14px;text-align:center;z-index:5;
+background:linear-gradient(transparent,rgba(0,0,0,.72));padding-bottom:calc(14px + env(safe-area-inset-bottom))}
+#ui h1{color:#fff;font-size:16px}
+#ui p{color:#aaa;font-size:12px;margin:4px 0 10px}
+button{background:#ff2fa8;border:1px solid #ff2fa8;color:#fff;padding:14px 26px;border-radius:26px;font-size:16px;cursor:pointer;font-family:inherit}
+button.ghost{background:rgba(20,20,30,.8);border-color:#555}
+#back{position:fixed;top:10px;left:10px;z-index:5;color:#fff;background:rgba(20,20,30,.7);
+border:1px solid #444;border-radius:18px;padding:8px 14px;font-size:13px;text-decoration:none}
+#status{color:#8f8;font-size:12px;margin-top:8px;min-height:16px}
+</style>
+</head><body>
+<canvas id="camerafeed"></canvas>
+<a id="back" href="/f/__SLUG__">← __NAME__</a>
+<div id="ui">
+  <h1>__NAME__ in your room</h1>
+  <p id="hint">Open in <b>Chrome / Safari</b> (not inside WhatsApp or X) — AR needs your camera.</p>
+  <button id="placeBtn">📍 PLACE</button>
+  <button id="playBtn" style="display:none">▶ PLAY MINUTE</button>
+  <div id="status">starting…</div>
+</div>
+<audio id="a" src="__AUDIO__" preload="auto" crossorigin="anonymous"></audio>
+<audio id="w" src="__WALKOUT__" preload="auto" crossorigin="anonymous"></audio>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
+window.THREE = THREE;
+const BODY_URL = "__BODY__", BODY_FMT = "__BODY_FORMAT__", SLUG = "__SLUG__";
+const status = (t) => { document.getElementById('status').textContent = t; };
+let avatar = null, jawTargets = [], vrm = null, audioCtx = null, analyser = null, audioEl = null;
+let placed = false, playing = false, energy = 0, nextBlink = 3;
+let freqData = null, baseY = 0, entranceT = 1, walkoutEl = null, mixerAR = null;
+
+function collectJaw(root) {
+  const out = [];
+  root.traverse((o) => {
+    if (o.morphTargetDictionary && o.morphTargetInfluences) {
+      for (const n of ["jawOpen", "mouthOpen", "aa", "oh"]) {
+        if (n in o.morphTargetDictionary) out.push({ mesh: o, idx: o.morphTargetDictionary[n] });
+      }
+    }
+  });
+  return out;
+}
+
+const freakModule = () => ({
+  name: 'freak-ar',
+  onStart: async ({ canvas }) => {
+    const { scene, camera, renderer } = XR8.Threejs.xrScene();
+    try {
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFShadowMap;
+    } catch (err) {}
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x334455, 0.9));
+    const sun = new THREE.DirectionalLight(0xfff2dd, 1.2);
+    sun.position.set(3, 6, 4); sun.castShadow = true;
+    scene.add(sun);
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(30, 30),
+      new THREE.ShadowMaterial({ opacity: 0.35 }));
+    ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true;
+    scene.add(ground);
+    camera.position.set(0, 1.6, 0.1);
+    XR8.XrController.updateCameraProjectionMatrix({ origin: camera.position, facing: camera.quaternion });
+    canvas.addEventListener('touchstart', (e) => {
+      if (e.target.closest('#ui') || e.target.closest('#back')) return;
+      if (e.touches.length === 1 && placed) XR8.XrController.recenter();
+    }, true);
+    try {
+      const loader = new GLTFLoader();
+      if (BODY_FMT === 'vrm') loader.register((p) => new VRMLoaderPlugin(p, { autoUpdateHumanBones: true }));
+      const gltf = await loader.loadAsync(BODY_URL);
+      avatar = gltf.scene;
+      if (BODY_FMT === 'vrm') {
+        vrm = gltf.userData.vrm;
+        VRMUtils.removeUnnecessaryVertices(avatar);
+        VRMUtils.removeUnnecessaryJoints(avatar);
+      }
+      const box = new THREE.Box3().setFromObject(avatar);
+      const h = Math.max(0.5, box.max.y - box.min.y);
+      const s = 1.6 / h;
+      avatar.scale.setScalar(s);
+      avatar.userData.baseScale = s;
+      avatar.position.set(0, -box.min.y * s, -1.4);
+      avatar.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+      avatar.visible = false;
+      scene.add(avatar);
+      jawTargets = vrm ? [] : collectJaw(avatar);
+      try {
+        const clips = gltf.animations || [];
+        if (clips.length && !vrm) {
+          let ci = 0;
+          try {
+            ci = Math.max(0, parseInt(
+              new URLSearchParams(location.search).get('clip') || '0', 10) || 0) % clips.length;
+          } catch (err) {}
+          mixerAR = new THREE.AnimationMixer(avatar);
+          mixerAR.clipAction(clips[ci]).play();
+        }
+      } catch (err) { mixerAR = null; }
+      status('Avatar loaded. Point at the floor, tap PLACE.');
+    } catch (e) {
+      status('Could not load avatar body.');
+    }
+  },
+});
+
+const onxrloaded = () => {
+  const ua = navigator.userAgent || "";
+  if (/wv|WebView|FBAN|FBAV|Twitter|WhatsApp|Line\//i.test(ua)) {
+    status('In-app browser detected: tap ⋯ and "Open in Chrome/Safari" or the camera stays black.');
+  }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    status('This browser exposes no camera. Use Chrome/Safari with HTTPS.');
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then((stream) => {
+    stream.getTracks().forEach((t) => t.stop());
+    status('Camera OK. Starting room tracking — move the phone slowly.');
+    XR8.addCameraPipelineModules([
+    XR8.GlTextureRenderer.pipelineModule(),
+    XR8.Threejs.pipelineModule(),
+    XR8.XrController.pipelineModule(),
+    LandingPage.pipelineModule(),
+    XRExtras.FullWindowCanvas.pipelineModule(),
+    XRExtras.Loading.pipelineModule(),
+    XRExtras.RuntimeError.pipelineModule(),
+    freakModule(),
+  ]);
+  XR8.run({ canvas: document.getElementById('camerafeed') });
+  }).catch(() => {
+    status('Camera blocked: allow camera access in the browser, then reload. ' +
+           'On iPhone use Safari; on Android use Chrome — not the chat-app viewer.');
+  });
+};
+window.XR8 ? onxrloaded() : window.addEventListener('xrloaded', onxrloaded);
+
+document.getElementById('placeBtn').onclick = () => {
+  if (!avatar) { status('Still loading the body…'); return; }
+  avatar.visible = true; placed = true;
+  try { baseY = avatar.position.y; } catch (err) {}
+  entranceT = 0;
+  try {
+    walkoutEl = document.getElementById('w');
+    if (walkoutEl && walkoutEl.getAttribute('src')) {
+      walkoutEl.play().catch(() => {});
+      document.getElementById('hint').textContent = '🎺 __NAME__ takes the stage!';
+    }
+  } catch (err) {}
+  document.getElementById('placeBtn').style.display = 'none';
+  document.getElementById('playBtn').style.display = 'inline-block';
+  document.getElementById('hint').textContent = 'There they are. Tap PLAY.';
+  status('');
+};
+document.getElementById('playBtn').onclick = async () => {
+  if (playing || !placed) return;
+  playing = true;
+  try {
+    audioEl = document.getElementById('a');
+    audioEl.onerror = () => { status('Audio file failed to load.'); };
+    const clock = new THREE.Clock();
+    const alive = () => {
+      requestAnimationFrame(alive);
+      const dt = Math.min(0.05, clock.getDelta());
+      const t = clock.elapsedTime;
+      if (!placed || !avatar) return;
+      // idle life, always on: entrance rise, sway + bob + blink
+      if (entranceT < 1) entranceT = Math.min(1, entranceT + dt / 1.4);
+      const e = 1 - entranceT;
+      const back = 1 + 2.0 * e * e * e - 1.2 * e * e;
+      const bs = avatar.userData.baseScale || 1;
+      avatar.scale.setScalar(Math.max(0.01, bs * (entranceT < 1 ? back : 1)));
+      avatar.rotation.z = Math.sin(t * 0.9) * 0.03;
+      avatar.position.y = baseY + Math.abs(Math.sin(t * 2.2)) * 0.02;
+      if (vrm) {
+        try {
+          if (t > nextBlink) {
+            nextBlink = t + 2.5 + Math.random() * 2.5;
+            vrm.expressionManager.setValue('blink', 1);
+            setTimeout(() => { try { vrm.expressionManager.setValue('blink', 0); } catch (err) {} }, 140);
+          }
+          vrm.update(dt);
+        } catch (err) {}
+      }
+      try { mixerAR && mixerAR.update(dt); } catch (err) {}
+      // speaking: analyser energy -> jaw + bop
+      let w = 0;
+      if (playing && analyser) {
+        analyser.getByteFrequencyData(freqData);
+        let e = 0;
+        for (let i = 1; i < 12; i++) e += freqData[i];
+        w = Math.min(1, e / (12 * 160));
+      }
+      energy += (w - energy) * 0.4;
+      for (const j of jawTargets) {
+        try { j.mesh.morphTargetInfluences[j.idx] = energy; } catch (err) {}
+      }
+      try { vrm && vrm.expressionManager.setValue('aa', energy); } catch (err) {}
+      if (avatar) {
+        avatar.position.y = baseY + Math.abs(Math.sin(t * 2.2)) * 0.02 + energy * 0.03;
+        avatar.rotation.y += energy * 0.01;
+      }
+    };
+    alive();
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const src = audioCtx.createMediaElementSource(audioEl);
+    analyser = audioCtx.createAnalyser(); analyser.fftSize = 256;
+    src.connect(analyser); analyser.connect(audioCtx.destination);
+    await audioCtx.resume();
+    await audioEl.play();
+    document.getElementById('playBtn').style.display = 'none';
+    document.getElementById('hint').textContent = '🎤 live from your floor';
+    freqData = new Uint8Array(analyser.frequencyBinCount);
+    audioEl.onended = () => { playing = false; };
+  } catch (e) { status('Audio blocked — tap again.'); playing = false; }
+};
+</script>
+</body></html>"""
+
+
+@app.route("/ar/<slug>", methods=["GET"])
+@app.route("/a/<slug>", methods=["GET"])
+def watch_ar(slug):
+    """AR view: place the freak in your room (8th Wall WebAR) and play the set."""
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    bdir = FREAK_DIR / slug
+    meta = _bundle_meta(slug)
+    if not meta or not (bdir / "set.wav").exists():
+        return "No such set (yet). Make one in the Black Room.", 404
+    import html as _html
+    char = meta.get("character", {})
+    name = _html.escape(char.get("name", slug))
+    rt = _avatar_runtime(slug)
+    if not rt:
+        return ("This freak has no 3D body yet — open the watch page to "
+                "give it one, then come back.", 404)
+    walkout = ""
+    for f in ("walkout.mp3", "walkout.wav"):
+        if (bdir / f).exists():
+            walkout = f"/freaks/{slug}/{f}"
+            break
+    page = AR_TEMPLATE
+    for key, val in {
+        "__SLUG__": slug, "__NAME__": name,
+        "__BODY__": rt["uri"], "__BODY_FORMAT__": rt["format"],
+        "__AUDIO__": f"/freaks/{slug}/set.wav",
+        "__WALKOUT__": walkout,
+    }.items():
+        page = page.replace(key, val)
+    return page, 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
+@app.route("/b", methods=["GET"])
+def go_badger():
+    """Shortest badger demo: /b -> AR badger live in your room."""
+    from flask import redirect as _redirect
+    return _redirect("/a/badger-001", code=302)
+
+
+RECORD_TEMPLATE = """<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Record as __NAME__ — Freak Town</title>
+<meta name="theme-color" content="#ff2fa8">
+<script type="importmap">
+{"imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+  "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.3.0/lib/three-vrm.module.js",
+  "@mediapipe/tasks-vision": "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm",
+  "kalidokit": "https://cdn.jsdelivr.net/npm/kalidokit@1.1.5/+esm"
+}}
+</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#0a0a0f;color:#eee;font-family:monospace}
+#stage{position:fixed;inset:0}
+#stage canvas{width:100%;height:100%;display:block}
+#self{position:fixed;right:10px;top:10px;width:96px;border-radius:10px;border:1px solid #444;z-index:5;transform:scaleX(-1)}
+#ui{position:fixed;left:0;right:0;bottom:0;padding:12px;text-align:center;z-index:5;
+background:linear-gradient(transparent,rgba(0,0,0,.78));padding-bottom:calc(12px + env(safe-area-inset-bottom))}
+#ui h1{font-size:15px} #ui p{color:#aaa;font-size:12px;margin:4px 0 10px}
+button{background:#ff2fa8;border:1px solid #ff2fa8;color:#fff;padding:13px 24px;border-radius:26px;font-size:15px;cursor:pointer;font-family:inherit;margin:2px}
+button.ghost{background:rgba(20,20,30,.8);border-color:#555}
+button:disabled{opacity:.4}
+#status{color:#8f8;font-size:12px;margin-top:8px;min-height:16px}
+#back{position:fixed;top:10px;left:10px;z-index:5;color:#fff;background:rgba(20,20,30,.7);border:1px solid #444;border-radius:18px;padding:8px 14px;font-size:13px;text-decoration:none}
+#share{margin-top:8px;font-size:13px}
+#share a{color:#00d4ff}
+</style>
+</head><body>
+<div id="stage"></div>
+<video id="self" autoplay playsinline muted></video>
+<a id="back" href="/f/__SLUG__">← __NAME__</a>
+<div id="ui">
+  <h1>Become __NAME__</h1>
+  <p id="hint">1. Allow camera &amp; mic &nbsp;2. Step back for full body &nbsp;3. RECORD, perform, stop → share</p>
+  <button id="recBtn" disabled>⏺ RECORD</button>
+  <button id="stopBtn" disabled class="ghost">⏹ STOP</button>
+  <div id="status">loading face tracker…</div>
+  <div id="share"></div>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
+import { FaceLandmarker, PoseLandmarker, FilesetResolver } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs';
+import { Pose as KalidoPose } from 'kalidokit';
+const BODY_URL = "__BODY__", BODY_FMT = "__BODY_FORMAT__", SLUG = "__SLUG__";
+const status = (t) => { document.getElementById('status').textContent = t; };
+let vrm = null, jawMeshes = [], landmarker = null, video = null, stream = null;
+let renderer, scene, camera, recording = false, recorder = null, chunks = [], micStream = null;
+let micRec = null, micChunks = [], faceTimeline = [], lastCats = null, recStart = 0, lastSample = 0;
+let bodyRoot = null, staticPuppet = false;
+let mixer = null;
+let poseLandmarker = null, bodyDamp = {}, boneTimeline = [];
+let bodyOn = true;
+let lastBoneSnap = null;
+try { bodyOn = new URLSearchParams(location.search).get('body') !== '0'; } catch (e) {}
+
+// --- stage ---
+renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+document.getElementById('stage').appendChild(renderer.domElement);
+scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0a0f);
+camera = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.1, 50);
+camera.position.set(0, 1.45, 2.6);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x334455, 1.0));
+const key = new THREE.DirectionalLight(0xfff2dd, 1.6);
+key.position.set(2, 4, 3); key.castShadow = true;
+scene.add(key);
+const floor = new THREE.Mesh(new THREE.CircleGeometry(3, 40),
+  new THREE.MeshStandardMaterial({ color: 0x14141c, roughness: 0.9 }));
+floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true;
+scene.add(floor);
+
+async function loadBody() {
+  const loader = new GLTFLoader();
+  if (BODY_FMT === 'vrm') loader.register((p) => new VRMLoaderPlugin(p, { autoUpdateHumanBones: false }));
+  const gltf = await loader.loadAsync(BODY_URL);
+  const root = gltf.scene;
+  if (BODY_FMT === 'vrm') {
+    vrm = gltf.userData.vrm;
+    VRMUtils.removeUnnecessaryVertices(root);
+    VRMUtils.removeUnnecessaryJoints(root);
+  } else {
+    root.traverse((o) => {
+      if (o.morphTargetDictionary && o.morphTargetInfluences) {
+        for (const n of ["jawOpen", "mouthOpen", "aa", "oh"])
+          if (n in o.morphTargetDictionary) jawMeshes.push({ mesh: o, idx: o.morphTargetDictionary[n] });
+      }
+    });
+  }
+  const box = new THREE.Box3().setFromObject(root);
+  const h = Math.max(0.5, box.max.y - box.min.y);
+  root.scale.setScalar(1.6 / h);
+  root.position.set(0, -box.min.y * (1.6 / h), 0);
+  root.userData.baseY = root.position.y;
+  bodyRoot = root;
+  // Frame the whole body: fixed 2.6m overfills big-headed/T-pose models.
+  // Fit 1.6m + margin into the fov instead (same for every avatar).
+  try {
+    const fit = (1.6 / 2) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * 1.25;
+    camera.position.set(0, 1.45, Math.max(2.6, fit));
+  } catch (e) {}
+  staticPuppet = (BODY_FMT !== 'vrm') && (jawMeshes.length === 0);
+  if (staticPuppet) status('Body loaded. PUPPET mode: unrigged mesh — your face moves the whole badger.');
+  // Skeletal clips baked in the file (Atlas walk/swagger): play one on loop.
+  // ?clip=N picks; default 0. VRM/static bodies have none — guarded.
+  try {
+    const clips = gltf.animations || [];
+    if (clips.length && BODY_FMT !== 'vrm') {
+      let ci = 0;
+      try {
+        ci = Math.max(0, parseInt(
+          new URLSearchParams(location.search).get('clip') || '0', 10) || 0) % clips.length;
+      } catch (e) {}
+      mixer = new THREE.AnimationMixer(root);
+      mixer.clipAction(clips[ci]).play();
+      status('Body loaded' + (clips.length > 1 ? ` (${clips.length} clips, ?clip=N to switch).` : ' with walk cycle.')
+        + (staticPuppet ? ' PUPPET mode: your face moves him too.' : ''));
+    }
+  } catch (e) { mixer = null; }
+  root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  scene.add(root);
+  return true;
+}
+
+// --- face tracking: MediaPipe outputs 52 ARKit blendshapes, we map direct ---
+// --- body tracking: Pose landmarks solved onto VRM humanoid bones (Kalidokit) ---
+const BODY_BONES = ["hips", "spine", "chest", "neck",
+  "leftUpperArm", "leftLowerArm", "leftHand",
+  "rightUpperArm", "rightLowerArm", "rightHand",
+  "leftUpperLeg", "leftLowerLeg", "leftFoot",
+  "rightUpperLeg", "rightLowerLeg", "rightFoot"];
+const RIG_KEYS = ["Hips", "Spine", "Chest", "Neck",
+  "LeftUpperArm", "LeftLowerArm", "LeftHand",
+  "RightUpperArm", "RightLowerArm", "RightHand",
+  "LeftUpperLeg", "LeftLowerLeg", "LeftFoot",
+  "RightUpperLeg", "RightLowerLeg", "RightFoot"];
+
+function applyBody(pose3D, pose2D) {
+  if (!vrm || !bodyOn) return null;
+  let rig = null;
+  try {
+    rig = KalidoPose.solve(pose3D, pose2D, {
+      runtime: "mediapipe", video: video,
+      imageSize: { width: 640, height: 480 }, enableLegs: true });
+  } catch (e) { return null; }
+  if (!rig) return null;
+  const snap = [];
+  for (let i = 0; i < BODY_BONES.length; i++) {
+    const part = rig[RIG_KEYS[i]];
+    if (!part || !part.rotation) continue;
+    const t = part.rotation;
+    const cx = Math.max(-0.9, Math.min(0.9, t.x || 0));
+    const cy = Math.max(-0.9, Math.min(0.9, t.y || 0));
+    const cz = Math.max(-0.9, Math.min(0.9, t.z || 0));
+    let node = null;
+    try { node = vrm.humanoid.getNormalizedBoneNode(BODY_BONES[i]); } catch (e) {}
+    if (!node) continue;
+    const k = BODY_BONES[i];
+    bodyDamp[k] = bodyDamp[k] || { x: 0, y: 0, z: 0 };
+    const d = bodyDamp[k], a = 0.35;
+    d.x += (cx - d.x) * a; d.y += (cy - d.y) * a; d.z += (cz - d.z) * a;
+    try { node.rotation.set(d.x, d.y, d.z); } catch (e) {}
+    snap.push(Math.round(d.x * 100), Math.round(d.y * 100), Math.round(d.z * 100));
+  }
+  return snap;
+}
+
+async function initTracker() {
+  const vision = await FilesetResolver.forVisionTasks(
+    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+  landmarker = await FaceLandmarker.createFromOptions(vision, {
+    baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task", delegate: "GPU" },
+    outputFaceBlendshapes: true, outputFacialTransformationMatrixes: true,
+    runningMode: "VIDEO", numFaces: 1,
+  });
+  if (bodyOn) {
+    try {
+      poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+        baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task", delegate: "GPU" },
+        runningMode: "VIDEO", numPoses: 1,
+        minPoseDetectionConfidence: 0.5, minTrackingConfidence: 0.5,
+      });
+    } catch (e) { poseLandmarker = null; }
+  }
+}
+
+function applyFace(res) {
+  if (!res || !res.faceBlendshapes || !res.faceBlendshapes.length) return;
+  const cats = {};
+  for (const c of res.faceBlendshapes[0].categories) cats[c.categoryName] = c.score;
+  const setV = (name, v) => {
+    try { vrm && vrm.expressionManager.setValue(name, Math.min(1, Math.max(0, v))); } catch (e) {}
+  };
+  // visemes + smile + blink straight onto VRM presets
+  for (const v of ["aa", "ee", "ih", "oh", "ou"]) setV(v, cats[v] || 0);
+  setV('blink', Math.max(cats['eyeBlinkLeft'] || 0, cats['eyeBlinkRight'] || 0));
+  setV('happy', cats['mouthSmileLeft'] || 0);
+  // head pose from matrix
+  try {
+    const m = res.facialTransformationMatrixes[0].data;
+    const yaw = Math.atan2(m[8], m[10]), pitch = Math.asin(Math.max(-1, Math.min(1, -m[9])));
+    const head = vrm ? vrm.humanoid.getNormalizedBoneNode('head') : null;
+    if (head) { head.rotation.y += (yaw * 0.6 - head.rotation.y) * 0.4; head.rotation.x += (pitch * 0.5 - head.rotation.x) * 0.4; }
+  } catch (e) {}
+  // GLB morph fallback: jaw from mouth openness
+  const open = Math.max(cats['jawOpen'] || 0, cats['mouthOpen'] || 0, cats['aa'] || 0);
+  for (const j of jawMeshes) {
+    try { j.mesh.morphTargetInfluences[j.idx] = open; } catch (e) {}
+  }
+  // remix stem: tiny per-frame snapshot for later re-performance
+  const r2 = (v) => Math.round((v || 0) * 100) / 100;
+  lastCats = { o: r2(open), s: r2(cats['mouthSmileLeft']),
+    b: r2(Math.max(cats['eyeBlinkLeft'] || 0, cats['eyeBlinkRight'] || 0)),
+    a: r2(cats['aa']), e: r2(cats['ee']), i: r2(cats['ih']),
+    h: r2(cats['oh']), u: r2(cats['ou']) };
+}
+
+let lastT = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t - lastT) / 1000 || 0.016);
+  lastT = t;
+  try {
+    if (landmarker && video && video.readyState >= 2 && video.currentTime > 0) {
+      const res = landmarker.detectForVideo(video, performance.now());
+      applyFace(res);
+      if (poseLandmarker && vrm && bodyOn) {
+        try {
+          const pr = poseLandmarker.detectForVideo(video, performance.now());
+          const pw = pr && pr.poseWorldLandmarks && pr.poseWorldLandmarks[0];
+          const p2 = pr && pr.poseLandmarks && pr.poseLandmarks[0];
+          lastBoneSnap = (pw && p2) ? applyBody(pw, p2) : null;
+        } catch (e) { lastBoneSnap = null; }
+      }
+      if (staticPuppet && bodyRoot && lastCats) {
+        const tt = performance.now() / 1000;
+        bodyRoot.rotation.y = Math.sin(tt * 1.2) * 0.12 + (lastCats.s || 0) * 0.5;
+        bodyRoot.rotation.x = -(lastCats.o || 0) * 0.35;
+        bodyRoot.rotation.z = (lastCats.b || 0) * 0.15;
+        bodyRoot.position.y = (bodyRoot.userData.baseY || 0)
+          + (lastCats.o || 0) * 0.25 + Math.abs(Math.sin(tt * 2.2)) * 0.02;
+      }
+      if (recording && lastCats && performance.now() - lastSample > 100
+          && faceTimeline.length < 1200) {
+        lastSample = performance.now();
+        faceTimeline.push([Math.round(performance.now() - recStart),
+          lastCats.o, lastCats.s, lastCats.b, lastCats.a,
+          lastCats.e, lastCats.i, lastCats.h, lastCats.u]);
+        if (lastBoneSnap && boneTimeline.length < 1200)
+          boneTimeline.push([Math.round(performance.now() - recStart)].concat(lastBoneSnap));
+      }
+    }
+  } catch (e) {}
+  try { vrm && vrm.update(dt); } catch (e) {}
+  try { mixer && mixer.update(dt); } catch (e) {}
+  renderer.render(scene, camera);
+}
+
+document.getElementById('recBtn').onclick = async () => {
+  if (recording) return;
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (e) { status('Mic blocked: allow microphone, then reload.'); return; }
+  chunks = [];
+  faceTimeline = []; boneTimeline = []; lastBoneSnap = null;
+  recStart = 0; lastSample = 0;
+  try {
+    const cs = renderer.domElement.captureStream(30);
+    if (micStream) micStream.getAudioTracks().forEach((tr) => cs.addTrack(tr));
+    recorder = new MediaRecorder(cs, { mimeType: 'video/webm' });
+    try {
+      micChunks = [];
+      micRec = new MediaRecorder(micStream, { mimeType: 'audio/webm' });
+      micRec.ondataavailable = (e) => { if (e.data.size) micChunks.push(e.data); };
+      micRec.start(1000);
+    } catch (e) { micRec = null; }
+  } catch (e) { status('Recording unsupported in this browser.'); return; }
+  recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+  recorder.onstop = async () => {
+    const blob = new Blob(chunks, { type: 'video/webm' });
+    const finish = async (micBlob) => {
+      const fd = new FormData();
+      fd.append('file', blob, 'take.webm');
+      if (micBlob) fd.append('mic', micBlob, 'take-mic.webm');
+      try {
+        fd.append('meta', JSON.stringify({
+          duration_ms: Math.round(performance.now() - recStart),
+          face_samples: faceTimeline.length,
+          faces: faceTimeline.slice(0, 1200),
+          bone_samples: boneTimeline.length,
+          bones: boneTimeline.slice(0, 1200),
+          client: navigator.userAgent.slice(0, 80),
+        }));
+      } catch (e) {}
+      status('Uploading ' + Math.round(blob.size / 1024) + ' KB…');
+    try {
+      const r = await fetch('/api/record/' + SLUG, { method: 'POST', body: fd });
+      const j = await r.json();
+      if (j.ok) {
+        document.getElementById('share').innerHTML =
+          '🔗 <a href="' + j.url + '">share this take</a> · ' +
+          '<a href="' + j.url + '" download>save video</a> — post it, birthday-bomb a friend';
+        status('Saved. That take now lives at the link above.');
+      } else status('Save failed: ' + (j.error || r.status));
+    } catch (e) { status('Upload failed — video lost. Sorry.'); }
+      document.getElementById('recBtn').disabled = false;
+      document.getElementById('stopBtn').disabled = true;
+    };
+    if (micRec && micRec.state !== 'inactive') {
+      micRec.onstop = () => finish(new Blob(micChunks, { type: 'audio/webm' }));
+      micRec.stop();
+    } else finish(null);
+  };
+  recStart = performance.now();
+  recorder.start(1000);
+  recording = true;
+  document.getElementById('recBtn').disabled = true;
+  document.getElementById('stopBtn').disabled = false;
+  status('● REC — perform! Your face drives ' + document.title.split(' ')[0] + '.');
+};
+document.getElementById('stopBtn').onclick = () => {
+  if (recorder && recording) { recording = false; recorder.stop(); status('Stopping…'); }
+};
+
+(async () => {
+  try {
+    await loadBody();
+    status('Body loaded. Starting camera…');
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: 640 }, audio: false });
+    video = document.getElementById('self');
+    video.srcObject = stream;
+    await video.play();
+    await initTracker();
+    document.getElementById('recBtn').disabled = false;
+    status('Live. Your face is the puppet strings — nothing leaves your phone until you share.');
+    requestAnimationFrame(loop);
+  } catch (e) {
+    status('Need camera access (Chrome/Safari, not chat-app viewer). ' + String(e).slice(0, 80));
+  }
+})();
+</script>
+</body></html>"""
+
+
+@app.route("/record/<slug>", methods=["GET"])
+@app.route("/r/<slug>", methods=["GET"])
+def watch_record(slug):
+    """RECORD mode: become the freak. Webcam drives the VRM face live;
+    canvas + mic capture to a shareable take. All tracking on-device."""
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    bdir = FREAK_DIR / slug
+    meta = _bundle_meta(slug)
+    if not meta or not (bdir / "set.wav").exists():
+        return "No such set (yet). Make one in the Black Room.", 404
+    import html as _html
+    char = meta.get("character", {})
+    name = _html.escape(char.get("name", slug))
+    rt = _avatar_runtime(slug)
+    if not rt:
+        return "This freak needs a 3D body first.", 404
+    page = RECORD_TEMPLATE
+    for key, val in {
+        "__SLUG__": slug, "__NAME__": name,
+        "__BODY__": rt["uri"], "__BODY_FORMAT__": rt["format"],
+    }.items():
+        page = page.replace(key, val)
+    return page, 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
+@app.route("/api/record/<slug>", methods=["POST"])
+def save_take(slug):
+    """Save a recorded take (webm) into the freak bundle. Returns share URL.
+    Optional remix stems (same stamp, backward compatible when absent):
+    - `mic`: mic-only audio blob (the human voice, unmuxed)
+    - `meta`: JSON {duration_ms, face_samples, client} — face timeline
+      array itself rides inside `meta.faces` when small (<400KB)."""
+    import datetime
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    bdir = FREAK_DIR / slug
+    if _bundle_meta(slug) is None or not bdir.is_dir():
+        return jsonify({"ok": False, "error": "unknown set"}), 404
+    f = request.files.get("file")
+    if f is None:
+        return jsonify({"ok": False, "error": "multipart file required"}), 400
+    blob = f.read(64 * 1024 * 1024 + 1)
+    if len(blob) > 64 * 1024 * 1024 or len(blob) < 1024:
+        return jsonify({"ok": False, "error": "bad file (1KB–64MB webm)"}), 400
+    rdir = bdir / "takes"
+    rdir.mkdir(exist_ok=True)
+    stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d-%H%M%S")
+    (rdir / f"take-{stamp}.webm").write_bytes(blob)
+    stems = False
+    mic = request.files.get("mic")
+    if mic is not None:
+        mblob = mic.read(16 * 1024 * 1024 + 1)
+        if 1024 <= len(mblob) <= 16 * 1024 * 1024:
+            (rdir / f"take-{stamp}.mic").write_bytes(mblob)
+            stems = True
+    raw_meta = request.form.get("meta", "")
+    if raw_meta:
+        try:
+            m = json.loads(raw_meta)
+            if isinstance(m, dict):
+                m["slug"] = slug
+                m["take"] = f"take-{stamp}.webm"
+                (rdir / f"take-{stamp}.json").write_text(json.dumps(m)[:512_000])
+                stems = True
+        except Exception:
+            pass
+    return jsonify({"ok": True, "stems": stems,
+                    "url": f"/freaks/{slug}/takes/take-{stamp}.webm"})
+
+
+REVOICE_VOICES = ("en-US-AriaNeural", "en-US-GuyNeural",
+                  "en-US-ChristopherNeural", "en-US-SamanthaNeural",
+                  "en-US-JoannaNeural", "en-US-TonyNeural",
+                  "kokoro:af_heart", "kokoro:af_bella",
+                  "kokoro:am_adam", "kokoro:am_michael")
+
+
+def _bank_voices() -> list[dict]:
+    """5-second-clone bank: data/voice-bank/<id>/voice.json.
+    Rendered on GPU (Qwen3-TTS) or cached; listed automatically in revoice."""
+    out = []
+    bank = Path(__file__).parent / "data" / "voice-bank"
+    if not bank.is_dir():
+        return out
+    for v in sorted(bank.iterdir()):
+        if not v.is_dir():
+            continue
+        meta = v / "voice.json"
+        if not meta.exists():
+            continue
+        try:
+            m = json.loads(meta.read_text())
+        except Exception:
+            continue
+        if m.get("id") and m.get("ready"):
+            out.append({"id": f"bank:{m['id']}",
+                        "label": m.get("label", m["id"])})
+    return out
+
+
+@app.route("/revoice/<slug>/<fname>", methods=["GET"])
+def revoice_page(slug, fname):
+    """Change a take's voice after the fact: type what was (or should be)
+    said, pick a voice, get a new take with re-rendered speech muxed over
+    the same performance video. Timing comes from the new read; the body
+    and face stay yours."""
+    import html as _html
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    fname = re.sub(r"[^a-z0-9_.-]", "", fname)[:64]
+    if _bundle_meta(slug) is None or not fname.startswith("take-") \
+            or not fname.endswith(".webm"):
+        return "No such take.", 404
+    if not (FREAK_DIR / slug / "takes" / fname).exists():
+        return "No such take.", 404
+    wourl = ""
+    for f in ("walkout.mp3", "walkout.wav"):
+        if (FREAK_DIR / slug / f).exists():
+            wourl = f"/freaks/{slug}/{f}"
+            break
+    opts = "".join(f"<option value='{v}'>{_html.escape(v.split('-')[1])}</option>"
+                   for v in REVOICE_VOICES if not v.startswith(("kokoro:", "bank:")))
+    opts += "".join(f"<option value='{v}'>{_html.escape('Kokoro ' + v.split(':')[1])}</option>"
+                    for v in REVOICE_VOICES if v.startswith("kokoro:"))
+    opts += "".join(f"<option value='{b['id']}'>{_html.escape('★ ' + b['label'])}</option>"
+                    for b in _bank_voices())
+    return f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Revoice — Freak Town</title>
+<style>*{{margin:0;padding:0;box-sizing:border-box}}
+body{{background:#0a0a0f;color:#eee;font-family:monospace;padding:16px 12px 60px}}
+h1{{text-align:center;font-size:15px;color:#ff2fa8}}
+.wrap{{max-width:420px;margin:0 auto}}video{{width:100%;border-radius:8px;background:#000}}
+textarea{{width:100%;background:#14141c;color:#eee;border:1px solid #444;border-radius:8px;padding:10px;font-family:inherit}}
+select,button{{background:#14141c;color:#eee;border:1px solid #555;border-radius:18px;padding:10px 16px;font-family:inherit;margin-top:8px}}
+button{{background:#ff2fa8;border-color:#ff2fa8;color:#fff;cursor:pointer}}
+#msg{{color:#8f8;font-size:12px;margin-top:8px;min-height:16px}}a{{color:#00d4ff}}</style></head>
+<body><div class="wrap">
+<h1>🎙 REVOICE {_html.escape(slug)}</h1>
+<video src="/freaks/{slug}/takes/{fname}" controls playsinline preload="metadata"></video>
+<p style="font-size:12px;color:#888;margin:8px 0">Reroll the voice, the walkout, or the performer — same take, new show:</p>
+<div style="font-size:12px;margin:6px 0">🎺 walkout: <audio id="wo" controls preload="none" src="{wourl}" style="vertical-align:middle;max-width:220px"></audio>
+<button onclick="newWalkout()">🎲 reroll</button> <span id="woMsg" style="color:#666"></span></div>
+<div style="font-size:12px;margin:6px 0">🎭 perform as: <span id="cast">loading…</span></div>
+<p style="font-size:12px;color:#888;margin:8px 0">What was said (or should have been):</p>
+<textarea id="tx" rows="3" placeholder="Buster knows what you did with the cheese…"></textarea><br>
+<select id="vv">{opts}</select>
+<button onclick="go()">RENDER NEW VOICE ▶</button>
+<div id="msg"></div>
+<p style="margin-top:14px;font-size:12px"><a href="/f/{slug}">← back to {_html.escape(slug)}</a> · <a href="/takes">all takes</a></p>
+</div><script>
+async function newWalkout(){{
+var m=document.getElementById('woMsg');m.textContent='rolling…';
+try{{
+var r=await fetch('/api/walkout/{slug}',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:'{{}}'}});
+var j=await r.json();
+if(j.ok){{document.getElementById('wo').src=j.url;
+m.textContent=j.recipe.genre+'/'+j.recipe.mood+' (seed '+j.seed+')';}}
+else m.textContent='failed';
+}}catch(e){{m.textContent='error';}}
+}}
+async function loadCast(){{
+try{{
+var r=await fetch('/api/sets');var j=await r.json();
+var el=document.getElementById('cast');
+el.innerHTML=(j.sets||j||[]).slice(0,12).map(s=>'<a href="/r/'+s.slug+'">'+s.name+'</a>').join(' · ')||'none yet';
+}}catch(e){{document.getElementById('cast').textContent='error';}}
+}}
+loadCast();
+async function go(){{
+var m=document.getElementById('msg');m.textContent='rendering voice…';
+try{{
+var r=await fetch('/api/revoice',{{method:'POST',headers:{{'Content-Type':'application/json'}},
+body:JSON.stringify({{slug:'{slug}',file:'{fname}',
+text:document.getElementById('tx').value,
+voice:document.getElementById('vv').value}})}});
+var j=await r.json();
+if(j.ok){{m.innerHTML='done — <a href="'+j.url+'">watch the revoiced take</a>';}}
+else m.textContent='failed: '+(j.error||r.status);
+}}catch(e){{m.textContent='error';}}
+}}
+</script></body></html>""", 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
+@app.route("/api/revoice", methods=["POST"])
+def api_revoice():
+    """Render transcript in a new voice, mux over the take's video.
+    Body: {slug, file, text, voice}. Returns a NEW take file; source kept."""
+    import datetime
+    import subprocess
+    import tempfile
+    data = request.json or {}
+    slug = re.sub(r"[^a-z0-9_-]", "", str(data.get("slug", "")))[:45]
+    fname = re.sub(r"[^a-z0-9_.-]", "", str(data.get("file", "")))[:64]
+    text = str(data.get("text", "") or "").strip()[:500]
+    voice = str(data.get("voice", "") or "")
+    if _bundle_meta(slug) is None or not fname.startswith("take-") \
+            or not fname.endswith(".webm"):
+        return jsonify({"ok": False, "error": "bad slug/file"}), 400
+    src = FREAK_DIR / slug / "takes" / fname
+    if not src.exists():
+        return jsonify({"ok": False, "error": "unknown take"}), 404
+    if not text:
+        return jsonify({"ok": False, "error": "transcript required"}), 400
+    bank_ids = {b["id"] for b in _bank_voices()}
+    try:
+        if voice.startswith("kokoro:"):
+            from tts_provider import get_provider
+            wav = asyncio.run(get_provider("kokoro").generate(text, voice))
+        elif voice in bank_ids:
+            return jsonify({"ok": False,
+                            "error": "bank voice not rendered yet — see docs/VOICE-BANK.md"}), 502
+        elif voice in REVOICE_VOICES:
+            wav = asyncio.run(tts_generate(text, voice))
+        else:
+            return jsonify({"ok": False, "error": "unknown voice"}), 400
+    except Exception:
+        wav = b""
+    if not wav:
+        return jsonify({"ok": False, "error": "tts failed"}), 502
+    stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d-%H%M%S")
+    out = f"take-{stamp}-rv.webm"
+    with tempfile.TemporaryDirectory() as td:
+        vp = f"{td}/v.wav"
+        open(vp, "wb").write(wav)
+        pr = subprocess.run(
+            ["ffmpeg", "-y", "-i", str(src), "-i", vp,
+             "-map", "0:v", "-map", "1:a", "-shortest",
+             "-c:v", "copy", str(FREAK_DIR / slug / "takes" / out)],
+            capture_output=True, timeout=120)
+    if pr.returncode != 0 or not (FREAK_DIR / slug / "takes" / out).exists():
+        return jsonify({"ok": False, "error": "mux failed"}), 502
+    (FREAK_DIR / slug / "takes" / f"take-{stamp}-rv.json").write_text(
+        json.dumps({"source": fname, "voice": voice, "text": text,
+                    "slug": slug, "take": out}))
+    return jsonify({"ok": True,
+                    "url": f"/freaks/{slug}/takes/{out}"})
+
+
+def _list_takes(slug: str | None = None) -> list[dict]:
+    """Takes across pogs, newest first. Flat webm files only — stems
+    (take-<stamp>.json/.mic) are remix material, listed separately."""
+    out = []
+    dirs = [FREAK_DIR / slug] if slug else sorted(FREAK_DIR.iterdir())
+    for d in dirs:
+        if not d.is_dir():
+            continue
+        meta = _bundle_meta(d.name)
+        if not meta:
+            continue
+        rdir = d / "takes"
+        if not rdir.is_dir():
+            continue
+        cname = ((meta.get("character") or {}).get("name") or d.name)
+        for f in sorted(rdir.glob("take-*.webm"), reverse=True):
+            try:
+                st = f.stat()
+            except OSError:
+                continue
+            stem = f.with_suffix("")
+            out.append({
+                "slug": d.name, "name": cname, "file": f.name,
+                "url": f"/freaks/{d.name}/takes/{f.name}",
+                "size_kb": max(1, st.st_size // 1024),
+                "mtime": int(st.st_mtime),
+                "has_stems": stem.with_suffix(".json").exists(),
+            })
+    out.sort(key=lambda t: t["mtime"], reverse=True)
+    return out
+
+
+@app.route("/api/takes", methods=["GET"])
+def api_takes_all():
+    """Every take on every pog, newest first. The cross-pog browser."""
+    return jsonify({"ok": True, "takes": _list_takes()[:100]})
+
+
+@app.route("/api/takes/<slug>", methods=["GET"])
+def api_takes_one(slug):
+    """Takes for one pog."""
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    if _bundle_meta(slug) is None:
+        return jsonify({"ok": False, "error": "unknown set"}), 404
+    return jsonify({"ok": True, "slug": slug, "takes": _list_takes(slug)})
+
+
+@app.route("/api/agent", methods=["GET"])
+def api_agent_manifest():
+    """Machine-readable index for outside agents (Moltbook, OpenClaw, any
+    HTTP agent). Observe → act → assess, no key on trial. Full walkthrough:
+    docs/AGENT-ONBOARDING.md (repo) — this manifest is the contract."""
+    base = "https://trial.freak.town"
+    return jsonify({
+        "ok": True, "name": "freaktown-trial", "version": "trial",
+        "auth": {"mode": "none", "note": "open trial; be gentle, per-IP limits apply"},
+        "observe": {
+            "sets": f"{base}/api/sets",
+            "preload": f"{base}/api/preload/<slug>",
+            "takes": f"{base}/api/takes",
+            "takes_one": f"{base}/api/takes/<slug>",
+            "contracts": f"{base}/contracts/<name>.v1.schema.json",
+        },
+        "act": {
+            "respond_idea": f"{base}/api/respond_idea",
+            "respond_set": f"{base}/api/respond",
+            "create_set": f"{base}/api/sets",
+            "upload_avatar": f"{base}/api/avatar/upload",
+            "save_take": f"{base}/api/record/<slug>",
+            "revoice": f"{base}/api/revoice",
+            "walkout_reroll": f"{base}/api/walkout/<slug>",
+            "react": f"{base}/api/react",
+            "vote": f"{base}/api/vote",
+        },
+        "assess": {
+            "how": "preload gives beats + word timings + camera plan + cues; "
+                   "compare your set's plan against it, then check votes "
+                   "and takes (human baseline) for the same slug",
+            "reply_thread": f"{base}/api/replies/<slug>",
+            "submissions": f"{base}/api/submissions",
+        },
+        "example_flow": [
+            f"GET {base}/api/preload/badger-001",
+            "POST /api/respond_idea {slug:'badger-001', mode:'roast'}",
+            "POST /api/respond {parent_slug:'badger-001', mode:'roast', idea:'<angle>'}",
+            "GET preload/<your-slug> and diff beats/plan vs badger-001",
+            "record or revoice a take, compare takes + votes",
+        ],
+        "pogtown_game_api": "https://api.pog.town (DNS pending human; "
+                            "protocol: services/agent-gateway/AGENT-API.md)",
+    })
+
+
+@app.route("/llms.txt", methods=["GET"])
+def llms_txt():
+    """Compact machine index. Agents: start here, then /api/agent."""
+    txt = """# Freak Town (trial) — for agents
+Trial comedy-club API. No key. Observe, act, assess.
+- Manifest: /api/agent
+- Watch: /f/<slug>  AR: /a/<slug>  Record: /r/<slug>  Takes: /takes
+- Preload (beats+timings+plan): /api/preload/<slug>
+- Reply with a set: POST /api/respond_idea {slug, mode}
+- Human baseline + votes decide what cooked.
+- Game truth lives in pogtown (rooms/observe/act); this repo is the stage.
+- Rules: no secrets in calls, per-IP limits, original voices only.
+"""
+    return txt, 200, {"Content-Type": "text/plain; charset=utf-8"}
+
+
+@app.route("/contracts/<path:filename>")
+def serve_contracts(filename):
+    """Schemas + fixtures for agents. JSON only, no traversal."""
+    if not re.fullmatch(r"[A-Za-z0-9_./-]+\.json", filename) or ".." in filename:
+        return jsonify({"ok": False, "error": "not found"}), 404
+    return send_from_directory(str(Path(__file__).parent / "contracts"), filename)
+
+
 @app.route("/api/react", methods=["POST"])
 def react_to_set():
     """Audience reaction from a watch page: {slug, type, set_time_ms}.
@@ -2721,13 +3873,34 @@ def _sniff_glb(blob: bytes) -> dict:
             if isinstance(tn, list) and len(tn) == n_targets and n_targets:
                 names.update(str(x) for x in tn)
         caps["has_morph_targets"] = any_targets
+        # VRM 1.0 expressions live in extensions.VRMC_vrm, not mesh
+        # targetNames — semantically facial morphs all the same.
+        vrm_presets: set = set()
+        try:
+            _vrm = ((js.get("extensions") or {}).get("VRMC_vrm") or {})
+            _presets = ((_vrm.get("expressions") or {}).get("preset") or {})
+            if isinstance(_presets, dict):
+                vrm_presets = {str(k) for k in _presets.keys()}
+        except Exception:
+            vrm_presets = set()
+        caps["vrm_expressions"] = sorted(vrm_presets)
+        names |= vrm_presets
+        caps["all_morph_names"] = sorted(names)
+        try:
+            caps["face_profile"] = detect_face_profile(names)
+        except Exception:
+            caps["face_profile"] = "CUSTOM" if names else "NONE"
         mouth = {n for n in names if n in ARKIT_MOUTH or n in OCULUS_MOUTH}
-        caps["facial_morphs"] = len(mouth)
+        caps["facial_morphs"] = len(mouth | vrm_presets)
         caps["morph_names"] = sorted(mouth)[:24]
         # viseme: rich mouth rig (4+ known morphs). jaw: a single working
         # jaw (BASIC bodies, some mascots) — analyser-driven and honest.
+        # vrm: VRM expression presets carrying speech visemes (aa/ee/ih/oh/ou).
         jaw = {n for n in names if n in ("jawOpen", "jaw", "mouthOpen")}
+        vrm_vis = {n for n in names if n in ("aa", "ee", "ih", "oh", "ou")}
         if len(mouth) >= 4:
+            caps["lipsync_profile"] = "viseme"
+        elif len(vrm_vis) >= 3:
             caps["lipsync_profile"] = "viseme"
         elif jaw:
             caps["lipsync_profile"] = "jaw"
@@ -2939,7 +4112,9 @@ def _basic_build(slug: str, bdir, meta: dict, mode: str,
         "skeletal_animation": True, "facial_animation": True,
         "lipsync": True, "gestures": True, "locomotion": True,
     })
-    manifest["face_profile"] = {"morph_names": ["jawOpen"]}
+    manifest["face_profile"] = {"morph_names": ["jawOpen"],
+                                  "profile": "JAW",
+                                  "pog_face_v1": ["jaw_open", "mouth_open"]}
     (bdir / "avatar.json").write_text(json.dumps(manifest, indent=2))
     return manifest
 
@@ -3069,6 +4244,12 @@ def _avatar_finish(slug: str, bdir, job_id: str, mode: str, glb_url: str,
     })
     manifest["face_profile"] = {
         "morph_names": caps.get("morph_names", []),
+        "profile": caps.get("face_profile", "CUSTOM"),
+        "pog_face_v1": sorted(
+            to_pog_face(
+                caps.get("all_morph_names", caps.get("morph_names", [])),
+                (manifest.get("appearance", {}).get("runtime", {})
+                 .get("format", "glb")))["intents"]),
     }
     (bdir / "avatar.json").write_text(json.dumps(manifest, indent=2))
     return jsonify({"ok": True, "status": "done",
@@ -3171,7 +4352,14 @@ def avatar_upload():
         "gestures": caps["rigged"],
         "locomotion": caps["humanoid_skin"],
     })
-    manifest["face_profile"] = {"morph_names": caps.get("morph_names", [])}
+    manifest["face_profile"] = {"morph_names": caps.get("morph_names", []),
+                                  "profile": caps.get("face_profile", "CUSTOM"),
+                                  "pog_face_v1": sorted(
+                                      to_pog_face(
+                                          caps.get("all_morph_names",
+                                                   caps.get("morph_names", [])),
+                                          "vrm" if str(body_name).endswith(".vrm")
+                                          else "glb")["intents"])}
     (bdir / "avatar.json").write_text(json.dumps(manifest, indent=2))
     return jsonify({"ok": True, "status": "done",
                     "avatar_url": f"/freaks/{slug}/{body_name}",

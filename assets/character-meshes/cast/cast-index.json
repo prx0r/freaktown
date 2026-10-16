@@ -1,0 +1,278 @@
+{
+ "count": 39,
+ "cast": [
+  {
+   "id": "pog.bixby-hold-short",
+   "name": "Bixby Hold-Short",
+   "file": "airplane-bixby-hold-short.json",
+   "mesh": "arunangshubanerjee-airplane-2088.glb",
+   "engine": "Meal-prep courier with a threat model"
+  },
+  {
+   "id": "pog.captain-ata-ashcroft",
+   "name": "Captain Ata Ashcroft",
+   "file": "airplane-captain-ata-ashcroft.json",
+   "mesh": "arunangshubanerjee-airplane-2088.glb",
+   "engine": "Narrates his own life collapse in customer-service voice"
+  },
+  {
+   "id": "pog.jett-comfort-wing",
+   "name": "Jett Comfort-Wing",
+   "file": "airplane-jett-comfort-wing.json",
+   "mesh": "arunangshubanerjee-airplane-2088.glb",
+   "engine": "Clingy patient with attachment paperwork"
+  },
+  {
+   "id": "pog.basket-casey",
+   "name": "Basket Casey",
+   "file": "basket-basket-casey.json",
+   "mesh": "kosue4554-basket-4480.glb",
+   "engine": "Leveraged fund manager of eggs"
+  },
+  {
+   "id": "pog.hamper-thyme",
+   "name": "Hamper Thyme",
+   "file": "basket-hamper-thyme.json",
+   "mesh": "kosue4554-basket-4480.glb",
+   "engine": "Confessor who itemizes your shame"
+  },
+  {
+   "id": "pog.hoops-abandonado",
+   "name": "Hoops Abandonado",
+   "file": "basket-hoops-abandonado.json",
+   "mesh": "kosue4554-basket-4480.glb",
+   "engine": "Heartbroken romantic keeping score"
+  },
+  {
+   "id": "pog.duke-monarch-iv",
+   "name": "Duke Monarch IV",
+   "file": "butterfly-duke-monarch-iv.json",
+   "mesh": "gustavorezende-butterfly-3766.glb",
+   "engine": "Feudal landlord with summonses"
+  },
+  {
+   "id": "pog.madame-chrysalis",
+   "name": "Madame Chrysalis",
+   "file": "butterfly-madame-chrysalis.json",
+   "mesh": "gustavorezende-butterfly-3766.glb",
+   "engine": "High-pressure closer with a nectar habit"
+  },
+  {
+   "id": "pog.siffy-pollen",
+   "name": "Siffy Pollen",
+   "file": "butterfly-siffy-pollen.json",
+   "mesh": "gustavorezende-butterfly-3766.glb",
+   "engine": "One-insect public-health emergency"
+  },
+  {
+   "id": "pog.chairman-meow",
+   "name": "Chairman Meow",
+   "file": "cat-chairman-meow.json",
+   "mesh": "nyilonelycompany-cat-2058.glb",
+   "engine": "Committee chair with minutes"
+  },
+  {
+   "id": "pog.professor-litter",
+   "name": "Professor Litter",
+   "file": "cat-professor-litter.json",
+   "mesh": "nyilonelycompany-cat-2058.glb",
+   "engine": "Citation-counting committee member"
+  },
+  {
+   "id": "pog.red-dot-jones",
+   "name": "Red Dot Jones",
+   "file": "cat-red-dot-jones.json",
+   "mesh": "nyilonelycompany-cat-2058.glb",
+   "engine": "Obsessive gumshoe with a corkboard"
+  },
+  {
+   "id": "pog.coach-canopy",
+   "name": "Coach Canopy",
+   "file": "chimp-coach-canopy.json",
+   "mesh": "nyilonelycompany-chimp-4562.glb",
+   "engine": "Certified facilitator with handouts"
+  },
+  {
+   "id": "pog.dr-peel",
+   "name": "Dr. Peel",
+   "file": "chimp-dr-peel.json",
+   "mesh": "nyilonelycompany-chimp-4562.glb",
+   "engine": "Briefcase-carrying officer of the court"
+  },
+  {
+   "id": "pog.siskel-simian",
+   "name": "Siskel Simian",
+   "file": "chimp-siskel-simian.json",
+   "mesh": "nyilonelycompany-chimp-4562.glb",
+   "engine": "Byline tyrant with a rating system"
+  },
+  {
+   "id": "pog.al-arm",
+   "name": "Al Arm",
+   "file": "clock-al-arm.json",
+   "mesh": "gustavorezende-clock-3872.glb",
+   "engine": "Gentle addict negotiating with dawn"
+  },
+  {
+   "id": "pog.doug-deadline",
+   "name": "Doug Deadline",
+   "file": "clock-doug-deadline.json",
+   "mesh": "gustavorezende-clock-3872.glb",
+   "engine": "Petty tyrant of other people's minutes"
+  },
+  {
+   "id": "pog.tictoria-gossip",
+   "name": "Tictoria Gossip",
+   "file": "clock-tictoria-gossip.json",
+   "mesh": "gustavorezende-clock-3872.glb",
+   "engine": "Town crier with plausible deniability"
+  },
+  {
+   "id": "pog.howler-malone",
+   "name": "Howler Malone",
+   "file": "husky-howler-malone.json",
+   "mesh": "quaternius_cc0-husky-1095.glb",
+   "engine": "Audio-forensics host with a tip line"
+  },
+  {
+   "id": "pog.sergeant-sled",
+   "name": "Sergeant Sled",
+   "file": "husky-sergeant-sled.json",
+   "mesh": "quaternius_cc0-husky-1095.glb",
+   "engine": "Drill instructor with a whistle"
+  },
+  {
+   "id": "pog.yuki-yelp",
+   "name": "Yuki Yelp",
+   "file": "husky-yuki-yelp.json",
+   "mesh": "quaternius_cc0-husky-1095.glb",
+   "engine": "Byline snob with a rating scale"
+  },
+  {
+   "id": "pog.bogdan-verse",
+   "name": "Bogdan Verse",
+   "file": "monster-bogdan-verse.json",
+   "mesh": "nickpanek-monster-1664.glb",
+   "engine": "Open-mic regular with stage fright"
+  },
+  {
+   "id": "pog.mildred-mau",
+   "name": "Mildred Mau",
+   "file": "monster-mildred-mau.json",
+   "mesh": "nickpanek-monster-1664.glb",
+   "engine": "Certified people-manager with a pit"
+  },
+  {
+   "id": "pog.nigel-niche",
+   "name": "Nigel the Niche",
+   "file": "monster-nigel-niche.json",
+   "mesh": "nickpanek-monster-1664.glb",
+   "engine": "Engagement farmer with fangs"
+  },
+  {
+   "id": "pog.fern-gullywater",
+   "name": "Fern Gullywater",
+   "file": "nature-fern-gullywater.json",
+   "mesh": "nyilonelycompany-nature-51.glb",
+   "engine": "Covenant enforcer with a ruler"
+  },
+  {
+   "id": "pog.old-growth",
+   "name": "Old Growth",
+   "file": "nature-old-growth.json",
+   "mesh": "nyilonelycompany-nature-51.glb",
+   "engine": "Media kit with a moss wall"
+  },
+  {
+   "id": "pog.underbrush",
+   "name": "The Underbrush",
+   "file": "nature-the-underbrush.json",
+   "mesh": "nyilonelycompany-nature-51.glb",
+   "engine": "Licensed investigator with a docket"
+  },
+  {
+   "id": "pog.big-render",
+   "name": "Big Render",
+   "file": "pixellabs-big-render.json",
+   "mesh": "pixellabs-glb-3347.glb",
+   "engine": "Stanislavski devotee with headshots"
+  },
+  {
+   "id": "pog.lord-polygon",
+   "name": "Lord Polygon",
+   "file": "pixellabs-lord-polygon.json",
+   "mesh": "pixellabs-glb-3347.glb",
+   "engine": "Snob with a genealogy of vertices"
+  },
+  {
+   "id": "pog.the-buffer",
+   "name": "The Buffer",
+   "file": "pixellabs-the-buffer.json",
+   "mesh": "pixellabs-glb-3347.glb",
+   "engine": "Patient zero of lag"
+  },
+  {
+   "id": "pog.buffer-overflow",
+   "name": "Buffer Overflow",
+   "file": "robot-buffer-overflow.json",
+   "mesh": "tiny_planet_friends_3d-robot-4440.glb",
+   "engine": "Thoughtful friend from last Tuesday"
+  },
+  {
+   "id": "pog.paperclip",
+   "name": "Paperclip",
+   "file": "robot-paperclip.json",
+   "mesh": "tiny_planet_friends_3d-robot-4440.glb",
+   "engine": "Shop steward with your passwords"
+  },
+  {
+   "id": "pog.the-algorithm",
+   "name": "The Algorithm",
+   "file": "robot-the-algorithm.json",
+   "mesh": "tiny_planet_friends_3d-robot-4440.glb",
+   "engine": "Clingy landlord of human needs"
+  },
+  {
+   "id": "pog.brick-house",
+   "name": "Brick House",
+   "file": "rocks-brick-house.json",
+   "mesh": "legendsvr-rocks-303.glb",
+   "engine": "Bureaucrat with a velvet rope"
+  },
+  {
+   "id": "pog.pete-pebble",
+   "name": "Pete the Pebble",
+   "file": "rocks-pete-pebble.json",
+   "mesh": "legendsvr-rocks-303.glb",
+   "engine": "Chatty self-help author with runoff"
+  },
+  {
+   "id": "pog.sedimenta",
+   "name": "Sedimenta",
+   "file": "rocks-sedimenta.json",
+   "mesh": "legendsvr-rocks-303.glb",
+   "engine": "Chatty columnist with citations"
+  },
+  {
+   "id": "pog.charlotte-cpa",
+   "name": "Charlotte CPA",
+   "file": "spider-charlotte-cpa.json",
+   "mesh": "quaternius_cc0-spider-1368.glb",
+   "engine": "Fiduciary with a prosecution history (rumored)"
+  },
+  {
+   "id": "pog.miss-muffetson",
+   "name": "Miss Muffetson",
+   "file": "spider-miss-muffetson.json",
+   "mesh": "quaternius_cc0-spider-1368.glb",
+   "engine": "Gentle facilitator with ground rules"
+  },
+  {
+   "id": "pog.webley",
+   "name": "Webley",
+   "file": "spider-webley.json",
+   "mesh": "quaternius_cc0-spider-1368.glb",
+   "engine": "Portfolio-carrying design lead"
+  }
+ ]
+}

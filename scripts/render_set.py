@@ -1,0 +1,364 @@
+#!/usr/bin/env python3
+"""Render a character set in Blender (runs INSIDE blender headless).
+
+Usage:
+  blender -b --python scripts/render_set.py -- \
+    --glb data/character-meshes/quaternius_cc0-husky-1095.glb \
+    --audio /tmp/pilot/set.wav --timeline /tmp/pilot/timeline.json \
+    --outdir /tmp/pilot/frames --width 360 --height 640 --fps 24
+
+Reads the delivery timeline, stages a Workbench club scene, drives the
+puppet from its own GLB actions plus procedural emphasis, cuts cameras
+per beat, and renders a PNG sequence (muxed later with ffmpeg).
+"""
+import argparse
+import json
+import math
+import os
+import sys
+
+import bpy
+
+
+def parse():
+    argv = sys.argv
+    if "--" in argv:
+        argv = argv.index("--") + 1
+        argv = sys.argv[argv:]
+    else:
+        argv = []
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--glb", required=True)
+    ap.add_argument("--audio", required=True)
+    ap.add_argument("--timeline", required=True)
+    ap.add_argument("--outdir", required=True)
+    ap.add_argument("--width", type=int, default=360)
+    ap.add_argument("--height", type=int, default=640)
+    ap.add_argument("--fps", type=int, default=24)
+    ap.add_argument("--height_m", type=float, default=1.1)
+    ap.add_argument("--mouth", default="", help="mouth_cues.json for jaw drive (optional)")
+    ap.add_argument("--face-yaw", type=float, default=0.0,
+                    help="rotate performer so front faces camera (deg, e.g. 180 for backwards models)")
+    ap.add_argument("--from-frame", type=int, default=1, help="resume: skip segments ending before this frame")
+    return ap.parse_args(argv)
+
+
+def ms_to_frame(ms, fps):
+    return 1 + int(ms / 1000.0 * fps)
+
+
+def set_stepped():
+    """PogMotion stepped sampler: CONSTANT interpolation on every fcurve
+    (12Hz-placed keys hold; camera/scene untouched) — EXCEPT jaw and morph
+    channels, which stay smooth so speech never looks broken (FT-10)."""
+    jaw_hits = ("jaw", "mouth", "morph", "viseme", "lipsync")
+    for act in bpy.data.actions:
+        bags = []
+        try:
+            bags.append(act.fcurves)
+        except AttributeError:
+            pass
+        try:
+            for layer in act.layers:
+                for strip in layer.strips:
+                    try:
+                        bags.append(strip.channelbag.fcurves)
+                    except AttributeError:
+                        pass
+        except AttributeError:
+            pass
+        for fcs in bags:
+            for fc in fcs:
+                smooth = any(h in (fc.data_path or "").lower() for h in jaw_hits)
+                for kp in fc.keyframe_points:
+                    kp.interpolation = "BEZIER" if smooth else "CONSTANT"
+
+
+def main():
+    a = parse()
+    fps = a.fps
+    timeline = json.load(open(a.timeline))
+    total_ms = max(t["end_ms"] + t["pause_after_ms"] for t in timeline)
+    end_frame = ms_to_frame(total_ms, fps) + 12
+
+    # --- wipe + import -----------------------------------------------------
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    bpy.ops.import_scene.gltf(filepath=a.glb)
+    roots = [o for o in bpy.context.scene.objects if o.parent is None]
+    perf = max(roots, key=lambda o: (o.type == "MESH", (o.dimensions.z if hasattr(o, "dimensions") else 0)))
+    # normalize height
+    dims = [o.dimensions.z for o in bpy.context.scene.objects if o.type == "MESH"]
+    tall = max(dims) if dims else 1.0
+    s = a.height_m / tall if tall > 0 else 1.0
+    for o in roots:
+        o.scale = (o.scale.x * s, o.scale.y * s, o.scale.z * s)
+    bpy.context.view_layer.update()
+    # ground the performer: lowest point to z=0
+    zmin = min((o.matrix_world @ v.co).z for o in bpy.context.scene.objects
+               if o.type == "MESH" for v in o.data.vertices)
+    for o in roots:
+        o.location.z -= zmin
+    bpy.context.view_layer.update()
+    cx = sum(o.location.x for o in roots) / max(1, len(roots))
+    # measured bounds AFTER normalize: cameras frame the actual performer
+    # (FT-11 — fixed positions silently fail on odd-sized meshes).
+    allz = [(o.matrix_world @ v.co).z for o in bpy.context.scene.objects
+            if o.type == "MESH" for v in o.data.vertices]
+    allx = [(o.matrix_world @ v.co).x for o in bpy.context.scene.objects
+            if o.type == "MESH" for v in o.data.vertices]
+    zhi, zlo = max(allz), min(allz)
+    h_meas = max(0.2, zhi - zlo)
+    cx = sum(allx) / max(1, len(allx))
+
+    sc = bpy.context.scene
+    sc.render.engine = "BLENDER_WORKBENCH"
+    sc.render.resolution_x = a.width
+    sc.render.resolution_y = a.height
+    sc.render.film_transparent = False
+    sc.display.shading.light = "MATCAP"
+    world = sc.world
+    if world is None:
+        world = bpy.data.worlds.new("World")
+        sc.world = world
+    world.use_nodes = True
+    world.node_tree.nodes["Background"].inputs[0].default_value = (0.05, 0.03, 0.06, 1.0)
+    world.node_tree.nodes["Background"].inputs[1].default_value = 1.0
+
+    # --- club: floor, backdrop, lights, mic --------------------------------
+    bpy.ops.mesh.primitive_plane_add(size=30, location=(0, 0, -0.01))
+    floor = bpy.context.object
+    fmat = bpy.data.materials.new("Floor")
+    fmat.diffuse_color = (0.08, 0.05, 0.09, 1.0)
+    floor.data.materials.append(fmat)
+    bpy.ops.mesh.primitive_plane_add(size=30, location=(0, 8, 5), rotation=(math.radians(90), 0, 0))
+    bpy.ops.object.light_add(type="SPOT", location=(0, -3, 5))
+    key = bpy.context.object
+    key.data.energy = 2500
+    key.data.color = (1.0, 0.85, 0.7)
+    key.data.spot_size = 0.7
+    track = key.constraints.new("TRACK_TO")
+    track.target = perf
+    track.track_axis = "TRACK_NEGATIVE_Z"
+    track.up_axis = "UP_Y"
+    bpy.ops.object.light_add(type="AREA", location=(3, -4, 3))
+    fill = bpy.context.object
+    fill.data.energy = 500
+    fill.data.color = (0.5, 0.65, 1.0)
+    bpy.ops.object.light_add(type="POINT", location=(0, -2.5, 1.2))
+    front = bpy.context.object
+    front.data.energy = 300
+    front.data.color = (1.0, 0.9, 0.8)
+    bpy.ops.object.light_add(type="SPOT", location=(0, 4, 4))
+    rim = bpy.context.object
+    rim.data.energy = 400
+    rim.data.color = (1.0, 0.4, 0.3)
+    # mic: stand + head
+    bpy.ops.mesh.primitive_cylinder_add(radius=0.02, depth=1.4, location=(0.45, -0.55, 0.7))
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.07, location=(0.45, -0.55, 1.45))
+
+    # --- cameras: wide / medium / close ------------------------------------
+    # Positions derive from MEASURED performer bounds (h_meas ~1.1 normally):
+    # identical framing for a giraffe, a chimp and a cat.
+    u = h_meas / 1.1
+    bpy.ops.object.empty_add(location=(cx, 0, zlo + 0.85 * h_meas))
+    aim_head = bpy.context.object
+    aim_head.name = "AIM_HEAD"
+    bpy.ops.object.empty_add(location=(cx, 0, zlo + 0.55 * h_meas))
+    aim_mid = bpy.context.object
+    aim_mid.name = "AIM_MID"
+    cams = {}
+
+    def add_cam(name, loc, rot, target=None):
+        bpy.ops.object.camera_add(location=loc, rotation=rot)
+        c = bpy.context.object
+        c.name = name
+        c.data.lens = 50
+        cams[name] = c
+        t = c.constraints.new("TRACK_TO")
+        t.target = target or perf
+        t.track_axis = "TRACK_NEGATIVE_Z"
+        t.up_axis = "UP_Y"
+        return c
+
+    add_cam("CAM_WIDE", (cx, -4.2 * u, zlo + 1.3 * u), (math.radians(78), 0, 0))
+    add_cam("CAM_MEDIUM", (cx + 0.3 * u, -2.7 * u, zlo + 1.15 * u), (math.radians(82), 0, 0), aim_mid)
+    add_cam("CAM_CLOSE", (cx - 0.3 * u, -2.2 * u, zlo + 1.3 * u), (math.radians(84), 0, 0), aim_head)
+    # face the audience: yaw the whole performer (default 0 = untouched)
+    if a.face_yaw:
+        for o in roots:
+            o.rotation_euler[2] += math.radians(a.face_yaw)
+    bpy.context.view_layer.update()
+
+    # --- puppet motion ------------------------------------------------------
+    # PogMotion v1: NLA clips where present; procedural stepped layer for
+    # emphasis; jaw driven from mouth cues where a jaw bone exists;
+    # whole-body fallback (bob/lean/slide) for armature-less meshes.
+    arm = next((o for o in sc.objects if o.type == "ARMATURE"), None)
+    actions = {act.name: act for act in bpy.data.actions}
+    idle = (actions.get("Idle_2") or actions.get("Idle") or actions.get("Anim_GiraffeIdle")
+            or actions.get("Spider_Idle") or actions.get("Pixabay_International_Cat"))
+    if idle is None:
+        idle = next((v for k, v in actions.items() if "idle" in k.lower()), None)
+    walk = actions.get("Walk") or actions.get("Anim_GiraffeWalkForward") or actions.get("Spider_Walk")
+    if walk is None:
+        walk = next((v for k, v in actions.items()
+                     if "walk" in k.lower() and v is not idle), None)
+    movers = [arm] if arm else roots
+    # entrance: slide in from stage left over first 3s
+    for m in movers:
+        m.location.x = -2.4
+        m.keyframe_insert("location", frame=1)
+        m.location.x = 0.0
+        m.keyframe_insert("location", frame=3 * fps)
+    if arm and idle:
+        ad = arm.animation_data_create()
+        ad.action = None
+        tr = ad.nla_tracks.new()
+        tr.name = "base"
+        ilen = max(1, int(idle.frame_range.y - idle.frame_range.x))
+        reps = max(1, math.ceil(end_frame / ilen) + 1)
+        st = tr.strips.new("idle", 1, idle)
+        st.repeat = reps
+        st.blend_type = "COMBINE"
+        # punchline emphasis: head dip + recover on each punchline/tag
+        pbones = arm.pose.bones
+        head = (pbones.get("Head") or pbones.get("Head_M") or pbones.get("Neck3")
+                or pbones.get("Neck_3") or pbones.get("Neck1"))
+        # sparse speech-coupled emphasis: 2 small nods per beat on the 12Hz
+        # grid (no constant bobbing; energy scales amplitude)
+        for t in timeline:
+            if head and t["dur_ms"] > 1200:
+                f0 = ms_to_frame(t["start_ms"], fps)
+                amp = 0.06 + 0.06 * float(t.get("energy", 0.9) or 0.9)
+                span = int(t["dur_ms"] / 1000.0 * fps)
+                for pos, direction in ((0.30, -1.0), (0.55, 1.0)):
+                    f = max(f0 + 2, f0 + int(round(span * pos)))
+                    head.rotation_mode = "XYZ"
+                    head.rotation_euler = (amp * direction, 0, 0)
+                    head.keyframe_insert("rotation_euler", frame=f)
+                    head.rotation_euler = (0.0, 0, 0)
+                    head.keyframe_insert("rotation_euler", frame=f + 4)
+        for t in timeline:
+            if t["type"] in ("punchline", "tag"):
+                f0 = ms_to_frame(t["start_ms"], fps)
+                if head:
+                    head.rotation_mode = "XYZ"
+                    for df, ang in ((0, 0.0), (6, -0.28), (14, 0.12), (22, 0.0)):
+                        head.rotation_euler = (ang, 0, 0)
+                        head.keyframe_insert("rotation_euler", frame=f0 + df)
+                # hop: root z bump
+                arm.location.z = 0.0
+                arm.keyframe_insert("location", frame=f0 + 4)
+                arm.location.z = 0.12
+                arm.keyframe_insert("location", frame=f0 + 10)
+                arm.location.z = 0.0
+                arm.keyframe_insert("location", frame=f0 + 18)
+        # jaw drive from mouth cues (replacement-morph-simple flap ladder:
+        # real bone where present, nothing faked where absent)
+        jaw = None
+        for cand in ("Jaw_M", "Wolf_Head_JawSHJnt", "Mouth", "Jaw"):
+            if cand in pbones:
+                jaw = pbones[cand]
+                break
+        if jaw and getattr(a, "mouth", ""):
+            try:
+                mouth_doc = json.load(open(a.mouth))
+            except Exception:
+                mouth_doc = []
+            cues = mouth_doc.get("cues", mouth_doc) if isinstance(mouth_doc, dict) else mouth_doc
+            jaw.rotation_mode = "XYZ"
+            for c in cues:
+                f0 = ms_to_frame(c["start_ms"], fps)
+                f1 = ms_to_frame(c["end_ms"], fps)
+                ang = float(c.get("angle", -0.35))  # pose angle or legacy flap
+                jaw.rotation_euler = (0.0, 0, 0)
+                jaw.keyframe_insert("rotation_euler", frame=max(1, f0 - 1))
+                jaw.rotation_euler = (ang, 0, 0)
+                jaw.keyframe_insert("rotation_euler", frame=f0 + 1)
+                jaw.rotation_euler = (0.0, 0, 0)
+                jaw.keyframe_insert("rotation_euler", frame=f1)
+    else:
+        # static-mesh fallback: whole-body acting on roots (stepped later)
+        for t in timeline:
+            f0 = ms_to_frame(t["start_ms"], fps)
+            for m in movers:
+                if t["type"] in ("punchline", "tag"):
+                    m.rotation_euler = (0.06, 0, 0.04)
+                    m.keyframe_insert("rotation_euler", frame=f0 + 6)
+                    m.rotation_euler = (0.0, 0, 0)
+                    m.keyframe_insert("rotation_euler", frame=f0 + 20)
+                elif t["dur_ms"] > 1200:
+                    f = f0 + int(t["dur_ms"] / 1000.0 * fps * 0.4 // 2 * 2)
+                    m.rotation_euler = (0.03, 0, 0)
+                    m.keyframe_insert("rotation_euler", frame=f)
+                    m.rotation_euler = (0.0, 0, 0)
+                    m.keyframe_insert("rotation_euler", frame=f + 4)
+
+    # --- camera cuts per beat (frame handler: robust headless) ------------------
+    order = {"CAM_MEDIUM": 0}
+
+    def pick_cam(beat, i):
+        # close-ups are earned: punchline only. Everything else plays
+        # medium (closer goes wide). The old alternating MEDIUM/CLOSE
+        # rhythm decapitated performers mid-thought.
+        t = beat["type"]
+        if t == "punchline":
+            return "CAM_CLOSE"
+        if t == "closer":
+            return "CAM_WIDE"
+        return "CAM_MEDIUM"
+
+    cuts = []  # (start_frame, cam_obj)
+    sc.camera = cams["CAM_WIDE"]
+    # PogDirector mechanism language (comedy/mechanism-direction.json):
+    # beat type resolves to a mechanism entry; its acting list is logged
+    # per segment for traceability. Camera stays type-resolved (v1).
+    dpath = os.path.join(os.path.dirname(__file__), "..", "comedy", "mechanism-direction.json")
+    try:
+        direction = json.load(open(os.path.normpath(dpath)))
+    except Exception:
+        direction = {}
+    TYPE2MECH = {"setup": "incongruity_misdirection", "escalation": "escalation",
+                 "misdirect": "incongruity_misdirection", "punchline": "escalation",
+                 "tag": "callback", "callback": "callback", "closer": "callback"}
+    segments = []  # (start_frame, end_frame, cam_obj): exact tiling
+    for i, t in enumerate(timeline):
+        f = ms_to_frame(t["start_ms"], fps)
+        cam = cams[pick_cam(t, i)]
+        sc.timeline_markers.new("b%s_%s" % (t["beat_id"], cam.name), frame=f)
+        cuts.append((f, cam.name))
+        f1 = ms_to_frame(timeline[i + 1]["start_ms"], fps) - 1 if i + 1 < len(timeline) else end_frame
+        segments.append((f, f1, cam))
+    import math as _m
+    cover_est = {}
+    for f0, f1, cam in segments:
+        sc.camera = cam
+        bpy.context.view_layer.update()
+        dist = (cam.location - aim_mid.location).length
+        ang = float(cam.data.angle) if hasattr(cam.data, "angle") else 0.7
+        cover_est[cam.name] = round(h_meas / max(0.01, 2 * dist * _m.tan(ang / 2)), 3)
+    json.dump([{"frame": f0, "camera": c.name,
+                "beat_id": timeline[i]["beat_id"], "beat_type": timeline[i]["type"],
+                "cover_est": cover_est.get(c.name),
+                "mechanism": TYPE2MECH.get(timeline[i]["type"], "escalation"),
+                "acting": direction.get(TYPE2MECH.get(timeline[i]["type"], "escalation"), {}).get("acting", [])}
+               for i, (f0, _, c) in enumerate(segments)],
+              open(os.path.join(os.path.dirname(a.timeline), "cuts.json"), "w"), indent=1)
+
+    # --- render PNG sequence: one pass per camera segment (deterministic) ----
+    set_stepped()  # stepped puppet channels; camera/scene untouched
+    sc.render.fps = fps
+    os.makedirs(a.outdir, exist_ok=True)
+    sc.render.filepath = os.path.join(a.outdir, "f###.png")
+    sc.render.image_settings.file_format = "PNG"
+    for f0, f1, cam in segments:
+        if f1 < a.from_frame:
+            continue
+        sc.camera = cam
+        sc.frame_start = max(f0, a.from_frame)
+        sc.frame_end = f1
+        bpy.ops.render.render(animation=True)
+    print("RENDER DONE frames=%d fps=%d segs=%d" % (end_frame, fps, len(segments)))
+
+
+main()

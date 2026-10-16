@@ -16,7 +16,7 @@
 
 import { DurableObject } from 'cloudflare:workers';
 
-import { CameraCutPayloadV1, type EllaSenseV1 } from '../src/contracts/show';
+import { validateCameraCut, type EllaSenseV1 } from '../src/contracts/show';
 
 export type EpisodeState = {
   episodeId: string;
@@ -349,16 +349,16 @@ export class EpisodeRoom extends DurableObject {
           if ((attachment.role === 'stage' || attachment.role === 'puppeteer') && attachment.authenticated) {
             // Shared contract gates the payload: unknown camera names are
             // dropped here, never persisted, never broadcast.
-            const parsed = CameraCutPayloadV1.safeParse({
+            const parsed = validateCameraCut({
               camera: data.camera,
               performance_id: this.episodeState.activeAppearanceId,
               set_time_ms: data.set_time_ms ?? null,
               source: 'human_director',
             });
-            if (!parsed.success) break;
+            if (!parsed.ok) break;
             await this.executeCommand('camera.cut', {
               actor: attachment.role,
-              ...parsed.data,
+              ...parsed.value,
             });
           }
           break;

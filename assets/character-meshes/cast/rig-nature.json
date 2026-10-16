@@ -1,0 +1,24 @@
+{
+ "schema": "pog.puppet-rig.v1",
+ "character_id": "pog.fern-gullywater",
+ "mesh_r2_key": "character-meshes/nyilonelycompany-nature-51.glb",
+ "inspected_at": "2026-10-08",
+ "rig_bones": 53,
+ "actions_available": [
+  "Anim_GiraffeIdle",
+  "Anim_GiraffeWalkForward",
+  "Drink"
+ ],
+ "face": {
+  "jaw_bone": "Mouth",
+  "mouth_morphs": []
+ },
+ "controls": {
+  "speech_base": "Anim_GiraffeIdle looped",
+  "mouth": "Mouth driven from mouth_cues.json",
+  "emphasis": "Head dip + root hop (rigged) / lean + rock (static)",
+  "entrance": "Walk action + slide (rigged) / slide-in (static)"
+ },
+ "suggested_family": "articulated",
+ "validation": "structural pass (factory report); GIRAFFE RIG 53 bones incl Mouth/Mouth_L/Mouth_R + giraffe action set"
+}

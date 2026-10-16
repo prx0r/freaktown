@@ -1,0 +1,20 @@
+{
+ "schema": "pog.puppet-rig.v1",
+ "character_id": "pog.captain-ata-ashcroft",
+ "mesh_r2_key": "character-meshes/arunangshubanerjee-airplane-2088.glb",
+ "inspected_at": "2026-10-08",
+ "rig_bones": 0,
+ "actions_available": [],
+ "face": {
+  "jaw_bone": null,
+  "mouth_morphs": []
+ },
+ "controls": {
+  "speech_base": "whole-body procedural (no armature)",
+  "mouth": "NO jaw/morph -> coupled-motion fallback + cue track",
+  "emphasis": "Head dip + root hop (rigged) / lean + rock (static)",
+  "entrance": "Walk action + slide (rigged) / slide-in (static)"
+ },
+ "suggested_family": "rigid",
+ "validation": "structural pass (factory report); static 29k, tiny 0.12m"
+}

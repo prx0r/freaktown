@@ -1,0 +1,120 @@
+{
+ "characters": [
+  {
+   "attempts": 1,
+   "cast": "airplane-captain-ata-ashcroft.json",
+   "id": "pog.captain-ata-ashcroft",
+   "mesh": "arunangshubanerjee-airplane-2088.glb",
+   "status": "AWAITING_EVIDENCE",
+   "voice": "en-GB-RyanNeural"
+  },
+  {
+   "attempts": 1,
+   "cast": "butterfly-madame-chrysalis.json",
+   "id": "pog.madame-chrysalis",
+   "mesh": "gustavorezende-butterfly-3766.glb",
+   "status": "AWAITING_EVIDENCE",
+   "voice": "en-GB-SoniaNeural"
+  },
+  {
+   "attempts": 1,
+   "cast": "clock-doug-deadline.json",
+   "id": "pog.doug-deadline",
+   "mesh": "gustavorezende-clock-3872.glb",
+   "status": "AWAITING_EVIDENCE",
+   "voice": "en-US-GuyNeural"
+  },
+  {
+   "attempts": 1,
+   "cast": "basket-hamper-thyme.json",
+   "id": "pog.hamper-thyme",
+   "mesh": "kosue4554-basket-4480.glb",
+   "status": "AWAITING_EVIDENCE",
+   "voice": "en-US-AriaNeural"
+  },
+  {
+   "attempts": 1,
+   "cast": "rocks-pete-pebble.json",
+   "id": "pog.pete-pebble",
+   "mesh": "legendsvr-rocks-303.glb",
+   "status": "AWAITING_EVIDENCE",
+   "voice": "en-US-ChristopherNeural"
+  },
+  {
+   "attempts": 1,
+   "cast": "monster-mildred-mau.json",
+   "id": "pog.mildred-mau",
+   "mesh": "nickpanek-monster-1664.glb",
+   "status": "AWAITING_EVIDENCE",
+   "voice": "en-US-JennyNeural"
+  },
+  {
+   "attempts": 1,
+   "cast": "cat-chairman-meow.json",
+   "id": "pog.chairman-meow",
+   "mesh": "nyilonelycompany-cat-2058.glb",
+   "status": "AWAITING_EVIDENCE",
+   "voice": "en-US-GuyNeural"
+  },
+  {
+   "attempts": 1,
+   "cast": "chimp-dr-peel.json",
+   "id": "pog.dr-peel",
+   "mesh": "nyilonelycompany-chimp-4562.glb",
+   "status": "AWAITING_EVIDENCE",
+   "voice": "en-GB-RyanNeural"
+  },
+  {
+   "attempts": 1,
+   "cast": "nature-fern-gullywater.json",
+   "id": "pog.fern-gullywater",
+   "mesh": "nyilonelycompany-nature-51.glb",
+   "status": "AWAITING_EVIDENCE",
+   "voice": "en-AU-NatashaNeural"
+  },
+  {
+   "attempts": 1,
+   "cast": "pixellabs-big-render.json",
+   "id": "pog.big-render",
+   "mesh": "pixellabs-glb-3347.glb",
+   "status": "AWAITING_EVIDENCE",
+   "voice": "en-US-ChristopherNeural"
+  },
+  {
+   "attempts": 1,
+   "cast": "husky-sergeant-sled.json",
+   "eligible_views": 0,
+   "id": "pog.sergeant-sled",
+   "mesh": "quaternius_cc0-husky-1095.glb",
+   "status": "AWAITING_EVIDENCE",
+   "voice": "en-US-GuyNeural"
+  },
+  {
+   "attempts": 1,
+   "cast": "spider-miss-muffetson.json",
+   "id": "pog.miss-muffetson",
+   "mesh": "quaternius_cc0-spider-1368.glb",
+   "status": "AWAITING_EVIDENCE",
+   "voice": "en-US-AriaNeural"
+  },
+  {
+   "attempts": 1,
+   "cast": "robot-the-algorithm.json",
+   "id": "pog.the-algorithm",
+   "mesh": "tiny_planet_friends_3d-robot-4440.glb",
+   "status": "AWAITING_EVIDENCE",
+   "voice": "en-US-GuyNeural"
+  }
+ ],
+ "note": "P0 flagship per mesh. Retired characters stay in world (guest spots, revivals). Only eligible attempts count toward the three-shot rule.",
+ "states": [
+  "BORN",
+  "DEVELOPING",
+  "AUDITIONING",
+  "AWAITING_EVIDENCE",
+  "REGULAR",
+  "STAR",
+  "RETIRED",
+  "REVIVED"
+ ]
+}

@@ -1,0 +1,27 @@
+{
+ "schema": "pog.motion-style.v1",
+ "character_id": "pog.big-render",
+ "family": "rigid",
+ "cadence": {
+  "body_pose_fps": 8,
+  "mouth_pose_fps": 12
+ },
+ "temperament": {
+  "energy": 0.9,
+  "confidence": 1.0,
+  "nervousness": 0.3,
+  "theatricality": 1.0
+ },
+ "signature": {
+  "primary_control": "statue wobble",
+  "gesture_frequency": "high",
+  "preferred_pose": "booming projection",
+  "reaction_delay_ms": 150,
+  "signature_action": "signing rubble"
+ },
+ "physicality": {
+  "settle": 0.2,
+  "overshoot": 0.12,
+  "idle_breath": 0.0
+ }
+}

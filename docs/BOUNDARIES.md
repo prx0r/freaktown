@@ -1,4 +1,4 @@
-# Boundaries
+# Boundaries — what lives where (2026-09-11)
 
 ```text
 Freak Town Studio creates performances.
@@ -15,6 +15,50 @@ Ella observes and acts on live events.
 
 No subsystem may recreate another subsystem's responsibility.
 ```
+
+## 0. Pogtown vs Freaktown (repo line)
+
+| | prx0r/pogtown | prx0r/freaktown (this repo) |
+|---|---|---|
+| Owns | game truth: packs, runtime, protocol, rooms API, director, sealed-bundle import, gift packs, order state machine, the five gift tools, media providers, channel reference | product: Studio, stage, party UX, media, performance contracts, avatar pipeline, delivery, Ella |
+| Serves | Pog API (Docker, Postgres) | Flask app (live site), later FastAPI strangler |
+| Never | product UI, avatars, voices as store of record | game-truth reimplementation (see `archive/`) |
+
+Import direction: freaktown consumes the pog protocol via the stage-adapter
+(pog side) and `backend/services/freaktown/`. Pogtown never imports freaktown
+runtime code — only validates its bundles. The dormant Python game engine was
+archived for exactly this reason (`archive/README.md`).
+
+Gift packs: pogtown owns the spec, the validator, and the state machine
+(briefed → generating → qa → delivered). Freaktown owns the avatar pipeline
+that generates the actual assets (portrait, video, voice, walkout). The
+shared key is the freak pack identity. Nothing crosses the boundary except
+bundles and events. See `pogtown-mvp/packages/gift-pack/` for the spec.
+
+## 1. New vs old (in this repo)
+
+- **Serving now:** `app.py` (Flask, strangler shell) + `party.py` blueprint +
+  `contracts/` + `freaks/` bundles + `stage/` + `apps/live/` + `edge/worker/`
+  + `packages/stage-runtime/`.
+- **Future, not serving:** `backend/` (FastAPI + Postgres + R2 interfaces).
+  Do not route traffic to it until parity is proven; do not add a second
+  Studio/watch/party implementation inside it (devplan §2).
+- **Retired:** `archive/` (dormant Python game engine — authority moved to
+  pogtown), killella donor history (git ancestry only, repo frozen).
+
+## 2. The three "rooms" (do not merge)
+
+- **Pog rooms** (pogtown): authoritative game sessions, all formats.
+- **PartyRoom** (`party.py`): small invited groups, secret roles, turn-based
+  party games. Stays — different semantics from broadcast (devplan §16).
+- **EpisodeRoom** (`edge/worker/episode-room.ts`): live broadcast show state.
+
+## 3. Asset rule (avatars/media)
+
+Canonical bodies are open files (GLB/VRM + `avatar.json` manifest) in R2,
+referenced by the Freak Pack. Vendors (three.ws forge, bitHuman, Runway) are
+providers behind the manifest — never the store of record. See
+`docs/avataroptions.md`, `docs/vendors/`.
 
 ## Ownership
 

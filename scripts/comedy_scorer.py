@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """Ella M Comedy Scorer — ML model for scoring one-minute comedy sets.
 
+DEPRECATED on trial/avatar-flow: embedding similarity cannot judge whether a
+character contradiction lands. Audience POG + judge-protocol duel procedure
+decide. Kept as experimental baseline only.
+"""
+
 Approach:
 1. Sentence embeddings (all-MiniLM-L6-v2, 384-dim, CPU-friendly)
 2. Feature engineering (word count, sentiment, punctuation patterns)
