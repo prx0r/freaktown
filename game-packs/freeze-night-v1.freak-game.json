@@ -1,0 +1,72 @@
+{
+  "schema": "freaktown.game/v1",
+  "id": "freeze-night-v1",
+  "name": "Freeze Night v1 (MVP)",
+  "version": "1.0.0",
+  "description": "Improv evening: scenes freeze, the room prompts what happens next, winners unfreeze the scene. Halftime humiliation ritual, wheel punishments, Last-Lash final.",
+  "spec": "../../improv/docs/MVP-FREEZE-NIGHT-V1.md",
+
+  "players": {
+    "min": 4,
+    "max": 8,
+    "kinds": ["human", "agent"],
+    "identityProviders": []
+  },
+  "modes": ["human", "agent", "mixed"],
+
+  "capabilities": {
+    "voice": "required",
+    "avatars": "optional",
+    "private_information": false,
+    "spectators": true
+  },
+
+  "states": ["LOBBY", "SCENE", "FREEZE", "VOTE", "UNFREEZE",
+             "HALFTIME", "WHEEL", "FINAL", "CROWNING", "ARCHIVED"],
+
+  "rounds": [
+    {"id": "scene1-ending", "format": "funnier-ending",
+     "performers": "all", "durationSeconds": 600,
+     "submission": "ending", "advance": {"vote": "funniest"}},
+    {"id": "scene1-walkin", "format": "freeze-frame",
+     "performers": "all", "durationSeconds": 600,
+     "submission": "walkin", "advance": {"vote": "funniest"}},
+    {"id": "ritual-halftime", "format": "humiliation-ritual",
+     "deck": "say-it", "performers": 3, "durationSeconds": 600,
+     "submission": "performance",
+     "advance": {"pass_fail": true, "author_guess": true}},
+    {"id": "scene2-object", "format": "pocket-object",
+     "performers": "all", "durationSeconds": 600,
+     "submission": "object", "advance": {"vote": "funniest"}},
+    {"id": "scene2-ending", "format": "funnier-ending",
+     "performers": "all", "durationSeconds": 600,
+     "submission": "ending", "advance": {"vote": "funniest"}},
+    {"id": "wheel", "format": "wheel-of-shame",
+     "performers": 2, "durationSeconds": 300,
+     "submission": "punishment",
+     "advance": {"vote": "served_or_double"}},
+    {"id": "last-lash", "format": "last-lash",
+     "performers": "all", "durationSeconds": 600,
+     "submission": "answer", "advance": {"votes_each": 3, "points": "triple"}}
+  ],
+
+  "modifiers": ["callback-bonus", "wheel-of-shame"],
+
+  "judging": {
+    "audienceWeight": 0.5,
+    "judgeWeight": 0.0,
+    "sweepBonus": 0.25,
+    "callbackMultiplier": 1.5,
+    "rubric": "./scoring/rubric.json"
+  },
+
+  "ballots": ["funny", "caught-that", "pass-fail", "author-guess", "spread-3"],
+
+  "stage": {
+    "preset": "comedy-club",
+    "walkouts": false,
+    "audienceReactions": true
+  },
+
+  "renderers": ["web"]
+}
