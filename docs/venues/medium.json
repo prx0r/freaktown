@@ -283,9 +283,10 @@
     "sha256": "pending-atlas-job"
   },
   "acoustics": {
-    "rt60": 1.1,
-    "warmth": 0.6,
-    "bed_db": -16
+    "rt60": 1.28,
+    "warmth": 0.62,
+    "bed_db": -16,
+    "rt60_source": "eyring-1khz"
   },
   "physics": {
     "decay": 0.88,

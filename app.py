@@ -1668,6 +1668,97 @@ live audience · predicted heat is heuristic v0</p>
 </body></html>""", 200, {"Content-Type": "text/html; charset=utf-8"}
 
 
+@app.route("/cauldron")
+def cauldron_concepts():
+    """THE CAULDRON v1 concept gallery: draft frames + the prompts that made
+    them. Owner reviews on phone, replies keep/kill per shot. Winners become
+    Marble contextFrames anchors (atlasGenerate). Nothing here is a promise —
+    drafts until gated per CAULDRON-PROFILE.md."""
+    import html as _html
+    import glob as _glob
+    concept_dir = Path(__file__).parent / "static" / "concepts"
+    metas = []
+    for jf in sorted(concept_dir.glob("*.json")):
+        try:
+            metas.append(json.loads(jf.read_text()))
+        except Exception:
+            continue
+    metas.sort(key=lambda m: m.get("generated_at", ""), reverse=True)
+    cards = []
+    for m in metas:
+        shot = m.get("shot", "?")
+        img = f"/static/concepts/{m.get('file', shot + '.jpg')}"
+        g = m.get("gates", {})
+        verdict = g.get("verdict", "unreviewed")
+        vcolor = {"pass": "#7fdb7f", "fail": "#ff6b6b"}.get(verdict, "#888")
+        anchor = "ANCHOR-OK" if m.get("anchor_eligible") else "vibe only"
+        acolor = "#7fdb7f" if m.get("anchor_eligible") else "#888"
+        cards.append(
+            f"<figure class='card' data-verdict='{verdict}'>"
+            f"<a href='{img}' target='_blank'>"
+            f"<img src='{img}' alt='{_html.escape(shot)}: {_html.escape(m.get('prompt','')[:160])}' loading='lazy'></a>"
+            f"<figcaption><b>🕯️ {_html.escape(shot)}</b> "
+            f"<span class='badge' style='border-color:{vcolor};color:{vcolor}'>{verdict}</span> "
+            f"<span class='badge' style='border-color:{acolor};color:{acolor}'>{anchor}</span>"
+            f"<div class='meta'>{m.get('width',0)}x{m.get('height',0)} · "
+            f"{_html.escape(str(m.get('model','')).split('/')[-1])} · "
+            f"{_html.escape(str(m.get('status','')))}</div>"
+            f"<details><summary>prompt + gates</summary><div class='prompt'>"
+            f"{_html.escape(m.get('prompt',''))}</div>"
+            f"<div class='meta'>{_html.escape(str(g))}</div></details>"
+            f"</figcaption></figure>")
+    body = "".join(cards) if cards else "<p>No frames yet.</p>"
+    return f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>THE CAULDRON — concept gallery v1</title>
+<style>:root{{--tile:220px}}
+body{{background:#0a0a0f;color:#eee;font-family:monospace;text-align:center;padding:24px 12px;margin:0}}
+a{{color:#ff2fa8}}
+#bar{{position:sticky;top:0;background:#0a0a0f;padding:10px;z-index:5;border-bottom:1px solid #282833}}
+#grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--tile),1fr));gap:12px;padding:16px 8px;max-width:1400px;margin:0 auto}}
+.card{{margin:0;border:1px solid #282833;border-radius:12px;padding:8px;text-align:left;background:#111119}}
+.card img{{width:100%;border-radius:8px;display:block;aspect-ratio:1/1;object-fit:cover}}
+.card figcaption{{font-size:12px;margin-top:6px}}
+.badge{{font-size:10px;border:1px solid #888;border-radius:8px;padding:0 6px}}
+.meta{{color:#555;font-size:10px;margin-top:4px}}
+.prompt{{color:#999;font-size:10px;margin-top:6px;line-height:1.5;white-space:pre-wrap}}
+details summary{{cursor:pointer;color:#888;font-size:10px;margin-top:4px}}
+button{{background:#1a1a2e;color:#eee;border:1px solid #333;border-radius:8px;padding:4px 10px}}
+input[type=range]{{width:140px;vertical-align:middle}}</style></head><body>
+<div id="bar">🕯️ THE CAULDRON · V1 · {len(cards)} frames · $0
+<button onclick="zoom(-40)">−</button><input id="z" type="range" min="120" max="460" value="220" oninput="document.documentElement.style.setProperty('--tile',this.value+'px')">
+<button onclick="zoom(40)">+</button>
+<button onclick="filter('all')">all</button><button onclick="filter('pass')">pass</button><button onclick="filter('fail')">fail</button>
+<a href="/perform" style="margin-left:8px">stage</a></div>
+<div id="grid">{body}</div>
+<p style="color:#555;font-size:11px">Gates: empty · no windows · shell-only ·
+tap a frame to zoom · reply keep/kill per shot</p>
+<script>function zoom(d){{var z=document.getElementById('z');z.value=+z.value+d;z.oninput();}}
+function filter(v){{document.querySelectorAll('.card').forEach(c=>{{c.style.display=(v==='all'||c.dataset.verdict===v)?'':'none';}});}}</script>
+</body></html>""", 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
+@app.route("/cauldron.json")
+def cauldron_concepts_json():
+    """Machine-readable feed for ChatGPT/agents: every frame with absolute
+    image URLs + full prompts + review status. No JS, no auth, CORS-open."""
+    concept_dir = Path(__file__).parent / "static" / "concepts"
+    items = []
+    for jf in sorted(concept_dir.glob("*.json")):
+        try:
+            m = json.loads(jf.read_text())
+        except Exception:
+            continue
+        m["image_url"] = f"https://funnier.si/static/concepts/{m.get('file', '')}"
+        items.append(m)
+    items.sort(key=lambda m: m.get("generated_at", ""), reverse=True)
+    resp = jsonify({"venue": "the-cauldron", "version": "v1",
+                    "gates": "empty/no-windows/bare-deck/chalk-sigil/<=30MB/3x-dingy",
+                    "count": len(items), "frames": items})
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
 @app.route("/api/perform/<slug>/heat")
 def perform_heat(slug):
     """Per-beat laugh prediction contract. v0 = heuristic prior; a vendored
@@ -2144,6 +2235,706 @@ def venue_manifest(vid):
         return jsonify({"ok": True, "venue": json.loads(p.read_text())})
     except Exception:
         return jsonify({"ok": False, "error": "bad venue file"}), 500
+
+
+@app.route("/venues/<path:filename>")
+def venue_file(filename):
+    """Local venue meshes (var/venues, gitignored). GLBs pinned by sha256
+    in the venue JSON — referenced by hash, never latest."""
+    if "/" in filename or not (filename.endswith(".glb") or filename.endswith(".spz")):
+        return jsonify({"ok": False, "error": "glb/spz only"}), 400
+    mime = "model/gltf-binary" if filename.endswith(".glb") else "application/octet-stream"
+    # pinned by sha256 in venue JSON = immutable content: cache hard so the
+    # big download happens once per phone, never every visit.
+    resp = send_from_directory(str(Path(__file__).parent / "var" / "venues"),
+                               filename, mimetype=mime)
+    resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    return resp
+
+
+# Second-screen pairing (YouTube-on-TV pattern, party-code logic).
+# TV shows a 4-letter code; phones join at /code. Controllers post
+# reactions; the TV polls the feed and drives shared energy. Ephemeral:
+# codes die with the process. Smile/mic are boolean presence only.
+PAIR = {}
+PAIR_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+
+
+def _pair_code():
+    import secrets as _secrets
+    while True:
+        code = "".join(_secrets.choice(PAIR_ALPHABET) for _ in range(4))
+        if code not in PAIR:
+            return code
+
+
+@app.route("/api/venue/<vid>/pair", methods=["POST"])
+def venue_pair(vid):
+    vid = re.sub(r"[^a-z0-9-]", "", vid)[:32]
+    code = _pair_code()
+    PAIR[code] = {"code": code, "venue": vid, "seq": 0, "events": [],
+                  "members": 0, "t": time.time()}
+    return jsonify({"ok": True, "code": code})
+
+
+@app.route("/api/pair/<code>", methods=["GET"])
+def pair_join(code):
+    code = re.sub(r"[^A-Z0-9]", "", code.upper())[:8]
+    r = PAIR.get(code)
+    if not r:
+        return jsonify({"ok": False, "error": "no such code"}), 404
+    r["members"] += 1
+    return jsonify({"ok": True, "venue": r["venue"], "members": r["members"]})
+
+
+@app.route("/api/pair/<code>/react", methods=["POST"])
+def pair_react(code):
+    code = re.sub(r"[^A-Z0-9]", "", code.upper())[:8]
+    r = PAIR.get(code)
+    if not r:
+        return jsonify({"ok": False, "error": "no such code"}), 404
+    data = request.get_json(force=True, silent=True) or {}
+    kind = str(data.get("kind", ""))[:12]
+    if kind not in ("laugh", "haha", "boo", "clap", "cheer", "smile", "mic"):
+        return jsonify({"ok": False, "error": "bad kind"}), 400
+    r["seq"] += 1
+    ev = {"seq": r["seq"], "kind": kind, "t": time.time(),
+          "by": re.sub(r"[^\w -]", "", str(data.get("name", "guest")))[:16]}
+    r["events"].append(ev)
+    r["events"] = r["events"][-200:]
+    return jsonify({"ok": True, "seq": r["seq"]})
+
+
+@app.route("/api/pair/<code>/feed")
+def pair_feed(code):
+    code = re.sub(r"[^A-Z0-9]", "", code.upper())[:8]
+    r = PAIR.get(code)
+    if not r:
+        return jsonify({"ok": False, "error": "no such code"}), 404
+    try:
+        since = int(request.args.get("since", 0))
+    except ValueError:
+        since = 0
+    return jsonify({"ok": True, "seq": r["seq"], "members": r["members"],
+                    "events": [e for e in r["events"] if e["seq"] > since]})
+
+
+@app.route("/venue/<vid>")
+def venue_stage(vid):
+    """P0 venue stage: Marble room views as the walls + VRM performer +
+    procedural mic. v0 uses generated-view textures; swaps to the pinned
+    GLB the moment cauldron.json carries a real glb.sha256."""
+    vid = re.sub(r"[^a-z0-9-]", "", vid)[:32]
+    return f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>THE CAULDRON — live stage v0</title>
+<style>html,body{{margin:0;height:100%;background:#000;overflow:hidden;font-family:monospace}}
+#ui{{position:fixed;top:8px;left:8px;z-index:5;color:#eee;font-size:12px;background:rgba(10,10,15,.7);padding:8px 10px;border-radius:10px;border:1px solid #282833}}
+#ui button{{background:#1a1a2e;color:#eee;border:1px solid #333;border-radius:8px;padding:4px 10px;margin:2px}}
+#ui a{{color:#ff2fa8}}</style>
+<script type="importmap">
+{{"imports":{{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/","@pixiv/three-vrm":"https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.3.0/lib/three-vrm.module.js","three-vrm-animation":"https://cdn.jsdelivr.net/npm/@pixiv/three-vrm-animation@3.3.0/lib/three-vrm-animation.module.min.js","@sparkjsdev/spark":"https://sparkjs.dev/releases/spark/2.3.1/spark.module.js","three-vrm-lip-sync":"https://cdn.jsdelivr.net/npm/three-vrm-lip-sync@0.1.0/dist/index.min.js","wlipsync":"https://cdn.jsdelivr.net/npm/wlipsync@1.3.1/dist/wlipsync-single.min.js"}}}}
+</script></head><body>
+<div id="ui">🕯️ <span id="vname">{vid}</span> · v0 room-views + live body<br>
+<span id="cams"></span><br><button id="play">▶ PLAY SET (biscuit)</button>
+<button id="rec">● REC</button>
+<button id="room">ROOM: ON</button>
+<button id="tvbtn" title="pair a phone">📱</button>
+<a href="/cauldron">concepts</a> · <a href="/perform">stage</a>
+<div id="msg" style="color:#888">loading room…</div>
+<div id="blog" style="color:#555;font-size:10px;margin-top:4px;text-align:left;max-height:120px;overflow:auto"></div>
+<div style="margin-top:4px">ROOM ENERGY <span id="emeter" style="color:#ff2fa8">░░░░░░░░░░</span>
+<button id="laugh">😄</button><button id="boo">👎</button></div></div>
+<canvas id="c" style="width:100%;height:100%;display:block"></canvas>
+<script>
+(function () {{
+  var el = document.getElementById('msg');
+  function say(t) {{ el.textContent = 'probe: ' + t; }}
+  try {{
+    if (!window.fetch) return say('no fetch API');
+    var c = document.createElement('canvas');
+    var gl2 = c.getContext('webgl2');
+    if (!gl2) {{
+      var gl1 = c.getContext('webgl') || c.getContext('experimental-webgl');
+      return say(gl1 ? 'WebGL1 only — need WebGL2' : 'NO WebGL at all (private mode? old browser?)');
+    }}
+    var dbg = gl2.getExtension('WEBGL_debug_renderer_info');
+    var gpu = dbg ? gl2.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : 'unknown gpu';
+    say('WebGL2 ok (' + String(gpu).slice(0, 60) + '), loading 3D libs…');
+  }} catch (e) {{ say('probe failed: ' + e.message); }}
+}})();
+</script>
+<script type="module">
+import * as THREE from 'three';
+import {{ GLTFLoader }} from 'three/addons/loaders/GLTFLoader.js';
+import {{ VRMLoaderPlugin, VRMUtils }} from '@pixiv/three-vrm';
+import {{ MeshoptDecoder }} from 'three/addons/libs/meshopt_decoder.module.js';
+import {{ VRMAnimationLoaderPlugin, createVRMAnimationClip }} from 'three-vrm-animation';
+import {{ SparkRenderer, SplatMesh }} from '@sparkjsdev/spark';
+import {{ VRMLipSync }} from 'three-vrm-lip-sync';
+const VID = '{vid}';
+const boot = [];
+const blog = (t) => {{ try {{ const b = document.getElementById('blog'); b.innerHTML += '• ' + t + '<br>'; const lines = b.innerHTML.split('<br>'); if (lines.length > 9) b.innerHTML = lines.slice(-9).join('<br>'); }} catch (e) {{}} }};
+const msg = (t) => {{ boot.push(t); blog(t); document.getElementById('msg').textContent = t; }};
+window.addEventListener('error', (e) => {{ msg('JS ERROR: ' + (e.message || e.type)); }});
+window.addEventListener('unhandledrejection', (e) => {{ msg('LOAD FAILED: ' + (e.reason && e.reason.message || e.reason)); }});
+msg('step 1/5: imports ok, fetching venue…');
+const v = await (await fetch('/api/venue/' + VID)).json().then(j => j.venue);
+msg('step 2/5: venue ok, starting WebGL…');
+document.getElementById('vname').textContent = v.name + ' · ' + v.size;
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({{canvas, antialias: true}});
+renderer.setSize(innerWidth, innerHeight);
+// look: filmic tone curve + slight lift. Cheap, no deps, works on phones.
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+// P0: shadows OFF — SwiftShader/ANGLE fails MToon+spot-shadow compile
+// (vSpotShadowCoord), which eats the performer. Room+body first.
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x050508);
+const camera = new THREE.PerspectiveCamera(46, innerWidth/innerHeight, 0.1, 100);
+// room shell from venue dims (origin at stage front-center, meters)
+const R = v.room, S = v.stage;
+const tex = (u) => new THREE.TextureLoader().load(u);
+const wallMat = (u) => new THREE.MeshBasicMaterial({{map: tex(u)}});
+const dark = new THREE.MeshBasicMaterial({{color: 0x0a0a0e}});
+// room: SPLAT first (photoreal, World Labs Spark fuses splat+mesh in one
+// scene), pinned GLB second, generated-view box last. Chain degrades
+// gracefully — whatever fails, the show still has walls.
+let roomGLB = false;
+const NOBG = new URLSearchParams(location.search).get('nobg') === '1';
+// ?style= splat|mesh|box|void — the Cauldron is a MOTIF, not a file.
+// Same night renders photoreal (splat), stylized (mesh), graphic (box),
+// or void (performer only). Falls through the chain until something holds.
+const STYLE = new URLSearchParams(location.search).get('style') || 'auto';
+const wantSplat = !NOBG && (STYLE === 'auto' || STYLE === 'splat');
+const wantMesh = !NOBG && (STYLE === 'auto' || STYLE === 'mesh');
+if (v.splat && v.splat.local && wantSplat) {{
+  try {{
+    msg('step 3/5: downloading splat room (watch the counter)…');
+    const spark = new SparkRenderer({{renderer}});
+    scene.add(spark);
+    const splat = new SplatMesh({{url: v.splat.local}});
+    await new Promise((resolve, reject) => {{
+      const iv = setInterval(() => {{
+        if (splat.ready) {{ clearInterval(iv); resolve(); }}
+      }}, 500);
+      setTimeout(() => {{ clearInterval(iv); reject(new Error('splat timeout 90s')); }}, 90000);
+    }});
+    scene.add(splat); roomGLB = true;
+    msg('step 4/5: splat room live…');
+  }} catch (e) {{ msg('splat skipped (' + e.message + '), trying mesh…'); }}
+}}
+if (!roomGLB && v.glb && v.glb.local && wantMesh) {{
+  try {{
+    msg('step 3/5: downloading venue mesh (watch the counter)…');
+    const venueLoader = new GLTFLoader();
+    venueLoader.setMeshoptDecoder(MeshoptDecoder);
+    const meshPromise = venueLoader.loadAsync(v.glb.local,
+      (xhr) => {{ if (xhr.total) msg('step 3/5: mesh ' + Math.round(xhr.loaded/1048576) + 'MB / ' + Math.round(xhr.total/1048576) + 'MB'); }});
+    const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('mesh timeout 25s — view-box it is')), 25000));
+    const g = await Promise.race([meshPromise, timeout]);
+    msg('step 4/5: mesh in, placing room…');
+    const obj = g.scene;
+    const box = new THREE.Box3().setFromObject(obj);
+    const size = box.getSize(new THREE.Vector3());
+    // fit by HEIGHT (floor stays floor, heads stay heads) — footprint
+    // fit made rooms cavernous and performers lost. Feet land on y=0.
+    const s = R.h / (size.y || 1);
+    obj.scale.setScalar(s);
+    const ctr = box.getCenter(new THREE.Vector3());
+    obj.position.x -= ctr.x * s; obj.position.z -= ctr.z * s;
+    obj.position.y -= box.min.y * s;
+    window.__roomS = s;
+    scene.add(obj); roomGLB = true;
+    // frame box AFTER scale+placement (pre-scale bounds misframe the camera)
+    obj.updateMatrixWorld(true);
+    window.__roomBox = new THREE.Box3().setFromObject(obj);
+  }} catch (e) {{ msg('mesh skipped (' + e.message + '), view-box fallback'); }}
+}}
+if (!roomGLB && !NOBG) {{
+msg('step 4/5: view-box room…');
+const roomMats = [dark, dark, dark, dark, wallMat('/static/concepts/mbl-wide.jpg'), dark];
+roomMats.forEach(m => {{ m.side = THREE.BackSide; }});
+const room = new THREE.Mesh(new THREE.BoxGeometry(R.w, R.h, R.d), roomMats);
+room.position.set(0, R.h/2, R.d/2 - 0);
+scene.add(room);
+}}
+// stage deck
+const deck = new THREE.Mesh(new THREE.BoxGeometry(S.w, S.top_y, S.d),
+  new THREE.MeshStandardMaterial({{color: 0x2a1d12, roughness: 0.9}}));
+deck.position.set(0, S.top_y/2, S.front_z - S.d/2); deck.receiveShadow = true;
+scene.add(deck);
+// live light rig from venue JSON (temp approx → color)
+const k2c = (k) => new THREE.Color().setHSL(0.09, 0.5, Math.min(0.9, 0.25 + (8000-k)/8000*0.5));
+scene.add(new THREE.AmbientLight(k2c(v.light_rig.house.temp_k), v.light_rig.house.level + 0.25));
+const spot = new THREE.SpotLight(k2c(v.light_rig.spot.temp_k), 60, 30, 0.5, 0.5);
+spot.position.set(...v.light_rig.spot.pos);
+spot.target.position.set(...v.marks[0].pos);
+scene.add(spot, spot.target);
+// procedural mic stand (layer 1, first object — zero downloads)
+const brass = new THREE.MeshStandardMaterial({{color: 0x8a6b32, metalness: 0.8, roughness: 0.35}});
+const mic = new THREE.Group();
+const base = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.04, 24), brass);
+base.position.y = 0.02; mic.add(base);
+const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 1.5, 12), brass);
+pole.position.y = 0.79; pole.castShadow = true; mic.add(pole);
+const ball = new THREE.Mesh(new THREE.SphereGeometry(0.05, 20, 16),
+  new THREE.MeshStandardMaterial({{color: 0x222226, roughness: 0.6}}));
+ball.position.y = 1.58; ball.castShadow = true; mic.add(ball);
+const cable = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.012, 8, 24, Math.PI),
+  new THREE.MeshStandardMaterial({{color: 0x111111}}));
+cable.position.y = 0.1; mic.add(cable);
+mic.position.set(...v.marks[0].pos); mic.position.y = S.top_y;
+// offset stage-right of the body so it reads on camera (comic holds it aside)
+mic.position.x += 0.35;
+scene.add(mic);
+// contact shadow: cheap grounding blob (Animal-Crossing rule — connects feet
+// to floor without real shadow maps, which broke SwiftShader).
+const blob = new THREE.Mesh(new THREE.CircleGeometry(0.45, 24),
+  new THREE.MeshBasicMaterial({{color: 0x000000, transparent: true, opacity: 0.4}}));
+blob.rotation.x = -Math.PI / 2;
+blob.position.set(v.marks[0].pos[0], S.top_y + 0.01, v.marks[0].pos[2] + 0.25);
+scene.add(blob);
+// performer (VRM default; ?body= URL swaps any GLB — weird characters
+// welcome. GLB bodies play embedded clips; VRM bodies get vrma + face.)
+msg('step 5/5: loading performer…');
+const loader = new GLTFLoader();
+loader.register((p) => new VRMLoaderPlugin(p));
+loader.register((p) => new VRMAnimationLoaderPlugin(p));
+const BODY_URL = new URLSearchParams(location.search).get('body') || '';
+const BODY_IS_GLB = BODY_URL.endsWith('.glb');
+let vrm = null, mixer = null, idleAction = null;
+async function loadClip(name) {{
+  const g = await loader.loadAsync('/static/gestures/' + name + '.vrma');
+  const data = g.userData.vrmAnimations && g.userData.vrmAnimations[0];
+  if (!data) throw new Error('no vrma in ' + name);
+  return createVRMAnimationClip(data, vrm);
+}}
+function playGesture(name, holdMs) {{
+  if (!mixer) return;
+  if (!vrm) {{
+    // GLB lane: embedded clips by name (punchline → Gallop etc.)
+    const want = {{cheer: 'Gallop', nod: 'Idle', surprise: 'Jump_ToIdle', wave: 'Walk'}}[name];
+    if (window.__glbClips && window.__glbClips[want]) {{
+      const act = mixer.clipAction(window.__glbClips[want]);
+      act.reset().setLoop(THREE.LoopOnce, 1); act.clampWhenFinished = true;
+      if (idleAction) act.crossFadeFrom(idleAction, 0.3, false);
+      act.play();
+      setTimeout(() => {{
+        if (idleAction && mixer) {{
+          idleAction.reset().setLoop(THREE.LoopRepeat);
+          idleAction.crossFadeFrom(act, 0.4, false); idleAction.play();
+        }}
+      }}, 2500);
+    }}
+    return;
+  }}
+  loadClip(name).then((clip) => {{
+    const act = mixer.clipAction(clip);
+    act.setLoop(THREE.LoopOnce, 1); act.clampWhenFinished = true;
+    if (idleAction) act.crossFadeFrom(idleAction, 0.4, false);
+    act.play();
+    setTimeout(() => {{
+      if (idleAction && mixer) {{
+        idleAction.reset().setLoop(THREE.LoopRepeat);
+        idleAction.crossFadeFrom(act, 0.5, false);
+        idleAction.play();
+      }}
+    }}, holdMs || (clip.duration * 1000 + 400));
+  }}).catch((e) => {{ blog('gesture miss: ' + name); }});
+}}
+const GESTURE_FOR = {{setup: 'nod', punchline: 'cheer', tag: 'surprise', closer: 'cheer', callback: 'nod'}};
+try {{
+  let bodyObj = null;
+  if (BODY_IS_GLB) {{
+    // weird-character lane: plain GLB, embedded clips, no expressions.
+    const g2 = await loader.loadAsync(BODY_URL);
+    bodyObj = g2.scene;
+    const bb = new THREE.Box3().setFromObject(bodyObj);
+    const bs = bb.getSize(new THREE.Vector3());
+    const bh = bs.y > 0 ? 1.1 / bs.y : 1;
+    bodyObj.scale.setScalar(bh);
+    bodyObj.position.set(v.marks[0].pos[0], S.top_y - bb.min.y * bh, v.marks[0].pos[2] + 0.25);
+    scene.add(bodyObj);
+    mixer = new THREE.AnimationMixer(bodyObj);
+    window.__glbClips = {{}};
+    g2.animations.forEach(a => {{ window.__glbClips[a.name] = a; }});
+    const idle = g2.animations.find(a => /idle/i.test(a.name)) || g2.animations[0];
+    if (idle) {{
+      idleAction = mixer.clipAction(idle);
+      idleAction.setLoop(THREE.LoopRepeat); idleAction.play();
+      blog('body clip: ' + idle.name);
+    }}
+    // adjustable mic: ball tracks the body's head height, pole follows.
+    const headY = (bb.max.y - bb.min.y) * bh * 0.92;
+    ball.position.y = headY;
+    pole.scale.y = headY / 1.5; pole.position.y = headY / 2;
+  }} else {{
+  const gltf = await loader.loadAsync('/static/avatars/default-v1.vrm');
+  vrm = gltf.userData.vrm;
+  vrm.scene.rotation.y = Math.PI;
+  vrm.scene.position.set(v.marks[0].pos[0], S.top_y, v.marks[0].pos[2] + 0.25);
+  scene.add(vrm.scene);
+  }} // end else (VRM path)
+  if (!BODY_IS_GLB) {{
+  mixer = new THREE.AnimationMixer(vrm.scene);
+  try {{
+    idleAction = mixer.clipAction(await loadClip('idle_breathing'));
+    idleAction.setLoop(THREE.LoopRepeat); idleAction.play();
+  }} catch (e) {{ blog('idle miss'); }}
+  }} // end VRM-only setup
+  msg('live — pick a camera');
+}} catch (e) {{ msg('performer failed: ' + e.message); }}
+// venue cameras as buttons
+const bar = document.getElementById('cams');
+v.cameras.forEach(c => {{
+  const b = document.createElement('button'); b.textContent = c.id;
+  b.onclick = () => {{ camera.position.set(...c.pos); camera.fov = c.fov;
+    camera.updateProjectionMatrix(); camera.lookAt(0, 1.2, -1); }};
+  bar.appendChild(b);
+}});
+camera.position.set(...v.cameras[0].pos); camera.lookAt(0, 1.2, -1);
+if (window.__roomBox) {{
+  // stand inside the real room: near one end, eyes up, look down its length
+  const rb = window.__roomBox, rc = rb.getCenter(new THREE.Vector3());
+  const rsz = rb.getSize(new THREE.Vector3());
+  camera.position.set(rc.x, rc.y + rsz.y * 0.25, rb.max.z - rsz.z * 0.12);
+  camera.lookAt(rc.x, rc.y - rsz.y * 0.1, rb.min.z + rsz.z * 0.25);
+}}
+addEventListener('resize', () => {{ renderer.setSize(innerWidth, innerHeight);
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); }});
+const clock = new THREE.Clock(); let t = 0;
+// set driver v0: set.wav + beat-type expressions on even cadence
+// (APPROXIMATE — no measured offsets in freaks packs; precise driver lands
+// with Rhubarb/forced alignment). Punchline pops + spot push per beat.
+const SET_SLUG = new URLSearchParams(location.search).get('set') || 'biscuit-4cb995';
+document.getElementById('play').textContent = '▶ PLAY SET (' + SET_SLUG.split('-')[0] + ')';
+let beats = [];
+try {{ beats = await (await fetch('/freaks/' + SET_SLUG + '/delivery.json')).json().then(j => j.beats || []); }} catch (e) {{}}
+const audio = new Audio();
+audio.preload = 'auto';
+audio.src = '/freaks/' + SET_SLUG + '/set.wav';
+// phones that refuse WAV (MEDIA_ERR_SRC_NOT_SUPPORTED) fall to MP3 at load,
+// so PLAY never meets a sourceless element. MP3 is also 12x smaller.
+audio.addEventListener('error', () => {{
+  const src = audio.src.split('/').pop();
+  if (!audio.src.endsWith('.mp3')) {{
+    blog('audio: ' + src + ' refused, trying mp3…');
+    audio.src = '/freaks/' + SET_SLUG + '/set.mp3';
+    audio.load();
+  }} else {{
+    msg('AUDIO DEAD: both wav+mp3 refused (' + src + ') — reply with phone model + browser');
+  }}
+}});
+audio.load();
+// jaw flap: audio energy → jaw morph (v0 lipsync; phonemes land later).
+let jawSlot = null, analyser = null, freqData = null;
+function initJaw() {{
+  // real lipsync first (MFCC vowels → visemes, in-browser, free), energy
+  // flap as fallback. Created on tap (mobile autoplay policy).
+  try {{
+    if (!window.__lipSync && vrm && typeof VRMLipSync !== 'undefined') {{
+      const opts = window.__roomCtx ? {{audioContext: window.__roomCtx}} : {{}};
+      VRMLipSync.create(vrm, opts).then((ls) => {{
+        window.__lipSync = ls;
+        try {{
+          const src = ls.createMediaElementSource
+            ? ls.createMediaElementSource(audio)
+            : (ls.useElement ? ls.useElement(audio) : null);
+          if (src && src.connect && window.__roomCtx) src.connect(window.__roomCtx.destination);
+        }} catch (e) {{}}
+        blog('lipsync: mfcc live');
+      }}).catch((e) => {{ blog('lipsync miss, flap fallback'); }});
+    }}
+  }} catch (e) {{}}
+  try {{
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) {{ blog('no webaudio'); return; }}
+    if (!window.__roomCtx) {{
+      const ctx = new AC();
+      const src = ctx.createMediaElementSource(audio);
+      window.__roomCtx = ctx;
+      analyser = ctx.createAnalyser(); analyser.fftSize = 256;
+      freqData = new Uint8Array(analyser.frequencyBinCount);
+      src.connect(analyser);
+    }} else if (window.__roomCtx.state === 'suspended') {{
+      window.__roomCtx.resume();
+    }}
+    const ctx = window.__roomCtx;
+    // ROOM: dry voice + venue reverb send. Impulse is synthesized at runtime
+    // from the venue's own rt60 (Sabine/Eyring, acoustics in venue JSON) —
+    // no IR files, and the tail matches the room's measured physics.
+    const dry = ctx.createGain(); dry.gain.value = 0.85;
+    analyser.connect(dry); dry.connect(ctx.destination);
+    const rt = (v.acoustics && v.acoustics.rt60) || 0.9;
+    const sr = ctx.sampleRate, len = Math.floor(sr * Math.min(4, rt * 1.5));
+    const ir = ctx.createBuffer(2, len, sr);
+    for (let ch = 0; ch < 2; ch++) {{
+      const d = ir.getChannelData(ch);
+      for (let i = 0; i < len; i++)
+        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.2);
+    }}
+    const verb = ctx.createConvolver(); verb.buffer = ir;
+    const wet = ctx.createGain(); wet.gain.value = 0.35;
+    analyser.connect(verb); verb.connect(wet); wet.connect(ctx.destination);
+    window.__roomFx = {{ctx, dry, wet, rt60: rt,
+      toggle(on) {{ wet.gain.value = on ? 0.35 : 0; dry.gain.value = on ? 0.85 : 1; }}}};
+    if (vrm && vrm.expressionManager) {{
+      const all = vrm.expressionManager.expressions.map(e => e.expressionName);
+      jawSlot = all.find(n => /jaw|aa|mouthopen|oh/i.test(n)) || null;
+    }}
+  }} catch (e) {{}}
+}}
+function flapJaw() {{
+  if (!analyser || !jawSlot || !vrm) return;
+  analyser.getByteFrequencyData(freqData);
+  let e = 0;
+  for (let i = 1; i < 12 && i < freqData.length; i++) e += freqData[i];
+  e = Math.min(1, e / (12 * 90));
+  try {{ vrm.expressionManager.setValue(jawSlot, e); }} catch (err) {{}}
+}}
+window.__venueDbg = {{get audioT() {{ return audio.currentTime; }},
+  get audioOn() {{ return !audio.paused; }},
+  get jaw() {{ return jawSlot; }}}};
+const EXPR = {{setup: 'neutral', punchline: 'happy', tag: 'happy', closer: 'happy', callback: 'happy'}};
+function setFace(name, val) {{
+  if (!vrm || !vrm.expressionManager) return;
+  try {{
+    const mgr = vrm.expressionManager;
+    const all = mgr.expressions.map(e => e.expressionName);
+    all.forEach(n => {{ try {{ mgr.setValue(n, 0); }} catch (e) {{}} }});
+    const slot = all.find(n => n.toLowerCase().includes(name)) || 'happy';
+    try {{ mgr.setValue(slot, val); }} catch (e) {{}}
+  }} catch (e) {{}}
+}}
+let beatTimer = null;
+document.getElementById('play').onclick = () => {{
+  initJaw();
+  audio.play().catch((e) => {{ msg('PLAY BLOCKED: ' + e.name + ' — tap again, check silent switch'); }});
+  msg('performing ' + beats.length + ' beats (approx timing)');
+  if (!beats.length || !isFinite(audio.duration)) return;
+  const per = (audio.duration || beats.length * 3) / beats.length;
+  let i = 0;
+  clearInterval(beatTimer);
+  beatTimer = setInterval(() => {{
+    if (i >= beats.length || audio.paused) {{ clearInterval(beatTimer); setFace('neutral', 1); return; }}
+    const b = beats[i++];
+    setFace(EXPR[b.type] || 'neutral', 0.9);
+    playGesture(GESTURE_FOR[b.type] || 'nod');
+    cutCam();
+    spot.intensity = 60 + (b.type === 'punchline' || b.type === 'closer' ? 25 : 0);
+  }}, per * 1000);
+}};
+// cinematography: REC captures the canvas; while recording, each beat cuts
+// the camera (wide → medium → close rotation), then offers the webm.
+let recorder = null, recChunks = [], recCam = 0;
+document.getElementById('rec').onclick = () => {{
+  if (recorder && recorder.state !== 'inactive') {{ recorder.stop(); return; }}
+  try {{
+    const stream = canvas.captureStream(30);
+    recChunks = [];
+    recorder = new MediaRecorder(stream, {{mimeType: 'video/webm'}});
+    recorder.ondataavailable = (e) => {{ if (e.data.size) recChunks.push(e.data); }};
+    recorder.onstop = () => {{
+      const url = URL.createObjectURL(new Blob(recChunks, {{type: 'video/webm'}}));
+      msg('take ready — tap to download');
+      const a = document.createElement('a'); a.href = url;
+      a.download = 'cauldron-take.webm'; a.textContent = '⬇ DOWNLOAD TAKE';
+      a.style.cssText = 'color:#ff2fa8;font-size:14px';
+      document.getElementById('ui').appendChild(a);
+      document.getElementById('rec').textContent = '● REC';
+    }};
+    recorder.start(1000);
+    document.getElementById('rec').textContent = '■ STOP';
+    msg('recording — cameras cut per beat');
+  }} catch (e) {{ msg('rec failed: ' + e.message); }}
+}};
+document.getElementById('room').onclick = (e) => {{
+  const on = e.target.textContent.includes('ON');
+  if (window.__roomFx) window.__roomFx.toggle(!on);
+  e.target.textContent = on ? 'ROOM: OFF' : 'ROOM: ON';
+}};
+document.getElementById('tvbtn').onclick = () => {{
+  location.href = location.pathname + '?tv=1';
+}};
+// TV MODE (?tv=1): hide the desk UI, flash a 4-letter pair code, poll the
+// shared feed — controller taps land in THIS room's energy.
+const TVMODE = new URLSearchParams(location.search).get('tv') === '1';
+let pairCode = null, pairSeq = 0;
+async function tvInit() {{
+  document.getElementById('ui').style.display = 'none';
+  const ov = document.createElement('div');
+  ov.id = 'tvcode';
+  ov.style.cssText = 'position:fixed;top:12px;right:12px;z-index:6;text-align:center;background:rgba(10,10,15,.8);padding:12px 18px;border-radius:14px;border:1px solid #ff2fa8';
+  document.body.appendChild(ov);
+  try {{
+    const j = await (await fetch('/api/venue/' + VID + '/pair', {{method: 'POST'}})).json();
+    pairCode = j.code;
+  }} catch (e) {{ pairCode = '????'; }}
+  const showTv = (members) => {{
+    const n = Math.round(heat * 10);
+    const bar = '█'.repeat(n) + '░'.repeat(10 - n);
+    const verdict = heat >= 0.85 ? '🔥 KILLED' : heat >= 0.6 ? '🔥 HOT' : heat >= 0.3 ? '🙂 WARM' : '🍅 COLD';
+    ov.innerHTML = '<div style="font-size:11px;color:#888">PAIR PHONE @ funnier.si/code</div>' +
+      '<div style="font-size:44px;letter-spacing:8px;color:#ff2fa8">' + pairCode + '</div>' +
+      '<div style="font-size:11px;color:#888">' + members + ' connected</div>' +
+      '<div style="font-size:15px;color:#ff2fa8;margin-top:4px">' + bar + ' ' + verdict + '</div>';
+  }};
+  showTv(0);
+  setInterval(async () => {{
+    if (!pairCode || pairCode === '????') return;
+    try {{
+      const f = await (await fetch('/api/pair/' + pairCode + '/feed?since=' + pairSeq)).json();
+      if (!f.ok) return;
+      pairSeq = f.seq; showTv(f.members);
+      f.events.forEach(ev => {{
+        if (ev.kind === 'laugh' || ev.kind === 'haha' || ev.kind === 'clap' || ev.kind === 'cheer') {{
+          heat = Math.min(1, heat + GAIN / (1 + resist));
+          resist = Math.max(0, resist - 0.06);
+        }} else if (ev.kind === 'boo') {{
+          resist = Math.min(1, resist + 0.10); heat = Math.max(0, heat - 0.05);
+        }}
+      }});
+      paintEnergy();
+    }} catch (e) {{}}
+  }}, 2000);
+}}
+if (TVMODE) tvInit();
+// ROOM ENERGY: the venue's own crowd physics (decay/laugh_gain/resist from
+// venue JSON) running live. Laughs melt resistance; silence stiffens it.
+// P0 local sim (one room, one viewer) — shared multi-viewer sum lands later.
+let heat = 0.3, resist = (v.physics && v.physics.resist_start) || 0.35;
+const DECAY = (v.physics && v.physics.decay) || 0.85;
+const GAIN = (v.physics && v.physics.laugh_gain) || 0.18;
+function paintEnergy() {{
+  const n = Math.round(heat * 10);
+  document.getElementById('emeter').textContent = '█'.repeat(n) + '░'.repeat(10 - n);
+  const verdict = heat >= 0.85 ? '🔥 KILLED' : heat >= 0.6 ? '🔥 HOT' : heat >= 0.3 ? '🙂 WARM' : '🍅 COLD';
+  document.getElementById('emeter').title = verdict + ' · resist ' + resist.toFixed(2);
+}}
+document.getElementById('laugh').onclick = () => {{
+  heat = Math.min(1, heat + GAIN / (1 + resist));
+  resist = Math.max(0, resist - 0.06); paintEnergy();
+}};
+document.getElementById('boo').onclick = () => {{
+  resist = Math.min(1, resist + 0.10); heat = Math.max(0, heat - 0.05); paintEnergy();
+}};
+setInterval(() => {{ heat *= DECAY; resist = Math.min(1, resist + 0.005); paintEnergy(); }}, 4000);
+paintEnergy();
+function cutCam() {{
+  if (!recorder || recorder.state === 'inactive') return;
+  recCam = (recCam + 1) % v.cameras.length;
+  const c = v.cameras[recCam];
+  camera.position.set(...c.pos); camera.fov = c.fov;
+  camera.updateProjectionMatrix(); camera.lookAt(0, 1.2, -1);
+}}
+audio.onended = () => {{ clearInterval(beatTimer); setFace('neutral', 1); spot.intensity = 60; if (recorder && recorder.state !== 'inactive') recorder.stop(); }};
+renderer.setAnimationLoop(() => {{
+  const dt = Math.min(0.05, clock.getDelta());
+  t += dt;
+  if (vrm) {{ vrm.scene.position.y = S.top_y + Math.sin(t*1.4)*0.008;
+    vrm.scene.rotation.y = Math.sin(t*0.4)*0.06;
+    if (mixer) mixer.update(dt);
+    if (window.__lipSync) {{ try {{ window.__lipSync.update(); }} catch (e) {{ flapJaw(); }} }}
+    else flapJaw();
+    vrm.update(t); }}
+  renderer.render(scene, camera);
+}});
+</script></body></html>""", 200, {"Content-Type": "text/html; charset=utf-8",
+    "Cache-Control": "no-store"}
+
+
+@app.route("/code")
+def pair_controller():
+    """Phone controller: enter the 4-letter TV code, tap reactions, toggle
+    face/mic presence. Plain string (no f-string) — brace-heavy JS inside."""
+    return """<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>CONTROLLER — pair phone</title>
+<style>body{background:#0a0a0f;color:#eee;font-family:monospace;text-align:center;padding:24px 12px;margin:0}
+button{font-size:20px;padding:14px 16px;margin:6px;border-radius:16px;background:#1a1a2e;color:#eee;border:1px solid #333}
+button:active{background:#ff2fa8}
+input{font-size:28px;letter-spacing:8px;text-align:center;width:180px;padding:10px;border-radius:12px;border:1px solid #333;background:#111119;color:#ff2fa8;text-transform:uppercase}
+.big{font-size:26px;padding:18px 22px}
+.on{border-color:#7fdb7f;color:#7fdb7f}
+#status{color:#888;font-size:12px;margin-top:10px;min-height:18px}</style></head><body>
+<h2>📱 CONTROLLER</h2>
+<div id="join"><input id="code" maxlength="4" placeholder="CODE" autocomplete="off"><br>
+<button id="go" class="big">JOIN TV</button></div>
+<div id="pad" style="display:none">
+<div id="room" style="color:#ff2fa8;font-size:13px"></div>
+<button data-k="haha">😄</button><button data-k="haha">🤣</button><button data-k="clap">👏</button><button data-k="cheer">🎉</button><button data-k="boo">👎</button><br>
+<button id="face">📷 FACE: OFF</button><button id="mic">🎙 MIC: OFF</button>
+<div id="status"></div></div>
+<script>
+let CODE = null;
+const say = (t) => { document.getElementById('status').textContent = t; };
+document.getElementById('go').onclick = async () => {
+  CODE = document.getElementById('code').value.toUpperCase().trim();
+  const j = await (await fetch('/api/pair/' + CODE)).json().catch(() => ({}));
+  if (!j.ok) return say('no such code — check the TV');
+  document.getElementById('join').style.display = 'none';
+  document.getElementById('pad').style.display = '';
+  document.getElementById('room').textContent = 'paired → ' + j.venue + ' · ' + j.members + ' here';
+  say('tap away — the room feels it');
+};
+async function tap(kind) {
+  if (!CODE) return;
+  const j = await (await fetch('/api/pair/' + CODE + '/react', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({kind})})).json().catch(() => ({}));
+  if (!j.ok) say('lost the TV — rejoin');
+}
+document.querySelectorAll('[data-k]').forEach(b => { b.onclick = () => tap(b.dataset.k); });
+document.getElementById('face').onclick = (e) => {
+  const on = e.target.textContent.includes('OFF');
+  e.target.textContent = on ? '📷 FACE: ON' : '📷 FACE: OFF';
+  e.target.className = on ? 'on' : '';
+  tap('smile'); say(on ? 'face shared (boolean smiles only)' : 'face off');
+};
+document.getElementById('mic').onclick = (e) => {
+  const on = e.target.textContent.includes('OFF');
+  e.target.textContent = on ? '🎙 MIC: ON' : '🎙 MIC: OFF';
+  e.target.className = on ? 'on' : '';
+  tap('mic'); say(on ? 'mic laughs on (booleans only)' : 'mic off');
+};
+</script></body></html>""", 200, {"Content-Type": "text/html; charset=utf-8",
+    "Cache-Control": "no-store"}
+
+
+@app.route("/sets")
+def takes_gallery():
+    """Recorded venue sets (/sets — /takes belongs to the legacy pog-take
+    browser registered earlier in this file; first route wins in Flask).
+    Server-side takes, watchable on any phone with zero GPU."""
+    import html as _html
+    tdir = Path(__file__).parent / "static" / "takes"
+    cards = []
+    for jf in sorted(tdir.glob("*.json"), reverse=True):
+        try:
+            m = json.loads(jf.read_text())
+        except Exception:
+            continue
+        v = m.get("take", "")
+        cards.append(
+            "<div style='margin:0 auto 20px;max-width:720px;text-align:left;"
+            "border:1px solid #282833;border-radius:12px;padding:12px'>"
+            "<video src='/static/takes/" + v + "' controls preload='metadata' "
+            "playsinline style='width:100%;border-radius:8px'></video>"
+            "<div style='font-size:12px;margin-top:6px'>🎬 " + _html.escape(v) +
+            " <span style='color:#555'>" + _html.escape(str(m.get("venue", ""))) +
+            " · " + _html.escape(str(m.get("set", ""))) + "</span></div></div>")
+    body = "".join(cards) if cards else "<p>No takes yet.</p>"
+    return """<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TAKES — recorded sets</title>
+<style>body{background:#0a0a0f;color:#eee;font-family:monospace;text-align:center;padding:24px 12px}
+a{color:#ff2fa8}</style></head><body>
+<div style="font-size:12px;letter-spacing:2px;color:#ff2fa8;">🎬 TAKES</div>
+<h1>Recorded sets</h1>
+<p style="color:#888;font-size:12px;">server-recorded · plays anywhere ·
+<a href="/cauldron">concepts</a> · <a href="/perform">stage</a></p>
+<div>""" + body + """</div></body></html>""", 200, {
+        "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store"}
 
 
 @app.route("/perform/<slug>")

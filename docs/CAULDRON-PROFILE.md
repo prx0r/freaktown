@@ -95,7 +95,11 @@ the room here first; everything downstream follows.
 2. Window test: no daylight, no glass but ashtrays.
 3. Floor test: deck top y=0.6±0.05, room floor y=0±0.05, meter scale.
 4. Sigil test: chalk cauldron outline on back wall, smudged.
-5. Bare test: deck holds mic stand ONLY. No stools, no tables on stage,
-   no candles, no strings, no frames. Count the props: exactly the
-   registry (mic + curtains + stool-wing-R if booked).
+5. Bare test: deck holds NOTHING and floor holds NOTHING. No mic stand,
+   no stools, no tables, no chairs, no candles, no strings, no frames.
+   The venue GLB is the shell only (floor, walls, ceiling, deck, bar
+   block, curtain rails — no curtain fabric). Mic stand, curtains, tables,
+   chairs, sigil decal, and all glow arrive as added layers we own
+   (procedural props + light rig), because adding is easier than removing.
+   Count the baked geometry: shell only.
 6. Size test: GLB ≤30MB. 7. Night test: 3/3 reviewers say "dingy".

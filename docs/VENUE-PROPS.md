@@ -41,6 +41,10 @@ Max 2 per venue (dingy, not decor).
 Green emissive box + white EXIT (canvas texture), faint buzz flicker
 (opacity noise 0.9-1.0). source: procedural. Back-left door always.
 
+### easel
+Tripod legs + tilted board (1.2×0.9 white plane, faint grid). The
+freaktionary canvas anchors here. source: procedural.
+
 ### bulb-cage
 Dead bulb in wire cage (torus rings + sphere, unlit). source: procedural.
 One per venue max. The room's honesty certificate.

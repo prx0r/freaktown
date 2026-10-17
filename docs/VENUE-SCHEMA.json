@@ -82,8 +82,8 @@
         "pos": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3}}}
   },
   "sizes": {
-    "S": {"room": "≤12×9×3.4m", "capacity": "≤60", "parses": 3, "glb_mb": 30,
-          "note": "cellar. Cauldron lives here."},
+    "S": {"room": "≤12×9×4.0m", "capacity": "≤60", "parses": 3, "glb_mb": 30,
+          "note": "cellar/studio. Cauldron lives here."},
     "M": {"room": "≤20×16×6m", "capacity": "≤250", "parses": 5, "glb_mb": 80,
           "note": "hall. Judging panel fits; band kit fits."},
     "L": {"room": "≤40×30×12m", "capacity": "≤2000", "parses": 8, "glb_mb": 200,

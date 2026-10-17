@@ -1,0 +1,37 @@
+{
+  "id": "backroom",
+  "name": "Back Room",
+  "size": "S",
+  "room": {"w": 8, "d": 7, "h": 3.0},
+  "stage": {"w": 3.0, "d": 2.5, "top_y": 0.0, "front_z": 0, "back_z": -2.5},
+  "marks": [
+    {"id": "mic", "pos": [0, 0.0, -1.0], "facing": "+Z"},
+    {"id": "table", "pos": [0, 0.0, 1.5], "facing": "-Z"}
+  ],
+  "props": [
+    {"id": "mic-stand", "anchor": [0, 0.0, -1.0], "pack": "base", "variant": "brass-worn"},
+    {"id": "table-cocktail", "anchor": [0, 0.0, 1.5], "pack": "base", "variant": "green-felt"},
+    {"id": "bulb-cage", "anchor": [0, 2.9, 1.5], "pack": "base"},
+    {"id": "exit-sign", "anchor": [-3.5, 2.0, 3.2], "pack": "base"},
+    {"id": "ashtray", "anchor": [0, 0.78, 1.5], "pack": "base"}
+  ],
+  "light_rig": {
+    "house": {"temp_k": 2700, "level": 0.12, "pos": [0, 2.9, 2.0]},
+    "spot": {"temp_k": 3400, "level": 1.0, "pos": [0, 2.8, 1.5]},
+    "washes": [],
+    "practicals": ["table lamp amber", "EXIT green"]
+  },
+  "cameras": [
+    {"id": "wide", "pos": [0, 2.0, 5.5], "fov": 46},
+    {"id": "medium", "pos": [0, 1.6, 3.5], "fov": 34},
+    {"id": "close", "pos": [0, 1.5, 2.2], "fov": 28}
+  ],
+  "crowd": {
+    "capacity": 8,
+    "zones": [{"id": "table", "tier": "face", "count": 8}]
+  },
+  "budgets": {"glb_mb": 30, "parses": 3},
+  "glb": {"sha256": "pending-atlas-job"},
+  "acoustics": {"rt60": 0.5, "warmth": 0.9, "bed_db": -18},
+  "physics": {"decay": 0.82, "laugh_gain": 0.2, "resist_start": 0.3}
+}

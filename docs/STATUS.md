@@ -414,15 +414,28 @@ browser-visible only, so agents negative-control while humans judge looks.
   booth cam, balcony) · Red Curtain (L, 400, specials machine: band kit
   stage-left, judging desk + 3 buzzers front-center, 8 cameras incl.
   crowd + backstage + judges-cam). All glb sha pending Atlas jobs.
+- PARTY GAME HOMES (2026-10-17, all VALID): poker→Back Room (S, 8,
+  green-felt table, low lamp, driest physics) · quip→Static (M, 120, neon
+  game-show loft) · stone-face→Holding Cell (S, 6, interrogation stark,
+  stiffest resistance) · roast→Green Room (S, 20, couches, warmest start) ·
+  freaktionary→Sketchbook (S, 24, easel + skylight spill) · homebase→Lobby
+  (M, 60, archways to every room). 9/9 venues VALID (S height cap raised
+  3.4→4.0 for studios); easel added to registry. Freeze-night stays at the
+  Cauldron (improv is cellar music).
 - Canonical props, per-venue bodies (2026-10-17): prop instances take
   `variant` (brass-worn / black / chrome mic stands — zero downloads) +
   `mesh` slot (Atlas GLB override later). Venues carry `acoustics`
-  (Cauldron rt60 0.7 / Medium 1.1 / Red 1.6, bed gains) + `physics`
-  (Cauldron forgiving 0.85/0.18/0.35 resist — best crowds; Red stiff
-  0.9/0.12/0.6 — big rooms are hard). `/api/venue/<id>` serves truth;
+  + `physics` (Cauldron forgiving 0.85/0.18/0.35 resist — best crowds; Red
+  stiff 0.9/0.12/0.6 — big rooms are hard). `/api/venue/<id>` serves truth;
   monitors take `?venue=` and run its dynamics live (verified per-venue
   DECAY on the wire). Mesh variants slot into the same field when Atlas
   delivers — no code changes.
+- COMPUTATIONAL ACOUSTICS (2026-10-17): scripts/venue_acoustics.py derives
+  RT60 from Sabine + Eyring off actual dims/materials/audience
+  (Cauldron 1.13 / Medium 1.28 / Red 1.93 Eyring — applied, replacing my
+  vibes-guesses), plus Schroeder frequencies and axial boom modes per
+  house. Limits printed every run: Sabine overestimates dead rooms,
+  diffuse math fails below Schroeder, warmth stays an engineered mapping.
 
 ## PLATFORM DECISION (2026-10-17, final): browser/phone/laptop. No VR.
 

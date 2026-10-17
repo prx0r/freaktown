@@ -14,7 +14,7 @@ BASE = Path(__file__).resolve().parent.parent
 SCHEMA = json.loads((BASE / "docs" / "VENUE-SCHEMA.json").read_text())
 
 SIZE_BOUNDS = {
-    "S": {"room": (12, 9, 3.4), "capacity": 60, "parses": 3, "glb_mb": 30},
+    "S": {"room": (12, 9, 4.0), "capacity": 60, "parses": 3, "glb_mb": 30},
     "M": {"room": (20, 16, 6), "capacity": 250, "parses": 5, "glb_mb": 80},
     "L": {"room": (40, 30, 12), "capacity": 2000, "parses": 8, "glb_mb": 200},
 }
