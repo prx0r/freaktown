@@ -4459,6 +4459,11 @@ def apply_template():
     return jsonify({"ok": True, "template": name, "beats": beats})
 
 
+# ── Funnier skin + public-bill privacy (keep last: wraps every route above) ──
+import funnier_skin  # noqa: E402
+funnier_skin.init(app)
+
+
 # ── Main ────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
