@@ -117,8 +117,23 @@ All pasted in chat — treat as exposed, rotate if anything strange.
   style. Bake-off loop in record_set.py (`--body`, `--set`).
 - Meshy key stored. RPM recommended as low-investment cast.
 
-## Spend session 2
-Fish ~$0.01 (louis render). FAL $0. Jev ~$0.002. Total day FAL ~$0.52.
+## Session 3 — night (~19:10–19:45 UTC): 10 todos, all executed
+
+1. Silence timings ($0 ffmpeg): `scripts/extract_timings.py` — longest-N-1
+   silences as beat boundaries → `timings.json` for louis + biscuit.
+2. Measured driver: venue fires beats at real start_ms (even-cadence dead).
+3. VTubeMe Nova (VRM 0.x, 54 bones, 17 blends, CC BY) staged via `?body=`,
+   `/venues` serves .vrm now. Photoreal man performing verified.
+4. Bake-off: nova-louis + husky-louis takes recorded (same set, 3 bodies).
+5. Takes share links (copy-link per take in `/sets`).
+6. Mod KILL switch (`/api/pair/<code>/kill` → INTERMISSION card). No auth
+   yet — unlisted codes only, flagged.
+7. Face AB on Louis punchlines: 4/4 expressive (0.66–0.94).
+8. Cauldron submission dry-run green (fal-b + ang-b anchors, 4 targets).
+9. This handover + push (below).
+10. Final verify (below).
+
+Spend: $0 (ffmpeg + Jev micro ~$0.001). FAL untouched.
 
 ## Open threads (build order)
 1. Cauldron's own mesh (anchors ready: bare-2 + fal-b + ang-b) + motif styles.

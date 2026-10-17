@@ -2241,9 +2241,9 @@ def venue_manifest(vid):
 def venue_file(filename):
     """Local venue meshes (var/venues, gitignored). GLBs pinned by sha256
     in the venue JSON — referenced by hash, never latest."""
-    if "/" in filename or not (filename.endswith(".glb") or filename.endswith(".spz")):
-        return jsonify({"ok": False, "error": "glb/spz only"}), 400
-    mime = "model/gltf-binary" if filename.endswith(".glb") else "application/octet-stream"
+    if "/" in filename or not (filename.endswith(".glb") or filename.endswith(".spz") or filename.endswith(".vrm")):
+        return jsonify({"ok": False, "error": "glb/spz/vrm only"}), 400
+    mime = "model/gltf-binary" if filename.endswith((".glb", ".vrm")) else "application/octet-stream"
     # pinned by sha256 in venue JSON = immutable content: cache hard so the
     # big download happens once per phone, never every visit.
     resp = send_from_directory(str(Path(__file__).parent / "var" / "venues"),
@@ -2305,6 +2305,23 @@ def pair_react(code):
     return jsonify({"ok": True, "seq": r["seq"]})
 
 
+@app.route("/api/pair/<code>/kill", methods=["POST"])
+def pair_kill(code):
+    """Mod KILL switch (censor step 1): TV cuts to standby card on next poll.
+    No auth yet (unlisted codes only) — monitor auth lands with it."""
+    code = re.sub(r"[^A-Z0-9]", "", code.upper())[:8]
+    r = PAIR.get(code)
+    if not r:
+        return jsonify({"ok": False, "error": "no such code"}), 404
+    data = request.get_json(force=True, silent=True) or {}
+    r["seq"] += 1
+    ev = {"seq": r["seq"], "kind": "kill" if data.get("killed", True) else "resume",
+          "t": time.time(), "by": "mod"}
+    r["events"].append(ev)
+    r["events"] = r["events"][-200:]
+    return jsonify({"ok": True, "seq": r["seq"]})
+
+
 @app.route("/api/pair/<code>/feed")
 def pair_feed(code):
     code = re.sub(r"[^A-Z0-9]", "", code.upper())[:8]
@@ -2333,7 +2350,7 @@ def venue_stage(vid):
 #ui button{{background:#1a1a2e;color:#eee;border:1px solid #333;border-radius:8px;padding:4px 10px;margin:2px}}
 #ui a{{color:#ff2fa8}}</style>
 <script type="importmap">
-{{"imports":{{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/","@pixiv/three-vrm":"https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.3.0/lib/three-vrm.module.js","three-vrm-animation":"https://cdn.jsdelivr.net/npm/@pixiv/three-vrm-animation@3.3.0/lib/three-vrm-animation.module.min.js","@sparkjsdev/spark":"https://sparkjs.dev/releases/spark/2.3.1/spark.module.js","three-vrm-lip-sync":"https://cdn.jsdelivr.net/npm/three-vrm-lip-sync@0.1.0/dist/index.min.js","wlipsync":"https://cdn.jsdelivr.net/npm/wlipsync@1.3.1/dist/wlipsync-single.min.js"}}}}
+{{"imports":{{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/","@pixiv/three-vrm":"https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.3.0/lib/three-vrm.module.js","three-vrm-animation":"https://cdn.jsdelivr.net/npm/@pixiv/three-vrm-animation@3.3.0/lib/three-vrm-animation.module.min.js","@sparkjsdev/spark":"https://sparkjs.dev/releases/spark/2.3.1/spark.module.js","three-vrm-lip-sync":"https://cdn.jsdelivr.net/npm/three-vrm-lip-sync@0.1.0/dist/index.min.js","wlipsync":"https://cdn.jsdelivr.net/npm/wlipsync@1.3.1/dist/wlipsync-single.min.js","wawa-lipsync":"https://cdn.jsdelivr.net/npm/wawa-lipsync@0.0.2/dist/wawa-lipsync.es.js"}}}}
 </script></head><body>
 <div id="ui">🕯️ <span id="vname">{vid}</span> · v0 room-views + live body<br>
 <span id="cams"></span><br><button id="play">▶ PLAY SET (biscuit)</button>
@@ -2372,7 +2389,29 @@ import {{ MeshoptDecoder }} from 'three/addons/libs/meshopt_decoder.module.js';
 import {{ VRMAnimationLoaderPlugin, createVRMAnimationClip }} from 'three-vrm-animation';
 import {{ SparkRenderer, SplatMesh }} from '@sparkjsdev/spark';
 import {{ VRMLipSync }} from 'three-vrm-lip-sync';
+import {{ Lipsync as WawaLipsync }} from 'wawa-lipsync';
 const VID = '{vid}';
+// ?lipsync=wawa|mfcc — challenger engine AB. Default mfcc (incumbent).
+const LIPENGINE = new URLSearchParams(location.search).get('lipsync') || 'mfcc';
+// Oculus-15 → VRM-5 map (v1 approximations, documented, AB-tested).
+const WAWA_MAP = {{sil: null, PP: ['ou', 0.5], FF: ['ih', 0.6], TH: ['ih', 0.5],
+  DD: ['ee', 0.6], kk: ['aa', 0.4], CH: ['oh', 0.6], SS: ['ih', 0.7],
+  nn: ['ee', 0.4], RR: ['ou', 0.6], aa: ['aa', 1.0], E: ['ee', 0.9],
+  I: ['ih', 0.9], O: ['oh', 0.9], U: ['ou', 0.9]}};
+let wawa = null;
+function driveWawa() {{
+  if (!wawa || !vrm || !vrm.expressionManager) return null;
+  try {{
+    wawa.processAudio();
+    const key = String(wawa.viseme || '').replace('viseme_', '');
+    const mgr = vrm.expressionManager;
+    const all = mgr.expressions.map(e => e.expressionName);
+    ['aa','ih','ou','ee','oh'].forEach(n => {{ if (all.includes(n)) try {{ mgr.setValue(n, 0); }} catch (e) {{}} }});
+    const hit = WAWA_MAP[key];
+    if (hit && all.includes(hit[0])) {{ mgr.setValue(hit[0], hit[1]); return key; }}
+    return 'sil';
+  }} catch (e) {{ return null; }}
+}}
 const boot = [];
 const blog = (t) => {{ try {{ const b = document.getElementById('blog'); b.innerHTML += '• ' + t + '<br>'; const lines = b.innerHTML.split('<br>'); if (lines.length > 9) b.innerHTML = lines.slice(-9).join('<br>'); }} catch (e) {{}} }};
 const msg = (t) => {{ boot.push(t); blog(t); document.getElementById('msg').textContent = t; }};
@@ -2571,7 +2610,8 @@ try {{
     ball.position.y = headY;
     pole.scale.y = headY / 1.5; pole.position.y = headY / 2;
   }} else {{
-  const gltf = await loader.loadAsync('/static/avatars/default-v1.vrm');
+  const vrmUrl = (BODY_URL && BODY_URL.endsWith('.vrm')) ? BODY_URL : '/static/avatars/default-v1.vrm';
+  const gltf = await loader.loadAsync(vrmUrl);
   vrm = gltf.userData.vrm;
   vrm.scene.rotation.y = Math.PI;
   vrm.scene.position.set(v.marks[0].pos[0], S.top_y, v.marks[0].pos[2] + 0.25);
@@ -2595,6 +2635,19 @@ v.cameras.forEach(c => {{
   bar.appendChild(b);
 }});
 camera.position.set(...v.cameras[0].pos); camera.lookAt(0, 1.2, -1);
+// ?face=1: head close-up test rig — camera pinned to the face so lip and
+// face action fill the frame while the set plays. For AB verification.
+const FACEMODE = new URLSearchParams(location.search).get('face') === '1';
+if (FACEMODE && vrm) {{
+  const hb = new THREE.Box3().setFromObject(vrm.scene);
+  const hc = hb.getCenter(new THREE.Vector3());
+  const hs = hb.getSize(new THREE.Vector3());
+  const hy = hb.min.y + hs.y * 0.88;
+  camera.position.set(hc.x + 0.12, hy + 0.05, hc.z + hs.z * 0.9 + 0.55);
+  camera.fov = 22; camera.updateProjectionMatrix();
+  camera.lookAt(hc.x, hy, hc.z);
+  blog('face rig: close-up locked');
+}}
 if (window.__roomBox) {{
   // stand inside the real room: near one end, eyes up, look down its length
   const rb = window.__roomBox, rc = rb.getCenter(new THREE.Vector3());
@@ -2611,7 +2664,9 @@ const clock = new THREE.Clock(); let t = 0;
 const SET_SLUG = new URLSearchParams(location.search).get('set') || 'biscuit-4cb995';
 document.getElementById('play').textContent = '▶ PLAY SET (' + SET_SLUG.split('-')[0] + ')';
 let beats = [];
+let beatTimes = null; // measured timings preferred over cadence
 try {{ beats = await (await fetch('/freaks/' + SET_SLUG + '/delivery.json')).json().then(j => j.beats || []); }} catch (e) {{}}
+try {{ beatTimes = await (await fetch('/freaks/' + SET_SLUG + '/timings.json')).json().then(j => j.segments || null); }} catch (e) {{}}
 const audio = new Audio();
 audio.preload = 'auto';
 audio.src = '/freaks/' + SET_SLUG + '/set.wav';
@@ -2631,6 +2686,15 @@ audio.load();
 // jaw flap: audio energy → jaw morph (v0 lipsync; phonemes land later).
 let jawSlot = null, analyser = null, freqData = null;
 function initJaw() {{
+  // wawa challenger: direct element tap, no graph needed.
+  try {{
+    if (LIPENGINE === 'wawa' && !wawa && typeof WawaLipsync !== 'undefined') {{
+      wawa = new WawaLipsync();
+      wawa.connectAudio(audio);
+      blog('lipsync: wawa live');
+      return; // wawa owns the mouth; skip MFCC graph entirely
+    }}
+  }} catch (e) {{ blog('wawa miss: ' + e.message); }}
   // real lipsync first (MFCC vowels → visemes, in-browser, free), energy
   // flap as fallback. Created on tap (mobile autoplay policy).
   try {{
@@ -2638,13 +2702,18 @@ function initJaw() {{
       const opts = window.__roomCtx ? {{audioContext: window.__roomCtx}} : {{}};
       VRMLipSync.create(vrm, opts).then((ls) => {{
         window.__lipSync = ls;
+        // route set audio into the analyzer: element -> MediaStreamDestination
+        // -> useStream (documented path). Guessed element-tap APIs removed;
+        // the stream carries the same audio the room hears.
         try {{
-          const src = ls.createMediaElementSource
-            ? ls.createMediaElementSource(audio)
-            : (ls.useElement ? ls.useElement(audio) : null);
-          if (src && src.connect && window.__roomCtx) src.connect(window.__roomCtx.destination);
-        }} catch (e) {{}}
-        blog('lipsync: mfcc live');
+          const ctx = window.__roomCtx;
+          const dest = ctx.createMediaStreamDestination();
+          // reuse the single element source (one per element per context)
+          window.__roomSrc.connect(dest);
+          if (ls.useStream) ls.useStream(dest.stream);
+          else if (ls.useElement) ls.useElement(audio);
+          blog('lipsync: mfcc live (stream-tapped)');
+        }} catch (e) {{ blog('lipsync tap miss: ' + e.message); }}
       }}).catch((e) => {{ blog('lipsync miss, flap fallback'); }});
     }}
   }} catch (e) {{}}
@@ -2655,6 +2724,7 @@ function initJaw() {{
       const ctx = new AC();
       const src = ctx.createMediaElementSource(audio);
       window.__roomCtx = ctx;
+      window.__roomSrc = src;
       analyser = ctx.createAnalyser(); analyser.fftSize = 256;
       freqData = new Uint8Array(analyser.frequencyBinCount);
       src.connect(analyser);
@@ -2697,14 +2767,28 @@ function flapJaw() {{
 window.__venueDbg = {{get audioT() {{ return audio.currentTime; }},
   get audioOn() {{ return !audio.paused; }},
   get jaw() {{ return jawSlot; }}}};
+window.__mouthNow = function () {{
+  try {{
+    const m = vrm.expressionManager;
+    return ['aa','ih','ou','ee','oh','happy'].map(n => Math.round(m.getValue(n) * 100) / 100).join(',');
+  }} catch (e) {{ return 'err'; }}
+}};
+window.__setMouth = function (v) {{
+  try {{ vrm.expressionManager.setValue('aa', v); return 'set'; }}
+  catch (e) {{ return 'err:' + e.message; }}
+}};
 const EXPR = {{setup: 'neutral', punchline: 'happy', tag: 'happy', closer: 'happy', callback: 'happy'}};
+// Emotion channel ONLY (happy/angry/sad/surprised/relaxed/neutral). Never
+// touches mouth visemes (aa/ih/ou/ee/oh) or blink — those belong to the
+// lipsync engine. Old code zeroed everything per beat and stomped the mouth.
+const EMOTION_ONLY = ['happy', 'angry', 'sad', 'surprised', 'relaxed', 'neutral'];
 function setFace(name, val) {{
   if (!vrm || !vrm.expressionManager) return;
   try {{
     const mgr = vrm.expressionManager;
     const all = mgr.expressions.map(e => e.expressionName);
-    all.forEach(n => {{ try {{ mgr.setValue(n, 0); }} catch (e) {{}} }});
-    const slot = all.find(n => n.toLowerCase().includes(name)) || 'happy';
+    EMOTION_ONLY.forEach(n => {{ if (all.includes(n)) try {{ mgr.setValue(n, 0); }} catch (e) {{}} }});
+    const slot = EMOTION_ONLY.includes(name) ? name : (all.includes(name) ? name : 'happy');
     try {{ mgr.setValue(slot, val); }} catch (e) {{}}
   }} catch (e) {{}}
 }}
@@ -2712,6 +2796,23 @@ let beatTimer = null;
 document.getElementById('play').onclick = () => {{
   initJaw();
   audio.play().catch((e) => {{ msg('PLAY BLOCKED: ' + e.name + ' — tap again, check silent switch'); }});
+  clearInterval(beatTimer);
+  beatTimer = null;
+  if (beatTimes && beatTimes.length === beats.length) {{
+    // MEASURED driver: fire each beat at its real start offset.
+    msg('performing ' + beats.length + ' beats (measured timing)');
+    beatTimes.forEach((seg, i) => {{
+      setTimeout(() => {{
+        if (audio.paused) return;
+        const b = beats[i];
+        setFace(EXPR[b.type] || 'neutral', 0.9);
+        playGesture(GESTURE_FOR[b.type] || 'nod');
+        cutCam();
+        spot.intensity = 60 + (b.type === 'punchline' || b.type === 'closer' ? 25 : 0);
+      }}, seg.start_ms);
+    }});
+    return;
+  }}
   msg('performing ' + beats.length + ' beats (approx timing)');
   if (!beats.length || !isFinite(audio.duration)) return;
   const per = (audio.duration || beats.length * 3) / beats.length;
@@ -2789,7 +2890,9 @@ async function tvInit() {{
       if (!f.ok) return;
       pairSeq = f.seq; showTv(f.members);
       f.events.forEach(ev => {{
-        if (ev.kind === 'laugh' || ev.kind === 'haha' || ev.kind === 'clap' || ev.kind === 'cheer') {{
+        if (ev.kind === 'kill') {{
+          document.body.innerHTML = '<div style="background:#000;color:#ff2fa8;font-family:monospace;display:flex;align-items:center;justify-content:center;height:100vh;font-size:24px;letter-spacing:4px">🕯️ INTERMISSION</div>';
+        }} else if (ev.kind === 'laugh' || ev.kind === 'haha' || ev.kind === 'clap' || ev.kind === 'cheer') {{
           heat = Math.min(1, heat + GAIN / (1 + resist));
           resist = Math.max(0, resist - 0.06);
         }} else if (ev.kind === 'boo') {{
@@ -2836,7 +2939,8 @@ renderer.setAnimationLoop(() => {{
   if (vrm) {{ vrm.scene.position.y = S.top_y + Math.sin(t*1.4)*0.008;
     vrm.scene.rotation.y = Math.sin(t*0.4)*0.06;
     if (mixer) mixer.update(dt);
-    if (window.__lipSync) {{ try {{ window.__lipSync.update(); }} catch (e) {{ flapJaw(); }} }}
+    if (LIPENGINE === 'wawa' && wawa) {{ const vk = driveWawa(); if (vk) {{ window.__wawaV = vk; }} }}
+    else if (window.__lipSync) {{ try {{ window.__lipSync.update(); }} catch (e) {{ flapJaw(); }} }}
     else flapJaw();
     vrm.update(t); }}
   renderer.render(scene, camera);
@@ -2922,7 +3026,9 @@ def takes_gallery():
             "playsinline style='width:100%;border-radius:8px'></video>"
             "<div style='font-size:12px;margin-top:6px'>🎬 " + _html.escape(v) +
             " <span style='color:#555'>" + _html.escape(str(m.get("venue", ""))) +
-            " · " + _html.escape(str(m.get("set", ""))) + "</span></div></div>")
+            " · " + _html.escape(str(m.get("set", ""))) + "</span> " +
+            "<button onclick=\"navigator.clipboard.writeText('https://funnier.si/static/takes/" + v + "');this.textContent='✓ link copied'\" " +
+            "style='font-size:11px;padding:4px 10px;border-radius:8px;background:#1a1a2e;color:#eee;border:1px solid #333'>⧉ share</button></div></div>")
     body = "".join(cards) if cards else "<p>No takes yet.</p>"
     return """<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
