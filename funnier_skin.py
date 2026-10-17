@@ -114,6 +114,7 @@ body.ft-index>h1{margin-top:18px!important}
 .ft-skin #code{font-family:var(--fn-display,'Anton',Impact,sans-serif)!important;font-size:64px!important;letter-spacing:.12em!important;color:var(--fn-text,#f3f1ec);text-shadow:0 0 40px rgba(232,16,46,.35)}
 .ft-skin #host button,.ft-skin #decks button{background:var(--fn-panel2,#1a1a22);color:var(--fn-text,#f3f1ec);border:1px solid var(--fn-line,#23232d);border-radius:8px;padding:9px 14px;margin:3px;font-size:13px;letter-spacing:.02em;cursor:pointer}
 .ft-skin #host>button[onclick*="'start'"]{background:var(--fn-red,#e8102e);border-color:var(--fn-red,#e8102e);color:#fff;box-shadow:0 12px 40px -14px var(--fn-red,#e8102e)}
+.ft-skin #cv{max-width:100%;height:auto}
 @media (max-width:600px){.ft-skin .fn-top.ft-top{padding:10px 12px}.ft-skin .fn-top.ft-top .fn-nav a{font-size:13px;padding:6px 7px}.ft-skin .fn-top.ft-top .fn-wordmark{font-size:17px;padding:5px 8px 4px}.ft-skin .fn-userbtn{width:32px;height:32px}}
 @media (max-width:600px){.ft-bill{grid-template-columns:repeat(2,1fr);gap:12px}.ft-mode .ft-poster b{font-size:26px}}
 """
