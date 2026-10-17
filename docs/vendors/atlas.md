@@ -1,5 +1,13 @@
 # Atlas — vendor brief (imported 2026-09-11)
 
+> DISAMBIGUATION 2026-10-17: TWO different products share the name.
+> (A) Atlas.design (below) — mesh generation API. (B) Marble Atlas by
+> World Labs (atlas-beta.worldlabs.ai) — world MODEL (prompt → posed
+> views → splats → GLB). Owner holds Marble beta access. Section B added
+> at the bottom; nothing below was rewritten.
+
+## Mesh pipeline (the part we care about)
+
 Sources: https://docs.atlas.design/ (llms.txt + per-page .md + ?ask= agent
 query). Site: https://atlas.design/. Vienna outfit, SEGA/Square Enix
 customers, Google Cloud Marketplace. Pricing Pro €50/mo = 5,000 pooled
@@ -104,3 +112,38 @@ Raw: ~2M tris / 79MB per clip. Factory decimate 0.1 → ~200k tris / 11MB
 with all 41 bones + skin intact; intake battery passes; watch/AR/record
 all 200. No facial morphs (as predicted — puppet mode stays the face).
 animation_3.glb had not landed in the bucket at intake time.
+
+---
+
+## (B) Marble Atlas — World Labs world model (imported 2026-10-17)
+
+Sources: atlas-beta.worldlabs.ai/docs (how-to-use-atlas, cameras, depth,
+api-reference). API: `https://api.atlas-beta.worldlabs.ai/api/v2`, key
+`WLT_API_KEY` (NOT on box — owner holds beta access).
+
+Loop: pose (`images2PosedRGBD`) → generate (`atlasGenerate` with YOUR
+contextFrames + targetCameras) → edit objects (`atlasMasked`, black =
+edit) → splats → **`splats2Mesh` → GLB** (+texture/vertex colors).
+Start from text via `atlasTextToImage`, or from a depth blockout via
+`atlasChisel` (we control layout: stage + seats as depth, Marble paints
+it). Conventions: 1280×720, camera+depth are one unit, RUB/RDF noted,
+reuse `promptUsed` for speed. Async batch (minutes) — build sets offline,
+perform live.
+
+COMPATIBILITY (verified in code, not claimed):
+- Marble GLB (club, static) + Mutuals/Freaktown VRM (performers) compose
+  in ONE three.js scene. VRM 1.0 is glTF under the hood; our importmap
+  already loads it (@pixiv/three-vrm 3.3.0).
+- Mutuals avatars are `.vrm` models + `.vrma` clips baked onto the
+  skeleton (`extras.mutualsHarness` table) — NOT plain GLB. FoxGlove uses
+  a cooked player profile. Do not convert VRM→GLB and expect motion to
+  survive; keep performers VRM, rooms GLB.
+- Align frames: Marble camera math page before compositing (Y-up vs
+  camera conventions); floor-position cast against predicted (approx)
+  metric scale.
+- Non-humanoids stay clips/props (retargeter can't wear them).
+
+CLUB PLAN: atlasChisel blockout (stage box + seat rows as depth) →
+generate 8–12 posed views → splat → GLB → our stage. Comedians (VRM)
+and hecklers (pips/faces) composite live. Static crowd as inpainted
+objects via atlasMasked; live crowd stays ours.

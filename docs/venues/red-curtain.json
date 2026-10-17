@@ -1,0 +1,413 @@
+{
+  "id": "red-curtain",
+  "name": "Red Curtain",
+  "size": "L",
+  "room": {
+    "w": 32,
+    "d": 24,
+    "h": 9
+  },
+  "stage": {
+    "w": 12,
+    "d": 8,
+    "top_y": 1.0,
+    "front_z": 0,
+    "back_z": -8
+  },
+  "marks": [
+    {
+      "id": "mic",
+      "pos": [
+        0,
+        1.0,
+        -3.0
+      ],
+      "facing": "+Z"
+    },
+    {
+      "id": "wing-l",
+      "pos": [
+        -4.5,
+        1.0,
+        -6.5
+      ],
+      "facing": "+Z"
+    },
+    {
+      "id": "wing-r",
+      "pos": [
+        4.5,
+        1.0,
+        -6.5
+      ],
+      "facing": "+Z"
+    },
+    {
+      "id": "stool",
+      "pos": [
+        2.5,
+        1.0,
+        -3.5
+      ],
+      "facing": "+Z"
+    },
+    {
+      "id": "band",
+      "pos": [
+        -3.5,
+        1.0,
+        -6.0
+      ],
+      "facing": "+Z"
+    },
+    {
+      "id": "judges",
+      "pos": [
+        0,
+        0,
+        4.5
+      ],
+      "facing": "-Z"
+    }
+  ],
+  "props": [
+    {
+      "id": "mic-stand",
+      "anchor": [
+        0,
+        1.0,
+        -3.0
+      ],
+      "pack": "base",
+      "variant": "chrome"
+    },
+    {
+      "id": "stool-tall",
+      "anchor": [
+        2.5,
+        1.0,
+        -3.5
+      ],
+      "pack": "base"
+    },
+    {
+      "id": "curtain-traveler",
+      "anchor": [
+        -6.2,
+        0,
+        -5.0
+      ],
+      "pack": "base"
+    },
+    {
+      "id": "curtain-traveler",
+      "anchor": [
+        6.2,
+        0,
+        -5.0
+      ],
+      "pack": "base"
+    },
+    {
+      "id": "chalk-sigil",
+      "anchor": [
+        0,
+        4.5,
+        -11.9
+      ],
+      "pack": "base"
+    },
+    {
+      "id": "drum-kit",
+      "anchor": [
+        -3.5,
+        1.0,
+        -6.0
+      ],
+      "pack": "band"
+    },
+    {
+      "id": "guitar-stand",
+      "anchor": [
+        -5.0,
+        1.0,
+        -6.0
+      ],
+      "pack": "band"
+    },
+    {
+      "id": "keys-rig",
+      "anchor": [
+        -2.0,
+        1.0,
+        -6.5
+      ],
+      "pack": "band"
+    },
+    {
+      "id": "judging-desk",
+      "anchor": [
+        0,
+        0,
+        4.5
+      ],
+      "pack": "judging"
+    },
+    {
+      "id": "judging-chair",
+      "anchor": [
+        -1.2,
+        0,
+        5.2
+      ],
+      "pack": "judging"
+    },
+    {
+      "id": "judging-chair",
+      "anchor": [
+        0,
+        0,
+        5.2
+      ],
+      "pack": "judging"
+    },
+    {
+      "id": "judging-chair",
+      "anchor": [
+        1.2,
+        0,
+        5.2
+      ],
+      "pack": "judging"
+    },
+    {
+      "id": "buzzer",
+      "anchor": [
+        -1.2,
+        0.78,
+        4.5
+      ],
+      "pack": "judging"
+    },
+    {
+      "id": "buzzer",
+      "anchor": [
+        0,
+        0.78,
+        4.5
+      ],
+      "pack": "judging"
+    },
+    {
+      "id": "buzzer",
+      "anchor": [
+        1.2,
+        0.78,
+        4.5
+      ],
+      "pack": "judging"
+    },
+    {
+      "id": "exit-sign",
+      "anchor": [
+        -15.0,
+        3.0,
+        11.0
+      ],
+      "pack": "base"
+    },
+    {
+      "id": "bulb-cage",
+      "anchor": [
+        10.0,
+        8.5,
+        6.0
+      ],
+      "pack": "base"
+    },
+    {
+      "id": "bar-counter",
+      "anchor": [
+        13.0,
+        0,
+        9.0
+      ],
+      "pack": "base"
+    }
+  ],
+  "light_rig": {
+    "house": {
+      "temp_k": 3000,
+      "level": 0.25,
+      "pos": [
+        0,
+        8.5,
+        6.0
+      ]
+    },
+    "spot": {
+      "temp_k": 4500,
+      "level": 1.0,
+      "pos": [
+        0,
+        8.0,
+        10.0
+      ]
+    },
+    "washes": [
+      {
+        "temp_k": 3200,
+        "level": 0.6,
+        "pos": [
+          -6,
+          8.0,
+          2.0
+        ]
+      },
+      {
+        "temp_k": 3200,
+        "level": 0.6,
+        "pos": [
+          6,
+          8.0,
+          2.0
+        ]
+      },
+      {
+        "temp_k": 5600,
+        "level": 0.4,
+        "pos": [
+          -4,
+          8.0,
+          -6.0
+        ]
+      },
+      {
+        "temp_k": 5600,
+        "level": 0.4,
+        "pos": [
+          4,
+          8.0,
+          -6.0
+        ]
+      }
+    ],
+    "practicals": [
+      "bar amber blur",
+      "EXIT green",
+      "booth window",
+      "marquee red"
+    ]
+  },
+  "cameras": [
+    {
+      "id": "wide",
+      "pos": [
+        0,
+        4.5,
+        17.0
+      ],
+      "fov": 46
+    },
+    {
+      "id": "medium",
+      "pos": [
+        0,
+        3.0,
+        10.0
+      ],
+      "fov": 34
+    },
+    {
+      "id": "close",
+      "pos": [
+        0,
+        2.4,
+        5.5
+      ],
+      "fov": 28
+    },
+    {
+      "id": "side",
+      "pos": [
+        8.0,
+        3.0,
+        4.0
+      ],
+      "fov": 40
+    },
+    {
+      "id": "booth",
+      "pos": [
+        0,
+        5.0,
+        11.0
+      ],
+      "fov": 30
+    },
+    {
+      "id": "crowd",
+      "pos": [
+        0,
+        2.0,
+        8.0
+      ],
+      "fov": 50
+    },
+    {
+      "id": "backstage",
+      "pos": [
+        -5.0,
+        2.5,
+        -7.0
+      ],
+      "fov": 40
+    },
+    {
+      "id": "judges-cam",
+      "pos": [
+        0,
+        1.8,
+        7.5
+      ],
+      "fov": 32
+    }
+  ],
+  "crowd": {
+    "capacity": 400,
+    "zones": [
+      {
+        "id": "front",
+        "tier": "face",
+        "count": 60
+      },
+      {
+        "id": "mid",
+        "tier": "pip",
+        "count": 180
+      },
+      {
+        "id": "balcony",
+        "tier": "pip",
+        "count": 160
+      }
+    ]
+  },
+  "budgets": {
+    "glb_mb": 200,
+    "parses": 8
+  },
+  "glb": {
+    "sha256": "pending-atlas-job"
+  },
+  "acoustics": {
+    "rt60": 1.6,
+    "warmth": 0.5,
+    "bed_db": -18
+  },
+  "physics": {
+    "decay": 0.9,
+    "laugh_gain": 0.12,
+    "resist_start": 0.6
+  }
+}

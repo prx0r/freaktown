@@ -1,8 +1,6 @@
 # AGENTS.md — freaktown
 
-New agent: read in order: `HANDOVER-2026-09-12.md` (latest state), then
-`docs/BOUNDARIES.md` (what lives where), then this file. Do not build until
-you have read all three.
+New agent: read in order: `docs/STATUS.md` (honest vision/done/not-done/theatre/next — start here), then `HANDOVER-2026-10-17.md` (latest: stage day), then `docs/BOUNDARIES.md` (what lives where), then this file. Do not build until you have read all four. `HANDOVER-2026-09-12.md` is STALE — do not treat it as latest.
 
 ## What freaktown owns
 
@@ -30,8 +28,10 @@ except bundles and events.
 ## Binding rules
 
 1. **Secrets in vault/env, never in tree, never in chat.** Before every
-   commit: `grep -rIlE "cfat_|ghp_|sk-[A-Za-z0-9]{10,}" --exclude-dir=.git .`
-   must print nothing. Vault reads need `member` role; proxy role only wraps
+   commit the secret-scan must print nothing:
+   `grep -rIlE "cfat""_|ghp""_|sk-[A-Za-z0-9]{10,}" --exclude-dir=.git .`
+   (split-quoted so this file doesn't self-match; shell concatenates it to
+   the real pattern). Vault reads need `member` role; proxy role only wraps
    outbound calls.
 2. **Never push.** Owner pushes. Commit locally only when asked.
 3. **Check the site before claiming a deploy.** `curl` the public URL and the
@@ -53,25 +53,40 @@ except bundles and events.
 9. **Background servers fight sandboxes.** Prefer in-process Flask test
    client for verification; use tunnels only for public demos.
 
+## Live status (verified 2026-10-16, honest)
+
+- Box: systemd `freaktown.service` active, `/usr/bin/python3`, PORT 8090.
+  There is NO venv on this box (`/home/ubuntu/.venvs/freaktown` is gone —
+  do not source it). System python runs the service.
+- On-box: `http://127.0.0.1:8090/play` → 200. `http://127.0.0.1:8090/party` → 404 (no such route — Flask home is `/play`).
+- Public: `https://party.funnier.si/play` → 200 (direct Caddy+TLS, works).
+  `https://www.funnier.si/party` and `/play` → currently 404 (Worker `funnier-web` `/party`→`/play` mapping is broken — do NOT claim the www URL is live until you curl it yourself).
+- Missing runtime: no `.env` on disk (Ella LLM dead until restored), no `data/` dir (persistence restarts empty). `party_rooms.json` / `party_records.json` / `party_events.jsonl` exist but are gitignored runtime state.
+- Canon lives in `/root/improv/docs/`: `PARTY-FORMATS.md` (12 modes, 19+ formats), `ENGINES.md` (E1–E12), `MVP-FREEZE-NIGHT-V1.md`. Only 3 modes are wired in `party.py`.
+
 ## Where things are
 
-`HANDOVER-2026-09-12.md` (latest) · `NORTHSTAR.md` (avatar doctrine) ·
-`docs/` (index below) · `contracts/` (schema authority) ·
-`backend/services/` (delivery, audio, ella, judge, scoring, bundles) ·
-`packages/stage-runtime/` (live performer) ·
-`edge/worker/` (episode room + ella live) ·
-`apps/live/` (web client) ·
-`freaks/` (bundle storage, gitignored) ·
-`archive/` (retired engine, read-only).
+`docs/STATUS.md` (honest state — read first) · `HANDOVER-2026-10-16.md` (latest build) · `NORTHSTAR.md` (avatar doctrine) · `docs/` (map in `docs/README.md`) · `party.py` (party game — the live multiplayer loop) · `lab.py` (tech-lab rigs only, never called by game) · `comedy/` (theory engine — currently NEVER imported by `party.py`) · `game-packs/freeze-night-v1.freak-game.json` (pack spec — currently NEVER loaded by `party.py`, hardcoded `FZ_ROUNDS` rules instead) · `static/smile-referee.js` + `static/affect-servo.js` (served by lab only, no `<script>` tag in stage/controller) · `backend/services/` (delivery/audio/ella) · `apps/live/src` (web client) · `archive/` (retired engine, read-only).
 
 ## Commands
 
 ```bash
-source /home/ubuntu/.venvs/freaktown/bin/activate
-pytest tests/contract -q      # contract suite (46/47 pass, 1 env failure)
-python3 test_party.py         # party sim (script, never pytest)
-python3 app.py                # Flask dev server (live traffic, need .env)
+/usr/bin/python3 test_allbots.py && /usr/bin/python3 test_freeze_night.py && /usr/bin/python3 test_party.py && /usr/bin/python3 test_stone_face.py
+/usr/bin/python3 test_quip_clash.py && /usr/bin/python3 test_solo_night.py && /usr/bin/python3 test_tech_lab.py
+pytest tests/contract -q      # contract suite (1 pre-existing env failure: livekit not installed)
+curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8090/play   # on-box check
+curl -s -o /dev/null -w "%{http_code}\n" https://party.funnier.si/play # public check
 ```
+
+## Theatre warnings (do not claim these work until you verify)
+
+1. `comedy/` does not drive the game. Zero imports in `party.py` — no pregate→director→delivery chain, no vetoes, no priors in scoring.
+2. The game-pack JSON is not loaded. `_fz_next_round` uses hardcoded `FZ_ROUNDS`; pack drift is real (min players 3 vs 4, no SCENE/HALFTIME/CROWNING, 8-seg wheel vs canon 12).
+3. Affect/smile/props rigs are lab-only. `lab.py` validator + `affect-servo.js` vote weights + `smile-referee.js` are never called by `party.py` tallies.
+4. Bots drive freeze-night + quip only. No bot driver for roast-relay / freaktionary (`test_allbots.py` skips them by design).
+5. Controller could not send callbacks or caught-that until the 2026-10-16 fix (callback textarea + I-CAUGHT-THAT button). Server API existed; UI did not.
+6. `test_jev_images` / `test_affect_parity` cited in the 10-16 handover do not exist in-tree — do not cite them as coverage.
+7. Game-truth boundary is aspirational, not enforced. This repo says "game truth lives in pogtown" but `party.py` IS a full game implementation (rooms, rounds, ballots, bots). Treat the boundary doc as intent, not fact.
 
 ## Known failures
 

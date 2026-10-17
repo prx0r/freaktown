@@ -1,0 +1,262 @@
+{
+  "id": "cauldron",
+  "name": "The Cauldron",
+  "size": "S",
+  "room": {
+    "w": 12,
+    "d": 9,
+    "h": 3.4
+  },
+  "stage": {
+    "w": 4.5,
+    "d": 3,
+    "top_y": 0.6,
+    "front_z": 0,
+    "back_z": -3
+  },
+  "marks": [
+    {
+      "id": "mic",
+      "pos": [
+        0,
+        0.6,
+        -1.2
+      ],
+      "facing": "+Z"
+    },
+    {
+      "id": "wing-l",
+      "pos": [
+        -1.5,
+        0.6,
+        -2.2
+      ],
+      "facing": "+Z"
+    },
+    {
+      "id": "wing-r",
+      "pos": [
+        1.5,
+        0.6,
+        -2.2
+      ],
+      "facing": "+Z"
+    }
+  ],
+  "props": [
+    {
+      "id": "mic-stand",
+      "anchor": [
+        0,
+        0.6,
+        -1.2
+      ],
+      "pack": "base",
+      "variant": "brass-worn"
+    },
+    {
+      "id": "stool-tall",
+      "anchor": [
+        1.5,
+        0.6,
+        -2.2
+      ],
+      "pack": "base"
+    },
+    {
+      "id": "curtain-traveler",
+      "anchor": [
+        -2.4,
+        0,
+        -1.5
+      ],
+      "pack": "base"
+    },
+    {
+      "id": "curtain-traveler",
+      "anchor": [
+        2.4,
+        0,
+        -1.5
+      ],
+      "pack": "base"
+    },
+    {
+      "id": "chalk-sigil",
+      "anchor": [
+        0,
+        1.9,
+        -3.45
+      ],
+      "pack": "base"
+    },
+    {
+      "id": "table-cocktail",
+      "anchor": [
+        -1.5,
+        0,
+        2.5
+      ],
+      "pack": "base"
+    },
+    {
+      "id": "table-cocktail",
+      "anchor": [
+        1.5,
+        0,
+        2.5
+      ],
+      "pack": "base"
+    },
+    {
+      "id": "ashtray",
+      "anchor": [
+        -1.5,
+        0.78,
+        2.5
+      ],
+      "pack": "base"
+    },
+    {
+      "id": "exit-sign",
+      "anchor": [
+        -5.5,
+        2.2,
+        5.2
+      ],
+      "pack": "base"
+    },
+    {
+      "id": "bulb-cage",
+      "anchor": [
+        2.5,
+        3.3,
+        2.0
+      ],
+      "pack": "base"
+    },
+    {
+      "id": "bar-counter",
+      "anchor": [
+        4.5,
+        0,
+        4.5
+      ],
+      "pack": "base"
+    }
+  ],
+  "light_rig": {
+    "house": {
+      "temp_k": 2700,
+      "level": 0.15,
+      "pos": [
+        0,
+        3.3,
+        2.0
+      ]
+    },
+    "spot": {
+      "temp_k": 4000,
+      "level": 1.0,
+      "pos": [
+        0,
+        3.2,
+        5.2
+      ]
+    },
+    "washes": [
+      {
+        "temp_k": 3200,
+        "level": 0.5,
+        "pos": [
+          -2,
+          3.0,
+          1.0
+        ]
+      },
+      {
+        "temp_k": 3200,
+        "level": 0.5,
+        "pos": [
+          2,
+          3.0,
+          1.0
+        ]
+      }
+    ],
+    "practicals": [
+      "bar amber blur",
+      "EXIT green"
+    ]
+  },
+  "cameras": [
+    {
+      "id": "wide",
+      "pos": [
+        0,
+        2.2,
+        7.0
+      ],
+      "fov": 46
+    },
+    {
+      "id": "medium",
+      "pos": [
+        0,
+        1.7,
+        4.2
+      ],
+      "fov": 34
+    },
+    {
+      "id": "close",
+      "pos": [
+        0,
+        1.6,
+        2.4
+      ],
+      "fov": 28
+    },
+    {
+      "id": "side",
+      "pos": [
+        3.5,
+        1.8,
+        2.0
+      ],
+      "fov": 40
+    }
+  ],
+  "crowd": {
+    "capacity": 40,
+    "zones": [
+      {
+        "id": "front",
+        "tier": "face",
+        "count": 16
+      },
+      {
+        "id": "back",
+        "tier": "pip",
+        "count": 24
+      }
+    ]
+  },
+  "budgets": {
+    "glb_mb": 30,
+    "parses": 3
+  },
+  "glb": {
+    "sha256": "pending-atlas-job"
+  },
+  "acoustics": {
+    "rt60": 0.7,
+    "warmth": 0.8,
+    "bed_db": -14
+  },
+  "physics": {
+    "decay": 0.85,
+    "laugh_gain": 0.18,
+    "resist_start": 0.35
+  }
+}

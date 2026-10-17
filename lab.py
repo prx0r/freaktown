@@ -9,6 +9,7 @@ need spend sign-off).
 import json
 
 from flask import Blueprint, jsonify, request
+from harness_adapter import compile_harness_beats
 
 lab_bp = Blueprint("lab", __name__)
 
@@ -210,6 +211,25 @@ def lab_servo():
 
 PROP_OPS = {"uv_sphere", "cube", "cylinder", "torus", "cone", "plane"}
 PROP_STYLES = {"matcap", "anime", "noir", "clay", "hero"}
+
+
+@lab_bp.route("/party/acting/preview", methods=["POST"])
+def acting_preview():
+    """Free, deterministic staging preview for stand-up or Party actors.
+
+    Supply text + Mutuals-style beats + measured word timings. No external
+    model, voice provider, camera or paid inference is called.
+    """
+    data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict) or len(str(data.get("text", ""))) > 4000:
+        return jsonify({"ok": False, "error": "invalid or oversized request"}), 400
+    try:
+        output = compile_harness_beats(data.get("text", ""),
+                                       data.get("beats", []), data.get("words", []),
+                                       data.get("capabilities", {}))
+    except (ValueError, TypeError) as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    return jsonify({"ok": True, **output})
 
 
 @lab_bp.route("/party/prop/validate", methods=["POST"])

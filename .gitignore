@@ -4,6 +4,7 @@ __pycache__/
 audio_output/
 transcript_*.json
 .venv/
+.venv-heat/
 training_data/
 *.jsonl
 .hf_token

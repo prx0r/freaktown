@@ -14,6 +14,7 @@ value must not be able to kill a live performance.
 """
 
 from .bundle import BeatSpan, estimate_spans, spans_from_offsets
+from harness_adapter import compile_harness_beats
 
 # gesture → (action, layer, bone_mask, duration_ms)
 GESTURE_ACTION = {
@@ -105,6 +106,25 @@ def resolve_cues(manifest: dict, offsets: list[dict] | None = None,
         elif kind == "sfx":
             if value:
                 sfx.append({"at_ms": at, "name": value})
+    # Optional Mutuals Character Harness acting overlay. Timing is
+    # measured from the sealed performance's word offsets, not estimated.
+    acting = manifest.get("acting") if isinstance(manifest, dict) else None
+    if isinstance(acting, dict) and acting.get("schema") == "mutuals-beats/v1":
+        line = " ".join(b.get("text", "") for b in
+                        (manifest.get("delivery") or {}).get("beats", []))
+        word_times = manifest.get("words") or []
+        caps = (manifest.get("avatar") or {}).get("capabilities") or {}
+        try:
+            compiled = compile_harness_beats(line, acting.get("beats", []), word_times, caps)
+        except (ValueError, TypeError):
+            # Malformed/unaligned optional directions must never kill a show.
+            compiled = {"motion": [], "camera": []}
+        motion.extend(compiled["motion"])
+        camera.extend(compiled["camera"])
+        # Only the base cues are estimates when no explicit offsets exist.
+        if not cues:
+            estimated = False
+        # This overlay must NOT relabel AI reactions as observed human laughs.
     motion.sort(key=lambda m: m["at_ms"])
     camera.sort(key=lambda m: m["at_ms"])
     sfx.sort(key=lambda m: m["at_ms"])

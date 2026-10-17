@@ -1,0 +1,295 @@
+{
+  "id": "medium",
+  "name": "Medium",
+  "size": "M",
+  "room": {
+    "w": 18,
+    "d": 14,
+    "h": 5.5
+  },
+  "stage": {
+    "w": 8,
+    "d": 5,
+    "top_y": 0.9,
+    "front_z": 0,
+    "back_z": -5
+  },
+  "marks": [
+    {
+      "id": "mic",
+      "pos": [
+        0,
+        0.9,
+        -2.0
+      ],
+      "facing": "+Z"
+    },
+    {
+      "id": "wing-l",
+      "pos": [
+        -3.0,
+        0.9,
+        -4.0
+      ],
+      "facing": "+Z"
+    },
+    {
+      "id": "wing-r",
+      "pos": [
+        3.0,
+        0.9,
+        -4.0
+      ],
+      "facing": "+Z"
+    },
+    {
+      "id": "stool",
+      "pos": [
+        1.8,
+        0.9,
+        -2.5
+      ],
+      "facing": "+Z"
+    }
+  ],
+  "props": [
+    {
+      "id": "mic-stand",
+      "anchor": [
+        0,
+        0.9,
+        -2.0
+      ],
+      "pack": "base",
+      "variant": "black"
+    },
+    {
+      "id": "stool-tall",
+      "anchor": [
+        1.8,
+        0.9,
+        -2.5
+      ],
+      "pack": "base"
+    },
+    {
+      "id": "curtain-traveler",
+      "anchor": [
+        -4.2,
+        0,
+        -3.0
+      ],
+      "pack": "base"
+    },
+    {
+      "id": "curtain-traveler",
+      "anchor": [
+        4.2,
+        0,
+        -3.0
+      ],
+      "pack": "base"
+    },
+    {
+      "id": "chalk-sigil",
+      "anchor": [
+        0,
+        2.6,
+        -6.9
+      ],
+      "pack": "base"
+    },
+    {
+      "id": "table-cocktail",
+      "anchor": [
+        -3,
+        0,
+        4.0
+      ],
+      "pack": "base"
+    },
+    {
+      "id": "table-cocktail",
+      "anchor": [
+        3,
+        0,
+        4.0
+      ],
+      "pack": "base"
+    },
+    {
+      "id": "table-cocktail",
+      "anchor": [
+        0,
+        0,
+        6.0
+      ],
+      "pack": "base"
+    },
+    {
+      "id": "exit-sign",
+      "anchor": [
+        -8.5,
+        2.4,
+        6.5
+      ],
+      "pack": "base"
+    },
+    {
+      "id": "bulb-cage",
+      "anchor": [
+        5.0,
+        5.3,
+        3.0
+      ],
+      "pack": "base"
+    },
+    {
+      "id": "bar-counter",
+      "anchor": [
+        7.0,
+        0,
+        5.5
+      ],
+      "pack": "base"
+    }
+  ],
+  "light_rig": {
+    "house": {
+      "temp_k": 3000,
+      "level": 0.3,
+      "pos": [
+        0,
+        5.3,
+        3.0
+      ]
+    },
+    "spot": {
+      "temp_k": 4200,
+      "level": 1.0,
+      "pos": [
+        0,
+        5.0,
+        6.5
+      ]
+    },
+    "washes": [
+      {
+        "temp_k": 3200,
+        "level": 0.5,
+        "pos": [
+          -4,
+          5.0,
+          1.0
+        ]
+      },
+      {
+        "temp_k": 3200,
+        "level": 0.5,
+        "pos": [
+          4,
+          5.0,
+          1.0
+        ]
+      },
+      {
+        "temp_k": 2800,
+        "level": 0.4,
+        "pos": [
+          0,
+          5.0,
+          -4.0
+        ]
+      }
+    ],
+    "practicals": [
+      "bar amber blur",
+      "EXIT green",
+      "booth window"
+    ]
+  },
+  "cameras": [
+    {
+      "id": "wide",
+      "pos": [
+        0,
+        3.0,
+        11.0
+      ],
+      "fov": 46
+    },
+    {
+      "id": "medium",
+      "pos": [
+        0,
+        2.2,
+        6.5
+      ],
+      "fov": 34
+    },
+    {
+      "id": "close",
+      "pos": [
+        0,
+        1.9,
+        3.6
+      ],
+      "fov": 28
+    },
+    {
+      "id": "side",
+      "pos": [
+        5.5,
+        2.2,
+        3.0
+      ],
+      "fov": 40
+    },
+    {
+      "id": "booth",
+      "pos": [
+        0,
+        3.5,
+        6.8
+      ],
+      "fov": 30
+    }
+  ],
+  "crowd": {
+    "capacity": 150,
+    "zones": [
+      {
+        "id": "front",
+        "tier": "face",
+        "count": 40
+      },
+      {
+        "id": "mid",
+        "tier": "pip",
+        "count": 60
+      },
+      {
+        "id": "balcony",
+        "tier": "pip",
+        "count": 50
+      }
+    ]
+  },
+  "budgets": {
+    "glb_mb": 80,
+    "parses": 5
+  },
+  "glb": {
+    "sha256": "pending-atlas-job"
+  },
+  "acoustics": {
+    "rt60": 1.1,
+    "warmth": 0.6,
+    "bed_db": -16
+  },
+  "physics": {
+    "decay": 0.88,
+    "laugh_gain": 0.15,
+    "resist_start": 0.5
+  }
+}

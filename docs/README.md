@@ -1,12 +1,15 @@
 # docs/ — freaktown docs map
 
-Read in order: `BOUNDARIES.md` → `TRIAL_STAGE1_PLAN.md` → `CHARACTER_PACK.md`
-→ then the relevant deep-dive below.
+Read in order: `STATUS.md` (honest state — start here) → `BOUNDARIES.md` →
+`TRIAL_STAGE1_PLAN.md` → `CHARACTER_PACK.md` → then the relevant deep-dive
+below. `HANDOVER-2026-10-16.md` (repo root) is the latest build handover —
+`HANDOVER-2026-09-12.md` is stale, do not treat it as latest.
 
 ## Architecture and boundaries
 
 | File | What it is |
 |---|---|
+| STATUS.md | Honest state: vision, done, not-done, theatre-vs-real, human-only list, next |
 | BOUNDARIES.md | What lives where: pogtown vs freaktown, old vs new, three rooms, hard rules |
 | ARCHITECTURE.md | Live system map: Flask strangler, backend, edge, stage-runtime, contracts |
 | AGENT-ONBOARDING.md | Quick-start for coding agents joining the project |
@@ -48,5 +51,6 @@ Read in order: `BOUNDARIES.md` → `TRIAL_STAGE1_PLAN.md` → `CHARACTER_PACK.md
 | File | What it is |
 |---|---|
 | HANDOVER.md | Session close 2026-09-11 (historical, base state) |
-| HANDOVER-2026-09-12.md | Latest session: avatar flow, short URLs, revoice, takes, Blender |
+| HANDOVER-2026-09-12.md | Stale session: avatar flow, short URLs, revoice, takes, Blender (NOT latest) |
+| HANDOVER-2026-10-16.md (repo root) | Latest session: Party MVP build day — read this one |
 | migration/ | Alembic database migrations |

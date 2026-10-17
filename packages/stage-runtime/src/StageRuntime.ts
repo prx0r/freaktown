@@ -46,6 +46,7 @@ export class StageRuntime {
   private renderer: THREE.WebGLRenderer;
   private clock: THREE.Clock;
   private mixer: THREE.AnimationMixer | null = null;
+  private gestureActions = new Map<string, THREE.AnimationAction>();
   private vrm: VRM | null = null;
 
   // Subsystems
@@ -206,6 +207,13 @@ export class StageRuntime {
           this.vrm = vrm;
           this.scene.add(vrm.scene);
           this.mixer = new THREE.AnimationMixer(vrm.scene);
+          this.gestureActions.clear();
+          for (const clip of gltf.animations) {
+            // Prepared Mutuals VRMs carry named gesture clips. Ordinary VRMs
+            // can use the same mapping; missing clips simply do nothing.
+            const key = clip.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+            this.gestureActions.set(key, this.mixer.clipAction(clip));
+          }
 
           // VRM LookAt tracks our persistent gaze target
           if (vrm.lookAt) {
@@ -418,12 +426,13 @@ export class StageRuntime {
     }
 
     // Gesture
-    if (action.startsWith('gesture.') || action === 'locomotion.freeze') {
+    if (action.startsWith('gesture.') || action === 'locomotion.freeze' ||
+        ['shrug', 'point', 'wave', 'lean_in'].includes(action)) {
       this.executeGesture(action, cue);
     }
 
     // Face expression
-    if (action.startsWith('face.') || action.startsWith('reaction.')) {
+    if (action.startsWith('face.') || action.startsWith('reaction.') || action.startsWith('face_')) {
       this.executeFace(action, cue.intensity);
     }
 
@@ -461,8 +470,21 @@ export class StageRuntime {
       return;
     }
 
-    // Placeholder: gesture would load and play a clip
-    // In production: fetch motion asset from R2, create AnimationClip, play
+    // Play an embedded/retargeted GLB clip on the existing mixer.
+    // Separate R2 motion assets still require their own loader and capability
+    // mapping; this handles the common Mutuals-prepared VRM path.
+    const raw = action.replace(/^gesture\./, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const name = raw === 'leanin' ? 'lean' : raw;
+    const clip = this.gestureActions.get(name) ??
+      [...this.gestureActions.entries()].find(([key]) =>
+        key === name || key.startsWith(name + 'gestures') || key.startsWith(name + 'gesture'))?.[1];
+    if (!clip) return;
+    clip.reset();
+    clip.setLoop(THREE.LoopOnce, 1);
+    clip.clampWhenFinished = true;
+    clip.setEffectiveWeight(Math.max(0, Math.min(1, cue.intensity ?? 0.75)));
+    clip.fadeIn(0.12);
+    clip.play();
   }
 
   // Emotion expressions driven by semantic beats. Targeted writes ONLY —
@@ -478,6 +500,12 @@ export class StageRuntime {
 
     const exprMap: Record<string, string> = {
       'face.smile': 'happy',
+      'reaction.smile': 'happy',
+      'face_deadpan': 'neutral',
+      'face_excited': 'happy',
+      'face_whisper': 'neutral',
+      'face_shout': 'angry',
+      'face_neutral': 'neutral',
       'face.frown': 'sad',
       'face.annoyed': 'angry',
       'face.surprised': 'surprised',

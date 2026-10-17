@@ -15,11 +15,12 @@ import os
 import re
 import struct
 import subprocess
+import sys
 import time
 import wave
 from pathlib import Path
 
-from flask import Flask, send_from_directory, jsonify, request
+from flask import Flask, send_from_directory, send_file, jsonify, request
 
 from party import party_bp
 from lab import lab_bp
@@ -1534,6 +1535,1017 @@ def watch_character_set_canonical(char, set):
     return _render_watch(slug)
 
 
+# ── /perform: live stage (watch a freak perform) ──────────────────────
+# Same player core as /f/<slug> (set.wav + beat captions + avatar + laugh
+# buttons), wrapped in a live-night frame: bill, headliner, predicted-heat
+# strip, finale verdict. Laugh-sim is HEURISTIC_V0 (type/position prior +
+# characters' published 0.55/0.35 thresholds) until the real laugh model is
+# vendored — the /api/perform/<slug>/heat contract is the swap-in point.
+
+PERFORM_HEAT_MODEL = "heuristic-v0"
+PERFORM_CROWD_P = 0.55   # characters crowd_sim: full crowd at/above
+PERFORM_CHUCKLE_P = 0.35  # characters crowd_sim: chuckle band below crowd
+_PERFORM_TYPE_P = {"punchline": 0.62, "tag": 0.50, "closer": 0.55,
+                   "setup": 0.30}
+
+
+def _perform_bundles() -> list:
+    """Stage-ready bundles (set.wav present), newest first. Canonical
+    player logic lives in _render_watch; this only lists the bill."""
+    out = []
+    for d in sorted(FREAK_DIR.iterdir()):
+        if not d.is_dir():
+            continue
+        meta = _bundle_meta(d.name)
+        if not meta or not (d / "set.wav").exists():
+            continue
+        out.append((d.name, meta))
+    out.sort(key=lambda x: x[1].get("created_at", ""), reverse=True)
+    return out
+
+
+_PERFORM_HEAT_CACHE: dict = {}
+
+
+def _perform_model_p(slug: str) -> tuple:
+    """Real laugh probabilities from characters' delivery-aware model
+    (AUC 0.654, leave-one-comedian-out) via the numpy2 venv sidecar.
+    Returns (model_name, {beat_id: p}). Cached per slug. Any failure ->
+    empty (caller falls back to heuristic). Read-only on both repos."""
+    import subprocess as _sp
+    if slug in _PERFORM_HEAT_CACHE:
+        return _PERFORM_HEAT_CACHE[slug]
+    out = (PERFORM_HEAT_MODEL, {})
+    try:
+        r = _sp.run([str(Path(__file__).parent / ".venv-heat" / "bin" / "python"),
+                     str(Path(__file__).parent / "scripts" / "heat_model.py"), slug],
+                    capture_output=True, text=True, timeout=25)
+        d = json.loads(r.stdout or "{}")
+        if d.get("ok"):
+            out = (d.get("model", PERFORM_HEAT_MODEL),
+                   {b["id"]: b["p"] for b in d.get("beats", [])})
+    except Exception:
+        pass
+    _PERFORM_HEAT_CACHE[slug] = out
+    return out
+
+
+def _perform_beats(slug: str) -> list:
+    """Beat timeline + laugh probability. Mirrors the span logic
+    in _render_watch (measured offsets, else shared estimator)."""
+    from backend.services.freaktown.bundle import (
+        estimate_spans, spans_from_offsets,
+    )
+    bdir = FREAK_DIR / slug
+    meta = _bundle_meta(slug) or {}
+    try:
+        delivery = json.loads((bdir / "delivery.json").read_text())
+    except Exception:
+        return []
+    try:
+        offsets = json.loads((bdir / "offsets.json").read_text()).get("offsets", [])
+    except Exception:
+        offsets = []
+    beats_in = delivery.get("beats", [])
+    if not beats_in:
+        return []
+    duration_ms = int(float(meta.get("duration_s", 0)) * 1000) or None
+    spans = spans_from_offsets(offsets) if offsets else estimate_spans(beats_in, duration_ms)
+    by_id = {s.beat_id: s for s in spans}
+    n = len(beats_in)
+    model_name, model_p = _perform_model_p(slug)
+    out = []
+    for i, b in enumerate(beats_in):
+        s = by_id.get(b.get("id"))
+        if s is None:
+            continue
+        if b.get("id") in model_p:
+            p, src = model_p[b["id"]], model_name
+        else:
+            base = _PERFORM_TYPE_P.get(str(b.get("type", "")).lower(), 0.35)
+            ramp = min(1.25, 1.0 + 0.5 * (i / max(1, n - 1)))
+            p, src = round(min(0.95, base * ramp), 3), PERFORM_HEAT_MODEL
+        out.append({"text": b.get("text", ""), "start": s.start_ms,
+                    "end": s.start_ms + s.speech_ms, "p_laugh": p,
+                    "src": src,
+                    "crowd": p >= PERFORM_CROWD_P,
+                    "chuckle": PERFORM_CHUCKLE_P <= p < PERFORM_CROWD_P})
+    return out
+
+
+@app.route("/perform")
+def perform_bill():
+    """Tonight's bill: headliner + lineup. Every act is a stage-ready set."""
+    import html as _html
+    bill = _perform_bundles()
+    if not bill:
+        return "No acts ready yet. Make one in the Black Room.", 404
+    head_slug, head_meta = bill[0]
+    head_char = (head_meta.get("character", {}) or {}).get("name", head_slug)
+    cards = []
+    for slug, m in bill:
+        char = (m.get("character", {}) or {}).get("name", slug)
+        img = (f"/freaks/{slug}/portrait.png"
+               if (FREAK_DIR / slug / "portrait.png").exists() else "/icon-512.png")
+        cards.append(
+            f"<a href='/perform/{slug}' style='display:inline-block;width:150px;margin:8px;"
+            f"padding:10px;border:1px solid #282833;border-radius:12px;color:#eee;"
+            f"text-decoration:none;vertical-align:top'>"
+            f"<img src='{img}' style='width:100%;border-radius:8px'>"
+            f"<div style='font-size:13px;margin-top:6px'>{_html.escape(char)}</div>"
+            f"<div style='color:#666;font-size:11px'>{m.get('duration_s', 0)}s</div></a>")
+    return f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TONIGHT — Freak Town Live</title>
+<style>body{{background:#0a0a0f;color:#eee;font-family:monospace;text-align:center;padding:32px 16px}}
+a{{color:#ff2fa8}}</style></head><body>
+<div style="font-size:12px;letter-spacing:2px;color:#ff2fa8;">🎪 FREAK TOWN · LIVE</div>
+<h1>TONIGHT'S BILL</h1>
+<p style="color:#888;">Headliner: <a href="/perform/{head_slug}">{_html.escape(head_char)}</a></p>
+<div>{''.join(cards)}</div>
+<p style="color:#555;font-size:12px;margin-top:16px">{len(bill)} acts · pre-rendered sets,
+live audience · predicted heat is heuristic v0</p>
+</body></html>""", 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
+@app.route("/api/perform/<slug>/heat")
+def perform_heat(slug):
+    """Per-beat laugh prediction contract. v0 = heuristic prior; a vendored
+    laugh model answers this same shape later. Never a laughter label —
+    predictions only, observed laughs come from /api/react."""
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    beats = _perform_beats(slug)
+    if not beats and not (FREAK_DIR / slug / "set.wav").exists():
+        return jsonify({"ok": False, "error": "no such set"}), 404
+    srcs = sorted({b.get("src", PERFORM_HEAT_MODEL) for b in beats})
+    return jsonify({"ok": True, "slug": slug, "model": PERFORM_HEAT_MODEL,
+                    "models": srcs,
+                    "thresholds": {"crowd": PERFORM_CROWD_P,
+                                   "chuckle": PERFORM_CHUCKLE_P},
+                    "beats": beats})
+
+
+@app.route("/api/perform/<slug>/acting")
+def perform_acting(slug):
+    """Deterministic acting timeline: delivery beats + measured offsets +
+    character vibe profile -> timestamped expression/gesture/look/hold/
+    camera events. No model, no randomness (seeded by beat id). This is the
+    swap-in point for characters' jev_loop delivery profiles: same shape,
+    richer values."""
+    import hashlib as _hl
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    bdir = FREAK_DIR / slug
+    meta = _bundle_meta(slug) or {}
+    try:
+        delivery = json.loads((bdir / "delivery.json").read_text())
+    except Exception:
+        return jsonify({"ok": False, "error": "no such set"}), 404
+    try:
+        from backend.services.freaktown.bundle import (
+            estimate_spans, spans_from_offsets,
+        )
+        try:
+            offsets = json.loads((bdir / "offsets.json").read_text()).get("offsets", [])
+        except Exception:
+            offsets = []
+        beats_in = delivery.get("beats", [])
+        duration_ms = int(float(meta.get("duration_s", 0)) * 1000) or None
+        spans = spans_from_offsets(offsets) if offsets else estimate_spans(beats_in, duration_ms)
+        by_id = {s.beat_id: s for s in spans}
+    except Exception:
+        by_id = {}
+    vibe = ((meta.get("character", {}) or {}).get("vibe", "")
+            or (meta.get("character", {}) or {}).get("premise", ""))
+    prof = profile_for_vibe(vibe)
+    gf = prof.get("gesture_frequency", 0.3)
+    hold_ms = prof.get("punchline_hold_ms", 850)
+    events = []
+    for b in delivery.get("beats", []):
+        s = by_id.get(b.get("id"))
+        if s is None:
+            continue
+        t, end = s.start_ms, s.start_ms + s.speech_ms
+        perf = b.get("performance", {}) or {}
+        btype = str(b.get("type", "")).lower()
+        events.append({"t": t, "kind": "expression",
+                       "value": perf.get("expression", "neutral")})
+        events.append({"t": t, "kind": "look",
+                       "value": perf.get("look", "audience")})
+        gest = perf.get("gesture", "normal")
+        seed = int(_hl.sha256(str(b.get("id", "")).encode()).hexdigest(), 16) % 1000 / 1000.0
+        if gest and gest != "normal" and (btype in ("punchline", "tag", "closer") or seed < gf):
+            events.append({"t": t, "kind": "gesture", "value": gest})
+        if btype in ("punchline", "tag", "closer"):
+            events.append({"t": end, "kind": "hold", "ms": hold_ms})
+            events.append({"t": end, "kind": "camera", "value": "push-in"})
+    events.sort(key=lambda e: e["t"])
+    return jsonify({"ok": True, "slug": slug, "profile": prof, "events": events})
+
+
+_PERFORM_BED_CACHE: dict = {}
+
+
+@app.route("/api/perform/<slug>/crowd.wav")
+def perform_crowd(slug):
+    """Crowd ambience bed: real CC0 laugh clips at predicted moments, gain
+    by p, applause swell at close. Ambience, not Foley — the room starts it
+    with the set at low volume. Cached per slug in /tmp."""
+    import struct as _st
+    from flask import Response as _Resp
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    bdir = FREAK_DIR / slug
+    if not (bdir / "set.wav").exists():
+        return "no such set", 404
+    key = (slug, (bdir / "set.wav").stat().st_mtime)
+    if key not in _PERFORM_BED_CACHE:
+        sys.path.insert(0, str(Path(__file__).parent / "scripts"))
+        import crowd as _crowd
+        beats = _perform_beats(slug)
+        meta = _bundle_meta(slug) or {}
+        dur = int(float(meta.get("duration_s", 0)) * 1000)
+        if not dur and beats:
+            dur = max(b["end"] for b in beats) + 2000
+        pcm, _ = _crowd.build_bed(beats, dur or 60000)
+        wav = (b"RIFF" + _st.pack("<I", 36 + len(pcm)) + b"WAVEfmt "
+               + _st.pack("<IHHIIHH", 16, 1, 1, 24000, 24000 * 2, 2, 16)
+               + b"data" + _st.pack("<I", len(pcm)) + pcm)
+        p = Path("/tmp") / f"crowd-{slug}.wav"
+        try:
+            p.write_bytes(wav)
+        except Exception:
+            pass
+        _PERFORM_BED_CACHE[key] = bytes(wav)
+    return _Resp(_PERFORM_BED_CACHE[key], mimetype="audio/wav",
+                 headers={"Cache-Control": "public, max-age=3600"})
+
+
+_PERFORM_SIG: dict = {}
+_PERFORM_PRESENCE: dict = {}
+
+
+@app.route("/api/perform/<slug>/signal", methods=["GET", "POST"])
+def perform_signal(slug):
+    """Minimal WebRTC signaling for the stage monitor: audience publishes,
+    performer subscribes. {from, kind: offer/answer/ice, payload} in;
+    ?since=seq out. In-memory only, never persisted, never logged."""
+    import time as _time
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    box = _PERFORM_SIG.setdefault(slug, {"seq": 0, "msgs": []})
+    if request.method == "POST":
+        data = request.json or {}
+        frm = re.sub(r"[^a-zA-Z0-9_-]", "", str(data.get("frm", "")))[:24]
+        kind = str(data.get("kind", ""))
+        if not frm or kind not in ("offer", "answer", "ice", "bye"):
+            return jsonify({"ok": False, "error": "bad signal"}), 400
+        payload = data.get("payload")
+        box["seq"] += 1
+        box["msgs"].append({"seq": box["seq"], "t": _time.time(),
+                            "frm": frm, "kind": kind, "payload": payload})
+        box["msgs"] = box["msgs"][-200:]
+        return jsonify({"ok": True, "seq": box["seq"]})
+    try:
+        since = int(request.args.get("since", 0))
+    except Exception:
+        since = 0
+    return jsonify({"ok": True, "seq": box["seq"],
+                    "msgs": [m for m in box["msgs"] if m["seq"] > since]})
+
+
+@app.route("/api/perform/<slug>/presence", methods=["GET", "POST"])
+def perform_presence(slug):
+    """Who's in the room and how: face (on monitor) or pip (smile-only).
+    Heartbeat-pruned (>20s stale vanishes). No identities beyond a nickname."""
+    import time as _time
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    room = _PERFORM_PRESENCE.setdefault(slug, {})
+    now = _time.time()
+    for k in [k for k, v in room.items() if now - v.get("t", 0) > 20]:
+        del room[k]
+    if request.method == "POST":
+        data = request.json or {}
+        frm = re.sub(r"[^a-zA-Z0-9_-]", "", str(data.get("frm", "")))[:24]
+        mode = str(data.get("mode", "pip"))
+        if not frm or mode not in ("face", "pip"):
+            return jsonify({"ok": False, "error": "bad presence"}), 400
+        room[frm] = {"frm": frm, "mode": mode, "t": now,
+                     "nick": re.sub(r"[^a-zA-Z0-9 _-]", "",
+                                    str(data.get("nick", "")))[:24]}
+        return jsonify({"ok": True})
+    return jsonify({"ok": True, "here": sorted(room.values(), key=lambda v: v["frm"])})
+
+
+@app.route("/perform/<slug>/monitor")
+def perform_monitor(slug):
+    """Comedian's monitor: look out and see the room. Live faces for
+    audience who opted into APPEAR, glow pips + counts for everyone else.
+    Consent-separate from face TRACKING (which never leaves the device).
+    Nothing here is recorded — no recording code exists on this route.
+    ?venue=<id> runs this room on that venue's crowd physics."""
+    import html as _html
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    meta = _bundle_meta(slug) or {}
+    name = _html.escape((meta.get("character", {}) or {}).get("name", slug))
+    me = "mon_" + re.sub(r"[^a-z0-9]", "", slug)[:8]
+    physics = {"decay": 0.88, "laugh_gain": 0.15, "resist_start": 0.5,
+               "venue": "house"}
+    vid = re.sub(r"[^a-z0-9-]", "", request.args.get("venue", ""))[:32]
+    if vid:
+        try:
+            vv = json.loads((Path(__file__).parent / "docs" / "venues" / f"{vid}.json").read_text())
+            ph = vv.get("physics", {})
+            physics = {"decay": float(ph.get("decay", 0.88)),
+                       "laugh_gain": float(ph.get("laugh_gain", 0.15)),
+                       "resist_start": float(ph.get("resist_start", 0.5)),
+                       "venue": vid}
+        except Exception:
+            pass
+    page = f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MONITOR — {name}</title>
+<style>body{{background:#050508;color:#eee;font-family:monospace;text-align:center;padding:16px}}
+#faces{{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:12px 0}}
+#faces video{{width:160px;border-radius:10px;border:2px solid #ff2fa8}}
+#pips{{font-size:28px;min-height:40px}}
+.tick{{color:#555;font-size:11px}}</style></head><body>
+<div style="color:#ff2fa8;letter-spacing:3px;font-size:12px">🎤 STAGE MONITOR — {name}</div>
+<p class="tick">only opted-in faces appear · nothing is recorded · pips = smile-only crowd</p>
+<div id="faces"></div>
+<div id="pips"></div>
+<div class="tick"><span id="nface">0</span> faces · <span id="npip">0</span> pips · room reacts below</div>
+<div id="energy" style="max-width:520px;margin:10px auto;padding:10px;border:1px solid #282833;border-radius:12px">
+<div style="font-size:11px;color:#888;letter-spacing:2px">ROOM ENERGY</div>
+<div id="emeter" style="height:14px;border-radius:7px;background:#222;margin:8px 0"></div>
+<div id="rmeter" title="room resistance: laughs melt it, boos rebuild it"
+ style="height:6px;border-radius:3px;background:#222;margin:4px 0"></div>
+<div id="everdict" style="font-size:16px">…waiting for the room…</div>
+<div class="tick" id="esplit"></div></div>
+<div id="reactlog" style="max-width:520px;margin:10px auto;text-align:left;font-size:13px"></div>
+<script>
+var SLUG={json.dumps(slug)}, ME={json.dumps(me)}, mySeq=0, pcs={{}};
+function api(p, body){{
+  return fetch('/api/perform/'+SLUG+p, {{
+    method: body ? 'POST' : 'GET',
+    headers: {{'Content-Type': 'application/json'}},
+    body: body ? JSON.stringify(body) : undefined }}).then(function(r){{return r.json()}});
+}}
+function logReact(t, extra){{
+  var d = document.createElement('div'); d.textContent = t;
+  var box = document.getElementById('reactlog');
+  box.prepend(d); while (box.children.length > 12) box.lastChild.remove();
+}}
+// roster: faces + pips
+setInterval(function(){{
+  api('/presence').then(function(j){{
+    var faces = 0, pips = 0, html = '';
+    (j.here || []).forEach(function(p){{
+      if (p.mode === 'face') {{ faces++; }}
+      else {{ pips++; html += '😄 '; }}
+    }});
+    document.getElementById('nface').textContent = faces;
+    document.getElementById('npip').textContent = pips;
+    document.getElementById('pips').textContent = html;
+  }}).catch(function(){{}});
+}}, 3000);
+// answer incoming face offers
+setInterval(function(){{
+  api('/signal?since=' + mySeq).then(function(j){{
+    mySeq = j.seq || mySeq;
+    (j.msgs || []).forEach(function(m){{
+      if (m.frm === ME) return;
+      if (m.kind === 'offer' && !pcs[m.frm]) answer(m);
+      else if (m.kind === 'ice' && pcs[m.frm]) pcs[m.frm].pc.addIceCandidate(m.payload).catch(function(){{}});
+      else if (m.kind === 'bye' && pcs[m.frm]) dropPeer(m.frm);
+    }});
+  }}).catch(function(){{}});
+}}, 1500);
+function dropPeer(frm){{
+  try {{ pcs[frm].pc.close(); }} catch (e) {{}}
+  var v = document.getElementById('v-' + frm); if (v) v.remove();
+  delete pcs[frm]; refreshFaces();
+}}
+function refreshFaces(){{
+  document.getElementById('nface').textContent = Object.keys(pcs).length;
+}}
+function answer(m){{
+  var pc = new RTCPeerConnection({{iceServers: [{{urls: 'stun:stun.l.google.com:19302'}}]}});
+  pcs[m.frm] = {{pc: pc}};
+  pc.ontrack = function(ev){{
+    var v = document.getElementById('v-' + m.frm);
+    if (!v) {{
+      v = document.createElement('video');
+      v.id = 'v-' + m.frm; v.autoplay = true; v.playsInline = true; v.muted = true;
+      document.getElementById('faces').appendChild(v);
+    }}
+    v.srcObject = ev.streams[0]; refreshFaces();
+  }};
+  pc.onicecandidate = function(ev){{
+    if (ev.candidate) api('/signal', {{frm: ME, kind: 'ice', payload: ev.candidate}});
+  }};
+  pc.setRemoteDescription(m.payload).then(function(){{ return pc.createAnswer(); }})
+    .then(function(a){{ return pc.setLocalDescription(a).then(function(){{
+      api('/signal', {{frm: ME, kind: 'answer', payload: pc.localDescription}});
+    }}); }}).catch(function(){{ dropPeer(m.frm); }});
+}}
+// room laugh feed (boolean events the room already emits)
+// Crowd physics ported from characters' laugh_timeline.CrowdState:
+// heat *= 0.88 per event, +0.15 per laugh (cap 1.0), contagion ±1 (cap 5).
+// Plus wall-clock bleed (×0.88 per 10s silence) so the bar visibly decays
+// live. Real weights file pending; dynamics are the documented ones.
+var lastReact = 0;
+var DECAY = __DECAY__, GAIN = __GAIN__;
+var heat = 0, contagion = 0, resist = __RESIST__, lastHeatT = Date.now();
+var VENUE = __VENUE__;
+var state = 'COLD';
+function bleedHeat() {{
+  var gaps = Math.floor((Date.now() - lastHeatT) / 10000);
+  for (var i = 0; i < gaps; i++) {{ heat *= DECAY; resist = Math.min(1, resist + 0.01); }}
+  if (gaps > 0) lastHeatT = Date.now();
+}}
+// Guitar-hero states with hysteresis: step down needs heat 0.15 lower
+// than the step up took, so the room holds a state it earned.
+function crowdState() {{
+  if (state === 'KILLED') return heat >= 0.70 ? 'KILLED' : 'HOT';
+  if (state === 'HOT') return heat >= 0.85 ? 'KILLED' : (heat >= 0.45 ? 'HOT' : 'WARM');
+  if (state === 'WARM') return heat >= 0.6 ? 'HOT' : (heat >= 0.15 ? 'WARM' : 'COLD');
+  return heat >= 0.3 ? 'WARM' : 'COLD';
+}}
+setInterval(function() {{ bleedHeat(); paintEnergy(); }}, 2000);
+var energyLog = [];
+function scoreE(r) {{
+  if (r === 'hahaha') return 2;
+  if (r === 'haha' || r === 'laugh' || r === 'smile') return 1;
+  if (r === 'cheer' || r === 'clap') return 0.5;
+  if (r === 'boo') return -1;
+  return 0;
+}}
+function paintEnergy() {{
+  bleedHeat();
+  var cutoff = Date.now() - 15000, byType = {{}};
+  energyLog = energyLog.filter(function(x) {{ return x.at > cutoff; }});
+  energyLog.forEach(function(x) {{ byType[x.r] = (byType[x.r] || 0) + 1; }});
+  state = crowdState();
+  var pct = Math.round(heat * 100);
+  document.getElementById('emeter').style.background =
+    'linear-gradient(90deg,#ff2fa8 ' + pct + '%,#222 ' + pct + '%)';
+  var v = document.getElementById('everdict');
+  var faces = {{COLD: ['🧊 COLD ROOM', '#888'], WARM: ['🙂 warming up', '#eee'],
+                HOT: ['🔥 THE ROOM IS HOT', '#ff2fa8'], KILLED: ['💀 KILLED (live)', '#ff2fa8']}};
+  v.textContent = faces[state][0];
+  v.style.color = faces[state][1];
+  if (state === 'COLD' && energyLog.length > 3) v.textContent = '🍅 tough crowd';
+  var rpct = Math.round(resist * 100);
+  document.getElementById('esplit').textContent =
+    'heat ' + heat.toFixed(2) + ' · resistance ' + rpct + '% · contagion ' + contagion + ' · ' +
+    (Object.keys(byType).map(function(k) {{ return k + '×' + byType[k]; }}).join(' · ') || 'no signals yet');
+  var rb = document.getElementById('rmeter');
+  if (rb) rb.style.background =
+    'linear-gradient(90deg,#888 ' + rpct + '%,#222 ' + rpct + '%)';
+}}
+setInterval(function(){{
+  fetch('/api/react/feed?slug=' + SLUG + '&since=' + lastReact).then(function(r){{ return r.json(); }})
+    .then(function(j){{
+      (j.events || []).forEach(function(e){{
+        lastReact = Math.max(lastReact, e.seq || 0);
+        energyLog.push({{at: Date.now(), s: scoreE(e.reaction), r: e.reaction}});
+        heat *= DECAY;
+        var laughish = (e.reaction === 'haha' || e.reaction === 'hahaha' ||
+                        e.reaction === 'laugh' || e.reaction === 'smile');
+        if (laughish) {{
+          heat = Math.min(1, heat + GAIN / (1 + resist));
+          resist = Math.max(0, resist - 0.06);
+          contagion = Math.min(5, contagion + 1);
+        }}
+        else {{
+          contagion = Math.max(0, contagion - 1);
+          if (e.reaction === 'boo') resist = Math.min(1, resist + 0.10);
+        }}
+        lastHeatT = Date.now();
+        logReact('😄 ' + (e.reaction || 'laugh') + (e.nick ? ' — ' + e.nick : ''));
+      }});
+      paintEnergy();
+    }}).catch(function(){{}});
+}}, 2500);
+</script></body></html>"""
+    page = page.replace("__DECAY__", repr(physics["decay"]))
+    page = page.replace("__GAIN__", repr(physics["laugh_gain"]))
+    page = page.replace("__RESIST__", repr(physics["resist_start"]))
+    page = page.replace("__VENUE__", json.dumps(physics["venue"]))
+    return page, 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
+_KILLED_ENERGY = 12.0   # total weighted energy across the set
+_KILLED_COVERAGE = 0.5  # fraction of beats with >=1 laugh-ish tap
+_KILLED_CREATORS = 3    # distinct tappers (one fan can't kill alone)
+_KILLED_BOOS = 1        # max boos tolerated
+_VERDICT_W = {"hahaha": 2.0, "haha": 1.0, "laugh": 1.0, "smile": 1.0,
+              "cheer": 0.5, "clap": 0.5, "boo": -1.0}
+
+
+@app.route("/api/perform/<slug>/verdict")
+def perform_verdict(slug):
+    """Definitive KILLED badge. Hard on purpose: big energy AND broad
+    coverage AND a real crowd (distinct tappers) AND (almost) no boos.
+    Computed from the reaction log at finale time."""
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    try:
+        lines = (Path(__file__).parent / "reactions.jsonl").read_text().splitlines()
+    except Exception:
+        lines = []
+    import time as _time
+    energy, boos, creators = 0.0, 0, set()
+    hit_beats: set = set()
+    beats = _perform_beats(slug)
+    week_ago = _time.time() - 7 * 86400  # a kill is recent room life, not history
+    for ln in lines:
+        try:
+            e = json.loads(ln)
+        except Exception:
+            continue
+        if e.get("slug") != slug or e.get("t", 0) < week_ago:
+            continue
+        r = e.get("reaction", "")
+        energy += _VERDICT_W.get(r, 0)
+        if r == "boo":
+            boos += 1
+        if e.get("creator"):
+            creators.add(e["creator"])
+        if r in ("haha", "hahaha", "laugh", "smile"):
+            t = e.get("set_time_ms", 0)
+            for i, b in enumerate(beats):
+                if b["start"] - 500 <= t < b["end"] + 2500:
+                    hit_beats.add(i)
+                    break
+    coverage = len(hit_beats) / max(1, len(beats))
+    killed = (energy >= _KILLED_ENERGY and coverage >= _KILLED_COVERAGE
+              and len(creators) >= _KILLED_CREATORS and boos <= _KILLED_BOOS
+              and len(beats) > 0)
+    return jsonify({"ok": True, "slug": slug, "killed": killed,
+                    "energy": round(energy, 1), "coverage": round(coverage, 2),
+                    "creators": len(creators), "boos": boos,
+                    "bars": {"energy": _KILLED_ENERGY,
+                             "coverage": _KILLED_COVERAGE,
+                             "creators": _KILLED_CREATORS, "boos": _KILLED_BOOS}})
+
+
+_LAUGH_DIR = Path(__file__).parent / "audio_output" / "laughs"
+_LAUGH_MAX = 50
+
+
+@app.route("/api/laughs", methods=["POST"])
+def upload_laugh():
+    """Opt-in personal laugh sample. {b64: webm/opus data URL or raw b64,
+    <=200KB}. Stored by random id, served unlisted. No listing endpoint.
+    Delete by asking (owner tool) — no account system to self-serve."""
+    import base64 as _b64
+    import secrets as _sec
+    data = request.json or {}
+    raw = str(data.get("b64", ""))
+    if "," in raw:
+        raw = raw.split(",", 1)[1]
+    try:
+        blob = _b64.b64decode(raw, validate=True)
+    except Exception:
+        return jsonify({"ok": False, "error": "bad audio"}), 400
+    if not (1024 <= len(blob) <= 200 * 1024):
+        return jsonify({"ok": False, "error": "need 1KB-200KB"}), 400
+    if blob[:4] != b"\x1a\x45\xdf\xa3" and blob[:4] != b"RIFF":
+        return jsonify({"ok": False, "error": "webm or wav only"}), 400
+    try:
+        _LAUGH_DIR.mkdir(parents=True, exist_ok=True)
+        existing = sorted(_LAUGH_DIR.glob("*.webm"), key=lambda p: p.stat().st_mtime)
+        while len(existing) >= _LAUGH_MAX:
+            existing.pop(0).unlink(missing_ok=True)
+        lid = _sec.token_hex(8)
+        (_LAUGH_DIR / f"{lid}.webm").write_bytes(blob)
+    except Exception:
+        return jsonify({"ok": False, "error": "store failed"}), 500
+    return jsonify({"ok": True, "laugh_id": lid})
+
+
+@app.route("/api/laughs/<lid>")
+def serve_laugh(lid):
+    lid = re.sub(r"[^a-z0-9]", "", lid)[:32]
+    p = _LAUGH_DIR / f"{lid}.webm"
+    if not p.exists():
+        return jsonify({"ok": False, "error": "no such laugh"}), 404
+    return send_file(str(p), mimetype="audio/webm",
+                     headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.route("/api/venue/<vid>")
+def venue_manifest(vid):
+    """Venue truth: profile, props, light rig, physics, acoustics. Rooms
+    reference venues by id; GLB by hash, never latest."""
+    vid = re.sub(r"[^a-z0-9-]", "", vid)[:32]
+    p = Path(__file__).parent / "docs" / "venues" / f"{vid}.json"
+    if not p.exists():
+        return jsonify({"ok": False, "error": "no such venue"}), 404
+    try:
+        return jsonify({"ok": True, "venue": json.loads(p.read_text())})
+    except Exception:
+        return jsonify({"ok": False, "error": "bad venue file"}), 500
+
+
+@app.route("/perform/<slug>")
+def perform_room(slug):
+    """Live room for one act: the canonical watch player + live frame
+    (LIVE banner, predicted-heat strip, finale verdict, next act)."""
+    import html as _html
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    rendered = _render_watch(slug)
+    if isinstance(rendered, tuple):
+        page, code, headers = rendered[0], rendered[1], rendered[2] if len(rendered) > 2 else {}
+    else:
+        page, code, headers = rendered, 200, {}
+    if code != 200:
+        return rendered
+    beats = _perform_beats(slug)
+    meta = _bundle_meta(slug) or {}
+    char = meta.get("character", {}) or {}
+    import html as _html2
+    pname = _html2.escape(char.get("name", slug))
+    ppremise = _html2.escape(char.get("premise", ""))
+    pimg = (f"/freaks/{slug}/portrait.png"
+            if (FREAK_DIR / slug / "portrait.png").exists() else "/icon-512.png")
+    walkout_url = ""
+    for _w in ("walkout.mp3", "walkout.wav"):
+        if (FREAK_DIR / slug / _w).exists():
+            walkout_url = f"/freaks/{slug}/{_w}"
+            break
+    entrance = (
+        "<div id='entrance' style='position:fixed;inset:0;background:#0a0a0f;z-index:50;"
+        "display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px'>"
+        "<div style='color:#ff2fa8;font-size:12px;letter-spacing:3px'>● LIVE</div>"
+        f"<img src='{pimg}' style='width:180px;border-radius:16px;margin:14px 0'>"
+        f"<h2 style='margin:0'>{pname}</h2>"
+        f"<p style='color:#888;font-size:13px;max-width:340px'>{ppremise}</p>"
+        "<p style='color:#555;font-size:12px'>is coming out…</p>"
+        "<button id='showtimeBtn' style='font-size:18px;padding:14px 34px;margin-top:10px;"
+        "background:#ff2fa8;border:none;border-radius:28px;color:#fff'>"
+        "TAP FOR SHOWTIME</button>"
+        "<p style='color:#555;font-size:11px;margin-top:10px'>cheer while you wait — "
+        "buttons below work any time</p></div>"
+        f"<audio id='walkout' src='{walkout_url}' preload='auto'></audio>" if walkout_url else
+        "<div id='entrance' style='position:fixed;inset:0;background:#0a0a0f;z-index:50;"
+        "display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px'>"
+        "<div style='color:#ff2fa8;font-size:12px;letter-spacing:3px'>● LIVE</div>"
+        f"<img src='{pimg}' style='width:180px;border-radius:16px;margin:14px 0'>"
+        f"<h2 style='margin:0'>{pname}</h2>"
+        f"<p style='color:#888;font-size:13px;max-width:340px'>{ppremise}</p>"
+        "<p style='color:#555;font-size:12px'>is coming out…</p>"
+        "<button id='showtimeBtn' style='font-size:18px;padding:14px 34px;margin-top:10px;"
+        "background:#ff2fa8;border:none;border-radius:28px;color:#fff'>"
+        "TAP FOR SHOWTIME</button>"
+        "<p style='color:#555;font-size:11px;margin-top:10px'>cheer while you wait — "
+        "buttons below work any time</p></div>")
+    crowdbar = (
+        "<div id='crowdbar' style='position:fixed;left:0;right:0;bottom:0;z-index:40;"
+        "display:flex;justify-content:center;gap:8px;padding:10px 8px 14px;"
+        "background:rgba(10,10,15,.92);border-top:1px solid #282833'>"
+        + "".join(
+            f"<button data-r='{t}' style='font-size:15px;padding:10px 12px;border-radius:20px;"
+            f"background:#1a1a2e;border:1px solid #333;color:#eee'>{e} <span id='cnt-{t}'>0</span></button>"
+            for e, t in (("😄", "haha"), ("🤣", "hahaha"), ("👏", "clap"),
+                         ("🎉", "cheer"), ("👎", "boo")))
+        + "</div>"
+        "<script>(function(){var counts={};"
+        "function setTime(){var a=document.getElementById('a');"
+        "return (a&&!a.paused&&isFinite(a.currentTime))?Math.round(a.currentTime*1000):0}"
+        "document.querySelectorAll('#crowdbar button').forEach(function(b){"
+        "b.addEventListener('click',function(){var t=b.getAttribute('data-r');"
+        "counts[t]=(counts[t]||0)+1;"
+        "document.getElementById('cnt-'+t).textContent=counts[t];"
+        "b.style.transform='scale(1.25)';setTimeout(function(){b.style.transform=''},150);"
+        "fetch('/api/react',{method:'POST',headers:{'Content-Type':'application/json'},"
+        "body:JSON.stringify({slug:'" + slug + "',type:t,set_time_ms:setTime(),"
+        "laugh_id:(window.__laughId||''),"
+        "cond:(typeof CROWD_COND!=='undefined'?CROWD_COND:'live')})}).catch(function(){});"
+        "if((t==='haha'||t==='hahaha'||t==='laugh')&&window.__laughUrl){"
+        "try{new Audio(window.__laughUrl).play().catch(function(){});}catch(e){}}"
+        "if(t==='cheer'){var s=document.getElementById('stageImg');"
+        "if(s){s.classList.add('pf-pop');setTimeout(function(){s.classList.remove('pf-pop')},400)}}"
+        "});});"
+        "var st=document.getElementById('showtimeBtn');"
+        "if(st)st.addEventListener('click',function(){"
+        "var w=document.getElementById('walkout');"
+        "var go=function(){document.getElementById('entrance').style.display='none';"
+        "var b=document.getElementById('bed');"
+        "if(b){b.volume=0.25;b.play().catch(function(){});}"
+        "var p=document.getElementById('playBtn');if(p)p.click();};"
+        "if(w&&w.src){w.play().catch(function(){});"
+        "w.onended=go;setTimeout(go,9000);}else{go();}});"
+        "})();</script>")
+    n_crowd = sum(1 for b in beats if b["crowd"])
+    banner = (
+        "<div id='livebanner' style='background:#ff2fa8;color:#fff;font-size:12px;"
+        "letter-spacing:3px;padding:6px;text-align:center'>● LIVE — "
+        f"{n_crowd} big moments predicted · you're the audience</div>")
+    strip = (
+        "<div id='heatstrip' style='display:flex;gap:2px;justify-content:center;"
+        "max-width:560px;margin:6px auto;padding:0 16px' title='predicted laugh heat (heuristic v0)'>"
+        + "".join(
+            f"<div style='flex:1;height:6px;border-radius:3px;background:"
+            f"{'#ff2fa8' if b['crowd'] else ('#7a2f5c' if b['chuckle'] else '#282833')}'"
+            f" title='{round(b['p_laugh'] * 100)}%'></div>" for b in beats)
+        + "</div>"
+        + "<div style='font-size:10px;color:#555;text-align:center'>predicted heat · "
+        "heuristic v0 (real laugh model hooks in at /api/perform/heat)</div>")
+    bill = [s for s, _ in _perform_bundles()]
+    try:
+        nxt = bill[(bill.index(slug) + 1) % len(bill)] if bill else ""
+    except ValueError:
+        nxt = ""
+    acting_js = (
+        "<script>(function(){var acts=[],fired={},holdUntil=0;"
+        "fetch('/api/perform/" + slug + "/acting').then(function(r){return r.json()})"
+        ".then(function(j){if(j.ok)acts=j.events||[]}).catch(function(){});"
+        "function img(){return document.getElementById('stageImg')}"
+        "function vrm(){return document.getElementById('vrmStage')}"
+        "function stages(){var o=[],m=img(),v=vrm();if(m)o.push(m);if(v)o.push(v);return o}"
+        "function clearMove(){stages().forEach(function(m){"
+        "m.classList.remove('pf-lean','pf-pop','pf-shake','pf-look-l','pf-look-r')})}"
+        "function eachStage(fn){stages().forEach(fn)}"
+        "window.__vrmFace=function(face){"
+        "if(!stages().length)return;clearMove();"
+        "if(face==='deadpan'||face==='neutral'){return}"
+        "if(face==='happy'||face==='excited'||face==='delighted'){eachStage(function(m){m.classList.add('pf-pop')})}"
+        "else if(face==='angry'||face==='indignant'){eachStage(function(m){m.classList.add('pf-shake')})}"
+        "else{eachStage(function(m){m.classList.add('pf-lean')})}};"
+        "setInterval(function(){var a=document.getElementById('a');"
+        "if(!a||a.paused)return;var t=a.currentTime*1000;"
+        "acts.forEach(function(e,i){"
+        "if(fired[i]||t<e.t)return;fired[i]=1;"
+        "if(e.kind==='gesture'){clearMove();"
+        "eachStage(function(m){m.classList.add('pf-shake')});setTimeout(clearMove,450)}"
+        "else if(e.kind==='look'){clearMove();"
+        "if(e.value==='left')eachStage(function(m){m.classList.add('pf-look-l')});"
+        "else if(e.value==='right')eachStage(function(m){m.classList.add('pf-look-r')})}"
+        "else if(e.kind==='hold'){holdUntil=t+e.ms;eachStage(function(m){m.classList.add('pf-hold')});"
+        "var c=document.getElementById('caption');if(c)c.style.opacity='1'}"
+        "else if(e.kind==='camera'){eachStage(function(m){m.classList.add('pf-lean')});"
+        "setTimeout(function(){eachStage(function(m){m.classList.remove('pf-lean')})},900)}"
+        "});"
+        "if(holdUntil&&t>holdUntil){holdUntil=0;"
+        "eachStage(function(m){m.classList.remove('pf-hold')})}"
+        "},200);})();</script>")
+    finale_js = (
+        "<div id='finale' style='display:none;max-width:560px;margin:12px auto;padding:14px;"
+        "border:1px solid #ff2fa8;border-radius:12px;text-align:center'>"
+        "<div style='color:#ff2fa8;letter-spacing:2px;font-size:12px'>SET OVER</div>"
+        f"<div id='verdict' style='margin:8px 0'></div>"
+        f"{f'<p><a href=/perform/{nxt} style=color:#00d4ff>next act →</a></p>' if nxt and nxt != slug else ''}"
+        "<p><a href='/perform' style='color:#888;font-size:12px'>back to the bill</a></p></div>"
+        "<script>(function(){var a=document.getElementById('a');if(!a)return;"
+        "a.addEventListener('ended',function(){"
+        "var f=document.getElementById('finale');if(!f)return;f.style.display='block';"
+        "var n=(typeof myLaughs!=='undefined')?myLaughs:0;"
+        "try{n+=parseInt((document.getElementById('cnt-haha')||{textContent:0}).textContent)||0;"
+        "n+=3*(parseInt((document.getElementById('cnt-hahaha')||{textContent:0}).textContent)||0);}catch(e){}"
+        "document.getElementById('verdict').textContent="
+        "n>0?('You laughed '+n+'× — they earned another night.'):"
+        "('Stone face. The room decides.');"
+        "f.scrollIntoView();"
+        "fetch('/api/perform/" + slug + "/verdict').then(function(r){return r.json()})"
+        ".then(function(v){if(!v.ok)return;var d=document.createElement('div');"
+        "d.style.cssText='margin:10px 0;font-size:12px;color:#888';"
+        "if(v.killed){d.innerHTML='<div style=font-size:28px>💀 KILLED</div>'"
+        "+'<div>energy '+v.energy+' · '+Math.round(v.coverage*100)+'% of beats laughed · '+v.creators+' in the crowd</div>'"
+        "+'<div style=color:#ff2fa8>Ella: bury them. Encore.</div>';}"
+        "else{d.textContent='room verdict: energy '+v.energy+'/'+v.bars.energy"
+        "+' · coverage '+Math.round(v.coverage*100)+'%/'+Math.round(v.bars.coverage*100)+'%'"
+        "+' · crowd '+v.creators+'/'+v.bars.creators+' · boos '+v.boos+' (max '+v.bars.boos+')';}"
+        "f.appendChild(d);}).catch(function(){});"
+        "var mine=(window.__mySmiles||[]);"
+        "if(mine.length){fetch('/api/perform/" + slug + "/heat').then(function(r){return r.json()})"
+        ".then(function(j){if(!j.ok||!j.beats)return;var g=document.createElement('div');"
+        "g.style.cssText='margin:10px 0;font-size:11px;color:#888';"
+        "g.innerHTML='<div style=color:#ff2fa8;letter-spacing:2px>YOUR FACE vs PREDICTED HEAT</div>';"
+        "j.beats.forEach(function(b,i){var hit=mine.some(function(t){return t>=b.start-500&&t<b.end+2500});"
+        "var row=document.createElement('div');row.style.cssText='display:flex;gap:4px;align-items:center;margin:2px 0';"
+        "var bar=document.createElement('div');"
+        "bar.style.cssText='width:'+Math.round(b.p_laugh*100)+'%;height:8px;border-radius:4px;background:#7a2f5c';"
+        "var dot=document.createElement('span');dot.textContent=hit?'😄':'·';"
+        "dot.style.color=hit?'#ff2fa8':'#333';"
+        "row.appendChild(dot);row.appendChild(bar);g.appendChild(row);});"
+        "f.appendChild(g);}).catch(function(){});}"
+        "});})();</script>")
+    act_css = (
+        "<style>body{padding-bottom:92px}"
+        "#vrmStage{transition:transform .18s ease,filter .18s ease}"
+        "#stageImg{transition:transform .18s ease,filter .18s ease}"
+        ".pf-lean{transform:scale(1.12)}.pf-pop{transform:scale(1.06) rotate(-1.5deg)}"
+        ".pf-shake{animation:pfshake .3s ease}.pf-look-l{transform:translateX(-14px)}"
+        ".pf-look-r{transform:translateX(14px)}.pf-hold{filter:brightness(1.35) saturate(1.2);"
+        "outline:2px solid #ff2fa8;outline-offset:4px}"
+        "@keyframes pfshake{25%{transform:translateX(-6px) rotate(-2deg)}"
+        "75%{transform:translateX(6px) rotate(2deg)}}</style>")
+    from flask import request as _req
+    crowd_on = _req.args.get("crowd", "1") != "0"
+    mouth = _req.args.get("mouth", "v1")
+    if mouth not in ("v0", "v1"):
+        mouth = "v1"
+    bed_el = ("<audio id='bed' src='/api/perform/" + slug + "/crowd.wav' preload='auto'></audio>"
+              if crowd_on else "")
+    # Personal laugh: record once (local), hear it on every tap, share it
+    # with the room only if asked. Upload = room-audible (monitor mix).
+    laughblock = (
+        "<div style='margin:6px auto;max-width:520px;text-align:center'>"
+        "<button id='laughCalBtn' style='font-size:13px;padding:8px 16px;border-radius:18px;"
+        "background:#1a1a2e;border:1px solid #333;color:#eee'>😂 RECORD MY LAUGH (3s)</button> "
+        "<button id='laughPlayBtn' style='font-size:13px;padding:8px 16px;border-radius:18px;"
+        "background:#1a1a2e;border:1px solid #333;color:#555' disabled>▶</button>"
+        "<label style='font-size:11px;color:#888'><input type='checkbox' id='laughShare'> "
+        "share with room</label>"
+        "<div id='laughCalMsg' style='font-size:11px;color:#888;margin-top:4px'>"
+        "Your laugh, on your taps, amidst the crowd. Stored on this device unless shared.</div></div>"
+        "<script>(function(){"
+        "try{var s=localStorage.getItem('ft_laugh');"
+        "if(s){window.__laughUrl=s;document.getElementById('laughPlayBtn').disabled=false;}"
+        "var sid=localStorage.getItem('ft_laugh_id');"
+        "if(sid){window.__laughId=sid;document.getElementById('laughShare').checked=true;}}catch(e){}"
+        "document.getElementById('laughPlayBtn').addEventListener('click',function(){"
+        "if(window.__laughUrl)new Audio(window.__laughUrl).play().catch(function(){});});"
+        "document.getElementById('laughCalBtn').addEventListener('click',async function(){"
+        "var msg=document.getElementById('laughCalMsg'),btn=this;"
+        "try{btn.disabled=true;btn.textContent='LAUGH NOW…';"
+        "var st=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true}});"
+        "var rec=new MediaRecorder(st);var ch=[];"
+        "rec.ondataavailable=function(e){if(e.data.size)ch.push(e.data)};"
+        "rec.start();await new Promise(function(r){setTimeout(r,3000)});"
+        "rec.stop();await new Promise(function(r){rec.onstop=r});"
+        "st.getTracks().forEach(function(t){t.stop()});"
+        "var blob=new Blob(ch,{type:rec.mimeType||'audio/webm'});"
+        "if(blob.size<1024){msg.textContent='Too quiet — try again, closer.';return;}"
+        "var rd=new FileReader();"
+        "rd.onload=function(){var url=rd.result;"
+        "try{if(url.length<400000)localStorage.setItem('ft_laugh',url);}catch(e){}"
+        "window.__laughUrl=url;"
+        "document.getElementById('laughPlayBtn').disabled=false;"
+        "msg.textContent='Got it ('+Math.round(blob.size/1024)+'KB). Tap ▶ to hear you.';};"
+        "rd.readAsDataURL(blob);"
+        "}catch(e){msg.textContent='Mic unavailable or declined: '+String(e);}"
+        "finally{btn.disabled=false;btn.textContent='😂 RECORD MY LAUGH (3s)';}});"
+        "document.getElementById('laughShare').addEventListener('change',async function(){"
+        "var msg=document.getElementById('laughCalMsg');"
+        "if(!this.checked){window.__laughId='';"
+        "try{localStorage.removeItem('ft_laugh_id');}catch(e){}"
+        "msg.textContent='Unshared. The room hears the generic crowd.';return;}"
+        "if(!window.__laughUrl){msg.textContent='Record your laugh first.';this.checked=false;return;}"
+        "msg.textContent='Sharing with the room…';"
+        "try{var r=await fetch('/api/laughs',{method:'POST',"
+        "headers:{'Content-Type':'application/json'},"
+        "body:JSON.stringify({b64:window.__laughUrl})});var j=await r.json();"
+        "if(j.ok){window.__laughId=j.laugh_id;"
+        "try{localStorage.setItem('ft_laugh_id',j.laugh_id);}catch(e){}"
+        "msg.textContent='Shared — the standup hears YOU in the mix.';}"
+        "else{msg.textContent='Share failed: '+(j.error||r.status);this.checked=false;}}"
+        "catch(e){msg.textContent='Share failed.';this.checked=false;}});"
+        "})();</script>")
+    # Mic laugh detector: HEURISTIC (energy bursts, not a laugh model).
+    # Opt-in, booleans only — no audio ever leaves the device. Posts
+    # {type:'laugh', src:'mic'} so the room can tell mic laughs apart.
+    micblock = (
+        "<div style='margin:6px auto;max-width:520px;text-align:center'>"
+        "<button id='micBtn' style='font-size:13px;padding:8px 16px;border-radius:18px;"
+        "background:#1a1a2e;border:1px solid #333;color:#eee'>🎙 MIC LAUGHS (OPTIONAL)</button>"
+        "<div id='micMsg' style='font-size:11px;color:#888;margin-top:4px'>"
+        "Local laugh detection (approximate): only laugh moments leave this device.</div></div>"
+        "<script>(function(){var ctx=null,stream=null,an=null,timer=null,base=0.02,cool=0;"
+        "function setTime(){var a=document.getElementById('a');"
+        "return (a&&!a.paused&&isFinite(a.currentTime))?Math.round(a.currentTime*1000):0}"
+        "document.getElementById('micBtn').addEventListener('click',async function(){"
+        "var msg=document.getElementById('micMsg'),btn=this;"
+        "if(stream){clearInterval(timer);timer=null;"
+        "stream.getTracks().forEach(function(t){t.stop()});stream=null;"
+        "if(ctx){ctx.close();ctx=null;}"
+        "btn.textContent='🎙 MIC LAUGHS (OPTIONAL)';"
+        "msg.textContent='Mic off. Nothing was ever uploaded.';return;}"
+        "try{btn.disabled=true;"
+        "stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true}});"
+        "ctx=new (window.AudioContext||window.webkitAudioContext)();"
+        "var src=ctx.createMediaStreamSource(stream);an=ctx.createAnalyser();an.fftSize=1024;"
+        "src.connect(an);var buf=new Float32Array(an.fftSize),ring=[];"
+        "msg.textContent='Listening locally — laugh out loud.';"
+        "btn.textContent='MIC ON — TAP TO STOP';"
+        "timer=setInterval(function(){an.getFloatTimeDomainData(buf);"
+        "var s=0;for(var i=0;i<buf.length;i++)s+=buf[i]*buf[i];"
+        "var rms=Math.sqrt(s/buf.length);"
+        "base=base*0.98+rms*0.02;"
+        "ring.push(rms);if(ring.length>10)ring.shift();"
+        "var hot=0;for(var j=0;j<ring.length;j++)if(ring[j]>2.5*Math.max(base,0.008))hot++;"
+        "var now=Date.now();"
+        "if(hot>=4&&now>cool){cool=now+4000;"
+        "fetch('/api/react',{method:'POST',headers:{'Content-Type':'application/json'},"
+        "body:JSON.stringify({slug:'" + slug + "',type:'laugh',set_time_ms:setTime(),"
+        "src:'mic',cond:(typeof CROWD_COND!=='undefined'?CROWD_COND:'live')})}).catch(function(){});"
+        "msg.textContent='😄 heard that ('+new Date().toLocaleTimeString()+')';}"
+        "},100);"
+        "}catch(e){if(stream){stream.getTracks().forEach(function(t){t.stop()});stream=null;}"
+        "msg.textContent='Mic unavailable or declined: '+String(e);}"
+        "finally{btn.disabled=false;}});})();</script>")
+    smileblock = (
+        "<div style='margin:10px auto;max-width:520px;text-align:center'>"
+        "<button id='smileToggle' style='font-size:13px;padding:8px 16px;border-radius:18px;"
+        "background:#1a1a2e;border:1px solid #333;color:#eee'>📷 TRACK MY FACE (OPTIONAL)</button>"
+        "<div id='smileMsg' style='font-size:11px;color:#888;margin-top:4px'>"
+        "Local only: calibrates in your browser, only yes/no smile moments leave this device.</div>"
+        "<video id='smileVideo' muted autoplay playsinline "
+        "style='display:none;width:120px;border-radius:8px'></video>"
+        "<div style='margin-top:8px'><button id='appearBtn' style='font-size:13px;padding:8px 16px;"
+        "border-radius:18px;background:#2a0a1e;border:1px solid #ff2fa8;color:#ffb7dc'>"
+        "📡 APPEAR ON STAGE MONITOR</button>"
+        "<div id='appearMsg' style='font-size:11px;color:#888;margin-top:4px'>"
+        "Second opt-in: the comedian sees your live face. Stop anytime.</div></div></div>"
+        "<script>(function(){var pc=null,stream=null,me='a_'+Math.random().toString(36).slice(2,10),seq=0;"
+        "function sig(b){return fetch('/api/perform/" + slug + "/signal',{method:'POST',"
+        "headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(function(r){return r.json()});}"
+        "function beat(){return setInterval(function(){"
+        "fetch('/api/perform/" + slug + "/presence',{method:'POST',"
+        "headers:{'Content-Type':'application/json'},"
+        "body:JSON.stringify({frm:me,mode:(pc?'face':'pip')})}).catch(function(){});},8000);}"
+        "beat();"
+        "document.getElementById('appearBtn').addEventListener('click',async function(){"
+        "var msg=document.getElementById('appearMsg'),btn=this;"
+        "if(pc){try{if(pc._iv)clearInterval(pc._iv);}catch(e0){}try{pc.close();}catch(e){}pc=null;"
+        "if(stream){stream.getTracks().forEach(function(t){t.stop()});stream=null;}"
+        "sig({frm:me,kind:'bye'}).catch(function(){});"
+        "btn.textContent='📡 APPEAR ON STAGE MONITOR';"
+        "msg.textContent='Off the monitor. The room still has your taps.';return;}"
+        "try{btn.disabled=true;"
+        "stream=await navigator.mediaDevices.getUserMedia({video:{width:320,facingMode:'user'},audio:false});"
+        "pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});"
+        "stream.getTracks().forEach(function(t){pc.addTrack(t,stream)});"
+        "pc.onicecandidate=function(ev){if(ev.candidate)sig({frm:me,kind:'ice',payload:ev.candidate});};"
+        "var off=await pc.createOffer();await pc.setLocalDescription(off);"
+        "await sig({frm:me,kind:'offer',payload:pc.localDescription});"
+        "var got=false;"
+        "var iv=setInterval(async function(){"
+        "var j=await (await fetch('/api/perform/" + slug + "/signal?since='+seq)).json();"
+        "seq=j.seq||seq;"
+        "(j.msgs||[]).forEach(function(m){if(m.frm!==me)return;"
+        "if(m.kind==='answer'&&!got){got=true;pc.setRemoteDescription(m.payload).catch(function(){});}"
+        "else if(m.kind==='ice'&&pc){pc.addIceCandidate(m.payload).catch(function(){});}});"
+        "},1500);"
+        "pc._iv=iv;"
+        "btn.textContent='ON MONITOR — TAP TO HIDE';"
+        "msg.textContent='The comedian can see you now. Nothing is recorded.';"
+        "}catch(e){if(stream){stream.getTracks().forEach(function(t){t.stop()});stream=null;}"
+        "if(pc){try{pc.close();}catch(e2){}pc=null;}"
+        "msg.textContent='Camera unavailable or declined: '+String(e);}"
+        "finally{btn.disabled=false;}});})();</script>"
+        "<script src='/static/smile-referee.js'></script>"
+        "<script>(function(){var stream=null,ref=null,poll=null,wasHigh=false,cooldown=0;"
+        "window.__mySmiles=[];"
+        "function setTime(){var a=document.getElementById('a');"
+        "return (a&&!a.paused&&isFinite(a.currentTime))?Math.round(a.currentTime*1000):0}"
+        "function loadScript(u){return new Promise(function(res,rej){var s=document.createElement('script');"
+        "s.src=u;s.onload=res;s.onerror=rej;document.head.appendChild(s);});}"
+        "document.getElementById('smileToggle').addEventListener('click',async function(){"
+        "var msg=document.getElementById('smileMsg'),btn=this;"
+        "if(stream){clearInterval(poll);poll=null;"
+        "stream.getTracks().forEach(function(t){t.stop()});stream=null;"
+        "if(ref){ref.dispose();ref=null;}"
+        "document.getElementById('smileVideo').srcObject=null;wasHigh=false;"
+        "btn.textContent='📷 TRACK MY FACE (OPTIONAL)';"
+        "msg.textContent='Camera stopped. No frames were ever sent.';return;}"
+        "try{btn.disabled=true;"
+        "if(typeof tf==='undefined')await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest');"
+        "var v=document.getElementById('smileVideo');"
+        "stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false});"
+        "v.srcObject=stream;await v.play();v.style.display='inline-block';"
+        "msg.textContent='Calibrating: hold neutral, then smile when asked.';"
+        "ref=await SmileReferee.calibrate(v,{samples:30,ephemeral:true,"
+        "onStep:function(s){msg.textContent=s.smiling?'Smile now':'Hold a neutral face';}});"
+        "var cv=document.createElement('canvas'),ctx=cv.getContext('2d');"
+        "poll=setInterval(function(){if(!ref||!v.videoWidth)return;"
+        "cv.width=v.videoWidth;cv.height=v.videoHeight;ctx.drawImage(v,0,0);"
+        "var p=ref.predict(cv),high=p>0.82,now=Date.now();"
+        "if(high&&!wasHigh&&now>cooldown){cooldown=now+3000;"
+        "var t=setTime();window.__mySmiles.push(t);"
+        "fetch('/api/react',{method:'POST',headers:{'Content-Type':'application/json'},"
+        "body:JSON.stringify({slug:'" + slug + "',type:'smile',set_time_ms:t,"
+        "cond:(typeof CROWD_COND!=='undefined'?CROWD_COND:'live')})}).catch(function(){});}"
+        "wasHigh=high;"
+        "msg.textContent='Camera on · local only · '+(high?'smiling':'neutral');"
+        "},350);"
+        "btn.textContent='STOP TRACKING';"
+        "}catch(e){if(stream){stream.getTracks().forEach(function(t){t.stop()});stream=null;}"
+        "msg.textContent='Camera unavailable or declined: '+String(e);}"
+        "finally{btn.disabled=false;}});})();</script>")
+    if mouth == "v0":
+        page = page.replace("const MOUTH = 'v1'", "const MOUTH = 'v0'")
+    cond_js = ("var CROWD_COND='" + ("bed" if crowd_on else "nobed") + "+mouth" + mouth + "';")
+    if "<body>" in page:
+        page = page.replace("<body>", "<body>" + banner + strip + act_css + entrance + crowdbar + bed_el
+                            + smileblock + micblock + "<script>" + cond_js + "</script>", 1)
+    head, sep, tail = page.rpartition("</body>")
+    if sep:
+        page = head + acting_js + finale_js + sep + tail
+    else:
+        page = page + acting_js + finale_js
+    return page, 200, headers
+
+
 @app.route("/api/card/<slug>.png")
 def og_card(slug):
     """Purpose-built 1200x630 share card: portrait/name/premise/duration."""
@@ -1739,6 +2751,7 @@ def _render_watch(slug):
         "__CHAR_SLUG__": char_slug, "__SET_LABEL__": set_label,
         "__NREPLIES__": str(nreplies),
         "__IMG__": img, "__DUR__": str(dur),
+        "__MOUTH__": "v1",
         "__BEATS__": json.dumps(beats),
         "__BODY__": body_url, "__BODY_FORMAT__": body_fmt,
         "__ARBTN__": arbtn,
@@ -2254,7 +3267,8 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin } from '@pixiv/three-vrm';
 let vrm = null, analyser = null, freqData = null, audioCtx = null;
-let pAA = 0, pIH = 0, pOH = 0, nextBlink = 0;
+let pAA = 0, pIH = 0, pOH = 0, pOU = 0, pEE = 0, nextBlink = 0;
+const MOUTH = '__MOUTH__';  // v0: 3-shape envelope (legacy). v1: 5-shape + rounded/high vowels.
 const clock = new THREE.Clock();
 const FACE = {grin: ['happy', 0.55], deadpan: ['relaxed', 0.7], annoyed: ['angry', 0.6],
               confused: ['surprised', 0.35], surprised: ['surprised', 0.8], neutral: [null, 0]};
@@ -2364,10 +3378,18 @@ try {
       pAA = sm(pAA, Math.min(1, band(0, 10) / 200), 0.5);
       pIH = sm(pIH, Math.min(1, band(40, 80) / 180) * 0.7, 0.5);
       pOH = sm(pOH, Math.min(1, band(10, 40) / 220) * 0.7, 0.5);
+      if (MOUTH === 'v1') {
+        pOU = sm(pOU, Math.min(1, band(5, 18) / 210) * 0.8, 0.5);
+        pEE = sm(pEE, Math.min(1, band(55, 100) / 170) * 0.65, 0.5);
+      }
       try {
         vrm.expressionManager.setValue('aa', pAA);
         vrm.expressionManager.setValue('ih', pIH);
         vrm.expressionManager.setValue('oh', pOH);
+        if (MOUTH === 'v1') {
+          vrm.expressionManager.setValue('ou', pOU);
+          vrm.expressionManager.setValue('ee', pEE);
+        }
       } catch (e) {}
     } else if (vrm?.expressionManager) {
       pAA = sm(pAA, 0, 0.3); pIH = sm(pIH, 0, 0.3); pOH = sm(pOH, 0, 0.3);
@@ -2375,6 +3397,11 @@ try {
         vrm.expressionManager.setValue('aa', pAA);
         vrm.expressionManager.setValue('ih', pIH);
         vrm.expressionManager.setValue('oh', pOH);
+        if (MOUTH === 'v1') {
+          pOU = sm(pOU, 0, 0.3); pEE = sm(pEE, 0, 0.3);
+          vrm.expressionManager.setValue('ou', pOU);
+          vrm.expressionManager.setValue('ee', pEE);
+        }
       } catch (e) {}
     }
     if (vrm?.humanoid) {
@@ -3406,15 +4433,54 @@ def react_to_set():
     data = request.json or {}
     slug = re.sub(r"[^a-z0-9_-]", "", str(data.get("slug", "")))[:45]
     rtype = str(data.get("type", ""))
-    if not slug or rtype not in ("laugh", "clap", "crickets", "groan"):
+    if not slug or rtype not in ("laugh", "haha", "hahaha", "clap", "cheer",
+                                 "boo", "smile", "crickets", "groan"):
         return jsonify({"ok": False, "error": "bad reaction"}), 400
     try:
+        cond = re.sub(r"[^a-z0-9_-]", "", str(data.get("cond", "")))[:16]
+        src = re.sub(r"[^a-z]", "", str(data.get("src", "")))[:8]
+        creator = re.sub(r"[^a-zA-Z0-9_]", "", str(data.get("creator", "")))[:24]
+        laugh_id = re.sub(r"[^a-z0-9]", "", str(data.get("laugh_id", "")))[:32]
         with open(Path(__file__).parent / "reactions.jsonl", "a") as f:
             f.write(json.dumps({"t": _time.time(), "slug": slug, "reaction": rtype,
-                                "set_time_ms": int(data.get("set_time_ms", 0))}) + "\n")
+                                "set_time_ms": int(data.get("set_time_ms", 0)),
+                                "cond": cond, "src": src,
+                                "creator": creator, "laugh_id": laugh_id}) + "\n")
     except Exception:
         pass
     return jsonify({"ok": True})
+
+
+@app.route("/api/react/feed")
+def react_feed():
+    """Live room feed for the stage monitor: recent boolean reactions.
+    No identities (audience are anonymous taps); nick only if volunteered."""
+    slug = re.sub(r"[^a-z0-9_-]", "", request.args.get("slug", ""))[:45]
+    try:
+        since = int(request.args.get("since", 0))
+    except Exception:
+        since = 0
+    try:
+        lines = (Path(__file__).parent / "reactions.jsonl").read_text().splitlines()
+    except Exception:
+        lines = []
+    out = []
+    start = max(0, len(lines) - 200)
+    for i, ln in enumerate(lines[start:], start=start):
+        try:
+            e = json.loads(ln)
+        except Exception:
+            continue
+        if slug and e.get("slug") != slug:
+            continue
+        if i < since:
+            continue
+        out.append({"seq": i, "reaction": e.get("reaction"),
+                    "set_time_ms": e.get("set_time_ms", 0),
+                    "cond": e.get("cond", ""),
+                    "src": e.get("src", ""),
+                    "laugh_id": e.get("laugh_id", "")})
+    return jsonify({"ok": True, "seq": len(lines) - 1, "events": out[-30:]})
 
 
 @app.route("/api/vote", methods=["POST"])
