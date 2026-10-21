@@ -8,10 +8,10 @@ describe('PokerDealer (poker-ts) → contract events', () => {
     const d = new PokerDealer(seats());
     const ev = d.startHand(0);
     expect(ev[0].type).toBe('poker.hand_start');
-    expect((ev[0].payload.seats as unknown[]).length).toBe(5);
+    expect((ev[0].payload.seats as unknown[]).length).toBe(6);
     expect(ev.filter((e) => e.type === 'poker.chips').map((e) => e.payload.amount).sort()).toEqual([10, 20]);
     const deals = ev.filter((e) => e.type === 'poker.deal');
-    expect(deals).toHaveLength(5);
+    expect(deals).toHaveLength(6);
     for (const e of deals) expect((e.payload.cards as unknown[]).length).toBe(2);
     const turn = ev[ev.length - 1];
     expect(turn.type).toBe('poker.turn');
@@ -45,11 +45,11 @@ describe('PokerDealer (poker-ts) → contract events', () => {
     const sd = all.find((e) => e.type === 'poker.showdown')!;
     const winners = sd.payload.winners as Array<{ seat: number; amount: number; ranking: string }>;
     expect(winners.length).toBeGreaterThan(0);
-    expect(winners.reduce((a, w) => a + w.amount, 0)).toBe(100); // 5 × 20
-    expect((sd.payload.hole as unknown[]).length).toBe(5);
+    expect(winners.reduce((a, w) => a + w.amount, 0)).toBe(120); // 6 × 20
+    expect((sd.payload.hole as unknown[]).length).toBe(6);
     expect(all.filter((e) => e.type === 'poker.chips' && e.payload.from === 'pot').length).toBe(winners.filter((w) => w.amount > 0).length);
     const total = d.seats.reduce((a, s) => a + s.stack, 0);
-    expect(total).toBe(5000);
+    expect(total).toBe(6000);
   });
 
   it('all fold to one player → showdown "everyone folded"', () => {
@@ -74,7 +74,7 @@ describe('bots', () => {
   });
 });
 
-describe('PokerShow: 4 bots + a human seat play to showdown through send()', () => {
+describe('PokerShow: 5 bots + a human seat play to showdown through send()', () => {
   it('waits for the human, applies poker.intent, quips, reaches showdown', async () => {
     const sent: Array<{ type: string; payload: Record<string, unknown> }> = [];
     const q: Array<() => void> = [];

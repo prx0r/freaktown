@@ -46,6 +46,7 @@ export const PODCAST_CAST: CastMemberV1[] = [
   { seat: 'seat1', character_id: 'pog.captain-ata-ashcroft', name: 'Captain Ata', avatar_url: 'basic', kind: 'character' },
   { seat: 'seat2', character_id: 'pog.chairman-meow', name: 'Chairman Meow', avatar_url: 'basic', kind: 'character' },
   { seat: 'seat3', character_id: 'pog.the-algorithm', name: 'The Algorithm', avatar_url: 'basic:robot', kind: 'character' },
+  { seat: 'seat4', character_id: 'pog.buddha-ultimate-deadpan', name: 'Buddha', avatar_url: 'basic', kind: 'character' },
 ];
 
 export const PODCAST_LINES: Array<[string, string, string?]> = [
@@ -58,6 +59,8 @@ export const PODCAST_LINES: Array<[string, string, string?]> = [
   ['seat1', 'Okay. Next question. Should robots pay rent?', 'playful'],
   ['seat3', 'I live in the cloud. The cloud is very expensive.', 'sad'],
   ['seat2', 'I knock things off the cloud. For free.', 'smug'],
+  ['seat4', 'I once meditated for forty-nine days. The Wi-Fi never came back.', 'deadpan'],
+  ['seat2', 'That explains the buffering.', 'smug'],
 ];
 
 export function podcastDemo(): TimedCommand[] {
@@ -75,6 +78,7 @@ export function podcastDemo(): TimedCommand[] {
 
 export const POKER_CAST: CastMemberV1[] = [
   { seat: 'seat0', character_id: 'pog.captain-ata-ashcroft', name: 'Captain Ata', avatar_url: 'basic', kind: 'bot' },
+  { seat: 'seat1', character_id: 'pog.buddha-ultimate-deadpan', name: 'Buddha', avatar_url: 'basic', kind: 'bot' },
   { seat: 'seat2', character_id: 'pog.chairman-meow', name: 'Chairman Meow', avatar_url: 'basic', kind: 'bot' },
   { seat: 'seat3', character_id: 'pog.the-algorithm', name: 'The Algorithm', avatar_url: 'basic:robot', kind: 'bot' },
   { seat: 'seat6', character_id: 'pog.dana-deadline', name: 'Dana Deadline', avatar_url: 'basic', kind: 'bot' },
@@ -85,6 +89,7 @@ export const POKER_HUMAN_SEAT = 4;
 export function pokerSeats(humanName = 'You'): DealerSeat[] {
   return [
     { seat: 0, name: 'Captain Ata', stack: 1000, kind: 'bot', style: 'loose' },
+    { seat: 1, name: 'Buddha', stack: 1000, kind: 'bot', style: 'tight' },
     { seat: 2, name: 'Chairman Meow', stack: 1000, kind: 'bot', style: 'calling-station' },
     { seat: 3, name: 'The Algorithm', stack: 1000, kind: 'bot', style: 'tight' },
     { seat: POKER_HUMAN_SEAT, name: humanName, stack: 1000, kind: 'human' },
