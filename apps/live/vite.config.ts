@@ -52,6 +52,8 @@ function repoAssets(): Plugin {
 // LIVE_BASE: where the app is mounted, e.g. "/perform/live/" behind Caddy.
 export default defineConfig({
   base: process.env.LIVE_BASE ?? '/',
+  // poker-ts (MIT) requires node's `assert`; give the browser a 4-line shim.
+  resolve: { alias: { assert: path.resolve(__dirname, 'src/shims/assert.ts'), crypto: path.resolve(__dirname, 'src/shims/crypto.ts') } },
   plugins: [react(), repoAssets()],
   server: {
     port: 5173,

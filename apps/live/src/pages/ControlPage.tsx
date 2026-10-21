@@ -14,6 +14,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { EventConsumer, LocalTransport } from '@freaktown/stage-runtime';
 import type { ShowEvent } from '@freaktown/contracts';
 import { ControlClient } from '../control/controlClient';
+import { SetsPanel } from '../control/SetsPanel';
 import { adminKey, createTransport, loadSetCatalog, setAdminKey, transportMode, type SetEntry } from '../live/transport';
 
 const CAMERAS: Array<{ id: string; label: string; key: string }> = [
@@ -178,8 +179,10 @@ export function ControlPage() {
         </div>
       </header>
 
+      <SetsPanel episodeId={episodeId} mode={mode} authKey={key} />
+
       <section style={card}>
-        <h2 style={h2}>Act / set</h2>
+        <h2 style={h2}>Act / set <span style={{ fontSize: 12, opacity: 0.6 }}>(comedy club)</span></h2>
         <div style={row}>
           <select value={setId} onChange={(e) => setSetId(e.target.value)} style={input} data-testid="set-select">
             {sets.map((s) => <option key={s.id} value={s.id}>{s.title}</option>)}
