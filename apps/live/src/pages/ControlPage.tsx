@@ -1,375 +1,287 @@
 /**
- * ControlPage — operator console for the show.
+ * ControlPage — operator console.
  *
- * Camera control, show commands, crowd monitoring.
- * This is what the human director sees.
+ * INVARIANT: control never mutates stage state directly. Every button is a
+ * canonical command through ONE LiveTransport (ControlClient):
+ *   local mode → LocalRoom (BroadcastChannel) · room mode → EpisodeRoom DO.
+ * The log/phase panels are a READ view of the same room.
  *
- * INVARIANT: control never mutates stage state directly. Every button
- * issues a canonical command (POST /live/:ep/command → EpisodeRoom →
- * persist → broadcast → stage executes). The crowd/phase/timer panels
- * are a READ view fed by an audience-role socket.
- *
- * URL: /control/:episodeId
+ * URL: /control/:episodeId?transport=local|room
  */
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { useShowStore, CameraPreset, ShowPhase } from '../store/showStore';
-import { EventConsumer } from '../stage/EventConsumer';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { EventConsumer, LocalTransport } from '@freaktown/stage-runtime';
+import type { ShowEvent } from '@freaktown/contracts';
 import { ControlClient } from '../control/controlClient';
+import { adminKey, createTransport, loadSetCatalog, setAdminKey, transportMode, type SetEntry } from '../live/transport';
 
-const PHASES: ShowPhase[] = [
-  'pre_show', 'intro', 'lineup', 'character_enter', 'set_active',
-  'post_set', 'judging', 'roast', 'transition', 'live_test',
-  'model_reveal', 'elimination', 'finale', 'winner', 'outro', 'ended',
+const CAMERAS: Array<{ id: string; label: string; key: string }> = [
+  { id: 'WIDE_STAGE', label: 'Wide', key: '1' },
+  { id: 'COMIC_MEDIUM', label: 'Mid', key: '2' },
+  { id: 'COMIC_CLOSE', label: 'Close-up', key: '3' },
+  { id: 'SIDE_STAGE', label: 'Side', key: '4' },
+];
+const REACTIONS = ['laugh', 'clap', 'groan', 'boo', 'crickets'] as const;
+const AVATARS: Array<{ id: string; label: string }> = [
+  { id: '', label: 'Set default' },
+  { id: 'avatars/default-v1.vrm', label: 'VRM · default-v1' },
+  { id: 'basic', label: 'BASIC · human' },
+  { id: 'basic:robot', label: 'BASIC · robot' },
 ];
 
-const CAMERA_PRESETS_LIST: CameraPreset[] = [
-  'WIDE_STAGE', 'COMIC_MEDIUM', 'COMIC_CLOSE',
-  'SIDE_STAGE', 'PANEL_WIDE', 'ELLA_CLOSE',
-  'CHATGPT_CLOSE', 'STREAM_CLOSE',
-];
-
-const ADMIN_KEY_STORAGE = 'freaktown_admin_key';
+type ShowState = 'idle' | 'loading' | 'waiting_stage' | 'live' | 'paused' | 'ended';
 
 export function ControlPage() {
-  const { episodeId } = useParams<{ episodeId: string }>();
-  const ep = episodeId ?? 'demo';
+  const { episodeId = 'demo' } = useParams<{ episodeId: string }>();
+  const [search] = useSearchParams();
+  const mode = transportMode(search);
 
-  const phase = useShowStore((s) => s.phase);
-  const currentCamera = useShowStore((s) => s.currentCamera);
-  const currentTimeMs = useShowStore((s) => s.currentTimeMs);
-  const crowd = useShowStore((s) => s.crowd);
-  const judgeScores = useShowStore((s) => s.judgeScores);
-  const scoresRevealed = useShowStore((s) => s.scoresRevealed);
-
-  const [adminKey, setAdminKey] = useState(
-    () => localStorage.getItem(ADMIN_KEY_STORAGE) ?? ''
-  );
-  const [wsConnected, setWsConnected] = useState(false);
+  const [key, setKey] = useState(adminKey);
+  const [sets, setSets] = useState<SetEntry[]>([]);
+  const [setId, setSetId] = useState<string>('');
+  const [avatarOverride, setAvatarOverride] = useState('');
+  const [events, setEvents] = useState<ShowEvent[]>([]);
+  const [connected, setConnected] = useState(false);
+  const [show, setShow] = useState<ShowState>('idle');
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [stageUrl, setStageUrl] = useState<string | null>(null);
-  const [preload, setPreload] = useState({ performance_id: '', avatar_url: '', audio_url: '' });
+  const [stageLink, setStageLink] = useState<string | null>(null);
+  const [perfId, setPerfId] = useState<string | null>(null);
+  const [camera, setCamera] = useState('WIDE_STAGE');
+  const [stageAvatar, setStageAvatar] = useState<string | null>(null);
 
-  const client = useMemo(() => new ControlClient(ep, adminKey), [ep, adminKey]);
-  const consumerRef = useRef<EventConsumer | null>(null);
+  const transport = useMemo(() => createTransport(mode, { authKey: key }), [mode, key]);
+  const client = useMemo(() => new ControlClient(transport), [transport]);
+  const readyWaiters = useRef(new Map<string, () => void>());
+  const startedRef = useRef<string | null>(null);
+  const perfIdRef = useRef<string | null>(null);
 
-  // READ view: audience-role socket (no privileged token needed).
+  useEffect(() => { void loadSetCatalog().then((s) => { setSets(s); setSetId((cur) => cur || s[0]?.id || ''); }).catch((e) => setNotice(String(e))); }, []);
+
+  // READ view of the room (same transport the commands go through).
   useEffect(() => {
-    const consumer = new EventConsumer();
-    consumerRef.current = consumer;
-    consumer
-      .connect(ep, { role: 'audience', sessionId: `control-${Date.now()}` })
-      .then(() => setWsConnected(true))
-      .catch(() => setWsConnected(false));
-    const timer = window.setInterval(() => setWsConnected(consumer.connected), 2000);
-    return () => {
-      window.clearInterval(timer);
-      consumer.disconnect();
-      consumerRef.current = null;
-      setWsConnected(false);
-    };
-  }, [ep]);
-
-  useEffect(() => {
-    localStorage.setItem(ADMIN_KEY_STORAGE, adminKey);
-  }, [adminKey]);
-
-  // Camera hotkeys 1-6 → canonical commands (not local mutations).
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      const idx = ['1', '2', '3', '4', '5', '6', '7', '8'].indexOf(e.key);
-      if (idx >= 0) void runCommand(`camera ${CAMERA_PRESETS_LIST[idx]}`, () =>
-        client.cutCamera(CAMERA_PRESETS_LIST[idx]));
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ep, adminKey]);
-
-  async function runCommand(label: string, fn: () => Promise<unknown>): Promise<void> {
-    if (busy) return;
-    setBusy(label);
-    setNotice(null);
-    try {
-      await fn();
-      setNotice(`${label}: ok`);
-    } catch (e) {
-      setNotice(`${label}: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function mintToken(): Promise<void> {
-    await runCommand('mint stage token', async () => {
-      const token = await client.mintStageToken('stage');
-      const url = `${window.location.origin}/stage/${ep}?token=${encodeURIComponent(token)}`;
-      setStageUrl(url);
+    const consumer = new EventConsumer({ transport });
+    setEvents([]);
+    const off = consumer.onEvent((e) => {
+      setEvents((prev) => [...prev.slice(-199), e]);
+      if (e.type === 'camera.cut' && typeof e.payload?.camera === 'string') setCamera(e.payload.camera);
+      if (e.type === 'performance.ready') {
+        const pid = e.payload?.performance_id as string | undefined;
+        const av = e.payload?.avatar as { kind?: string; name?: string; mouthMode?: string } | undefined;
+        if (av) setStageAvatar(`${av.kind}:${av.name} · mouth ${av.mouthMode}`);
+        if (pid) { readyWaiters.current.get(pid)?.(); readyWaiters.current.delete(pid); }
+      }
     });
-  }
+    const offSnap = consumer.onSnapshot((s) => { if (s.seq === 0) setEvents([]); });
+    consumer.connect(episodeId, { role: 'audience', sessionId: `control-${Date.now()}` })
+      .then(() => setConnected(true))
+      .catch(() => { setConnected(false); setNotice(mode === 'room' ? 'EpisodeRoom unreachable (wrangler dev on :8787?)' : 'local link failed'); });
+    const timer = window.setInterval(() => setConnected(consumer.connected), 1500);
+    return () => { window.clearInterval(timer); off(); offSnap(); consumer.disconnect(); };
+  }, [transport, episodeId, mode]);
 
-  const formatTime = (ms: number): string => {
-    const totalSeconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    const millis = Math.floor((ms % 1000) / 10);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}.${millis.toString().padStart(2, '0')}`;
+  const run = useCallback(async (label: string, fn: () => Promise<unknown>) => {
+    setBusy(label); setNotice(null);
+    try { await fn(); } catch (e) { setNotice(`${label}: ${e instanceof Error ? e.message : String(e)}`); }
+    finally { setBusy(null); }
+  }, []);
+
+  const current = sets.find((s) => s.id === setId);
+
+  const waitReady = (pid: string, ms: number) => new Promise<boolean>((resolve) => {
+    const t = window.setTimeout(() => { readyWaiters.current.delete(pid); resolve(false); }, ms);
+    readyWaiters.current.set(pid, () => { window.clearTimeout(t); resolve(true); });
+  });
+
+  const startShow = () => run('start', async () => {
+    if (!current) throw new Error('pick a set');
+    const pid = `${current.id}-${Date.now().toString(36)}`;
+    setPerfId(pid);
+    perfIdRef.current = pid;
+    setShow('loading');
+    await client.startShow(current.title);
+    const ready = waitReady(pid, 45000);
+    await client.preloadPerformance({
+      performance_id: pid,
+      set_url: current.set_url,
+      audio_url: current.audio_url,
+      avatar_url: avatarOverride || current.avatar_url,
+      character_name: current.character_name,
+      title: current.premise,
+      episode_id: episodeId,
+    });
+    setShow('waiting_stage');
+    if (!(await ready)) {
+      if (startedRef.current !== pid) setNotice('No stage acknowledged the preload — open the stage link, then press Go.');
+      return;
+    }
+    await go(pid);
+  });
+
+  const go = async (pid = perfIdRef.current) => {
+    if (!pid || startedRef.current === pid) return; // never start a performance twice
+    startedRef.current = pid;
+    await client.enterCharacter(pid);
+    await client.startPerformance(pid);
+    setShow('live');
   };
 
+  const pause = () => run('pause', async () => { await client.pauseShow(); setShow('paused'); });
+  const resume = () => run('resume', async () => { await client.resumeShow(); setShow('live'); });
+  const end = () => run('end', async () => {
+    if (perfId) { await client.endPerformance(perfId); await client.exitCharacter(perfId); }
+    await client.endShow();
+    setShow('ended');
+  });
+  const cut = (cam: string) => run(`cut ${cam}`, () => client.cutCamera(cam));
+  const react = (r: string) => run(`react ${r}`, () => client.triggerReaction(r));
+  const rimshot = () => run('rimshot', () => client.playSfx('rimshot'));
+  const reset = () => {
+    if (transport instanceof LocalTransport) { transport.reset(); setEvents([]); setShow('idle'); setPerfId(null); }
+  };
+  const mintStage = () => run('mint', async () => {
+    const tok = await client.mintStageToken('stage');
+    const base = `${window.location.origin}${import.meta.env.BASE_URL}stage/${episodeId}?transport=${mode}`;
+    setStageLink(tok ? `${base}&token=${encodeURIComponent(tok)}` : base);
+  });
+
+  // Hotkeys: 1-4 camera, space pause/resume, L laugh — all as commands.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
+      const c = CAMERAS.find((x) => x.key === e.key);
+      if (c) { void cut(c.id); return; }
+      if (e.key === 'l') void react('laugh');
+      if (e.key === ' ') { e.preventDefault(); if (show === 'live') void pause(); else if (show === 'paused') void resume(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
+  const stageHref = `${import.meta.env.BASE_URL}stage/${episodeId}?transport=${mode}`;
+
   return (
-    <div style={{
-      width: '100vw', height: '100vh', background: '#0f0f14', color: '#e0e0e0',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      display: 'flex', flexDirection: 'column', overflow: 'hidden',
-    }}>
-      <header style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '12px 20px', borderBottom: '1px solid #333', background: '#1a1a24',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <h1 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>FREAK TOWN</h1>
-          <span style={{ fontSize: 12, opacity: 0.5 }}>CONTROL</span>
+    <div style={page} data-testid="control">
+      <header style={header}>
+        <div>
+          <div style={{ fontSize: 12, letterSpacing: 3, color: '#ff7ac8' }}>FREAK TOWN · CONTROL</div>
+          <h1 style={{ margin: '2px 0 0', fontSize: 22 }}>Episode <code>{episodeId}</code></h1>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <input
-            type="password"
-            placeholder="admin key (ft_… or Privy JWT)"
-            value={adminKey}
-            onChange={(e) => setAdminKey(e.target.value)}
-            style={{
-              background: '#0f0f14', border: '1px solid #444', color: '#e0e0e0',
-              padding: '6px 10px', borderRadius: 4, fontSize: 12, width: 220,
-            }}
-          />
-          <span style={{
-            fontSize: 12, padding: '4px 8px', borderRadius: 4,
-            background: wsConnected ? '#1a4a1a' : '#4a1a1a',
-            color: wsConnected ? '#4aff4a' : '#ff4a4a',
-          }}>
-            {wsConnected ? 'CONNECTED' : 'DISCONNECTED'}
+        <div style={{ textAlign: 'right', fontSize: 13 }}>
+          <span style={pill(connected ? '#1f7a3a' : '#7a1f1f')} data-testid="link-status">
+            {mode === 'local' ? 'LOCAL LINK' : 'EPISODE ROOM'} · {connected ? 'connected' : 'offline'}
           </span>
-          <span style={{ fontSize: 12, opacity: 0.5 }}>EP: {ep}</span>
+          <div style={{ marginTop: 6 }}>
+            <Link to={stageHref} target="_blank" style={{ color: '#9fd8ff' }}>open stage ↗</Link>
+          </div>
         </div>
       </header>
 
-      {notice && (
-        <div style={{
-          padding: '8px 20px', fontSize: 12,
-          background: notice.includes('failed') || notice.includes('4') ? '#3a1a1a' : '#1a3a2a',
-          borderBottom: '1px solid #333',
-        }}>
-          {busy ? `${busy}…` : notice}
+      <section style={card}>
+        <h2 style={h2}>Act / set</h2>
+        <div style={row}>
+          <select value={setId} onChange={(e) => setSetId(e.target.value)} style={input} data-testid="set-select">
+            {sets.map((s) => <option key={s.id} value={s.id}>{s.title}</option>)}
+          </select>
+          <select value={avatarOverride} onChange={(e) => setAvatarOverride(e.target.value)} style={input} data-testid="avatar-select">
+            {AVATARS.map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}
+          </select>
         </div>
-      )}
+        {current && (
+          <div style={{ fontSize: 13, opacity: 0.8, marginTop: 8 }}>
+            {current.beats} beats · {(current.duration_ms / 1000).toFixed(1)}s · body: {avatarOverride || current.avatar_note}
+          </div>
+        )}
+      </section>
 
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        <div style={{
-          width: 240, borderRight: '1px solid #333', padding: 16,
-          display: 'flex', flexDirection: 'column', gap: 12, overflow: 'auto',
-        }}>
-          <h3 style={{ fontSize: 12, opacity: 0.5, margin: 0 }}>CAMERAS (1-8)</h3>
-          {CAMERA_PRESETS_LIST.map((preset, i) => (
-            <button
-              key={preset}
-              disabled={busy !== null}
-              onClick={() => void runCommand(`camera ${preset}`, () => client.cutCamera(preset))}
-              style={{
-                padding: '10px 12px',
-                border: currentCamera === preset ? '2px solid #4a9' : '1px solid #444',
-                borderRadius: 6,
-                background: currentCamera === preset ? '#1a3a2a' : '#1a1a24',
-                color: '#e0e0e0', cursor: 'pointer', textAlign: 'left', fontSize: 13,
-              }}
-            >
-              <span style={{ fontFamily: 'monospace', marginRight: 8, opacity: 0.5 }}>{i + 1}</span>
-              {preset.replace(/_/g, ' ')}
+      <section style={card}>
+        <h2 style={h2}>Show <span style={pill('#333')} data-testid="show-state">{show}</span></h2>
+        <div style={row}>
+          <button style={btn('#ff2fa0')} onClick={startShow} disabled={!!busy || show === 'loading' || show === 'waiting_stage'} data-testid="start">▶ Start show</button>
+          {show === 'waiting_stage' && <button style={btn('#c78a00')} onClick={() => run('go', () => go())}>Go anyway</button>}
+          <button style={btn('#444')} onClick={pause} disabled={show !== 'live'} data-testid="pause">❚❚ Pause</button>
+          <button style={btn('#444')} onClick={resume} disabled={show !== 'paused'} data-testid="resume">▶ Resume</button>
+          <button style={btn('#7a1f1f')} onClick={end} disabled={show === 'idle' || show === 'ended'} data-testid="end">■ End</button>
+          {mode === 'local' && <button style={btn('#222')} onClick={reset} data-testid="reset">New show (clear log)</button>}
+        </div>
+        {stageAvatar && <div style={{ fontSize: 12, opacity: 0.75, marginTop: 8 }} data-testid="stage-avatar">stage ready · {stageAvatar}</div>}
+      </section>
+
+      <section style={card}>
+        <h2 style={h2}>Camera <span style={{ fontSize: 12, opacity: 0.6 }}>(keys 1–4 · plan auto-cuts run on the stage)</span></h2>
+        <div style={row}>
+          {CAMERAS.map((c) => (
+            <button key={c.id} style={btn(camera === c.id ? '#2d6cdf' : '#333')} onClick={() => cut(c.id)} data-testid={`cam-${c.id}`}>
+              {c.key} · {c.label}
             </button>
           ))}
-
-          <h3 style={{ fontSize: 12, opacity: 0.5, margin: '8px 0 0 0' }}>STAGE TOKEN</h3>
-          <button
-            disabled={busy !== null}
-            onClick={() => void mintToken()}
-            style={{
-              padding: '10px 12px', border: '1px solid #49a', borderRadius: 6,
-              background: 'transparent', color: '#49a', cursor: 'pointer', fontSize: 12,
-            }}
-          >
-            MINT STAGE TOKEN
-          </button>
-          {stageUrl && (
-            <div style={{ fontSize: 11, wordBreak: 'break-all', opacity: 0.8 }}>
-              <div style={{ opacity: 0.5, marginBottom: 4 }}>STAGE URL (episode-scoped):</div>
-              <a href={stageUrl} target="_blank" rel="noreferrer" style={{ color: '#49a' }}>
-                {stageUrl.slice(0, 80)}…
-              </a>
-            </div>
-          )}
         </div>
+      </section>
 
-        <div style={{ flex: 1, padding: 16, display: 'flex', flexDirection: 'column', gap: 16, overflow: 'auto' }}>
-          <div style={{
-            fontSize: 48, fontFamily: 'monospace', fontWeight: 'bold',
-            textAlign: 'center', padding: 20, background: '#1a1a24', borderRadius: 8,
-          }}>
-            {formatTime(currentTimeMs)}
-          </div>
-
-          <div style={{ padding: 16, background: '#1a1a24', borderRadius: 8 }}>
-            <h3 style={{ fontSize: 12, opacity: 0.5, margin: '0 0 12px 0' }}>PHASE</h3>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {PHASES.map((p) => (
-                <button
-                  key={p}
-                  disabled={busy !== null}
-                  onClick={() => void runCommand(`phase ${p}`, () => client.setPhase(p))}
-                  style={{
-                    padding: '6px 10px',
-                    border: phase === p ? '2px solid #4a9' : '1px solid #444',
-                    borderRadius: 4,
-                    background: phase === p ? '#1a3a2a' : 'transparent',
-                    color: '#e0e0e0', cursor: 'pointer', fontSize: 11,
-                    textTransform: 'uppercase',
-                  }}
-                >
-                  {p.replace(/_/g, ' ')}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ padding: 16, background: '#1a1a24', borderRadius: 8 }}>
-            <h3 style={{ fontSize: 12, opacity: 0.5, margin: '0 0 12px 0' }}>PRELOAD FREAK</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <ControlInput placeholder="performance_id" value={preload.performance_id}
-                onChange={(v) => setPreload({ ...preload, performance_id: v })} />
-              <ControlInput placeholder="avatar GLB URL" value={preload.avatar_url}
-                onChange={(v) => setPreload({ ...preload, avatar_url: v })} />
-              <ControlInput placeholder="set WAV URL" value={preload.audio_url}
-                onChange={(v) => setPreload({ ...preload, audio_url: v })} />
-              <ActionButton
-                label={busy ? 'WORKING…' : 'PRELOAD → STAGE'}
-                color="#49a"
-                onClick={() => void runCommand('preload', () =>
-                  client.preloadPerformance({
-                    performance_id: preload.performance_id,
-                    avatar_url: preload.avatar_url,
-                    audio_url: preload.audio_url,
-                  }))}
-              />
-            </div>
-          </div>
+      <section style={card}>
+        <h2 style={h2}>Crowd</h2>
+        <div style={row}>
+          {REACTIONS.map((r) => (
+            <button key={r} style={btn('#3a2a55')} onClick={() => react(r)} data-testid={`react-${r}`}>{r}</button>
+          ))}
+          <button style={btn('#3a2a55')} onClick={rimshot}>ba-dum-tss</button>
         </div>
+      </section>
 
-        <div style={{
-          width: 280, borderLeft: '1px solid #333', padding: 16,
-          display: 'flex', flexDirection: 'column', gap: 16, overflow: 'auto',
-        }}>
-          <div style={{ padding: 16, background: '#1a1a24', borderRadius: 8 }}>
-            <h3 style={{ fontSize: 12, opacity: 0.5, margin: '0 0 12px 0' }}>CROWD</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <MetricCard label="Viewers" value={crowd.active_viewers} />
-              <MetricCard label="Laughers" value={crowd.unique_laughers} />
-              <MetricCard label="Laughs" value={crowd.laugh_events} />
-              <MetricCard label="Claps" value={crowd.claps} />
-              <MetricCard label="Boos" value={crowd.boos} />
+      {mode === 'room' && (
+        <section style={card}>
+          <h2 style={h2}>EpisodeRoom auth</h2>
+          <div style={row}>
+            <input style={{ ...input, flex: 2 }} type="password" placeholder="admin key (ft_…) or Privy JWT" value={key}
+              onChange={(e) => { setKey(e.target.value); setAdminKey(e.target.value); }} />
+            <button style={btn('#2d6cdf')} onClick={mintStage}>Mint stage link</button>
+          </div>
+          {stageLink && <div style={{ fontSize: 12, wordBreak: 'break-all', marginTop: 8 }}><a href={stageLink} target="_blank" rel="noreferrer" style={{ color: '#9fd8ff' }}>{stageLink}</a></div>}
+        </section>
+      )}
+
+      {notice && <div style={noticeBox} data-testid="notice">{notice}</div>}
+
+      <section style={card}>
+        <h2 style={h2}>Event log <span style={{ fontSize: 12, opacity: 0.6 }}>(persisted, replayable)</span></h2>
+        <div style={logBox} data-testid="event-log">
+          {[...events].reverse().slice(0, 40).map((e) => (
+            <div key={e.seq} style={{ display: 'flex', gap: 10 }}>
+              <span style={{ opacity: 0.5, width: 34, textAlign: 'right' }}>{e.seq}</span>
+              <span style={{ color: '#ffd27a', minWidth: 150 }}>{e.type}</span>
+              <span style={{ opacity: 0.7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {summary(e)}
+              </span>
             </div>
-          </div>
-
-          <div style={{ padding: 16, background: '#1a1a24', borderRadius: 8 }}>
-            <h3 style={{ fontSize: 12, opacity: 0.5, margin: '0 0 12px 0' }}>
-              JUDGES {scoresRevealed ? '(REVEALED)' : '(LOCKED)'}
-            </h3>
-            {judgeScores.length === 0 ? (
-              <div style={{ fontSize: 12, opacity: 0.3 }}>No scores yet</div>
-            ) : (
-              judgeScores.map((s) => (
-                <div key={s.name} style={{
-                  padding: '8px 12px', border: '1px solid #333',
-                  borderRadius: 4, marginBottom: 6,
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 13, fontWeight: 500 }}>{s.name}</span>
-                    <span style={{
-                      fontSize: 16, fontWeight: 'bold',
-                      color: s.score >= 7 ? '#4a9' : s.score >= 5 ? '#aa4' : '#a44',
-                    }}>
-                      {scoresRevealed ? s.score.toFixed(1) : '??'}
-                    </span>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          <div style={{ padding: 16, background: '#1a1a24', borderRadius: 8 }}>
-            <h3 style={{ fontSize: 12, opacity: 0.5, margin: '0 0 12px 0' }}>ACTIONS</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <ActionButton label="START SHOW" color="#4a9"
-                onClick={() => void runCommand('start show', () => client.startShow())} />
-              <ActionButton label="PAUSE" color="#aa4"
-                onClick={() => void runCommand('pause', () => client.pauseShow())} />
-              <ActionButton label="RESUME" color="#4a9"
-                onClick={() => void runCommand('resume', () => client.resumeShow())} />
-              <ActionButton label="START PERFORMANCE" color="#4a9"
-                onClick={() => void runCommand('performance start', () =>
-                  client.startPerformance(preload.performance_id || 'current'))} />
-              <ActionButton label="END SET" color="#aa4"
-                onClick={() => void runCommand('end set', () =>
-                  client.endPerformance(preload.performance_id || 'current'))} />
-              <ActionButton label="REVEAL SCORES" color="#49a"
-                onClick={() => void runCommand('reveal', () => client.revealScores())} />
-              <ActionButton label="END SHOW" color="#a44"
-                onClick={() => void runCommand('end show', () => client.endShow())} />
-            </div>
-          </div>
+          ))}
+          {!events.length && <div style={{ opacity: 0.5 }}>no events yet</div>}
         </div>
-      </div>
+      </section>
     </div>
   );
 }
 
-function MetricCard({ label, value }: { label: string; value: number }) {
-  return (
-    <div style={{ padding: '8px 10px', background: '#0f0f14', borderRadius: 4, textAlign: 'center' }}>
-      <div style={{ fontSize: 18, fontWeight: 'bold' }}>{value}</div>
-      <div style={{ fontSize: 10, opacity: 0.5, textTransform: 'uppercase' }}>{label}</div>
-    </div>
-  );
+function summary(e: ShowEvent): string {
+  const p = e.payload ?? {};
+  if (e.type === 'camera.cut') return String(p.camera);
+  if (e.type === 'crowd.reaction') return String(p.reaction);
+  if (e.type === 'performance.preload') return `${p.set_url} · ${p.avatar_url}`;
+  if (e.type === 'performance.ready') return `${p.performance_id} (${e.actor})`;
+  if (e.type === 'show.start') return String(p.title ?? '');
+  return Object.keys(p).length ? JSON.stringify(p).slice(0, 80) : '';
 }
 
-function ControlInput({ placeholder, value, onChange }: {
-  placeholder: string; value: string; onChange: (v: string) => void;
-}) {
-  return (
-    <input
-      placeholder={placeholder}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      style={{
-        background: '#0f0f14', border: '1px solid #444', color: '#e0e0e0',
-        padding: '8px 10px', borderRadius: 4, fontSize: 12, width: '100%',
-      }}
-    />
-  );
-}
-
-function ActionButton({ label, color, onClick }: {
-  label: string; color: string; onClick?: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        padding: '10px 12px', border: `1px solid ${color}`, borderRadius: 4,
-        background: 'transparent', color, cursor: 'pointer', fontSize: 12,
-        fontWeight: 500, textTransform: 'uppercase',
-      }}
-    >
-      {label}
-    </button>
-  );
-}
+const page: React.CSSProperties = {
+  minHeight: '100vh', background: '#0c0a12', color: '#eee', fontFamily: 'Inter, system-ui, sans-serif',
+  padding: '18px clamp(12px, 3vw, 32px)', boxSizing: 'border-box', maxWidth: 980, margin: '0 auto',
+};
+const header: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 14, gap: 12 };
+const card: React.CSSProperties = { background: '#16131f', border: '1px solid #2a2438', borderRadius: 10, padding: '12px 14px', marginBottom: 12 };
+const h2: React.CSSProperties = { margin: '0 0 10px', fontSize: 15, fontWeight: 700, display: 'flex', gap: 10, alignItems: 'center' };
+const row: React.CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 8 };
+const input: React.CSSProperties = { flex: 1, minWidth: 200, background: '#0c0a12', color: '#eee', border: '1px solid #3a3350', borderRadius: 6, padding: '8px 10px', fontSize: 14 };
+const btn = (bg: string): React.CSSProperties => ({ background: bg, color: '#fff', border: 'none', borderRadius: 6, padding: '9px 14px', fontSize: 14, fontWeight: 600, cursor: 'pointer' });
+const pill = (bg: string): React.CSSProperties => ({ background: bg, color: '#fff', borderRadius: 999, padding: '3px 10px', fontSize: 12, fontWeight: 600 });
+const noticeBox: React.CSSProperties = { background: '#3a2a10', border: '1px solid #7a5a20', color: '#ffd9a0', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 13 };
+const logBox: React.CSSProperties = { fontFamily: 'ui-monospace, monospace', fontSize: 12, maxHeight: 260, overflowY: 'auto', lineHeight: 1.6 };

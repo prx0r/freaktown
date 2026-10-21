@@ -8,10 +8,16 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { useShowStore } from '../store/showStore';
-import { EventConsumer } from '../stage/EventConsumer';
-import { payForAction } from '../x402/pay';
+import { useParams, useSearchParams } from 'react-router-dom';
+import { EventConsumer } from '@freaktown/stage-runtime';
+import { showRoomStore, useShowStore } from '../store/showStore';
+import { createTransport, transportMode } from '../live/transport';
+
+// x402 is out of the MVP runtime (docs/BOUNDARIES.md); paid actions are
+// stubbed until the FastAPI control plane owns payment capture.
+async function payForAction(_: { action: string; showId: string; message: string }): Promise<{ ok: boolean; error?: string }> {
+  return { ok: false, error: 'payments are not enabled in this build' };
+}
 
 const SESSION_STORAGE_KEY = 'freaktown_session_id';
 
@@ -30,6 +36,8 @@ function stableSessionId(): string {
 
 export function LivePage() {
   const { episodeId } = useParams<{ episodeId: string }>();
+  const [search] = useSearchParams();
+  const mode = transportMode(search);
 
   const phase = useShowStore((s) => s.phase);
   const currentTimeMs = useShowStore((s) => s.currentTimeMs);
@@ -46,7 +54,7 @@ export function LivePage() {
   // and reconnects resume the same identity.
   useEffect(() => {
     if (!episodeId) return;
-    const consumer = new EventConsumer();
+    const consumer = new EventConsumer({ transport: createTransport(mode), store: showRoomStore });
     consumerRef.current = consumer;
     consumer
       .connect(episodeId, { role: 'audience', sessionId: stableSessionId() })
@@ -59,7 +67,7 @@ export function LivePage() {
       consumerRef.current = null;
       setWsConnected(false);
     };
-  }, [episodeId]);
+  }, [episodeId, mode]);
 
   // Format time as MM:SS
   const formatTime = (ms: number): string => {

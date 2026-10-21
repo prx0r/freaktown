@@ -4,7 +4,7 @@
  */
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { PerspectiveCamera } from 'three';
-import { CameraDirector } from './CameraDirector';
+import { CameraDirector } from '../src/CameraDirector';
 
 function makeDirector() {
   const camera = new PerspectiveCamera(45, 1, 0.1, 100);

@@ -1,23 +1,34 @@
 /**
  * StageRuntime — the single renderer for Freak Town.
  *
- * One Three.js scene. One AudioContext. One Transport.
- * Handles VRM loading, lip sync, motion cues, camera control.
+ * One Three.js scene. One AudioContext. One Transport (the show clock).
+ * Data/events in, performance out. No React, no app imports: the host
+ * injects a ClockSink (timer readout) and a RoomStore (state mirror).
  *
- * Used in both:
- * - /stage/:episodeId (production stage)
- * - /control/:episodeId (operator console)
+ *   performer  = AvatarDriver (VRM → GLB → BASIC) + Performer (body/face)
+ *   mouth      = MouthTrack on the media clock (plan) | analyser (live audio)
+ *   camera     = CameraDirector presets; plan camera_cues + camera.cut events
+ *   room       = StageSet (brick wall, mic, lights, audience)
+ *
+ * Lifecycle: EMPTY → LOADING → READY → PLAYING ⇄ PAUSED → ENDED.
+ * play() is a no-op until READY; the show gates performance.start on the
+ * stage.performance_ready ACK the executor sends after preload.
  */
 
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { VRMLoaderPlugin, VRM } from '@pixiv/three-vrm';
+import type { CameraCue, MotionCue, PerformancePlan, WordTiming } from '@freaktown/contracts';
 import { Transport } from './Transport';
 import { AudioBus } from './AudioBus';
-import { CameraDirector, CameraPresetName } from './CameraDirector';
-import { LipSyncAdapter } from './LipSync';
+import { CameraDirector, type CameraPresetName } from './CameraDirector';
 import { EventConsumer } from './EventConsumer';
-import { useShowStore, MotionCue, WordTiming, PerformancePlan } from '../store/showStore';
+import { StageSet } from './StageSet';
+import { SfxSynth } from './SfxSynth';
+import { NULL_CLOCK_SINK, type ClockSink, type RoomStore } from './ports';
+import type { LiveTransport } from './live/LiveTransport';
+import { loadAvatar } from './avatars/loadAvatar';
+import type { AvatarCapabilities, AvatarDriver, Emotions, Visemes } from './avatars/types';
+import { MouthTrack } from './performance/MouthTrack';
+import { Performer } from './performance/Performer';
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -29,275 +40,270 @@ export interface PreloadSpec {
   plan: PerformancePlan;
   wordTimings?: WordTiming[];
   walkoutUrl?: string;
+  name?: string;
+  seed?: string;
 }
 
 export interface StageConfig {
-  mode: 'live' | 'green-room';
   container: HTMLElement;
+  mode?: 'live' | 'green-room';
   background?: string;
+  clockSink?: ClockSink;
+  store?: RoomStore;
+  transport?: LiveTransport;
+  /** Bind number keys to local camera cuts (debug only; live cuts are events). */
+  keyboard?: boolean;
+  /** Frame-stepped capture mode: no realtime loop, no audio output. */
+  capture?: boolean;
+  shadows?: boolean;
+  sign?: string;
+  /** 'low' = half-res, no shadows/AA (software GL, old phones, CI). */
+  quality?: 'high' | 'low';
+  /** CPU skinning/morphs for GPUs without vertex texture fetch (CI/SwiftShader). */
+  cpuSkinning?: boolean;
 }
+
+export interface CutRecord {
+  camera: CameraPresetName;
+  set_time_ms: number;
+  source: 'auto_director' | 'human_director' | 'initial';
+  wall_ms: number;
+}
+
+export interface StageTelemetry {
+  status: RuntimeStatus;
+  timeMs: number;
+  durationMs: number;
+  audioState: string;
+  mouth: number;
+  visemes: Visemes;
+  emotions: Emotions;
+  blink: number;
+  blinks: number;
+  camera: CameraPresetName;
+  cuts: CutRecord[];
+  wordIndex: number;
+  word: string | null;
+  avatar: AvatarCapabilities | null;
+  avatarFallback: string | null;
+  mouthSource: 'plan' | 'analyser' | 'none';
+  frames: number;
+  fps: number;
+}
+
+const ZERO_VIS: Visemes = { aa: 0, ih: 0, ou: 0, ee: 0, oh: 0 };
+const ZERO_EMO: Emotions = { happy: 0, angry: 0, sad: 0, surprised: 0, relaxed: 0 };
 
 // ── Stage Runtime ─────────────────────────────────────────────────
 
 export class StageRuntime {
-  // Three.js
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
   private renderer: THREE.WebGLRenderer;
-  private clock: THREE.Clock;
-  private mixer: THREE.AnimationMixer | null = null;
-  private vrm: VRM | null = null;
+  private set: StageSet;
+  private gaze = new THREE.Object3D();
 
-  // Subsystems
   private transport: Transport;
   private audioBus: AudioBus;
+  private sfx: SfxSynth;
   private cameraDirector: CameraDirector;
-  private lipSync: LipSyncAdapter;
   private eventConsumer: EventConsumer;
+  private clockSink: ClockSink;
 
-  // Performance plan
+  private avatar: AvatarDriver | null = null;
+  private avatarFallback: string | null = null;
+  private performer = new Performer();
+  private mouthTrack: MouthTrack | null = null;
+  private analyserData: Uint8Array<ArrayBuffer>;
+
   private plan: PerformancePlan | null = null;
   private wordTimings: WordTiming[] = [];
-  private currentCueIndex: number = 0;
+  private cueIndex = 0;
+  private camIndex = 0;
 
-  // State
   private config: StageConfig;
-  private animationFrameId: number | null = null;
-  private unbindCameraKeyboard: (() => void) | null = null;
+  private frameId: number | null = null;
+  private unbindKeyboard: (() => void) | null = null;
+  private lastWall = 0;
+  private resizeObserver: ResizeObserver | null = null;
 
-  /**
-   * Explicit lifecycle. play() is a no-op until preload() resolves READY;
-   * performance.start is only legal in READY (the show gates on the
-   * stage.performance_ready ACK the executor sends after preload).
-   */
+  // telemetry
+  private cuts: CutRecord[] = [];
+  private mouthOpen = 0;
+  private visemes: Visemes = { ...ZERO_VIS };
+  private emotions: Emotions = { ...ZERO_EMO };
+  private blink = 0;
+  private blinks = 0;
+  private wordIndex = -1;
+  private frames = 0;
+  private fps = 0;
+  private fpsWindow: number[] = [];
+  private captureTimeMs = 0;
+  private lastCutSource: CutRecord['source'] = 'initial';
+
   status: RuntimeStatus = 'EMPTY';
-
-  // Gaze target (persistent Object3D — vrm.lookAt.target must be an Object3D)
-  private gazeTarget: THREE.Object3D;
 
   constructor(config: StageConfig) {
     this.config = config;
+    this.clockSink = config.clockSink ?? NULL_CLOCK_SINK;
+    const { clientWidth: w, clientHeight: h } = config.container;
 
-    // Scene
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(config.background || '#0a0a1a');
+    this.scene.background = new THREE.Color(config.background || '#05030a');
 
-    // Camera
-    this.camera = new THREE.PerspectiveCamera(
-      45,
-      config.container.clientWidth / config.container.clientHeight,
-      0.1,
-      100
-    );
+    this.camera = new THREE.PerspectiveCamera(45, Math.max(1, w) / Math.max(1, h), 0.05, 60);
 
-    // Renderer
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-    this.renderer.setSize(config.container.clientWidth, config.container.clientHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    const low = config.quality === 'low';
+    this.renderer = new THREE.WebGLRenderer({ antialias: !low, alpha: false, preserveDrawingBuffer: !!config.capture });
+    this.renderer.setPixelRatio(low ? 0.5 : Math.min(window.devicePixelRatio || 1, 2));
+    this.renderer.setSize(Math.max(1, w), Math.max(1, h));
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.2;
+    this.renderer.toneMappingExposure = 1.15;
+    this.renderer.shadowMap.enabled = config.shadows ?? !low;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.domElement.style.display = 'block';
     config.container.appendChild(this.renderer.domElement);
 
-    // Clock
-    this.clock = new THREE.Clock();
+    this.set = new StageSet(this.scene, { shadows: config.shadows ?? !low, sign: config.sign });
+    this.gaze.position.set(0, 1.5, 6);
+    this.scene.add(this.gaze);
 
-    // Gaze target — VRM LookAt tracks this Object3D
-    this.gazeTarget = new THREE.Object3D();
-    this.gazeTarget.position.set(0, 1.5, 3);
-    this.scene.add(this.gazeTarget);
-
-    // Audio — one graph: transport → VOICE bus → analyser → MASTER.
-    // The bus owns the lipsync tap; nothing else creates analysers.
+    // Audio: transport → VOICE bus → analyser → MASTER (one graph).
     const audioContext = new AudioContext();
     this.transport = new Transport();
     this.transport.setAudioContext(audioContext);
     this.transport.setOnEnd(() => this.onTransportEnd());
     this.audioBus = new AudioBus(audioContext);
     this.transport.setOutputNode(this.audioBus.getGain('VOICE'));
+    this.sfx = new SfxSynth(audioContext, this.audioBus.getGain('SFX'));
+    this.analyserData = new Uint8Array(this.audioBus.getVoiceAnalyser().fftSize);
+    if (config.capture) {
+      this.transport.setManualClock(() => this.captureTimeMs);
+      this.audioBus.muteAll();
+    }
 
-    // Camera director
     this.cameraDirector = new CameraDirector(this.camera);
+    this.cameraDirector.setAspect(this.camera.aspect);
     this.cameraDirector.setClock(() => this.transport.currentTimeMs);
+    this.cameraDirector.setOnCut((camera, set_time_ms) => {
+      this.cuts.push({ camera, set_time_ms: Math.round(set_time_ms), source: this.lastCutSource, wall_ms: Date.now() });
+    });
+    this.cuts.push({ camera: 'WIDE_STAGE', set_time_ms: 0, source: 'initial', wall_ms: Date.now() });
+    if (config.keyboard) this.unbindKeyboard = this.cameraDirector.bindKeyboard();
 
-    // Lip sync reads the bus voice tap; mouth channel only.
-    this.lipSync = new LipSyncAdapter();
-    this.lipSync.attach(this.audioBus.getVoiceAnalyser());
+    this.eventConsumer = new EventConsumer({ transport: config.transport, store: config.store });
 
-    // Event consumer
-    this.eventConsumer = new EventConsumer();
-
-    // Setup lights
-    this.setupLights();
-
-    // Setup resize handler
     window.addEventListener('resize', this.handleResize);
+    if (typeof ResizeObserver !== 'undefined') {
+      this.resizeObserver = new ResizeObserver(this.handleResize);
+      this.resizeObserver.observe(config.container);
+    }
 
-    // CameraDirector owns keyboard mapping (StagePage must NOT add its own
-    // handler — double handling crashes cutCamera with raw key strings).
-    this.unbindCameraKeyboard = this.cameraDirector.bindKeyboard();
+    // Idle performer before any show: BASIC body so the stage is never empty.
+    void this.setAvatar({ avatarUrl: 'basic', name: 'house' }).then(() => {
+      if (this.disposed) return;
+      if (!config.capture) this.startLoop();
+      else this.renderFrame(0, 1 / 30);
+    });
   }
 
-  /** The shared consumer, so pages can attach one executor to it. */
-  get consumer(): EventConsumer {
-    return this.eventConsumer;
-  }
-
-  get audio(): AudioBus {
-    return this.audioBus;
-  }
-
-  get director(): CameraDirector {
-    return this.cameraDirector;
-  }
-
-  /** Current transport time in milliseconds. */
-  get currentTimeMs(): number {
-    return this.transport.currentTimeMs;
-  }
-
-  // ── Setup ────────────────────────────────────────────────────────
-
-  private setupLights(): void {
-    // Ambient
-    const ambient = new THREE.AmbientLight(0xffffff, 0.5);
-    this.scene.add(ambient);
-
-    // Key light (warm)
-    const keyLight = new THREE.DirectionalLight(0xfff5e6, 1.4);
-    keyLight.position.set(2, 3, 2);
-    keyLight.castShadow = true;
-    this.scene.add(keyLight);
-
-    // Fill light (cool)
-    const fillLight = new THREE.DirectionalLight(0xe6f0ff, 0.4);
-    fillLight.position.set(-2, 1, -1);
-    this.scene.add(fillLight);
-
-    // Rim light
-    const rimLight = new THREE.DirectionalLight(0xffffff, 0.3);
-    rimLight.position.set(0, 2, -3);
-    this.scene.add(rimLight);
-  }
+  // ── accessors ────────────────────────────────────────────────────
+  get consumer(): EventConsumer { return this.eventConsumer; }
+  get audio(): AudioBus { return this.audioBus; }
+  get director(): CameraDirector { return this.cameraDirector; }
+  get currentTimeMs(): number { return this.transport.currentTimeMs; }
+  get canvas(): HTMLCanvasElement { return this.renderer.domElement; }
+  get currentPlan(): PerformancePlan | null { return this.plan; }
 
   private handleResize = (): void => {
     const w = this.config.container.clientWidth;
     const h = this.config.container.clientHeight;
+    if (!w || !h) return;
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    this.cameraDirector.setAspect(this.camera.aspect);
     this.renderer.setSize(w, h);
   };
 
-  // ── Asset Loading ────────────────────────────────────────────────
+  // ── assets ───────────────────────────────────────────────────────
 
-  async loadAvatar(url: string): Promise<void> {
-    const loader = new GLTFLoader();
-    loader.register((parser) => new VRMLoaderPlugin(parser));
-
-    return new Promise((resolve, reject) => {
-      loader.load(
-        url,
-        async (gltf) => {
-          const vrm = gltf.userData.vrm as VRM;
-          if (!vrm) {
-            reject(new Error('No VRM found in GLB'));
-            return;
-          }
-
-          this.vrm = vrm;
-          this.scene.add(vrm.scene);
-          this.mixer = new THREE.AnimationMixer(vrm.scene);
-
-          // VRM LookAt tracks our persistent gaze target
-          if (vrm.lookAt) {
-            vrm.lookAt.target = this.gazeTarget;
-          }
-
-          // Set default pose
-          vrm.humanoid?.resetNormalizedPose();
-
-          // Connect lip sync
-          this.lipSync.setVRM(vrm);
-
-          resolve();
-        },
-        undefined,
-        reject
-      );
-    });
+  private async setAvatar(spec: { avatarUrl: string; name?: string; seed?: string }): Promise<void> {
+    const loaded = await loadAvatar({ url: spec.avatarUrl, name: spec.name, seed: spec.seed, lite: this.config.quality === 'low', cpuSkinning: this.config.cpuSkinning });
+    if (this.disposed) { loaded.driver.dispose(); return; }
+    if (this.avatar) this.avatar.dispose();
+    this.avatar = loaded.driver;
+    this.avatarFallback = loaded.fallbackReason ?? null;
+    if (loaded.fallbackReason) console.warn('[stage]', loaded.fallbackReason);
+    this.avatar.setGazeTarget(this.gaze);
+    this.scene.add(this.avatar.root);
   }
 
-  async loadAudio(url: string): Promise<void> {
-    await this.transport.loadAudio(url);
-  }
+  async loadAudio(url: string): Promise<void> { await this.transport.loadAudio(url); }
+  async loadAudioFromBytes(bytes: ArrayBuffer): Promise<void> { await this.transport.loadAudioFromBytes(bytes); }
 
-  async loadAudioFromBytes(bytes: ArrayBuffer): Promise<void> {
-    await this.transport.loadAudioFromBytes(bytes);
-  }
-
-  /**
-   * Unlock audio from a user gesture (required on iPhone/mobile Safari
-   * where Web Audio starts suspended). StagePage calls this on first tap.
-   */
   async unlockAudio(): Promise<void> {
     const ctx = this.transport.getAudioContext();
-    if (ctx && ctx.state === 'suspended') {
-      await ctx.resume();
-    }
+    if (ctx && ctx.state === 'suspended') await ctx.resume();
   }
 
-  /** True while the AudioContext needs a user gesture to start. */
   isAudioLocked(): boolean {
     const ctx = this.transport.getAudioContext();
-    return !!ctx && ctx.state === 'suspended';
+    return !this.config.capture && !!ctx && ctx.state === 'suspended';
   }
-
-  // ── Performance Plan ─────────────────────────────────────────────
 
   setPlan(plan: PerformancePlan, wordTimings: WordTiming[] = []): void {
     this.plan = plan;
-    this.wordTimings = wordTimings;
-    this.currentCueIndex = 0;
+    this.wordTimings = wordTimings.length ? wordTimings : plan.word_timings ?? [];
+    this.mouthTrack = MouthTrack.fromPlan(plan, this.wordTimings);
+    this.performer.energy = plan.energy ?? 0.7;
+    this.cueIndex = 0;
+    this.camIndex = 0;
   }
 
-  /**
-   * Load a Freak onto the stage: avatar GLB + set audio + plan + words.
-   * EMPTY → LOADING → READY. play() is a no-op until READY.
-   */
+  /** Load a performance: avatar + set audio + plan. EMPTY → LOADING → READY. */
   async preload(spec: PreloadSpec): Promise<void> {
     this.setStatus('LOADING');
-    await this.loadAvatar(spec.avatarUrl);
-    await this.loadAudio(spec.audioUrl);
+    this.transport.stop();
+    await Promise.all([
+      this.setAvatar({ avatarUrl: spec.avatarUrl, name: spec.name, seed: spec.seed ?? spec.plan?.character_id }),
+      this.loadAudio(spec.audioUrl),
+    ]);
     this.setPlan(spec.plan, spec.wordTimings ?? []);
+    this.performer.reset();
+    this.cutCamera('WIDE_STAGE', 'auto_director');
     this.setStatus('READY');
   }
 
   private statusListeners = new Set<(s: RuntimeStatus) => void>();
-
   onStatus(cb: (s: RuntimeStatus) => void): () => void {
     this.statusListeners.add(cb);
     return () => { this.statusListeners.delete(cb); };
   }
-
   private setStatus(s: RuntimeStatus): void {
     this.status = s;
-    for (const cb of this.statusListeners) {
-      try { cb(s); } catch { /* listener errors never break playback */ }
-    }
+    for (const cb of this.statusListeners) { try { cb(s); } catch { /* never break playback */ } }
   }
 
-  // ── Transport Controls (state-machine gated) ──────────────────────
+  // ── transport (state-machine gated) ──────────────────────────────
 
   play(): void {
     if (this.status !== 'READY' && this.status !== 'PAUSED' && this.status !== 'ENDED') return;
-    this.lipSync.setActive(true);
-    this.transport.play();
+    if (this.status === 'ENDED') { this.transport.stop(); this.cueIndex = 0; this.camIndex = 0; }
+    if (!this.config.capture) this.transport.play();
     this.setStatus('PLAYING');
-    this.startAnimationLoop();
+  }
+
+  /** Start from an offset (late-joining stage catching up on a running set). */
+  playFrom(ms: number): void {
+    if (this.status !== 'READY' && this.status !== 'PAUSED') return;
+    this.transport.seek(ms);
+    this.syncIndices(ms);
+    this.play();
   }
 
   pause(): void {
     if (this.status !== 'PLAYING') return;
-    this.lipSync.setActive(false);
     this.transport.pause();
     this.setStatus('PAUSED');
   }
@@ -307,260 +313,216 @@ export class StageRuntime {
     this.play();
   }
 
+  /** performance.end / show.end: stop the set, close the mouth. */
+  end(): void {
+    if (this.status === 'PLAYING' || this.status === 'PAUSED') {
+      this.transport.pause();
+      this.setStatus('ENDED');
+    }
+  }
+
   seek(ms: number): void {
     if (this.status !== 'PLAYING' && this.status !== 'PAUSED') return;
     this.transport.seek(ms);
-    this.currentCueIndex = this.plan?.cues.findIndex(c => c.at_ms >= ms) ?? 0;
-    if (this.currentCueIndex < 0) this.currentCueIndex = 0;
+    this.syncIndices(ms);
   }
 
-  /** Called when the set audio naturally ends. */
+  private syncIndices(ms: number): void {
+    const cues = this.plan?.cues ?? [];
+    const cams = this.plan?.camera_cues ?? [];
+    this.cueIndex = Math.max(0, cues.findIndex((c) => c.at_ms >= ms));
+    if (cues.length && cues[cues.length - 1].at_ms < ms) this.cueIndex = cues.length;
+    let ci = 0;
+    while (ci < cams.length && cams[ci].at_ms <= ms) ci++;
+    if (ci > 0) { this.lastCutSource = 'auto_director'; this.cameraDirector.cut(cams[ci - 1].camera); }
+    this.camIndex = ci;
+  }
+
   private onTransportEnd(): void {
-    this.lipSync.setActive(false);
     this.setStatus('ENDED');
+    this.cutCamera('WIDE_STAGE', 'auto_director');
   }
 
-  // ── Camera Control ──────────────────────────────────────────────
+  // ── camera / reactions ───────────────────────────────────────────
 
-  cutCamera(preset: CameraPresetName): void {
+  cutCamera(preset: CameraPresetName, source: CutRecord['source'] = 'human_director'): void {
+    this.lastCutSource = source;
     this.cameraDirector.cut(preset);
   }
 
-  /** Gaze out at the crowd (character entrance default). */
   async lookAtAudience(): Promise<void> {
-    this.gazeTarget.position.set(0, 1.5, 3);
+    this.performer.trigger('gaze.audience', 1, 1000, this.performerClock());
   }
 
-  // ── Audio Control ───────────────────────────────────────────────
-
-  duckMusic(): void {
-    this.audioBus.duckMusic();
+  /** Crowd reaction (crowd.reaction event): sound + room + performer. */
+  react(kind: string): void {
+    this.sfx.play(kind);
+    const big = kind === 'laugh' || kind === 'clap' || kind === 'love';
+    this.set.excite(big ? 1 : 0.3);
+    const map: Record<string, string> = {
+      laugh: 'reaction.laugh', clap: 'reaction.laugh', love: 'reaction.laugh',
+      boo: 'reaction.boo', groan: 'reaction.groan', crickets: 'reaction.dead_stare', wtf: 'reaction.confused',
+    };
+    const action = map[kind];
+    if (action) this.performer.trigger(action, 1, 1800, this.performerClock());
   }
 
-  unduckMusic(): void {
-    this.audioBus.unduckMusic();
-  }
+  playSfx(name: string): void { this.sfx.play(name); }
 
-  // ── Connection ──────────────────────────────────────────────────
+  duckMusic(): void { this.audioBus.duckMusic(); }
+  unduckMusic(): void { this.audioBus.unduckMusic(); }
 
   async connect(episodeId: string, token?: string): Promise<void> {
     await this.eventConsumer.connect(episodeId, { role: 'stage', token });
   }
 
-  // ── Animation Loop ──────────────────────────────────────────────
+  // ── frame loop ───────────────────────────────────────────────────
 
-  private startAnimationLoop(): void {
-    if (this.animationFrameId !== null) return;
-
-    const animate = () => {
-      if (this.transport.state !== 'playing') {
-        this.animationFrameId = null;
-        return;
-      }
-
-      const delta = this.clock.getDelta();
-      const currentTimeMs = this.transport.currentTimeMs;
-
-      // Update VRM
-      if (this.vrm) {
-        this.vrm.update(delta);
-      }
-
-      // Update animation mixer
-      if (this.mixer) {
-        this.mixer.update(delta);
-      }
-
-      // Process motion cues
-      this.processCues(currentTimeMs);
-
-      // Update lip sync
-      this.lipSync.update();
-
-      // Update word highlighting
-      this.updateWordHighlight(currentTimeMs);
-
-      // Update store
-      useShowStore.getState().setCurrentTime(currentTimeMs);
-
-      // Render
-      this.renderer.render(this.scene, this.camera);
-
-      this.animationFrameId = requestAnimationFrame(animate);
-    };
-
-    this.animationFrameId = requestAnimationFrame(animate);
+  private performerClock(): number {
+    return this.plan && this.status !== 'READY' && this.status !== 'LOADING' && this.status !== 'EMPTY'
+      ? this.transport.currentTimeMs
+      : performance.now();
   }
 
-  // ── Cue Processing ──────────────────────────────────────────────
+  private startLoop(): void {
+    if (this.frameId !== null) return;
+    this.lastWall = performance.now();
+    const tick = () => {
+      if (this.disposed) return;
+      const now = performance.now();
+      const dt = Math.min(0.1, (now - this.lastWall) / 1000);
+      this.lastWall = now;
+      this.renderFrame(now, dt);
+      this.frameId = requestAnimationFrame(tick);
+    };
+    this.frameId = requestAnimationFrame(tick);
+  }
 
-  private processCues(timeMs: number): void {
-    if (!this.plan || !this.vrm) return;
+  private renderFrame(wallMs: number, dt: number): void {
+    const playing = this.status === 'PLAYING';
+    const t = this.transport.currentTimeMs;
+    if (playing) this.processCues(t);
 
-    while (
-      this.currentCueIndex < this.plan.cues.length &&
-      this.plan.cues[this.currentCueIndex].at_ms <= timeMs
-    ) {
-      const cue = this.plan.cues[this.currentCueIndex];
-      this.executeCue(cue);
-      this.currentCueIndex++;
+    // mouth: plan track on the media clock, analyser as live fallback
+    let open = 0;
+    let vis: Visemes = { ...ZERO_VIS };
+    if (playing && this.mouthTrack) {
+      const s = this.mouthTrack.sample(t);
+      open = s.open; vis = s.visemes; this.wordIndex = s.wordIndex;
+    } else if (playing) {
+      const an = this.audioBus.getVoiceAnalyser();
+      an.getByteTimeDomainData(this.analyserData);
+      let sum = 0;
+      for (let i = 0; i < this.analyserData.length; i++) { const v = (this.analyserData[i] - 128) / 128; sum += v * v; }
+      open = Math.min(1, Math.sqrt(sum / this.analyserData.length) * 5);
+      vis = { ...ZERO_VIS, aa: open };
+    }
+    // smooth closing so pauses don't snap
+    this.mouthOpen = open > this.mouthOpen ? open : this.mouthOpen + (open - this.mouthOpen) * Math.min(1, dt * 18);
+    this.visemes = vis;
+
+    const frame = this.performer.update(this.performerClock(), wallMs, dt, this.mouthOpen);
+    this.emotions = frame.emotions;
+    if (frame.blink > 0.5 && this.blink <= 0.5) this.blinks++;
+    this.blink = frame.blink;
+    if (this.avatar) {
+      this.avatar.setPose(frame.pose);
+      this.avatar.setExpression(frame.emotions);
+      this.avatar.setMouth(this.mouthOpen, vis);
+      this.avatar.setBlink(frame.blink);
+      this.avatar.update(dt);
+    }
+    this.gaze.position.set(frame.pose.headYaw * 4, 1.5 - frame.pose.headPitch * 4, 6);
+
+    this.set.update(dt, wallMs);
+    this.cameraDirector.update(wallMs, this.config.capture ? 0.5 : 1);
+    this.clockSink.setCurrentTime(t);
+    this.renderer.render(this.scene, this.camera);
+
+    this.frames++;
+    this.fpsWindow.push(wallMs);
+    while (this.fpsWindow.length && wallMs - this.fpsWindow[0] > 1000) this.fpsWindow.shift();
+    this.fps = this.fpsWindow.length;
+  }
+
+  private processCues(t: number): void {
+    const plan = this.plan;
+    if (!plan) return;
+    while (this.cueIndex < plan.cues.length && plan.cues[this.cueIndex].at_ms <= t) {
+      this.executeCue(plan.cues[this.cueIndex]);
+      this.cueIndex++;
+    }
+    const cams: CameraCue[] = plan.camera_cues ?? [];
+    while (this.camIndex < cams.length && cams[this.camIndex].at_ms <= t) {
+      this.cutCamera(cams[this.camIndex].camera, 'auto_director');
+      this.camIndex++;
     }
   }
 
   private executeCue(cue: MotionCue): void {
-    if (!this.vrm) return;
-
-    const action = cue.action;
-
-    // Gaze
-    if (action.startsWith('gaze.')) {
-      this.executeGaze(action, cue.intensity);
-    }
-
-    // Gesture
-    if (action.startsWith('gesture.') || action === 'locomotion.freeze') {
-      this.executeGesture(action, cue);
-    }
-
-    // Face expression
-    if (action.startsWith('face.') || action.startsWith('reaction.')) {
-      this.executeFace(action, cue.intensity);
-    }
-
-    // Pose
-    if (action.startsWith('pose.')) {
-      this.executePose(action, cue);
-    }
+    this.performer.trigger(cue.action, cue.intensity, cue.duration_ms, cue.at_ms);
   }
 
-  private executeGaze(action: string, _intensity: number): void {
-    if (!this.vrm?.lookAt) return;
+  // ── capture (frame-stepped, offline MP4) ─────────────────────────
 
-    const targets: Record<string, THREE.Vector3> = {
-      'gaze.audience': new THREE.Vector3(0, 1.5, 3),
-      'gaze.ella': new THREE.Vector3(2, 1.5, 1),
-      'gaze.ground': new THREE.Vector3(0, 0, 2),
-      'gaze.sky': new THREE.Vector3(0, 3, 2),
-      'gaze.left': new THREE.Vector3(-3, 1.5, 2),
-      'gaze.right': new THREE.Vector3(3, 1.5, 2),
-      'gaze.away': new THREE.Vector3(-2, 1.5, -1),
-      'gaze.stare': new THREE.Vector3(0, 1.5, 3),
+  /** Render the performance at media time `ms` and return a PNG data URL. */
+  captureAt(ms: number, fps = 25): string {
+    if (!this.config.capture) throw new Error('captureAt needs capture mode');
+    if (this.status === 'READY') this.play();
+    if (ms < this.captureTimeMs) { this.performer.reset(); this.syncIndices(ms); }
+    this.captureTimeMs = ms;
+    this.renderFrame(ms, 1 / fps);
+    return this.renderer.domElement.toDataURL('image/jpeg', 0.9);
+  }
+
+  // ── telemetry ────────────────────────────────────────────────────
+
+  private currentWordCb?: (index: number, word: string) => void;
+  setWordCallback(cb: (index: number, word: string) => void): void { this.currentWordCb = cb; }
+
+  telemetry(): StageTelemetry {
+    const w = this.wordIndex >= 0 ? this.wordTimings[this.wordIndex] : undefined;
+    if (w) this.currentWordCb?.(this.wordIndex, w.word);
+    return {
+      status: this.status,
+      timeMs: Math.round(this.transport.currentTimeMs),
+      durationMs: Math.round(this.transport.durationMs || this.plan?.duration_ms || 0),
+      audioState: this.transport.getAudioContext()?.state ?? 'none',
+      mouth: Math.round(this.mouthOpen * 1000) / 1000,
+      visemes: { ...this.visemes },
+      emotions: { ...this.emotions },
+      blink: Math.round(this.blink * 1000) / 1000,
+      blinks: this.blinks,
+      camera: this.cameraDirector.getCurrentPreset(),
+      cuts: [...this.cuts],
+      wordIndex: this.wordIndex,
+      word: w?.word ?? null,
+      avatar: this.avatar?.caps ?? null,
+      avatarFallback: this.avatarFallback,
+      mouthSource: this.mouthTrack ? 'plan' : this.avatar?.caps.mouthMode === 'none' ? 'none' : 'analyser',
+      frames: this.frames,
+      fps: this.fps,
     };
-
-    const target = targets[action];
-    if (target) {
-      this.gazeTarget.position.copy(target);
-    }
   }
 
-  private executeGesture(action: string, cue: MotionCue): void {
-    if (action === 'locomotion.freeze') {
-      if (this.mixer) {
-        this.mixer.stopAllAction();
-      }
-      return;
-    }
+  // ── cleanup ──────────────────────────────────────────────────────
 
-    // Placeholder: gesture would load and play a clip
-    // In production: fetch motion asset from R2, create AnimationClip, play
-  }
-
-  // Emotion expressions driven by semantic beats. Targeted writes ONLY —
-  // never resetValues() here: that would also clear the mouth visemes
-  // (lipsync channel) and blink (timer channel) mid-frame and make them
-  // fight. Channels: mouth = analyser, face = beats, blink = timer.
-  private static readonly EMOTION_EXPRESSIONS = ['happy', 'angry', 'sad', 'surprised', 'neutral'];
-
-  private executeFace(action: string, intensity: number): void {
-    if (!this.vrm?.expressionManager) return;
-
-    const em = this.vrm.expressionManager;
-
-    const exprMap: Record<string, string> = {
-      'face.smile': 'happy',
-      'face.frown': 'sad',
-      'face.annoyed': 'angry',
-      'face.surprised': 'surprised',
-      'face.deadpan': 'neutral',
-      'face.smug': 'happy',
-      'face.disgusted': 'angry',
-      'reaction.confused': 'surprised',
-      'reaction.annoyed': 'angry',
-      'reaction.shock': 'surprised',
-      'reaction.dead_stare': 'neutral',
-    };
-
-    const expr = exprMap[action];
-    if (!expr) return;
-
-    for (const name of StageRuntime.EMOTION_EXPRESSIONS) {
-      if (name !== expr) em.setValue(name, 0);
-    }
-    em.setValue(expr, intensity);
-  }
-
-  private executePose(action: string, cue: MotionCue): void {
-    if (!this.vrm?.humanoid) return;
-
-    const head = this.vrm.humanoid.getNormalizedBoneNode('head');
-    if (!head) return;
-
-    switch (action) {
-      case 'pose.lean_forward':
-        head.rotation.x = -0.1 * cue.intensity;
-        break;
-      case 'pose.lean_back':
-        head.rotation.x = 0.1 * cue.intensity;
-        break;
-      case 'pose.confident':
-        head.rotation.x = 0;
-        head.rotation.z = 0;
-        break;
-      case 'pose.slump':
-        head.rotation.x = 0.15;
-        head.rotation.z = 0.05;
-        break;
-    }
-  }
-
-  // ── Word Highlight ──────────────────────────────────────────────
-
-  private currentWordIndex: number = -1;
-  private onWordChange?: (index: number, word: string) => void;
-
-  setWordCallback(cb: (index: number, word: string) => void): void {
-    this.onWordChange = cb;
-  }
-
-  private updateWordHighlight(timeMs: number): void {
-    for (let i = 0; i < this.wordTimings.length; i++) {
-      const wt = this.wordTimings[i];
-      if (timeMs >= wt.start_ms && timeMs <= wt.end_ms) {
-        if (i !== this.currentWordIndex) {
-          this.currentWordIndex = i;
-          this.onWordChange?.(i, wt.word);
-        }
-        break;
-      }
-    }
-  }
-
-  // ── Cleanup ──────────────────────────────────────────────────────
+  private disposed = false;
 
   dispose(): void {
-    if (this.animationFrameId) {
-      cancelAnimationFrame(this.animationFrameId);
-    }
-
+    this.disposed = true;
+    if (this.frameId !== null) cancelAnimationFrame(this.frameId);
+    this.frameId = null;
     window.removeEventListener('resize', this.handleResize);
-    this.unbindCameraKeyboard?.();
-    this.unbindCameraKeyboard = null;
-
+    this.resizeObserver?.disconnect();
+    this.unbindKeyboard?.();
     this.transport.dispose();
     this.audioBus.dispose();
     this.cameraDirector.dispose();
     this.eventConsumer.disconnect();
-
+    this.avatar?.dispose();
     this.renderer.dispose();
+    this.renderer.domElement.remove();
+    void this.transport.getAudioContext()?.close().catch(() => {});
   }
 }

@@ -1,10 +1,11 @@
 /**
  * EventConsumer unit tests — token URL, explicit-disconnect silence,
  * backoff reconnect on surprise drops, replay idempotency.
+ * Store is injected (RoomStore port), never the app's zustand store.
  */
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { EventConsumer } from './EventConsumer';
-import { useShowStore } from '../store/showStore';
+import { EventConsumer } from '../src/EventConsumer';
+import { createMemoryRoomStore } from '../src/ports';
 
 interface FakeSocket {
   url: string;
@@ -52,20 +53,11 @@ class FakeWebSocket {
   }
 }
 
+let store = createMemoryRoomStore();
 function resetStore(): void {
-  useShowStore.setState({
-    events: [],
-    lastSeq: 0,
-    phase: 'pre_show',
-    isPaused: false,
-    scoresRevealed: false,
-    judgeScores: [],
-    crowd: {
-      active_viewers: 0, unique_laughers: 0, laugh_events: 0,
-      claps: 0, boos: 0, crickets: 0, groans: 0,
-    },
-  });
+  store = createMemoryRoomStore();
 }
+const mk = () => new EventConsumer({ store });
 
 beforeEach(() => {
   sockets.length = 0;
@@ -87,7 +79,7 @@ afterEach(() => {
 
 describe('EventConsumer', () => {
   it('builds a stage-token URL', async () => {
-    const c = new EventConsumer();
+    const c = mk();
     const p = c.connect('ep1', { role: 'stage', token: 'tok123', sessionId: 's1' });
     const sock = sockets[0] as unknown as FakeWebSocket;
     sock.onopen?.();
@@ -103,7 +95,7 @@ describe('EventConsumer', () => {
 
   it('explicit disconnect never reconnects (no zombies)', async () => {
     vi.useFakeTimers();
-    const c = new EventConsumer();
+    const c = mk();
     const p = c.connect('ep1', { role: 'audience' });
     (sockets[0] as unknown as FakeWebSocket).onopen?.();
     await p;
@@ -115,7 +107,7 @@ describe('EventConsumer', () => {
 
   it('surprise drops reconnect with backoff', async () => {
     vi.useFakeTimers();
-    const c = new EventConsumer();
+    const c = mk();
     const p = c.connect('ep1', { role: 'audience' });
     (sockets[0] as unknown as FakeWebSocket).onopen?.();
     await p;
@@ -128,7 +120,7 @@ describe('EventConsumer', () => {
   });
 
   it('replayed events apply once (idempotent store)', async () => {
-    const c = new EventConsumer();
+    const c = mk();
     const p = c.connect('ep1', { role: 'stage' });
     const sock = sockets[0] as unknown as FakeWebSocket;
     sock.onopen?.();
@@ -136,13 +128,30 @@ describe('EventConsumer', () => {
     const ev = { seq: 5, type: 'show.start', actor: 'system', payload: {}, created_at: new Date().toISOString() };
     sock.serverSend({ type: 'show.event', data: ev });
     sock.serverSend({ type: 'show.event', data: ev }); // duplicate delivery
-    expect(useShowStore.getState().events).toHaveLength(1);
-    expect(useShowStore.getState().phase).toBe('intro');
+    expect(store.state.events).toHaveLength(1);
+    expect(store.state.phase).toBe('intro');
+    c.disconnect();
+  });
+
+  it('handlers see each seq once, and replay after a snapshot still executes', async () => {
+    const c = mk();
+    const seen: number[] = [];
+    c.onEvent((e) => seen.push(e.seq));
+    const p = c.connect('ep1', { role: 'stage' });
+    const sock = sockets[0] as unknown as FakeWebSocket;
+    sock.onopen?.();
+    await p;
+    // DO order on ready: snapshot (seq=3) THEN replay 1..3
+    sock.serverSend({ type: 'show.snapshot', data: { episode_id: 'ep1', phase: 'intro', seq: 3 } });
+    for (const seq of [1, 2, 3, 2]) {
+      sock.serverSend({ type: 'show.event', data: { seq, type: 'x', actor: 's', payload: {}, created_at: '' } });
+    }
+    expect(seen).toEqual([1, 2, 3]);
     c.disconnect();
   });
 
   it('reads snake_case snapshots', async () => {
-    const c = new EventConsumer();
+    const c = mk();
     const p = c.connect('ep1', { role: 'stage' });
     const sock = sockets[0] as unknown as FakeWebSocket;
     sock.onopen?.();
@@ -151,14 +160,14 @@ describe('EventConsumer', () => {
       type: 'show.snapshot',
       data: { episode_id: 'ep1', phase: 'judging', active_appearance_id: null, seq: 42, is_paused: false },
     });
-    expect(useShowStore.getState().phase).toBe('judging');
-    expect(useShowStore.getState().episodeId).toBe('ep1');
+    expect(store.state.phase).toBe('judging');
+    expect(store.state.episodeId).toBe('ep1');
     c.disconnect();
   });
 
   it('auth rejection disconnects silently', async () => {
     vi.useFakeTimers();
-    const c = new EventConsumer();
+    const c = mk();
     const p = c.connect('ep1', { role: 'stage', token: 'bad' });
     const sock = sockets[0] as unknown as FakeWebSocket;
     sock.onopen?.();

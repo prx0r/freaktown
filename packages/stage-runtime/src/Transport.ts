@@ -38,7 +38,15 @@ export class Transport {
     return this._state;
   }
 
+  // Capture mode: frame-stepped clock (offline MP4 capture). Never used live.
+  private manualClock: (() => number) | null = null;
+
+  setManualClock(clock: (() => number) | null): void {
+    this.manualClock = clock;
+  }
+
   get currentTimeMs(): number {
+    if (this.manualClock) return this.manualClock();
     if (this._state === 'idle') return 0;
     if (this._state === 'paused') return this.pausedMediaTime;
     if (!this.audioContext) return 0;
