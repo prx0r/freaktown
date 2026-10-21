@@ -34,9 +34,29 @@ export interface TimelineBeat {
   performance?: { expression?: string; gesture?: string; look?: string; [k: string]: unknown };
 }
 
+/** One real phonetic viseme (take visemes.json: TalkingHead-en). */
+export interface PhoneticViseme {
+  viseme: string;
+  time: number;
+  end: number;
+}
+
+/** AU prosody frame (take aus.json: au_track.py). */
+export interface ProsodyFrameInput {
+  t_ms: number;
+  accent: number;
+  arousal: number;
+  phrase_end: number;
+}
+
 export interface SealedSetInput {
   timeline: TimelineBeat[];
   mouthCues?: MouthSpan[];
+  /** Take visemes.json (optional): full-word phonetics, preferred over
+   *  vowel-group guessing in MouthTrack. */
+  visemes?: { visemes: string[]; vtimes: number[]; vdurations: number[] };
+  /** Take aus.json (optional): AU prosody track for brows/eyes/blink. */
+  aus?: { frames: ProsodyFrameInput[] };
   setPlan?: {
     character_id?: string;
     premise?: string;
@@ -130,6 +150,12 @@ function cue(at_ms: number, action: string, intensity: number, duration_ms: numb
 const EXPRESSION_ACTION: Record<string, string> = {
   deadpan: 'face.deadpan', smug: 'face.smug', smile: 'face.smile', annoyed: 'face.annoyed',
   surprised: 'face.surprised', frown: 'face.frown', disgusted: 'face.disgusted',
+  // Extended beat vocabulary (delivery beats + reactor; GlbAvatar renders
+  // the full FACS recipes, VRM falls back to the Performer presets):
+  grin: 'face.grin', confused: 'face.confused', afraid: 'face.afraid',
+  contempt: 'face.contempt', happy: 'face.happy', love: 'face.love',
+  sad: 'face.sad', angry: 'face.angry', excited: 'face.excited',
+  whisper: 'face.whisper', shout: 'face.shout', normal: 'face.normal',
 };
 
 /** Start of the last sentence of a beat (the actual punch), via word timings. */
@@ -227,6 +253,12 @@ export function adaptSealedSet(input: SealedSetInput): PerformancePlan {
     id: b.beat_id, type: b.type, start_ms: b.start_ms, end_ms: b.end_ms, text: b.text,
   }));
   const characterId = input.setPlan?.character_id;
+  // Face tracks ride the plan as extra props (typed at the call site):
+  // take visemes.json (TalkingHead-en phonetics) + aus.json (AU prosody).
+  const faceTracks = {
+    ...(input.visemes ? { visemes: input.visemes } : {}),
+    ...(input.aus ? { aus: input.aus } : {}),
+  };
   return {
     appearance_id: input.appearanceId ?? characterId ?? 'appearance',
     body_class: input.bodyClass ?? 'auto',
@@ -244,6 +276,7 @@ export function adaptSealedSet(input: SealedSetInput): PerformancePlan {
     mouth,
     camera_cues: cams.filter((c) => c.at_ms <= duration),
     source: { adapter: 'sealed-set.v1', words: 'derived-from-envelope' },
+    ...faceTracks,
   };
 }
 
@@ -258,10 +291,12 @@ export async function loadSealedSet(baseUrl: string, opts: Partial<SealedSetInpu
     }
     return (await res.json()) as T;
   };
-  const [timeline, mouthCues, setPlan] = await Promise.all([
+  const [timeline, mouthCues, setPlan, visemesDoc, ausDoc] = await Promise.all([
     getJson<TimelineBeat[]>('timeline.json', false),
     getJson<MouthSpan[]>('mouth_cues.json', true),
     getJson<SealedSetInput['setPlan']>('set_plan.json', true),
+    getJson<SealedSetInput['visemes']>('visemes.json', true),
+    getJson<SealedSetInput['aus']>('aus.json', true),
   ]);
-  return adaptSealedSet({ ...opts, timeline: timeline ?? [], mouthCues, setPlan });
+  return adaptSealedSet({ ...opts, timeline: timeline ?? [], mouthCues, setPlan, visemes: visemesDoc, aus: ausDoc });
 }

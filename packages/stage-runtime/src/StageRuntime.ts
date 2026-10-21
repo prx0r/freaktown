@@ -28,6 +28,10 @@ import type { LiveTransport } from './live/LiveTransport';
 import { loadAvatar } from './avatars/loadAvatar';
 import type { AvatarCapabilities, AvatarDriver, Emotions, Visemes } from './avatars/types';
 import { MouthTrack } from './performance/MouthTrack';
+import { toPhonetics } from './performance/MouthTrack';
+import type { PhoneticViseme } from './performance/MouthTrack';
+import { ProsodyTrack } from './performance/ProsodyTrack';
+import type { ProsodyFrame } from './performance/ProsodyTrack';
 import { Performer } from './performance/Performer';
 
 // ── Types ──────────────────────────────────────────────────────────
@@ -42,6 +46,11 @@ export interface PreloadSpec {
   walkoutUrl?: string;
   name?: string;
   seed?: string;
+  /** Take visemes.json (TalkingHead-en phonetics). Preferred over vowel
+   *  groups when present; may also ride the adapted plan. */
+  visemes?: { visemes: string[]; vtimes: number[]; vdurations: number[] };
+  /** Take aus.json (AU prosody track). Brows/eyes/blink under beats. */
+  aus?: { frames: ProsodyFrame[] };
 }
 
 export interface StageConfig {
@@ -86,7 +95,7 @@ export interface StageTelemetry {
   word: string | null;
   avatar: AvatarCapabilities | null;
   avatarFallback: string | null;
-  mouthSource: 'plan' | 'analyser' | 'none';
+  mouthSource: 'plan' | 'phonetic' | 'analyser' | 'none';
   frames: number;
   fps: number;
 }
@@ -114,6 +123,7 @@ export class StageRuntime {
   private avatarFallback: string | null = null;
   private performer = new Performer();
   private mouthTrack: MouthTrack | null = null;
+  private prosodyTrack: ProsodyTrack | null = null;
   private analyserData: Uint8Array<ArrayBuffer>;
 
   private plan: PerformancePlan | null = null;
@@ -252,10 +262,14 @@ export class StageRuntime {
     return !this.config.capture && !!ctx && ctx.state === 'suspended';
   }
 
-  setPlan(plan: PerformancePlan, wordTimings: WordTiming[] = []): void {
+  setPlan(plan: PerformancePlan, wordTimings: WordTiming[] = [], phonemes?: PhoneticViseme[], aus?: ProsodyFrame[]): void {
     this.plan = plan;
     this.wordTimings = wordTimings.length ? wordTimings : plan.word_timings ?? [];
-    this.mouthTrack = MouthTrack.fromPlan(plan, this.wordTimings);
+    const planPhonemes = (plan as unknown as { visemes?: { visemes: string[]; vtimes: number[]; vdurations: number[] } }).visemes;
+    const pv = phonemes ?? (planPhonemes ? toPhonetics(planPhonemes) : undefined);
+    this.mouthTrack = MouthTrack.fromPlan(plan, this.wordTimings, pv);
+    const planAus = (plan as unknown as { aus?: { frames: ProsodyFrame[] } }).aus;
+    this.prosodyTrack = new ProsodyTrack(aus ?? planAus?.frames);
     this.performer.energy = plan.energy ?? 0.7;
     this.cueIndex = 0;
     this.camIndex = 0;
@@ -269,7 +283,12 @@ export class StageRuntime {
       this.setAvatar({ avatarUrl: spec.avatarUrl, name: spec.name, seed: spec.seed ?? spec.plan?.character_id }),
       this.loadAudio(spec.audioUrl),
     ]);
-    this.setPlan(spec.plan, spec.wordTimings ?? []);
+    this.setPlan(
+      spec.plan,
+      spec.wordTimings ?? [],
+      spec.visemes ? toPhonetics(spec.visemes) : undefined,
+      spec.aus?.frames,
+    );
     this.performer.reset();
     this.cutCamera('WIDE_STAGE', 'auto_director');
     this.setStatus('READY');
@@ -423,13 +442,16 @@ export class StageRuntime {
 
     const frame = this.performer.update(this.performerClock(), wallMs, dt, this.mouthOpen);
     this.emotions = frame.emotions;
+    // AU prosody (aus.json): brows/eyes lift under beats; phrase blinks
+    // OR with the Performer's own blink timer (speech-synced wins ties).
+    const pro = playing && this.prosodyTrack ? this.prosodyTrack.sample(t) : null;
     if (frame.blink > 0.5 && this.blink <= 0.5) this.blinks++;
-    this.blink = frame.blink;
+    this.blink = Math.max(frame.blink, pro?.blink ?? 0);
     if (this.avatar) {
       this.avatar.setPose(frame.pose);
-      this.avatar.setExpression(frame.emotions);
+      this.avatar.setExpression(frame.emotions, pro ? { brow: pro.brow, eye: pro.eye } : undefined);
       this.avatar.setMouth(this.mouthOpen, vis);
-      this.avatar.setBlink(frame.blink);
+      this.avatar.setBlink(this.blink);
       this.avatar.update(dt);
     }
     this.gaze.position.set(frame.pose.headYaw * 4, 1.5 - frame.pose.headPitch * 4, 6);
@@ -499,7 +521,7 @@ export class StageRuntime {
       word: w?.word ?? null,
       avatar: this.avatar?.caps ?? null,
       avatarFallback: this.avatarFallback,
-      mouthSource: this.mouthTrack ? 'plan' : this.avatar?.caps.mouthMode === 'none' ? 'none' : 'analyser',
+      mouthSource: this.mouthTrack?.hasPhonetics ? 'phonetic' : this.mouthTrack ? 'plan' : this.avatar?.caps.mouthMode === 'none' ? 'none' : 'analyser',
       frames: this.frames,
       fps: this.fps,
     };

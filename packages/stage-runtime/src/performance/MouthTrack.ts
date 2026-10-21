@@ -39,25 +39,61 @@ function findIndex<T extends { start_ms: number; end_ms: number }>(xs: T[], t: n
 
 const RAMP_MS = 45;
 
+/** One real phonetic viseme (take visemes.json: TalkingHead-en output). */
+export interface PhoneticViseme {
+  viseme: string;
+  time: number;
+  end: number;
+}
+
+const VISEME_KEYS: VisemeKey[] = ['aa', 'ee', 'ih', 'ou', 'oh'];
+/** Oculus viseme ID -> the 5-key mouth shape (subset the drivers own). */
+function oculusToKey(v: string): VisemeKey {
+  switch (v) {
+    case 'E': return 'ee';
+    case 'I': return 'ih';
+    case 'O': return 'oh';
+    case 'U': return 'ou';
+    default: return 'aa'; // PP/FF/TH/DD/kk/CH/SS/nn/RR/sil -> jaw shapes
+  }
+}
+
+/** visemes.json (take build) -> timeline the track samples. */
+export function toPhonetics(doc: { visemes: string[]; vtimes: number[]; vdurations: number[] } | null | undefined): PhoneticViseme[] {
+  if (!doc) return [];
+  const n = Math.min(doc.visemes?.length ?? 0, doc.vtimes?.length ?? 0, doc.vdurations?.length ?? 0);
+  const out: PhoneticViseme[] = [];
+  for (let i = 0; i < n; i++) {
+    const time = Number(doc.vtimes[i]) || 0;
+    const dur = Math.max(20, Number(doc.vdurations[i]) || 0);
+    out.push({ viseme: String(doc.visemes[i]), time, end: time + dur });
+  }
+  return out.sort((a, b) => a.time - b.time);
+}
+
 export class MouthTrack {
   private words: WordTiming[];
   private spans: MouthSpan[];
   private groups: VisemeKey[][];
+  private phonemes: PhoneticViseme[];
 
-  constructor(words: WordTiming[] = [], spans: MouthSpan[] = []) {
+  constructor(words: WordTiming[] = [], spans: MouthSpan[] = [], phonemes: PhoneticViseme[] = []) {
     this.words = [...words].sort((a, b) => a.start_ms - b.start_ms);
     this.spans = [...spans].sort((a, b) => a.start_ms - b.start_ms);
     this.groups = this.words.map((w) => vowelGroups(w.word));
+    this.phonemes = [...phonemes].sort((a, b) => a.time - b.time);
   }
 
-  static fromPlan(plan: PerformancePlan | null | undefined, words?: WordTiming[]): MouthTrack | null {
+  static fromPlan(plan: PerformancePlan | null | undefined, words?: WordTiming[], phonemes?: PhoneticViseme[]): MouthTrack | null {
     const w = words?.length ? words : plan?.word_timings ?? [];
     const s = plan?.mouth ?? [];
-    if (!w.length && !s.length) return null;
-    return new MouthTrack(w, s);
+    const p = phonemes?.length ? phonemes : (plan as unknown as { phonemes?: PhoneticViseme[] })?.phonemes ?? [];
+    if (!w.length && !s.length && !p.length) return null;
+    return new MouthTrack(w, s, p);
   }
 
   get hasEnvelope(): boolean { return this.spans.length > 0; }
+  get hasPhonetics(): boolean { return this.phonemes.length > 0; }
 
   private gate(t: number): number {
     if (this.spans.length) {
@@ -77,6 +113,25 @@ export class MouthTrack {
     const g = Math.max(0, this.gate(t));
     const wi = findIndex(this.words, t);
     if (g <= 0) return { open: 0, visemes: vis, wordIndex: wi };
+    // Real phonetics win over vowel-group guessing when the take ships
+    // visemes.json (TalkingHead-en full-word phonetics vs first-vowel).
+    if (this.phonemes.length) {
+      let lo = 0, hi = this.phonemes.length - 1, hit = -1;
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        const p = this.phonemes[mid];
+        if (t < p.time) hi = mid - 1;
+        else if (t >= p.end) lo = mid + 1;
+        else { hit = mid; break; }
+      }
+      if (hit >= 0) {
+        const key = oculusToKey(this.phonemes[hit].viseme);
+        const open = g * 0.6;
+        vis[key] = open;
+        if (key !== 'aa') vis.aa = open * 0.35;
+        return { open, visemes: vis, wordIndex: wi };
+      }
+    }
     let open = g * 0.55;
     let key: VisemeKey = 'aa';
     if (wi >= 0) {

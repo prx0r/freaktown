@@ -1,0 +1,80 @@
+{
+  "meta": {
+    "id": "attardo-graph-v1",
+    "mined": "2026-10-21",
+    "sources": [
+      "Attardo GTVH (Raskin+Attardo SSTH; Attardo 1994 Linguistic Theories of Humor; Attardo 2001 Humorous Texts)",
+      "mined/gtvh-fields.json (KR field defs, 12 LMs)",
+      "mined/operators-v2.json + mechanism-direction.json (12 operator ids)",
+      "mined/premise-territories.json (3 Attardo seeds)"
+    ],
+    "provenance_rule": "Every node carries provenance: mined (from this repo's 2026-10-08 pass) or literature (standard GTVH inventory; verify against Humorous Texts ch.3 before banking new joke ids on literature-only nodes). Edges carry confidence: strong or plausible.",
+    "note": "FACS/AUBlendNet Table 2 is the authority for faces, not this file. This file is the authority for joke structure."
+  },
+  "knowledge_resources": [
+    {"id": "KR.SO", "rank": 1, "name": "script_opposition", "def": "Two scripts that overlap on a span and oppose on at least one dimension. Highest KR; changing SO changes the joke. Abstract classes: actual/non-actual, normal/abnormal, possible/impossible (good/bad is the common extension)."},
+    {"id": "KR.LM", "rank": 2, "name": "logical_mechanism", "def": "The playful reasoning step connecting the two scripts. Optional: absent = absurd/no-resolution; partial = playful only. Ranked below SO: same LM can serve many oppositions."},
+    {"id": "KR.SI", "rank": 3, "name": "situation", "def": "Participants, props, activity, macro-script (office, bar, interview). Carries backgrounded incongruities: suspend, never explicate."},
+    {"id": "KR.TA", "rank": 4, "name": "target", "def": "Butt of the joke (person/group/institution/belief/null) + orientation (speaker/hearer/other/situation). ~2/3 of corpus jokes carry one; empty = non-tendentious. Routes to taboo-gates."},
+    {"id": "KR.NS", "rank": 5, "name": "narrative_strategy", "def": "Surface arrangement: riddle-QA, 3-step-AAB, dialogue, list, trick-elicitation, knock-knock, anecdote-no-punch, one-liner. Arrangements, never premises."},
+    {"id": "KR.LA", "rank": 6, "name": "language", "def": "Exact wording: punch disjunctor (forces reinterpretation), ambiguity type (lexical/syntactic/referential/pragmatic/paronym), register (solemn/familiar/professional). Lowest KR: rewordable without killing the joke."}
+  ],
+  "script_oppositions": {
+    "abstract": ["actual/non-actual", "normal/abnormal", "possible/impossible", "good/bad"],
+    "concrete": ["life/death", "sex/non-sex", "money/no-money", "high/low-stature", "present/absent", "full/empty", "part/whole", "past/present", "self/other", "sacred/profane", "smart/dumb", "obscene/decent"]
+  },
+  "logical_mechanisms": [
+    {"id": "garden_path", "def": "Lead audience to assume script A; punch forces reanalysis to B.", "provenance": "mined"},
+    {"id": "false_analogy", "def": "Treat disparate things as same on weak similarity.", "provenance": "mined"},
+    {"id": "faulty_reasoning", "def": "Valid-looking syllogism with skipped/false step.", "provenance": "mined"},
+    {"id": "infer_consequence", "def": "Push a premise to its absurd literal consequence.", "provenance": "mined"},
+    {"id": "juxtaposition", "def": "Incompatible scripts side by side, no connective.", "provenance": "mined"},
+    {"id": "reversal", "def": "Swap figure/ground, subject/object, praise/blame.", "provenance": "mined"},
+    {"id": "exaggeration", "def": "Inflate systematically to mock-heroic.", "provenance": "mined"},
+    {"id": "understatement", "def": "Deflate to expose via restraint.", "provenance": "mined"},
+    {"id": "repetition_parallelism", "def": "AAB pattern plus break on the third.", "provenance": "mined"},
+    {"id": "ignoring_obvious", "def": "Persist with a rule despite counter-evidence (automaton).", "provenance": "mined"},
+    {"id": "self_undermining", "def": "Utterance defeats itself; tu quoque recoil.", "provenance": "mined"},
+    {"id": "cratylism", "def": "Treat similar sounds as similar meanings; puns and reanalysis.", "provenance": "mined"},
+    {"id": "ambiguity", "def": "Referential/structural ambiguity resolved at punch (disjunctor as connector).", "provenance": "literature"},
+    {"id": "contradiction", "def": "Assert p and not-p across the jab/punch turn.", "provenance": "literature"},
+    {"id": "parody", "def": "Incongruous imitation of a recognizable text/genre/register.", "provenance": "literature"},
+    {"id": "irony", "def": "Say the opposite of what the situation warrants; audience inverts.", "provenance": "literature"}
+  ],
+  "joke_anatomy": {
+    "jab_line": {"def": "Setup line carrying SO material without resolving it. Jabs can stack; each re-evokes the overlap span.", "position": "initial|medial"},
+    "punch_line": {"def": "Final line triggering the script switch. Position is criterial: move it and the text stops being a joke (vs anecdote).", "position": "final-required"},
+    "disjunctor": {"def": "Word/phrase forcing reinterpretation (punch trigger). Lives in KR.LA."},
+    "connector": {"def": "Span readable under both scripts (the overlap). Lives in KR.SO."},
+    "strand": {"def": "One jab->punch arc inside a longer text."},
+    "stack_sequence_combo": {"def": "Strands chained (sequence), piled on one punch (stack), or braided (combo). Long-form unit for sets."}
+  },
+  "narrative_strategies": ["riddle-QA", "3-step-AAB", "dialogue", "list", "trick-elicitation", "knock-knock", "anecdote-no-punch", "one-liner"],
+  "target_types": {"butt": ["person", "group", "institution", "belief", null], "orientation": ["speaker", "hearer", "other", "situation"], "stat": "target present in ~2/3 of corpus jokes"},
+  "links": {
+    "lm_to_operators": [
+      {"lm": "garden_path", "operators": ["interference_coincide"], "confidence": "strong"},
+      {"lm": "false_analogy", "operators": ["interference_coincide"], "confidence": "plausible"},
+      {"lm": "faulty_reasoning", "operators": ["faulty_syllogism_facade"], "confidence": "strong"},
+      {"lm": "infer_consequence", "operators": ["snowball_chain"], "confidence": "strong"},
+      {"lm": "juxtaposition", "operators": ["absurd_allusion"], "confidence": "plausible"},
+      {"lm": "reversal", "operators": ["inversion_recoil", "represent_opposite"], "confidence": "strong"},
+      {"lm": "exaggeration", "operators": ["snowball_chain"], "confidence": "plausible"},
+      {"lm": "understatement", "operators": ["displace_emphasis"], "confidence": "plausible"},
+      {"lm": "repetition_parallelism", "operators": ["repeat_variation"], "confidence": "strong"},
+      {"lm": "ignoring_obvious", "operators": ["multiple_use"], "confidence": "plausible"},
+      {"lm": "self_undermining", "operators": ["inversion_recoil", "unify_repartee"], "confidence": "plausible"},
+      {"lm": "cratylism", "operators": ["interference_coincide", "condense_composite"], "confidence": "strong"},
+      {"lm": "ambiguity", "operators": ["multiple_use", "displace_emphasis"], "confidence": "plausible"},
+      {"lm": "contradiction", "operators": ["represent_opposite"], "confidence": "plausible"},
+      {"lm": "parody", "operators": ["register_transpose", "absurd_allusion"], "confidence": "plausible"},
+      {"lm": "irony", "operators": ["represent_opposite", "displace_emphasis"], "confidence": "plausible"}
+    ],
+    "so_to_territories": [
+      {"seed": "Job interview garden-pathing from merit test to lecherous-boss script", "so": ["normal/abnormal", "high/low-stature"], "lm": ["garden_path"]},
+      {"seed": "Office shorthand scene where the backgrounded stereotype does the work", "so": ["actual/non-actual"], "lm": ["ignoring_obvious"]},
+      {"seed": "Bar bet with a talking dog; backgrounded impossibility ignored", "so": ["possible/impossible", "normal/abnormal"], "lm": ["understatement"]}
+    ],
+    "kr_to_jokeblock": {"KR.SO": "gtvh-fields.json#/jokeblock_fields/script_opposition", "KR.LM": "gtvh-fields.json#/jokeblock_fields/logical_mechanism", "KR.SI": "gtvh-fields.json#/jokeblock_fields/situation", "KR.TA": "gtvh-fields.json#/jokeblock_fields/target", "KR.NS": "gtvh-fields.json#/jokeblock_fields/narrative_strategy", "KR.LA": "gtvh-fields.json#/jokeblock_fields/language"}
+  }
+}

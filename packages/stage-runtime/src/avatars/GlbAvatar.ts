@@ -22,12 +22,20 @@ const VISEME_NAMES: Record<VisemeKey, string[]> = {
 const OPEN_NAMES = ['jawOpen', 'JawOpen', 'jaw_open', 'mouthOpen', 'MouthOpen', 'mouth_open', 'Mouth_Open'];
 const BLINK_NAMES = ['eyeBlinkLeft', 'eyeBlinkRight', 'blink', 'Blink', 'eyesClosed', 'Eyes_Closed', 'Fcl_EYE_Close'];
 const EMOTION_NAMES: Record<keyof Emotions, string[]> = {
-  happy: ['mouthSmileLeft', 'mouthSmileRight', 'happy', 'smile', 'Smile'],
-  angry: ['browDownLeft', 'browDownRight', 'angry'],
-  sad: ['mouthFrownLeft', 'mouthFrownRight', 'sad'],
-  surprised: ['browInnerUp', 'eyeWideLeft', 'eyeWideRight', 'surprised'],
+  // FACS-calibrated (AUBlendNet Table 2; see face_profiles.py):
+  // Happy AU6+12, Anger AU4+5+7+9+23, Sad AU1+4+15, Surprise AU1+2+5+27.
+  happy: ['mouthSmileLeft', 'mouthSmileRight', 'cheekSquintLeft', 'cheekSquintRight', 'happy', 'smile', 'Smile'],
+  angry: ['browDownLeft', 'browDownRight', 'eyeSquintLeft', 'eyeSquintRight', 'noseSneerLeft', 'noseSneerRight', 'mouthPressLeft', 'mouthPressRight', 'angry'],
+  sad: ['mouthFrownLeft', 'mouthFrownRight', 'browInnerUp', 'sad'],
+  surprised: ['jawOpen', 'browInnerUp', 'browOuterUpLeft', 'browOuterUpRight', 'eyeWideLeft', 'eyeWideRight', 'surprised'],
   relaxed: ['relaxed'],
 };
+
+// AU-prosody morphs (aus.json track): brow flash on accent (AU1+AU2),
+// eye widening on arousal (AU5). Bound by exact ARKit name when present;
+// VRM0/MMD variants intentionally excluded (these shapes are ARKit-only).
+const PROSODY_BROW = ['browInnerUp', 'browOuterUpLeft', 'browOuterUpRight'];
+const PROSODY_EYE = ['eyeWideLeft', 'eyeWideRight'];
 
 function findBone(root: THREE.Object3D, re: RegExp): THREE.Object3D | null {
   let hit: THREE.Object3D | null = null;
@@ -43,6 +51,10 @@ export class GlbAvatar implements AvatarDriver {
   private open: MorphRef[] = [];
   private blink: MorphRef[] = [];
   private emotions: Partial<Record<keyof Emotions, MorphRef[]>> = {};
+  private prosodyBrow: MorphRef[] = [];
+  private prosodyEye: MorphRef[] = [];
+  /** Every morph the face channel ever writes (emotion + prosody). */
+  private faceMorphs: MorphRef[] = [];
   private jaw: THREE.Object3D | null = null;
   private jawRest = new THREE.Euler();
   private head: THREE.Object3D | null = null;
@@ -79,6 +91,19 @@ export class GlbAvatar implements AvatarDriver {
     for (const k of Object.keys(EMOTION_NAMES) as (keyof Emotions)[]) {
       const refs = pick(EMOTION_NAMES[k]);
       if (refs.length) this.emotions[k] = refs;
+    }
+    this.prosodyBrow = pick(PROSODY_BROW);
+    this.prosodyEye = pick(PROSODY_EYE);
+    {
+      const seen = new Set<MorphRef>();
+      const all: MorphRef[] = [];
+      const add = (refs: MorphRef[]) => {
+        for (const r of refs) if (!seen.has(r)) { seen.add(r); all.push(r); }
+      };
+      for (const k of Object.keys(EMOTION_NAMES) as (keyof Emotions)[]) add(pick(EMOTION_NAMES[k]));
+      add(this.prosodyBrow);
+      add(this.prosodyEye);
+      this.faceMorphs = all;
     }
     this.jaw = findBone(scene, /jaw/i);
     if (this.jaw) this.jawRest.copy(this.jaw.rotation);
@@ -122,8 +147,27 @@ export class GlbAvatar implements AvatarDriver {
 
   setBlink(amount: number): void { this.setRefs(this.blink, amount); }
 
-  setExpression(em: Emotions): void {
-    for (const k of Object.keys(this.emotions) as (keyof Emotions)[]) this.setRefs(this.emotions[k], em[k]);
+  /**
+   * Beat/reactor emotions + AU-prosody lifts, resolved per morph with
+   * max() so a brow flash never clears a surprised brow and vice versa.
+   * Every bound face morph is written every call (goal or 0), so nothing
+   * sticks when its source decays. Unknown morphs were never bound.
+   */
+  setExpression(em: Emotions, prosody?: { brow: number; eye: number }): void {
+    const goals = new Map<MorphRef, number>();
+    const put = (refs: MorphRef[] | undefined, v: number) => {
+      if (!refs || v <= 0) return;
+      for (const r of refs) goals.set(r, Math.max(goals.get(r) ?? 0, v));
+    };
+    for (const k of Object.keys(this.emotions) as (keyof Emotions)[]) put(this.emotions[k], em[k] ?? 0);
+    if (prosody) {
+      put(this.prosodyBrow, Math.min(0.4, prosody.brow));
+      put(this.prosodyEye, Math.min(0.4, prosody.eye));
+    }
+    for (const r of this.faceMorphs) {
+      const v = goals.get(r) ?? 0;
+      if (r.mesh.morphTargetInfluences) r.mesh.morphTargetInfluences[r.index] = Math.max(0, Math.min(1, v));
+    }
   }
 
   setGazeTarget(): void { /* head aim comes through setPose().headYaw */ }

@@ -91,3 +91,30 @@ describe('setAdapter', () => {
     expect(wordWeight('2019')).toBeGreaterThan(1);
   });
 });
+
+describe('face tracks ride the plan', () => {
+  const visemes = {
+    visemes: ['I', 'E'],
+    vtimes: [0, 100],
+    vdurations: [100, 100],
+  };
+  const aus = { frames: [{ t_ms: 0, accent: 0.9, arousal: 0.3, phrase_end: 0 }] };
+  const plan = adaptSealedSet({
+    timeline: [{ beat_id: 'b1', type: 'setup', start_ms: 0, end_ms: 500, text: 'hi there' }],
+    visemes,
+    aus,
+  });
+
+  it('carries visemes.json + aus.json onto the plan when present', () => {
+    expect((plan as unknown as { visemes?: unknown }).visemes).toEqual(visemes);
+    expect((plan as unknown as { aus?: unknown }).aus).toEqual(aus);
+  });
+
+  it('omits them when the take predates the builders', () => {
+    const bare = adaptSealedSet({
+      timeline: [{ beat_id: 'b1', type: 'setup', start_ms: 0, end_ms: 500, text: 'hi' }],
+    });
+    expect((bare as unknown as { visemes?: unknown }).visemes).toBeUndefined();
+    expect((bare as unknown as { aus?: unknown }).aus).toBeUndefined();
+  });
+});

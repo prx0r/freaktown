@@ -67,7 +67,7 @@ export interface AvatarDriver {
   /** open 0..1 + viseme weights (already scaled by open). */
   setMouth(open: number, visemes: Visemes): void;
   setBlink(amount: number): void;
-  setExpression(emotions: Emotions): void;
+  setExpression(emotions: Emotions, prosody?: { brow: number; eye: number }): void;
   setPose(pose: PoseState): void;
   /** Gaze target in world space (VRM lookAt; others ignore or aim head). */
   setGazeTarget(target: THREE.Object3D): void;

@@ -1,0 +1,30 @@
+{
+  "_note": "Example director vocab (kappa-kyle-cucumber-debt). Copy to <take>/director.json and edit. Pattern: mutuals-inc/character-harness director.yaml (Apache-2.0). Words must match what the stage performs: emotions resolve through EXPRESSION_INTENTS/POG_FACE_V1; unknown words leave the face alone.",
+  "emotions": {
+    "deadpan": "flat, dry, matter-of-fact — good for a dry punchline",
+    "neutral": "at rest, listening face",
+    "annoyed": "irritated ledger-keeper, patience thinning",
+    "confused": "polite bow of incomprehension",
+    "surprised": "caught off guard, holds the gaze still",
+    "grin": "vindicated, dare-you smile",
+    "smirk": "knows something about cucumbers you don't",
+    "sad": "genuinely low, defeated, heavy"
+  },
+  "tags": {
+    "sighs": "sad",
+    "sigh": "sad",
+    "giggles": "grin",
+    "laughs": "grin",
+    "grumbles": "annoyed",
+    "muttering": "annoyed",
+    "gasps": "surprised",
+    "beaming": "grin",
+    "dryly": "deadpan",
+    "flatly": "deadpan"
+  },
+  "intense": ["surprised", "grin"],
+  "gestures": ["lean", "point", "shrug", "wave"],
+  "cameras": ["wide", "medium", "close", "side"],
+  "registers": ["regular"],
+  "limits": {"cameras": 1, "intense": 2}
+}
