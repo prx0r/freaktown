@@ -73,6 +73,11 @@ export interface AvatarDriver {
   setGazeTarget(target: THREE.Object3D): void;
   /** Optional seated variant (sets): bend hips/knees, drop the pelvis onto a 0.48 m seat. */
   setSeated?(seated: boolean): void;
+  /**
+   * Optional raw ARKit-52 weights (face/FaceChannel). Drivers write only names their
+   * bytes carry (GLB morphs, VRM custom expressions); BASIC maps a few by construction.
+   */
+  setBlendshapes?(weights: Partial<Record<string, number>>): void;
   update(dt: number): void;
   dispose(): void;
 }
