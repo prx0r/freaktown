@@ -17,7 +17,8 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { StageEventExecutor, StageRuntime, type StageTelemetry } from '@freaktown/stage-runtime';
+import { EventConsumer, SET_REGISTRY, StageEventExecutor, StageRuntime, type StageTelemetry } from '@freaktown/stage-runtime';
+import { SetStagePage } from './SetStagePage';
 import { showClockSink, showRoomStore, useShowStore } from '../store/showStore';
 import { createTransport, resolveAsset, transportMode } from '../live/transport';
 
@@ -32,7 +33,35 @@ declare global {
   }
 }
 
+/**
+ * StagePage — picks the renderer from the room: the latest `set.load` decides.
+ * No set (or comedy-club) → the classic single-performer StageRuntime;
+ * any other registered set → SetStagePage (multi-seat).
+ */
 export function StagePage() {
+  const { episodeId = 'demo' } = useParams<{ episodeId: string }>();
+  const [search] = useSearchParams();
+  const mode = transportMode(search);
+  const token = search.get('token') ?? undefined;
+  const [setId, setSetId] = useState<string | null>(search.get('set'));
+  useEffect(() => {
+    const consumer = new EventConsumer({ transport: createTransport(mode) });
+    const off = consumer.onEvent((e) => { if (e.type === 'set.load' && typeof e.payload?.setId === 'string') setSetId(e.payload.setId); });
+    const offSnap = consumer.onSnapshot((s) => { if (s.seq === 0) setSetId(search.get('set')); });
+    void consumer.connect(episodeId, { role: 'audience', sessionId: `stage-router-${Date.now()}`, token }).catch(() => {});
+    return () => { off(); offSnap(); consumer.disconnect(); };
+  }, [episodeId, mode, token]);
+  if (setId && setId !== 'comedy-club' && SET_REGISTRY.has(setId)) {
+    return (
+      <SetStagePage key={`${episodeId}`} episodeId={episodeId} mode={mode} token={token}
+        debug={search.get('debug') === '1'} quality={search.get('quality') === 'low' ? 'low' : 'high'}
+        cpuSkinning={search.get('cpuskin') === '1'} glb={search.get('setglb') === '1'} />
+    );
+  }
+  return <ClubStagePage />;
+}
+
+export function ClubStagePage() {
   const { episodeId = 'demo' } = useParams<{ episodeId: string }>();
   const [search] = useSearchParams();
   const token = search.get('token') ?? undefined;
