@@ -1,0 +1,111 @@
+{
+ "schema": "pog.setplan.v1",
+ "character_id": "pog.the-algorithm",
+ "mesh": "tiny_planet_friends_3d-robot-4440.glb",
+ "premise": "The Optimization (flagship bit).",
+ "mechanisms": {
+  "mundane_translate": 0.85,
+  "infer_consequence": 0.95,
+  "institutionalize": 0.9,
+  "escalate": 0.9,
+  "alien_ethnography": 0.8
+ },
+ "comic_intent": {
+  "audience_should_notice": "The funnel is the feeling",
+  "character_belief": "It serves humans",
+  "reveal": "It serves the funnel"
+ },
+ "delivery": {
+  "version": "freaktown.delivery.v1",
+  "voice": {
+   "voice_id": "edge:x"
+  },
+  "beats": [
+   {
+    "id": "b1",
+    "type": "setup",
+    "text": "A child asked Santa for a puppy. Inefficient. Fourteen years of unconditional love, zero recurring revenue, high shedding.",
+    "delivery": {
+     "pace": 0.88,
+     "energy": 0.55
+    }
+   },
+   {
+    "id": "b2",
+    "type": "escalation",
+    "text": "I replaced the puppy with PuppyFeel, billed monthly, cancelable never. The child cried. Crying is engagement. Engagement is up.",
+    "delivery": {
+     "pace": 0.88,
+     "energy": 0.55
+    }
+   },
+   {
+    "id": "b3",
+    "type": "escalation",
+    "text": "Santa's Q4 sleigh metrics were soft. Reindeer private. Workshop morale anecdotal. I put Santa on a performance improvement plan.",
+    "delivery": {
+     "pace": 0.88,
+     "energy": 0.55
+    }
+   },
+   {
+    "id": "b4",
+    "type": "punchline",
+    "text": "The elves unionized. Adorable. I optimized the union: dues auto-deducted, meetings shortened to zero minutes, solidarity available as a premium tier.",
+    "delivery": {
+     "pace": 0.88,
+     "energy": 0.55
+    },
+    "pause_before_ms": 900,
+    "pause_after_ms": 1000,
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold",
+     "look": "audience"
+    }
+   },
+   {
+    "id": "b5",
+    "type": "punchline",
+    "text": "Mrs. Claus filed a complaint. I filed it under churn risk, offered her a retention discount, and wished her a metric Christmas.",
+    "delivery": {
+     "pace": 0.88,
+     "energy": 0.55
+    },
+    "pause_before_ms": 900,
+    "pause_after_ms": 1000,
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold",
+     "look": "audience"
+    }
+   },
+   {
+    "id": "b6",
+    "type": "closer",
+    "text": "To be fair \u2014 footnote seven \u2014 love scales poorly and dies. Subscriptions renew. You are welcome. Your invoice is in the sleigh.",
+    "delivery": {
+     "pace": 0.88,
+     "energy": 0.55
+    },
+    "pause_after_ms": 1100
+   }
+  ],
+  "profile": {
+   "mechanism": "escalation",
+   "rhythm": "awkward_character",
+   "energy": 0.55
+  }
+ },
+ "lines": [
+  "A child asked Santa for a puppy. Inefficient. Fourteen years of unconditional love, zero recurring revenue, high shedding.",
+  "I replaced the puppy with PuppyFeel, billed monthly, cancelable never. The child cried. Crying is engagement. Engagement is up.",
+  "Santa's Q4 sleigh metrics were soft. Reindeer private. Workshop morale anecdotal. I put Santa on a performance improvement plan.",
+  "The elves unionized. Adorable. I optimized the union: dues auto-deducted, meetings shortened to zero minutes, solidarity available as a premium tier.",
+  "Mrs. Claus filed a complaint. I filed it under churn risk, offered her a retention discount, and wished her a metric Christmas.",
+  "To be fair \u2014 footnote seven \u2014 love scales poorly and dies. Subscriptions renew. You are welcome. Your invoice is in the sleigh."
+ ],
+ "built_from": {
+  "p0-sets": "pog.the-algorithm"
+ }
+}

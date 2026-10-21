@@ -1,61 +1,51 @@
 # FACE-VOICE-REACT — expressive faces, linked to voice, that react
+(live-stage architecture)
 
-Three channels, one face. The invariant (from `LipSync.ts`, now enforced
-on both sides of the stack):
-
-| channel | driver | writes ONLY |
-|---|---|---|
-| mouth | voice audio (analyser realtime, or Rhubarb offline) | visemes / jaw |
-| face | beats + reactions (smoothed, never pops) | emotion morphs |
-| blink | its own timer | blink |
-
-Channels never clear each other. Unknown values are skipped, never raised.
+Three channels, one face. The invariant (shared by LipSync,
+Performer, MouthTrack): mouth = voice, face = beats + reactions,
+blink = own timer. Channels never clear each other. Unknown values are
+skipped, never raised.
 
 ## 1. Voice -> mouth (speaking)
 
-Two paths, same intents (`POG_FACE_V1` in `face_profiles.py`):
+Two paths, same clock (`MouthTrack.sample(t)` on the media clock):
 
-- **Offline (pre-rendered sets):** `scripts/rhubarb_cues.py` emits
-  `pog.mouth-cues.v1` (poses A-H/X + jaw angle + audio sha).
-  `backend/services/freaktown/face_voice.py::mouth_cues_to_face_frames`
-  translates poses to viseme intents via `RHUBARB_TO_INTENT`
-  (calibration v1, one dict, retunable) and resolves them to real morph
-  names with `to_pog_face()`. A viseme the avatar lacks falls back to
-  `jaw_open` at the pose's angle — jaw is the honest universal mouth.
+- **Offline (sealed sets):** `scripts/rhubarb_cues.py` emits
+  `pog.mouth-cues.v1` envelope spans; `scripts/build_visemes.py` emits
+  `visemes.json` (TalkingHead-en full-word phonetics from
+  `vendor/talkinghead/lipsync-en.mjs`, MIT). `loadSealedSet` fetches
+  both; the track prefers real phonetics, falls back to vowel groups.
 - **Realtime (live, any source):** `LipSyncAdapter` reads the voice-bus
-  analyser. Source-agnostic by construction: set.wav, Edge TTS, Qwen
-  Omni PCM, LiveKit track, human mic all move the same mouth.
+  analyser. Source-agnostic: set.wav, Edge TTS, Qwen Omni PCM
+  (`OmniVoiceBridge`), LiveKit track, human mic.
 
-Qwen Omni's audio-out (24 kHz mono PCM chunks) plays through the voice
-bus (`OmniVoiceBridge`), so the mouth moves with zero new lipsync code.
+## 2. Beats -> face (FACS recipes on GlbAvatar)
 
-## 2. Beats -> face (expressive, no pops)
+Delivery beats carry `expression` (17 words and counting).
+`Performer`'s FACE_MAP resolves actions to the 5 emotion presets;
+`GlbAvatar.setExpression` renders the full FACS recipe per preset
+(happy = smile + cheek squint per AU6+12; angry = brow drop + squint +
+nose + press per AU4+5+7+9+23; etc. — authority: AUBlendNet Table 2,
+map in `face_profiles.py`). VRM avatars keep the 5-preset path; ARKit
+GLBs get brows, squint/wide eyes, cheeks, nose. Where emotion comes
+from, in priority order: (1) authored beat words, (2) room events via
+`resolve_expression`, (3) Omni tone override (`emotion` + `intensity`),
+(4) procedural stillness.
 
-Delivery beats already carry `expression` (deadpan/excited/whisper/
-shout/normal). The old path was dead: `cues.py` emitted `face_whisper`
-style actions the runtime never matched (`face_` vs `face.`), so live
-faces ignored beats entirely.
-
-Fix, all additive, no contract renamed. **Full-face range, FACS
-calibrated:** recipes follow AUBlendNet ICCV'25 Table 2 (Happy 6+12,
-Sad 1+4+15, Surprise 1+2+5+27, Fear 1+2+4+5+7+20+26, Anger 4+5+7+9+23,
-Disgust 9+5+16, Contempt 4+14+64; AU->ARKit map in `face_profiles.py`).
-BEAT (76h measured ARKit weights/emotion) is the future calibration
-source; current weights are the hand prior. VRM avatars keep the
-5-preset path unchanged. Where emotion comes from, in priority order: (1) authored beat words, (2) room events via
-`resolve_expression`, (3) Omni tone override (`emotion` + `intensity`
-heard from the room's prosody), (4) procedural stillness.
-
-## 3. Room -> face (reacting, via Qwen Omni)
+## 3. Room -> face (reacting, via Qwen Omni + crowd.reaction)
 
 The reactor is ears + improv brain, NOT lipsync. Mouth keeps running
-off its own audio; the reactor only emits face/gaze/gesture intents.
+off its own audio; the reactor emits `crowd.reaction` kinds
+(`to_stage_kind`: room_laugh->laugh, applause->clap, heckle->boo,
+silence->crickets), which play sfx + excite the room + trigger the
+matching `reaction.*` face: `omni -> ReactionPolicy -> crowd.reaction
+-> Performer`.
 
 ```
 room mic -> VAD gate (local, $0) -> reaction window?
   no  -> local energy only (laugh curve from POG presses)
-  yes -> Qwen Omni realtime (hears 2-4 s, returns JSON intent)
-       -> ReactionPolicy.decide -> ExpressionLayer
+  yes -> Qwen Omni (hears 2-4 s, returns JSON intent)
+       -> resolve_expression -> crowd.reaction
 ```
 
 Cost discipline: Omni hears windows, not streams. A show opens at most
@@ -77,18 +67,16 @@ Reaction vocabulary (existing verbs only):
 All thresholds live in `ReactionPolicy` (pure function, tested). Tune
 without touching the reactor or the renderer.
 ## 4. The TalkingHead path (GLB-direct, ARKit)
-The stage was VRM-only (`No VRM found in GLB` reject) while the whole
-cast is GLB-first with ARKit/Oculus shapes. Now both paths exist:
 
-- **VRM avatars:** LipSyncAdapter (analyser) + ExpressionLayer, unchanged.
-- **GLB avatars:** `MorphVisemePlayer` binds whatever `viseme_*`/ARKit
-  mouth morphs the file actually carries and plays the take's
-  `visemes.json` (TalkingHead `speakAudio` shape, PP/FF at 0.9).
+The cast is GLB-first with ARKit/Oculus shapes. `GlbAvatar` binds
+whatever `viseme_*`/ARKit morphs (plus VRM0/MMD variants) the file
+actually carries and plays the take's `visemes.json` (TalkingHead
+`speakAudio` shape). No VRM conversion required.
+
 - **One rules engine:** `vendor/talkinghead/lipsync-en.mjs` (MIT, kept
   verbatim with NOTICE) converts English text to Oculus visemes.
   `scripts/build_visemes.py --take <dir>` turns `timeline.json` into
-  `visemes.json`; the live client attaches it to preload as `visemes`.
-  No language modules duplicated, no drift between bank and stage.
+  `visemes.json`; `loadSealedSet` fetches it with the set.
 
 Next TTS upgrade when a voice earns it: HeadTTS/Kokoro REST (MIT, CPU
 RTF 0.2, returns words + visemes + phonemes in this exact shape) or
@@ -101,17 +89,11 @@ working (analyser fallback never removed).
 `fermion transcribe --json` (Fermion Phonon-2, Apache-2.0) gives
 segments + word timestamps + hotwords (character names) on CPU/CUDA
 with no account. Shape: room mic -> Phonon segments -> VAD windows ->
-ReactionPolicy -> ExpressionLayer. Qwen Omni stays the paid improv
-brain for windows worth hearing; everything else runs deaf on local
-energy. Not installed on this box (torch deps need gigabytes and the
-disk is 94%) — it belongs on the room machine, called exactly like the
-GPU voice-bank pattern (render there, ship WAV/JSON back).
-
-The reactor is ears + improv brain, NOT lipsync. Mouth keeps running
-off its own audio; the reactor only emits face/gaze/gesture events on
-the same cue bus scripted beats use (`sendReaction` / `MotionCue`).
-
-```
+ReactionPolicy -> crowd.reaction -> Performer. Qwen Omni stays the paid
+improv brain for windows worth hearing; everything else runs deaf on
+local energy. Not installed on this box (torch deps need gigabytes and
+the disk is 94%) — it belongs on the room machine, called exactly like
+the GPU voice-bank pattern (render there, ship WAV/JSON back).
 
 ## 6. Speech-synced upper face (AU prosody track)
 
@@ -122,8 +104,9 @@ the same clock. `backend/services/freaktown/au_track.py` reads set.wav
 AU5 eye widening), phrase_end (silence gaps -> AU45 blink + decay).
 Scales are absolute (dB-anchored), so whispers read calm and shouts
 read hot. `scripts/build_aus.py` builds it next to `visemes.json`;
-preload carries it as `aus`, and the layer merges it under
-beat/reactor emotions (prosody lifts, beats decide).
+`loadSealedSet` fetches it with the set, and the tick merges it under
+beat/reactor emotions (prosody lifts, beats decide, both sampled on
+the media clock).
 
 AUBlendNet verdict (ICCV'25, MIT): the model itself is not runnable
 here (11 GB VRAM, Baidu-hosted data, 2-commit repo) — but its design

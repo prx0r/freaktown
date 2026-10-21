@@ -22,10 +22,12 @@ from pathlib import Path
 from flask import Flask, send_from_directory, jsonify, request
 
 from party import party_bp
+from lab import lab_bp
 from face_profiles import detect_face_profile, to_pog_face
 
 app = Flask(__name__)
 app.register_blueprint(party_bp)
+app.register_blueprint(lab_bp)
 
 AUDIO_DIR = Path(__file__).parent / "audio_output"
 AUDIO_DIR.mkdir(exist_ok=True)
@@ -4455,6 +4457,11 @@ def apply_template():
         pause = template.get(b.get("type", "setup"), template.get("setup", 300))
         b["pause_after_ms"] = int(pause)
     return jsonify({"ok": True, "template": name, "beats": beats})
+
+
+# ── Funnier skin + public-bill privacy (keep last: wraps every route above) ──
+import funnier_skin  # noqa: E402
+funnier_skin.init(app)
 
 
 # ── Main ────────────────────────────────────────────────────────────

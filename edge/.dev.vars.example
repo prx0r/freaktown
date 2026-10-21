@@ -1,0 +1,3 @@
+# Copy to .dev.vars for `wrangler dev` (gitignored). LOCAL ONLY.
+STAGE_TOKEN_SECRET=local-dev-only-change-me
+LIVE_DEV_OPEN=1

@@ -22,3 +22,11 @@ party_rooms.json
 var/
 
 data/
+
+# TS workspace (live stage)
+node_modules/
+dist/
+.wrangler/
+.dev.vars
+apps/live/test-results/
+apps/live/playwright-report/

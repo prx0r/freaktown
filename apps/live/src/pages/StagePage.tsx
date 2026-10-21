@@ -1,160 +1,189 @@
 /**
  * StagePage — the production stage view (program feed).
  *
- * This is what OBS Browser Source captures: clean, no debug UI.
- * Append ?debug=1 for diagnostics (phase/time/camera overlays).
+ * What OBS Browser Source captures: clean picture, optional captions.
+ *   ?transport=local|room   which LiveTransport (default local)
+ *   ?token=…                EpisodeRoom stage token (room mode)
+ *   ?debug=1                telemetry overlay (phase/time/camera/mouth)
+ *   ?captions=0             hide the caption strip
+ *   ?capture=1              frame-stepped capture mode (offline MP4), no audio
+ *   ?quality=low            half-res, no shadows (software GL / weak devices)
+ *   ?cpuskin=1              CPU skinning/morphs (GPUs without vertex texture fetch, CI)
  *
- * Auth: the stage connects with an episode-scoped HMAC token minted by
- * control (POST /live/:ep/stage-token). Launch as /stage/:ep?token=...
- * Without a token the scene renders but the socket is rejected — the
- * banner says so instead of failing silently.
- *
- * Audio unlock: first user gesture resumes the AudioContext (iPhone).
- * OBS sources with autoplay enabled typically don't need the tap.
+ * The stage obeys events only: StageEventExecutor turns room events into
+ * runtime calls. Nothing in /control can reach this page except through
+ * the room.
  */
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { StageRuntime } from '../stage/StageRuntime';
-import { StageEventExecutor } from '../stage/StageEventExecutor';
-import { useShowStore } from '../store/showStore';
+import { StageEventExecutor, StageRuntime, type StageTelemetry } from '@freaktown/stage-runtime';
+import { showClockSink, showRoomStore, useShowStore } from '../store/showStore';
+import { createTransport, resolveAsset, transportMode } from '../live/transport';
 
-export function StagePage({ episodeId: propEpisodeId }: { episodeId?: string }) {
-  const { episodeId: urlEpisodeId } = useParams<{ episodeId: string }>();
+declare global {
+  interface Window {
+    __stage?: {
+      runtime: StageRuntime;
+      executor: StageEventExecutor;
+      telemetry: () => StageTelemetry;
+      errors: string[];
+    };
+  }
+}
+
+export function StagePage() {
+  const { episodeId = 'demo' } = useParams<{ episodeId: string }>();
   const [search] = useSearchParams();
-  const episodeId = propEpisodeId || urlEpisodeId || 'demo';
   const token = search.get('token') ?? undefined;
   const debug = search.get('debug') === '1';
+  const captions = search.get('captions') !== '0';
+  const capture = search.get('capture') === '1';
+  const quality = search.get('quality') === 'low' ? 'low' : 'high';
+  const cpuSkinning = search.get('cpuskin') === '1';
+  const mode = transportMode(search);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const runtimeRef = useRef<StageRuntime | null>(null);
   const [audioLocked, setAudioLocked] = useState(false);
-  const [authError, setAuthError] = useState<string | null>(null);
-  const [runtimeStatus, setRuntimeStatus] = useState('EMPTY');
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const [tele, setTele] = useState<StageTelemetry | null>(null);
 
   const phase = useShowStore((s) => s.phase);
-  const currentTimeMs = useShowStore((s) => s.currentTimeMs);
-  const currentCamera = useShowStore((s) => s.currentCamera);
-
-  const runtimeRef = useRef<StageRuntime | null>(null);
-  const executorRef = useRef<StageEventExecutor | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
-
+    const transport = createTransport(mode);
+    const errors: string[] = [];
     const runtime = new StageRuntime({
-      mode: 'live',
       container: containerRef.current,
-      background: '#0a0a1a',
+      transport,
+      store: showRoomStore,
+      clockSink: showClockSink,
+      keyboard: debug,
+      capture,
+      quality,
+      cpuSkinning,
     });
     runtimeRef.current = runtime;
-    const offStatus = runtime.onStatus((s) => setRuntimeStatus(s));
-
-    // Execution layer: show events → runtime actions. Without this the
-    // store updates but the Three.js scene never moves.
     const executor = new StageEventExecutor(runtime, runtime.consumer, {
-      onError: (m) => console.error('[stage executor]', m),
+      resolveUrl: resolveAsset,
+      onError: (m) => { errors.push(m); console.warn('[stage executor]', m); },
     });
     executor.attach();
-    executorRef.current = executor;
+    window.__stage = { runtime, executor, telemetry: () => runtime.telemetry(), errors };
 
-    runtime
-      .connect(episodeId, token)
-      .catch(() => setAuthError('stage socket rejected — mint a token from /control'));
+    runtime.consumer.transport.subscribe({
+      onRejected: (r) => setLinkError(`stage link rejected (${r}) — mint a stage link from /control`),
+    });
+    runtime.connect(episodeId, token).catch(() =>
+      setLinkError(mode === 'room' ? 'EpisodeRoom unreachable — is `wrangler dev` running?' : 'local link failed'));
 
-    // Audio unlock probe: mobile Safari starts Web Audio suspended; the
-    // first PLAY must come from a user gesture, so offer the tap.
-    const timer = window.setTimeout(() => {
+    const lockTimer = window.setTimeout(() => {
       if (runtimeRef.current?.isAudioLocked()) setAudioLocked(true);
-    }, 1200);
-    void timer;
+    }, 800);
+    const teleTimer = window.setInterval(() => {
+      const t = runtime.telemetry();
+      setTele(t);
+      if (t.status === 'PLAYING' && runtime.isAudioLocked()) setAudioLocked(true);
+    }, 200);
 
     return () => {
-      window.clearTimeout(timer);
+      window.clearTimeout(lockTimer);
+      window.clearInterval(teleTimer);
       executor.detach();
-      executorRef.current = null;
-      offStatus();
       runtime.dispose();
       runtimeRef.current = null;
+      if (window.__stage?.runtime === runtime) delete window.__stage;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [episodeId]);
-
-  // NOTE: no keyboard handler here. CameraDirector owns keys 1-6
-  // (bound inside StageRuntime); a second handler would call
-  // cutCamera() with raw key strings and crash.
+  }, [episodeId, token, mode, debug, capture, quality, cpuSkinning]);
 
   const unlockAudio = async () => {
     await runtimeRef.current?.unlockAudio().catch(() => {});
     setAudioLocked(false);
   };
 
-  const formatTime = (ms: number): string => {
-    const totalSeconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
+  const plan = runtimeRef.current?.currentPlan ?? null;
+  const words = plan?.word_timings ?? [];
+  const caption = (() => {
+    if (!tele || tele.status !== 'PLAYING' || tele.wordIndex < 0 || !words.length) return null;
+    const w = words[tele.wordIndex];
+    const beatWords = words.filter((x) => x.beat_id === w.beat_id);
+    const i = beatWords.indexOf(w);
+    const start = Math.max(0, i - 5);
+    return beatWords.slice(start, start + 11).map((x) => ({ text: x.word, on: x === w }));
+  })();
+  const showNameCard = tele && (tele.status === 'PLAYING' || tele.status === 'READY') && tele.timeMs < 5000 && plan;
 
   return (
     <div
-      style={{
-        width: '100vw', height: '100vh', position: 'relative',
-        overflow: 'hidden', background: '#000',
-      }}
+      data-testid="stage"
+      style={{ width: '100vw', height: '100dvh', position: 'relative', overflow: 'hidden', background: '#000' }}
       onPointerDown={() => { if (audioLocked) void unlockAudio(); }}
     >
-      <div
-        ref={containerRef}
-        style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }}
-      />
+      <div ref={containerRef} style={{ position: 'absolute', inset: 0 }} />
 
-      {debug && (
-        <>
-          <div style={debugBox({ top: 20, left: 20 })}>
-            <div style={{ opacity: 0.7, marginBottom: 4 }}>PHASE</div>
-            <div style={{ fontSize: 18, fontWeight: 'bold' }}>{phase.toUpperCase()}</div>
+      {showNameCard && !capture && (
+        <div style={nameCard}>
+          <div style={{ fontSize: 12, letterSpacing: 3, opacity: 0.75 }}>NOW ON STAGE</div>
+          <div style={{ fontSize: 'clamp(18px, 3vw, 30px)', fontWeight: 800 }}>
+            {(plan?.character_id ?? '').replace(/^pog\./, '').replace(/-/g, ' ').toUpperCase()}
           </div>
-          <div style={debugBox({ top: 20, right: 20 })}>
-            <div style={{ opacity: 0.7, marginBottom: 4 }}>TIME</div>
-            <div style={{ fontSize: 24, fontWeight: 'bold' }}>{formatTime(currentTimeMs)}</div>
-          </div>
-          <div style={debugBox({ bottom: 20, right: 20, fontSize: 12 })}>
-            CAM: {currentCamera} · {runtimeStatus}
-          </div>
-        </>
-      )}
-
-      {audioLocked && (
-        <button
-          onClick={unlockAudio}
-          style={{
-            position: 'absolute', top: '50%', left: '50%',
-            transform: 'translate(-50%, -50%)', zIndex: 30,
-            background: '#ff00aa', color: '#fff', border: 'none',
-            padding: '16px 28px', borderRadius: 8, fontSize: 16, cursor: 'pointer',
-          }}
-        >
-          TAP TO ENABLE AUDIO
-        </button>
-      )}
-
-      {authError && (
-        <div style={{
-          position: 'absolute', bottom: 20, left: 20, zIndex: 30,
-          color: '#ffb3b3', fontSize: 13, background: 'rgba(0,0,0,0.7)',
-          padding: '8px 12px', borderRadius: 4,
-        }}>
-          {authError}
+          {plan?.title && <div style={{ fontSize: 13, opacity: 0.8 }}>{plan.title}</div>}
         </div>
       )}
+
+      {captions && caption && (
+        <div style={captionStrip} data-testid="caption">
+          {caption.map((c, i) => (
+            <span key={i} style={{ color: c.on ? '#ffe14d' : '#fff', opacity: c.on ? 1 : 0.85 }}>{c.text} </span>
+          ))}
+        </div>
+      )}
+
+      {debug && tele && (
+        <div style={debugBox} data-testid="stage-debug">
+          <div>{mode.toUpperCase()} · {phase} · {tele.status} · {tele.audioState}</div>
+          <div>t {(tele.timeMs / 1000).toFixed(2)}s / {(tele.durationMs / 1000).toFixed(1)}s · {tele.fps} fps</div>
+          <div>cam {tele.camera} · cuts {tele.cuts.length}</div>
+          <div>mouth {tele.mouth.toFixed(2)} ({tele.mouthSource}) · blink {tele.blink.toFixed(2)}</div>
+          <div>avatar {tele.avatar?.kind}:{tele.avatar?.name} mouth={tele.avatar?.mouthMode}</div>
+          <div>face {Object.entries(tele.emotions).filter(([, v]) => v > 0.02).map(([k, v]) => `${k}:${v.toFixed(2)}`).join(' ') || 'neutral'}</div>
+        </div>
+      )}
+
+      {audioLocked && !capture && (
+        <button onClick={unlockAudio} style={unlockBtn}>TAP TO ENABLE AUDIO</button>
+      )}
+
+      {linkError && <div style={errorBox}>{linkError}</div>}
     </div>
   );
 }
 
-function debugBox(pos: Record<string, number | string>): React.CSSProperties {
-  return {
-    position: 'absolute', color: '#fff', fontSize: 14, fontFamily: 'monospace',
-    background: 'rgba(0,0,0,0.6)', padding: '8px 12px', borderRadius: 4, zIndex: 10,
-    ...pos,
-  };
-}
+const nameCard: React.CSSProperties = {
+  position: 'absolute', left: '4%', bottom: '18%', zIndex: 10, color: '#fff',
+  fontFamily: 'Inter, system-ui, sans-serif', padding: '10px 18px',
+  background: 'linear-gradient(90deg, rgba(255,47,160,0.85), rgba(80,20,120,0.55))',
+  borderLeft: '4px solid #ffe14d', maxWidth: '80%',
+};
+const captionStrip: React.CSSProperties = {
+  position: 'absolute', left: '50%', bottom: '5%', transform: 'translateX(-50%)', zIndex: 10,
+  maxWidth: '86%', textAlign: 'center', fontFamily: 'Inter, system-ui, sans-serif',
+  fontSize: 'clamp(15px, 2.2vw, 26px)', fontWeight: 700, lineHeight: 1.3,
+  background: 'rgba(0,0,0,0.55)', padding: '6px 14px', borderRadius: 6,
+};
+const debugBox: React.CSSProperties = {
+  position: 'absolute', top: 12, left: 12, zIndex: 20, color: '#9fffb0', fontSize: 12,
+  fontFamily: 'ui-monospace, monospace', background: 'rgba(0,0,0,0.65)', padding: '8px 10px', borderRadius: 4,
+  lineHeight: 1.5,
+};
+const unlockBtn: React.CSSProperties = {
+  position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 30,
+  background: '#ff2fa0', color: '#fff', border: 'none', padding: '16px 28px', borderRadius: 8,
+  fontSize: 16, fontWeight: 700, cursor: 'pointer',
+};
+const errorBox: React.CSSProperties = {
+  position: 'absolute', bottom: 12, right: 12, zIndex: 30, color: '#ffb3b3', fontSize: 13,
+  background: 'rgba(0,0,0,0.75)', padding: '8px 12px', borderRadius: 4, fontFamily: 'system-ui',
+};

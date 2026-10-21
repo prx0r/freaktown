@@ -60,7 +60,7 @@ except bundles and events.
 `backend/services/` (delivery, audio, ella, judge, scoring, bundles) ·
 `packages/stage-runtime/` (live performer) ·
 `edge/worker/` (episode room + ella live) ·
-`apps/live/` (web client) ·
+`apps/live/` (web client; live stage: `docs/LIVE-STAGE.md`, `docs/LIVE-STAGE-EXTENDING.md`) ·
 `freaks/` (bundle storage, gitignored) ·
 `archive/` (retired engine, read-only).
 
@@ -71,6 +71,8 @@ source /home/ubuntu/.venvs/freaktown/bin/activate
 pytest tests/contract -q      # contract suite (46/47 pass, 1 env failure)
 python3 test_party.py         # party sim (script, never pytest)
 python3 app.py                # Flask dev server (live traffic, need .env)
+npm install && npm test       # TS workspace (contracts, stage-runtime, apps/live, edge logic)
+npm run build                 # apps/live/dist (static live stage)
 ```
 
 ## Known failures

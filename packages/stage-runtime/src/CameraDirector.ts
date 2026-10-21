@@ -10,7 +10,7 @@
 
 import * as THREE from 'three';
 
-import { CAMERA_NAMES, type CameraPresetV1 } from '../contracts/show';
+import { CAMERA_NAMES, type CameraPresetV1 } from '@freaktown/contracts';
 
 // ── Camera Presets ────────────────────────────────────────────────
 
@@ -29,20 +29,23 @@ export const CAMERA_PRESETS: Record<CameraPresetName, CameraPreset> = {
     target: [0, 1.3, 0],
     fov: 46,
   },
+  // Framed for a performer normalized to 1.7 m at the origin (StageRuntime).
   COMIC_MEDIUM: {
-    position: [0, 1.75, 4.2],
-    target: [0, 1.45, 0],
-    fov: 34,
+    position: [0, 1.48, 2.35],
+    target: [0, 1.33, 0],
+    fov: 30,
   },
   COMIC_CLOSE: {
-    position: [0, 1.72, 2.6],
-    target: [0, 1.62, 0],
+    position: [0.08, 1.58, 1.6],
+    target: [0, 1.52, 0],
     fov: 28,
   },
+  // Club angle from house-left, so the mic stand (stage-right) never
+  // crosses the face.
   SIDE_STAGE: {
-    position: [4, 1.8, 5],
-    target: [0, 1.3, 0],
-    fov: 40,
+    position: [-2.9, 1.7, 3.6],
+    target: [0, 1.25, 0],
+    fov: 36,
   },
   PANEL_WIDE: {
     position: [3, 1.6, 6],
@@ -181,15 +184,43 @@ export class CameraDirector {
 
   // ── Preset Application ──────────────────────────────────────────
 
+  private aspect = 16 / 9;
+
+  /** Portrait screens get a slightly wider lens so the performer still fits. */
+  setAspect(aspect: number): void {
+    this.aspect = aspect > 0 ? aspect : 16 / 9;
+    this.applyPreset(this.currentPreset);
+  }
+
+  private effectiveFov(fov: number): number {
+    return this.aspect < 1 ? fov * (1 + (1 - this.aspect) * 0.6) : fov;
+  }
+
   private applyPreset(preset: CameraPresetName): void {
     const data = CAMERA_PRESETS[preset];
 
-    this.camera.position.set(...data.position);
-    this.camera.fov = data.fov;
+    this.targetPosition.set(...data.position);
+    this.camera.position.copy(this.targetPosition);
+    this.camera.fov = this.effectiveFov(data.fov);
     this.camera.updateProjectionMatrix();
 
     // Set look-at target
     this.targetLookAt.set(...data.target);
+    this.camera.lookAt(this.targetLookAt);
+  }
+
+  /**
+   * Operator-style life on a locked-off shot: a few millimetres of slow
+   * drift (cuts stay cuts). Call once per frame with wall time.
+   */
+  update(wallMs: number, amount = 1): void {
+    const s = wallMs / 1000;
+    const k = (this.currentPreset === 'COMIC_CLOSE' ? 0.6 : 1) * amount;
+    this.camera.position.set(
+      this.targetPosition.x + Math.sin(s * 0.31) * 0.025 * k,
+      this.targetPosition.y + Math.sin(s * 0.47 + 1) * 0.012 * k,
+      this.targetPosition.z + Math.sin(s * 0.23 + 2) * 0.03 * k,
+    );
     this.camera.lookAt(this.targetLookAt);
   }
 
