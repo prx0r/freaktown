@@ -1,13 +1,27 @@
 /** Shared procedural helpers for set builders (canvas textures, primitives, lights). */
 import * as THREE from 'three';
+import type { HeadlinePayloadV1, SetThemePayloadV1 } from '@freaktown/contracts';
 import type { LightingRig, SetDefinition } from '../types';
 
 export interface BuildContext { shadows: boolean; low: boolean }
+
+/** A wall card as the painter sees it (overlay.headline payload). */
+export type WallCard = Partial<HeadlinePayloadV1> & { text: string };
+/**
+ * Paints the video wall (pure 2D canvas, no network). `t` is seconds of set time
+ * for slow ambient motion. Supplied by the host (e.g. @freaktown/newsroom).
+ */
+export type WallPainter = (ctx: CanvasRenderingContext2D, card: WallCard, theme: SetThemePayloadV1 | null, t: number) => void;
 
 export interface BuiltSet {
   group: THREE.Group;
   update(dt: number, wallMs: number): void;
   setHeadline?(text: string, kicker?: string): void;
+  /** Newsroom wall card (layout/body/figure/credit) painted by the host's WallPainter. */
+  setWall?(card: WallCard, theme: SetThemePayloadV1 | null): void;
+  setWallPainter?(painter: WallPainter): void;
+  /** set.theme: recolour the set (lights, cyclorama, desk brand). */
+  setTheme?(theme: SetThemePayloadV1): void;
   setOnAir?(on: boolean): void;
   dispose(): void;
 }
@@ -46,16 +60,19 @@ export function cyl(rt: number, rb: number, h: number, m: THREE.Material, x = 0,
 }
 
 export function applyLighting(group: THREE.Group, rig: LightingRig, ctx: BuildContext): void {
-  group.add(new THREE.AmbientLight(rig.ambient.color, rig.ambient.intensity));
+  const amb = new THREE.AmbientLight(rig.ambient.color, rig.ambient.intensity); amb.name = 'light:ambient';
+  group.add(amb);
   group.add(new THREE.HemisphereLight(0xffffff, 0x202020, 0.35));
   const key = new THREE.DirectionalLight(rig.key.color, rig.key.intensity);
+  key.name = 'light:key';
   key.position.set(...rig.key.position);
   key.castShadow = ctx.shadows;
   if (ctx.shadows) { key.shadow.mapSize.set(1024, 1024); key.shadow.camera.left = -5; key.shadow.camera.right = 5; key.shadow.camera.top = 5; key.shadow.camera.bottom = -5; }
   group.add(key);
-  for (const l of [rig.fill, rig.rim]) {
+  for (const [nm, l] of [['fill', rig.fill], ['rim', rig.rim]] as const) {
     if (!l) continue;
     const d = new THREE.DirectionalLight(l.color, l.intensity);
+    d.name = `light:${nm}`;
     d.position.set(...l.position);
     group.add(d);
   }
@@ -88,4 +105,14 @@ export function disposeGroup(g: THREE.Object3D): void {
     for (const mt of mats) { (mt as THREE.MeshStandardMaterial).map?.dispose?.(); mt.dispose?.(); }
   });
   g.parent?.remove(g);
+}
+
+/** Recolour the lights applyLighting() named (set.theme). Missing colours keep the set's own. */
+export function tintLights(group: THREE.Group, colors: { ambient?: string; key?: string; fill?: string; rim?: string }): void {
+  for (const k of ['ambient', 'key', 'fill', 'rim'] as const) {
+    const c = colors[k];
+    if (!c) continue;
+    const l = group.getObjectByName(`light:${k}`) as THREE.Light | undefined;
+    if (l) l.color.set(c);
+  }
 }
