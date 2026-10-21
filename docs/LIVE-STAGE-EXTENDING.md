@@ -434,3 +434,137 @@ mapping, folds, showdown chip totals, bots, PokerShow with a human seat).
 `apps/live/e2e/sets.spec.ts`: each set loads + demo runs + ≥2 cuts + no console errors;
 poker human seat acts from `/play` and the stage reflects it to showdown; comedy club
 switch-back. Screenshots → `$SHOTS_DIR/sets`.
+
+---
+
+## 9. Modifying and extending each set (recipes)
+
+All paths under `packages/stage-runtime/src/sets/` unless noted. After any change:
+`npm test && npm run build`, then `cd apps/live && npx playwright test e2e/sets.spec.ts`.
+
+### 9.1 Swap in a GLB environment (any set)
+
+```ts
+// definitions.ts — e.g. news studio
+environment: {
+  builder: 'news-studio',                  // procedural set stays underneath (fallback + anchors)
+  glb: {
+    url: 'https://cdn.3dassets.dev/assets/35527/v1/model.glb',   // CORS CDN, or 'sets-assets/studio.glb' (apps/live/public)
+    license: 'CC0-1.0', source: 'https://3dassets.dev/assets/…',
+    transform: { position: [0, 0, -9], rotation: Math.PI / 2, scale: 1 },  // line its desk up with the seats
+    hideNodes: ['GreenRoom', 'Gallery'],   // crop parts of a big scene by node-name substring
+    verified: true,                        // false → only loads with /stage/:ep?setglb=1
+  },
+},
+```
+
+To *replace* procedural parts instead of layering, hide them in the builder when a GLB is
+present (e.g. skip the cyclorama) — keep seats/chairs so cameras stay valid. Workflow:
+load with `?setglb=1&debug=1`, adjust `transform` until the desk sits behind the anchor
+seats, flip `verified: true`, add a row to `assets/sets/LICENSES.md`. Committed bytes must
+be < 5 MB after `npx @gltf-transform/cli optimize in.glb out.glb --compress meshopt`.
+
+### 9.2 Add or move seats
+
+```ts
+// podcast: a 5th seat at the far side, facing the centre
+const PODCAST_SEATS = [ …, podSeat('seat5', 180, 'guest3') ];   // degrees from -Z; around() faces the centre
+// news: move anchor2 further left and make it standing
+seat('anchor2', -1.1, -0.55, 0, 'co-anchor', 'standing'),
+// poker: 10 seats instead of 8 — change POKER_SEATS and PokerDealer numSeats (default 8)
+const POKER_SEATS = 10;   // new PokerDealer(seats, blinds, 10)
+```
+
+Seat ids are referenced by camera presets (`seat: 'seat1'`), demo casts (`demos.ts`) and
+`POKER_HUMAN_SEAT` — rename all three together. `validateSetDefinition` throws on a
+duplicate id or a camera bound to a missing seat; `sets.test.ts` checks poker seats face
+the centre. Chairs, mics and headphones are placed by the builder from `def.seats`, so
+they follow automatically.
+
+### 9.3 Per-set cameras
+
+```ts
+cameras: {
+  // absolute
+  'crane': { position: [0, 4.5, 6], target: [0, 1, -1], fov: 40, label: 'Crane' },
+  // seat-bound: offsets in the seat's frame (x side, y up from head, z forward)
+  'host-ots': { seat: 'seat1', position: [0.35, 0.1, -0.6], target: [-0.4, -0.1, 2.0], fov: 34, label: 'Host OTS' },
+  // slow orbit around the target (rad/s)
+  'drift': { position: [0, 2.2, 4], target: [0, 0.9, 0], fov: 42, orbit: 0.1 },
+},
+controlCameras: ['wide', 'crane', 'host-ots', 'drift'],   // buttons in /control
+```
+
+Generic cues need no preset: `close:<seat>`, `single:<seat>`, `reaction:<seat>`,
+`two-shot:a+b`, `overhead`, `orbit`. Tune their offsets in `camera.ts`
+(`resolveCameraCue`); head height per pose is `HEAD_HEIGHT`. The auto director's rules
+(`autoDirector.ts`) and the poker cut policy (`PokerShow.apply`) choose cues by name.
+
+### 9.4 Props
+
+Props are built in the set's builder (`builders/sets.ts`). Per-seat props use the seat:
+
+```ts
+for (const s of def.seats) {
+  const [x, y, z] = seatLocal(s, [0.25, -0.45, 0.35]);   // right of the knees, table height
+  group.add(cyl(0.04, 0.035, 0.1, std(0xeeeeee), x, 0.8, z));   // a mug
+}
+```
+
+Animated props: return `update(dt, wallMs)` from the builder; show-driven props expose a
+method on `BuiltSet` (like `setHeadline` / `setOnAir`) and get an executor case (§4).
+Poker's moving parts live in `poker/PokerProps.ts` (cards, chip stacks, pot, button;
+`spot(seat, k, lateral)` gives felt positions between centre and seat).
+
+### 9.5 Overlays (ticker, strap, ON AIR, lower third)
+
+DOM in `apps/live/src/pages/SetStagePage.tsx`, state in `SetStage.overlay`:
+
+```ts
+send('overlay.ticker', { items: ['MARKETS: chips +4%', 'WEATHER: puns'] });  // scrolls (CSS ftTicker in index.html)
+send('overlay.lower_third', { name: 'Dana Deadline', title: 'Anchor', show: true });  // show:false hides
+send('overlay.headline', { text: 'Robot wins pie contest', kicker: 'breaking' });     // DOM state + video-wall texture
+```
+
+The podcast speaker strap comes from `dialogue.line` (`overlay.speaker`); ON AIR is
+`overlay.onAir` + the 3D sign (`BuiltSet.setOnAir`). A new overlay = a field on
+`OverlayState`, an executor case, a JSX block gated by `tele.setId`, and its hook name in
+`def.overlays`.
+
+### 9.6 Poker rules and bots
+
+```ts
+new PokerDealer(seats, { smallBlind: 25, bigBlind: 50 }, 8);   // blinds, seats (poker-ts Table)
+// ante: poker-ts Table({ ante: 5, smallBlind, bigBlind }) — pass through in PokerDealer's constructor
+pokerSeats('You')                  // demos.ts: who sits where, stacks, bot style
+{ seat: 2, name: 'Chairman Meow', stack: 1000, kind: 'bot', style: 'maniac' }   // tight | loose | maniac | calling-station
+```
+
+Bot behaviour is `botDecision(turn, strength, style, rnd)` in `poker/PokerDealer.ts`
+(preflop strength from `holeStrength`; post-flop it currently reuses it — a hand
+evaluator on the board is the natural next step). Quips: `QUIPS` / `quip(kind, n)`.
+Timing: `PokerShow({ botDelayMs, humanTimeoutMs, quips, directCameras })`. Multiple hands:
+call `dealHand()` again (button rotates via poker-ts). Event contract:
+`poker.hand_start / deal / turn / action / chips / board / showdown` (`contracts/src/sets.ts`);
+`poker.test.ts` covers the mapping — extend it when you change rules.
+
+### 9.7 The human seat
+
+`/play/:ep/seat/:n` (`PlayPage.tsx`): `seat.join {seat, name, avatar_url, kind:'human'}` →
+the stage casts a BASIC body (or `avatar_url`) into that seat; the player acts with
+`poker.intent {seat, action, amount}`; the dealer in /control applies it only on that
+seat's turn (`PokerShow.apply`, errors shown in the Set panel). Make more seats human:
+mark them `kind: 'human'` in `pokerSeats()` and `open: true` in the definition. For
+phones on other networks use the EpisodeRoom transport (`?transport=room`) — the DO's
+`/command` needs a **player-scoped token** before this is safe in prod (today: admin
+auth or `LIVE_DEV_OPEN`). Hole cards are public in the log (broadcast show only).
+
+### 9.8 A new set from scratch (checklist)
+
+1. `definitions.ts`: `SetDefinition` (id, seats, cameras, lighting, overlays, controlCameras).
+2. `builders/sets.ts`: `SET_BUILDERS['<id>'] = (def, ctx) => { … return { group, update, dispose } }`.
+3. `registry.ts`: `.register(MY_SET)` on `SET_REGISTRY`.
+4. `demos.ts`: a cast + `TimedCommand[]`; wire it in `SetsPanel.runDemo`.
+5. Overlays (optional) in `SetStagePage.tsx`; new events in `contracts/src/sets.ts` + executor.
+6. Tests: registry/camera assertions in `sets.test.ts`; a block in `e2e/sets.spec.ts`.
+7. Licences: any third-party asset → `assets/sets/LICENSES.md`.
