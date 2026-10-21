@@ -37,6 +37,11 @@ export interface CameraPresetDef {
   label?: string;
   /** Slow orbit around `target` (rad/s). */
   orbit?: number;
+  /**
+   * Portrait framing (aspect < 1, phones): replaces position/target and uses `fov`
+   * as the vertical FOV as-is (no automatic widening). Additive (newsroom).
+   */
+  portrait?: { position: Vec3; target: Vec3; fov: number };
 }
 
 export interface LightingRig {

@@ -1,0 +1,187 @@
+{
+ "schema": "freaktown.newsroom.rundown/v1",
+ "id": "fixture-goodnight-01",
+ "title": "Fixture Night",
+ "show_style": "goodnight",
+ "date": "2026-10-20",
+ "cast": {
+  "anchors": [
+   {
+    "chair": "anchor",
+    "name": "Test Anchor",
+    "seat": "anchor1"
+   }
+  ],
+  "reporters": [
+   {
+    "chair": "reporter:en-ke",
+    "name": "Test Reporter",
+    "locale": "EN-KE",
+    "presence": "remote"
+   }
+  ]
+ },
+ "segments": [
+  {
+   "id": "open",
+   "title": "Open",
+   "kind": "open",
+   "stories": [
+    {
+     "id": "open-ritual",
+     "pieces": [
+      {
+       "type": "wall",
+       "layout": "title",
+       "headline": "Fixture Night",
+       "kicker": "20 October 2026"
+      },
+      {
+       "type": "ticker",
+       "items": [
+        "Story one headline",
+        "Story two headline",
+        "Story three headline"
+       ]
+      },
+      {
+       "type": "jingle",
+       "kind": "open"
+      },
+      {
+       "type": "anchor_read",
+       "text": "Placeholder anchor sentence number 1, read slowly for the test. Placeholder anchor sentence number 2, read slowly for the test. Placeholder anchor sentence number 3, read slowly for the test."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "around-the-world",
+   "title": "Around the world",
+   "kind": "section",
+   "stories": [
+    {
+     "id": "s1",
+     "title": "Story one",
+     "country": "Kenya",
+     "source": {
+      "name": "Example Wire",
+      "url": "https://example.org/one",
+      "license": "fact-rewrite"
+     },
+     "pieces": [
+      {
+       "type": "wall",
+       "headline": "Story one headline for the wall",
+       "kicker": "Kenya",
+       "credit": "Example Wire",
+       "image_url": "https://example.org/img.jpg"
+      },
+      {
+       "type": "anchor_read",
+       "text": "Placeholder anchor sentence number 10, read slowly for the test. Placeholder anchor sentence number 11, read slowly for the test."
+      },
+      {
+       "type": "reporter_read",
+       "chair": "reporter:en-ke",
+       "country": "Kenya",
+       "text": "Placeholder reporter sentence 1, filed from the field for the test. Placeholder reporter sentence 2, filed from the field for the test. Placeholder reporter sentence 3, filed from the field for the test. Placeholder reporter sentence 4, filed from the field for the test."
+      },
+      {
+       "type": "anchor_read",
+       "text": "Placeholder anchor sentence number 20, read slowly for the test. Placeholder anchor sentence number 21, read slowly for the test."
+      }
+     ]
+    },
+    {
+     "id": "s2",
+     "title": "Story two",
+     "country": "Brazil",
+     "source": {
+      "name": "Space Agency",
+      "license": "verbatim-ok"
+     },
+     "pieces": [
+      {
+       "type": "wall",
+       "headline": "Story two headline, which is a little longer so it has to wrap across lines",
+       "kicker": "Brazil",
+       "credit": "Space Agency",
+       "image_url": "https://example.org/img2.jpg"
+      },
+      {
+       "type": "anchor_read",
+       "text": "Placeholder anchor sentence number 30, read slowly for the test. Placeholder anchor sentence number 31, read slowly for the test. Placeholder anchor sentence number 32, read slowly for the test."
+      },
+      {
+       "type": "anchor_read",
+       "text": "Placeholder number line: seventy five to one, the figure for the test.",
+       "numbers": {
+        "figure": "75\u20131",
+        "label": "Story two figure"
+       }
+      },
+      {
+       "type": "anchor_read",
+       "text": "Placeholder anchor sentence number 40, read slowly for the test. Placeholder anchor sentence number 41, read slowly for the test."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "quiet-win",
+   "title": "The quiet win",
+   "kind": "section",
+   "stories": [
+    {
+     "id": "s3",
+     "title": "Story three",
+     "country": "Netherlands",
+     "pieces": [
+      {
+       "type": "jingle",
+       "kind": "sting"
+      },
+      {
+       "type": "wall",
+       "headline": "Story three headline",
+       "kicker": "Netherlands"
+      },
+      {
+       "type": "anchor_read",
+       "text": "Placeholder anchor sentence number 50, read slowly for the test. Placeholder anchor sentence number 51, read slowly for the test. Placeholder anchor sentence number 52, read slowly for the test. Placeholder anchor sentence number 53, read slowly for the test."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "close",
+   "title": "Close",
+   "kind": "close",
+   "stories": [
+    {
+     "id": "close-ritual",
+     "pieces": [
+      {
+       "type": "wall",
+       "layout": "close",
+       "headline": "Fixture Night",
+       "kicker": "Same time tomorrow"
+      },
+      {
+       "type": "anchor_read",
+       "text": "Placeholder anchor sentence number 60, read slowly for the test. Placeholder anchor sentence number 61, read slowly for the test. Placeholder anchor sentence number 62, read slowly for the test."
+      },
+      {
+       "type": "jingle",
+       "kind": "close"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}
