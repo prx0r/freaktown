@@ -24,6 +24,8 @@ interface Binding {
 }
 
 // Oculus viseme -> morph names to accept, first present wins.
+// ARKit/VRM0/MMD variants included (live-stage GlbAvatar list);
+// jawOpen stays last (coarsest fallback, never preferred).
 const VISEME_MORPHS: Record<string, string[]> = {
   sil: ['viseme_sil'],
   PP: ['viseme_PP'],
@@ -35,11 +37,11 @@ const VISEME_MORPHS: Record<string, string[]> = {
   SS: ['viseme_SS'],
   nn: ['viseme_nn'],
   RR: ['viseme_RR'],
-  aa: ['viseme_aa', 'mouthOpen', 'jawOpen'],
-  E: ['viseme_E', 'mouthStretchLeft', 'mouthStretchRight'],
-  I: ['viseme_I'],
-  O: ['viseme_O', 'mouthFunnel', 'mouthPucker'],
-  U: ['viseme_U', 'mouthPucker', 'mouthFunnel'],
+  aa: ['viseme_aa', 'mouthOpen', 'v_aa', 'aa', 'A', 'mouth_a', 'Fcl_MTH_A', 'jawOpen'],
+  E: ['viseme_E', 'mouthStretchLeft', 'mouthStretchRight', 'v_e', 'ee', 'E', 'mouth_e', 'Fcl_MTH_E'],
+  I: ['viseme_I', 'v_ih', 'ih', 'I', 'mouth_i', 'Fcl_MTH_I'],
+  O: ['viseme_O', 'mouthFunnel', 'mouthPucker', 'v_oh', 'oh', 'O', 'mouth_o', 'Fcl_MTH_O'],
+  U: ['viseme_U', 'mouthPucker', 'mouthFunnel', 'v_ou', 'ou', 'U', 'mouth_u', 'Fcl_MTH_U'],
 };
 
 /** Minimal morph-target mesh surface (three Mesh, or a fake in tests). */

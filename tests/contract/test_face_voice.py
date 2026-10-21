@@ -236,3 +236,15 @@ class TestResolveExpression:
         # legacy event-only shape still parses
         r = _transcript_to_reaction('{"event": "applause"}')
         assert r["event"] == "applause" and r["emotion"] is None
+
+
+class TestStageKind:
+    def test_mapping(self):
+        from backend.services.freaktown.face_voice import to_stage_kind
+        assert to_stage_kind("room_laugh") == "laugh"
+        assert to_stage_kind("pog_burst") == "laugh"
+        assert to_stage_kind("applause") == "clap"
+        assert to_stage_kind("heckle") == "boo"
+        assert to_stage_kind("silence_after_punch") == "crickets"
+        assert to_stage_kind("moonwalk") is None
+        assert to_stage_kind(None) is None

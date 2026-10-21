@@ -190,6 +190,25 @@ POG_BURST_COUNT = 3
 POG_BURST_WINDOW_MS = 2000
 SILENCE_AFTER_PUNCH_MS = 2500
 
+# Room events -> live-stage runtime.react() kinds (crowd.reaction).
+# Their kinds play sfx + excite the room + trigger a reaction.* face,
+# so the reactor output gains sound for free through this map.
+STAGE_KINDS = {
+    "room_laugh": "laugh",
+    "pog_burst": "laugh",
+    "applause": "clap",
+    "heckle": "boo",
+    "silence_after_punch": "crickets",
+}
+
+
+def to_stage_kind(event):
+    """REACTIONS key -> live-stage crowd kind, or None if unmapped."""
+    try:
+        return STAGE_KINDS.get(str(event))
+    except Exception:
+        return None
+
 
 class ReactionPolicy:
     """Pure room-event -> reaction classifier. Feed it POG-press times,
