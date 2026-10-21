@@ -28,6 +28,7 @@ export class PokerShow {
   private o: Required<Omit<PokerShowOptions, 'seats'>>;
   private timer: unknown = null;
   private n = 0;
+  private actions = 0;
   private stopped = false;
   log: string[] = [];
   lastWinner: number | null = null;
@@ -103,8 +104,14 @@ export class PokerShow {
     const act = res.events.find((e) => e.type === 'poker.action');
     const done = res.events.filter((e) => e.type !== 'poker.action' || e === act);
     if (act) await this.send(act.type, act.payload);
-    if (this.o.directCameras && act && (action === 'raise' || action === 'bet' || action === 'fold' || this.n % 3 === 0)) {
-      await this.send('set.camera', { cue: `${action === 'fold' ? 'reaction' : 'close'}:${this.o.seatId(seat)}`, source: 'auto_director' });
+    if (this.o.directCameras && act) {
+      // raises get a close-up, folds a reaction shot; otherwise keep the table in view
+      const a = String(act.payload.action);
+      const k = this.actions++;
+      const cue = a === 'raise' || a === 'bet' ? `close:${this.o.seatId(seat)}`
+        : a === 'fold' ? `reaction:${this.o.seatId(seat)}`
+        : k % 4 === 0 ? `single:${this.o.seatId(seat)}` : k % 4 === 2 ? (k % 8 === 2 ? 'wide' : 'orbit') : null;
+      if (cue) await this.send('set.camera', { cue, source: 'auto_director' });
     }
     if (this.o.quips && act && (who !== 'human')) {
       await this.send('dialogue.line', { seat: this.o.seatId(seat), text: quip(String(act.payload.action), this.n++) });
