@@ -129,9 +129,9 @@ describe('demo timelines', () => {
     for (const c of cams) expect(isValidCameraCue(NEWS_STUDIO, String(c))).toBe(true);
     for (let i = 1; i < t.length; i++) expect(t[i].at_ms).toBeGreaterThanOrEqual(t[i - 1].at_ms);
   });
-  it('podcast: 3 speakers, auto director on', () => {
+  it('podcast: 4 speakers, auto director on', () => {
     const t = podcastDemo();
-    expect(new Set(t.filter((c) => c.type === 'dialogue.line').map((c) => c.payload.seat)).size).toBe(3);
+    expect(new Set(t.filter((c) => c.type === 'dialogue.line').map((c) => c.payload.seat)).size).toBe(4);
     expect(t.some((c) => c.type === 'set.auto_director' && c.payload.on === true)).toBe(true);
   });
 });

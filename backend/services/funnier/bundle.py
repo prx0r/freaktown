@@ -405,6 +405,7 @@ def build_performance_manifest(
     avatar: dict | None = None,
     walkout_ref: str = "",
     walkout_duration_ms: int = 0,
+    harness_beats: list[dict] | None = None,
 ) -> dict:
     """Sealed freaktown.performance.v1 manifest — what the stage performs.
 
@@ -458,6 +459,10 @@ def build_performance_manifest(
         "words": [{"word": w.word, "start_ms": w.start_ms, "end_ms": w.end_ms} for w in words],
         "motion": {"cues": cues},
     }
+    if harness_beats is not None:
+        # Preserve the closed delivery.v1 contract. Acting is a separate,
+        # versioned overlay interpreted by resolve_cues on the measured clock.
+        manifest["acting"] = {"schema": "mutuals-beats/v1", "beats": harness_beats}
     manifest["sha256"] = hashlib.sha256(
         json.dumps(manifest, sort_keys=True).encode()
     ).hexdigest()

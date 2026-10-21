@@ -23,6 +23,9 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, HERE)
 from tts_provider import AudioChunk, AudioCompositor, get_provider  # noqa: E402
 from puppet_qa import envelope_cues  # noqa: E402
+from backend.services.funnier.director_vocab import (  # noqa: E402
+    beat_emotion, load_vocab,
+)
 
 
 def main():
@@ -46,12 +49,26 @@ def main():
     comp = AudioCompositor(sample_rate=24000)
     wav, spans = comp.compose_with_spans(chunks)
     by_id = {b["id"]: b for b in delivery["beats"]}
-    timeline = [{"beat_id": sp["beat_id"], "type": by_id[sp["beat_id"]].get("type", "setup"),
-                 "start_ms": sp["start_ms"], "dur_ms": sp["dur_ms"], "end_ms": sp["end_ms"],
-                 "pause_before_ms": sp["pause_before_ms"], "pause_after_ms": sp["pause_after_ms"],
-                 "text": by_id[sp["beat_id"]]["text"],
-                 "performance": by_id[sp["beat_id"]].get("performance", {})}
-                for sp in spans]
+    vocab, _v_err = load_vocab(os.path.join(a.freak, "director.json"))
+    timeline = []
+    for sp in spans:
+        b = by_id[sp["beat_id"]]
+        perf = dict(b.get("performance", {}) or {})
+        # [tag] opener in the beat text wins via the vocab synonym map
+        # (instant, no model); else the authored expression stands.
+        emo = beat_emotion(b.get("text", ""),
+                           perf.get("expression"), vocab)
+        if emo and emo != perf.get("expression"):
+            perf = dict(perf, expression=emo,
+                        expression_source="delivery_tag")
+        timeline.append({
+            "beat_id": sp["beat_id"],
+            "type": b.get("type", "setup"),
+            "start_ms": sp["start_ms"], "dur_ms": sp["dur_ms"],
+            "end_ms": sp["end_ms"],
+            "pause_before_ms": sp["pause_before_ms"],
+            "pause_after_ms": sp["pause_after_ms"],
+            "text": b["text"], "performance": perf})
     wav_path = os.path.join(a.outdir, "set.wav")
     open(wav_path, "wb").write(wav)
     with wave.open(wav_path, "rb") as w:

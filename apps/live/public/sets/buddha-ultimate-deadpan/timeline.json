@@ -1,0 +1,523 @@
+[
+ {
+  "beat_id": "b1",
+  "type": "setup",
+  "start_ms": 200,
+  "dur_ms": 679,
+  "end_ms": 879,
+  "pause_before_ms": 200,
+  "pause_after_ms": 0,
+  "text": "Hey.",
+  "performance": {
+   "expression": "deadpan",
+   "look": "left"
+  }
+ },
+ {
+  "beat_id": "b2",
+  "type": "tag",
+  "start_ms": 1929,
+  "dur_ms": 835,
+  "end_ms": 2764,
+  "pause_before_ms": 1050,
+  "pause_after_ms": 0,
+  "text": "Great to be here.",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "hold"
+  }
+ },
+ {
+  "beat_id": "b3",
+  "type": "setup",
+  "start_ms": 3454,
+  "dur_ms": 2089,
+  "end_ms": 5543,
+  "pause_before_ms": 690,
+  "pause_after_ms": 0,
+  "text": "Although I'm not sure where else I could be.",
+  "performance": {
+   "expression": "annoyed",
+   "look": "left"
+  }
+ },
+ {
+  "beat_id": "b4",
+  "type": "tag",
+  "start_ms": 6413,
+  "dur_ms": 1306,
+  "end_ms": 7719,
+  "pause_before_ms": 870,
+  "pause_after_ms": 0,
+  "text": "Been enjoying the weather.",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "hold"
+  }
+ },
+ {
+  "beat_id": "b5",
+  "type": "tag",
+  "start_ms": 8559,
+  "dur_ms": 888,
+  "end_ms": 9447,
+  "pause_before_ms": 840,
+  "pause_after_ms": 0,
+  "text": "For rain...",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "hold"
+  }
+ },
+ {
+  "beat_id": "b6",
+  "type": "punchline",
+  "start_ms": 11257,
+  "dur_ms": 940,
+  "end_ms": 12197,
+  "pause_before_ms": 1810,
+  "pause_after_ms": 1170,
+  "text": "there must be a cloud?",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "hold"
+  }
+ },
+ {
+  "beat_id": "b7",
+  "type": "setup",
+  "start_ms": 13367,
+  "dur_ms": 1854,
+  "end_ms": 15221,
+  "pause_before_ms": 990,
+  "pause_after_ms": 0,
+  "text": "I drive myself crazy with that stuff.",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "shrug",
+   "look": "left"
+  }
+ },
+ {
+  "beat_id": "b8",
+  "type": "setup",
+  "start_ms": 16311,
+  "dur_ms": 1697,
+  "end_ms": 18008,
+  "pause_before_ms": 1090,
+  "pause_after_ms": 0,
+  "text": "I traced it back as far as I could.",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "shrug",
+   "look": "left"
+  }
+ },
+ {
+  "beat_id": "b9",
+  "type": "tag",
+  "start_ms": 18788,
+  "dur_ms": 783,
+  "end_ms": 19571,
+  "pause_before_ms": 780,
+  "pause_after_ms": 0,
+  "text": "Then I gave up.",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "hold"
+  }
+ },
+ {
+  "beat_id": "b10",
+  "type": "tag",
+  "start_ms": 20511,
+  "dur_ms": 1201,
+  "end_ms": 21712,
+  "pause_before_ms": 940,
+  "pause_after_ms": 0,
+  "text": "That's the whole religion.",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "hold"
+  }
+ },
+ {
+  "beat_id": "b11",
+  "type": "tag",
+  "start_ms": 22462,
+  "dur_ms": 1776,
+  "end_ms": 24238,
+  "pause_before_ms": 750,
+  "pause_after_ms": 0,
+  "text": "Six years, no food.",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "hold"
+  }
+ },
+ {
+  "beat_id": "b12",
+  "type": "tag",
+  "start_ms": 25078,
+  "dur_ms": 1018,
+  "end_ms": 26096,
+  "pause_before_ms": 840,
+  "pause_after_ms": 0,
+  "text": "Breath and bones.",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "hold"
+  }
+ },
+ {
+  "beat_id": "b13",
+  "type": "tag",
+  "start_ms": 27076,
+  "dur_ms": 1149,
+  "end_ms": 28225,
+  "pause_before_ms": 980,
+  "pause_after_ms": 0,
+  "text": "My legs complained.",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "hold"
+  }
+ },
+ {
+  "beat_id": "b14",
+  "type": "tag",
+  "start_ms": 28975,
+  "dur_ms": 1253,
+  "end_ms": 30228,
+  "pause_before_ms": 750,
+  "pause_after_ms": 0,
+  "text": "So I ate rice.",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "hold"
+  }
+ },
+ {
+  "beat_id": "b15",
+  "type": "tag",
+  "start_ms": 31058,
+  "dur_ms": 835,
+  "end_ms": 31893,
+  "pause_before_ms": 830,
+  "pause_after_ms": 0,
+  "text": "Middle way.",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "hold"
+  }
+ },
+ {
+  "beat_id": "b16",
+  "type": "punchline",
+  "start_ms": 33633,
+  "dur_ms": 2037,
+  "end_ms": 35670,
+  "pause_before_ms": 1740,
+  "pause_after_ms": 1400,
+  "text": "Not too much, not too little.",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "hold"
+  }
+ },
+ {
+  "beat_id": "b17",
+  "type": "tag",
+  "start_ms": 37070,
+  "dur_ms": 1541,
+  "end_ms": 38611,
+  "pause_before_ms": 1000,
+  "pause_after_ms": 0,
+  "text": "Porridge solved metaphysics.",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "hold"
+  }
+ },
+ {
+  "beat_id": "b18",
+  "type": "tag",
+  "start_ms": 39451,
+  "dur_ms": 966,
+  "end_ms": 40417,
+  "pause_before_ms": 840,
+  "pause_after_ms": 0,
+  "text": "Then one talk.",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "hold"
+  }
+ },
+ {
+  "beat_id": "b19",
+  "type": "tag",
+  "start_ms": 41437,
+  "dur_ms": 1070,
+  "end_ms": 42507,
+  "pause_before_ms": 1020,
+  "pause_after_ms": 0,
+  "text": "Four truths.",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "hold"
+  }
+ },
+ {
+  "beat_id": "b20",
+  "type": "tag",
+  "start_ms": 43637,
+  "dur_ms": 3082,
+  "end_ms": 46719,
+  "pause_before_ms": 1130,
+  "pause_after_ms": 0,
+  "text": "Suffering, cause, end, path.",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "hold"
+  }
+ },
+ {
+  "beat_id": "b21",
+  "type": "tag",
+  "start_ms": 47459,
+  "dur_ms": 966,
+  "end_ms": 48425,
+  "pause_before_ms": 740,
+  "pause_after_ms": 0,
+  "text": "Eight steps.",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "hold"
+  }
+ },
+ {
+  "beat_id": "b22",
+  "type": "tag",
+  "start_ms": 49555,
+  "dur_ms": 1123,
+  "end_ms": 50678,
+  "pause_before_ms": 1130,
+  "pause_after_ms": 0,
+  "text": "Nobody clapped.",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "hold"
+  }
+ },
+ {
+  "beat_id": "b23",
+  "type": "tag",
+  "start_ms": 51758,
+  "dur_ms": 1488,
+  "end_ms": 53246,
+  "pause_before_ms": 1080,
+  "pause_after_ms": 0,
+  "text": "The elders say save yourself.",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "hold"
+  }
+ },
+ {
+  "beat_id": "b24",
+  "type": "tag",
+  "start_ms": 54146,
+  "dur_ms": 1018,
+  "end_ms": 55164,
+  "pause_before_ms": 900,
+  "pause_after_ms": 0,
+  "text": "Very DIY.",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "hold"
+  }
+ },
+ {
+  "beat_id": "b25",
+  "type": "tag",
+  "start_ms": 55974,
+  "dur_ms": 835,
+  "end_ms": 56809,
+  "pause_before_ms": 810,
+  "pause_after_ms": 0,
+  "text": "Very quiet.",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "hold"
+  }
+ },
+ {
+  "beat_id": "b26",
+  "type": "tag",
+  "start_ms": 58009,
+  "dur_ms": 2377,
+  "end_ms": 60386,
+  "pause_before_ms": 1200,
+  "pause_after_ms": 0,
+  "text": "Bodhisattvas say save everyone first.",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "hold"
+  }
+ },
+ {
+  "beat_id": "b27",
+  "type": "tag",
+  "start_ms": 61286,
+  "dur_ms": 914,
+  "end_ms": 62200,
+  "pause_before_ms": 900,
+  "pause_after_ms": 0,
+  "text": "Group project.",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "hold"
+  }
+ },
+ {
+  "beat_id": "b28",
+  "type": "tag",
+  "start_ms": 62980,
+  "dur_ms": 1149,
+  "end_ms": 64129,
+  "pause_before_ms": 780,
+  "pause_after_ms": 0,
+  "text": "Nobody graduates.",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "hold"
+  }
+ },
+ {
+  "beat_id": "b29",
+  "type": "tag",
+  "start_ms": 64909,
+  "dur_ms": 1541,
+  "end_ms": 66450,
+  "pause_before_ms": 780,
+  "pause_after_ms": 0,
+  "text": "Zen says just sit.",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "hold"
+  }
+ },
+ {
+  "beat_id": "b30",
+  "type": "tag",
+  "start_ms": 67600,
+  "dur_ms": 653,
+  "end_ms": 68253,
+  "pause_before_ms": 1150,
+  "pause_after_ms": 0,
+  "text": "I sat.",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "hold"
+  }
+ },
+ {
+  "beat_id": "b31",
+  "type": "setup",
+  "start_ms": 69213,
+  "dur_ms": 2350,
+  "end_ms": 71563,
+  "pause_before_ms": 960,
+  "pause_after_ms": 0,
+  "text": "Tibet added a hundred deities and a rainbow body.",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "shrug",
+   "look": "left"
+  }
+ },
+ {
+  "beat_id": "b32",
+  "type": "tag",
+  "start_ms": 72693,
+  "dur_ms": 966,
+  "end_ms": 73659,
+  "pause_before_ms": 1130,
+  "pause_after_ms": 0,
+  "text": "I asked for tea.",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "hold"
+  }
+ },
+ {
+  "beat_id": "b33",
+  "type": "tag",
+  "start_ms": 74749,
+  "dur_ms": 1541,
+  "end_ms": 76290,
+  "pause_before_ms": 1090,
+  "pause_after_ms": 0,
+  "text": "Fourteen questions I refused.",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "hold"
+  }
+ },
+ {
+  "beat_id": "b34",
+  "type": "punchline",
+  "start_ms": 77940,
+  "dur_ms": 1175,
+  "end_ms": 79115,
+  "pause_before_ms": 1650,
+  "pause_after_ms": 1400,
+  "text": "Universe eternal?",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "hold"
+  }
+ },
+ {
+  "beat_id": "b35",
+  "type": "punchline",
+  "start_ms": 81115,
+  "dur_ms": 1724,
+  "end_ms": 82839,
+  "pause_before_ms": 2000,
+  "pause_after_ms": 1400,
+  "text": "I said: did you do the dishes?",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "hold"
+  }
+ },
+ {
+  "beat_id": "b36",
+  "type": "punchline",
+  "start_ms": 84359,
+  "dur_ms": 940,
+  "end_ms": 85299,
+  "pause_before_ms": 1520,
+  "pause_after_ms": 1400,
+  "text": "Don't cling.",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "hold"
+  }
+ },
+ {
+  "beat_id": "b37",
+  "type": "closer",
+  "start_ms": 86699,
+  "dur_ms": 888,
+  "end_ms": 87587,
+  "pause_before_ms": 1360,
+  "pause_after_ms": 1400,
+  "text": "Goodnight.",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "hold"
+  }
+ }
+]

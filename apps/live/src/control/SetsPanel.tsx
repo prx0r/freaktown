@@ -84,7 +84,7 @@ export function SetsPanel({ episodeId, mode, authKey }: { episodeId: string; mod
     else if (setId === 'poker-table') {
       runTimeline(pokerDemoIntro());
       timers.current.push(window.setTimeout(() => void dealHand(), 2500));
-      setStatus(`poker demo: 4 bots + open seat ${POKER_HUMAN_SEAT}`);
+        setStatus(`poker demo: 5 bots + open seat ${POKER_HUMAN_SEAT}`);
     } else await loadSet();
   };
   const dealHand = async () => {

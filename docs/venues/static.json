@@ -1,0 +1,46 @@
+{
+  "id": "static",
+  "name": "Static",
+  "size": "M",
+  "room": {"w": 16, "d": 12, "h": 5.0},
+  "stage": {"w": 7, "d": 4, "top_y": 0.8, "front_z": 0, "back_z": -4},
+  "marks": [
+    {"id": "mic", "pos": [0, 0.8, -1.5], "facing": "+Z"},
+    {"id": "wing-l", "pos": [-2.5, 0.8, -3.0], "facing": "+Z"},
+    {"id": "wing-r", "pos": [2.5, 0.8, -3.0], "facing": "+Z"}
+  ],
+  "props": [
+    {"id": "mic-stand", "anchor": [0, 0.8, -1.5], "pack": "base", "variant": "neon-pink"},
+    {"id": "curtain-traveler", "anchor": [-3.7, 0, -2.5], "pack": "base"},
+    {"id": "curtain-traveler", "anchor": [3.7, 0, -2.5], "pack": "base"},
+    {"id": "exit-sign", "anchor": [-7.5, 2.2, 5.5], "pack": "base"},
+    {"id": "bulb-cage", "anchor": [0, 4.9, 3.0], "pack": "base"}
+  ],
+  "light_rig": {
+    "house": {"temp_k": 4000, "level": 0.4, "pos": [0, 4.8, 3.0]},
+    "spot": {"temp_k": 5600, "level": 1.0, "pos": [0, 4.5, 5.0]},
+    "washes": [
+      {"temp_k": 6300, "level": 0.7, "pos": [-5, 4.5, 1.0]},
+      {"temp_k": 6300, "level": 0.7, "pos": [5, 4.5, 1.0]},
+      {"temp_k": 4500, "level": 0.5, "pos": [0, 4.5, -3.5]}
+    ],
+    "practicals": ["neon strips magenta/cyan", "EXIT green"]
+  },
+  "cameras": [
+    {"id": "wide", "pos": [0, 3.0, 9.5], "fov": 46},
+    {"id": "medium", "pos": [0, 2.0, 5.5], "fov": 34},
+    {"id": "close", "pos": [0, 1.8, 3.2], "fov": 28},
+    {"id": "side", "pos": [5.0, 2.0, 2.5], "fov": 40}
+  ],
+  "crowd": {
+    "capacity": 120,
+    "zones": [
+      {"id": "front", "tier": "face", "count": 30},
+      {"id": "mid", "tier": "pip", "count": 90}
+    ]
+  },
+  "budgets": {"glb_mb": 80, "parses": 5},
+  "glb": {"sha256": "pending-atlas-job"},
+  "acoustics": {"rt60": 1.0, "warmth": 0.4, "bed_db": -15},
+  "physics": {"decay": 0.86, "laugh_gain": 0.16, "resist_start": 0.45}
+}

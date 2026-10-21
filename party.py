@@ -26,6 +26,7 @@ import time
 from pathlib import Path
 
 from flask import Blueprint, Response, jsonify, request
+from harness_adapter import party_reaction
 
 party_bp = Blueprint("party", __name__)
 
@@ -35,7 +36,8 @@ RECORDS_FILE = BASE / "party_records.json"
 ROOMS_FILE = BASE / "party_rooms.json"
 
 # High-frequency events skip disk snapshots (replay buffer keeps them in RAM).
-NO_SNAPSHOT = {"draw.batch", "guess", "laugh", "line.accepted", "vote.accepted"}
+NO_SNAPSHOT = {"draw.batch", "guess", "laugh", "line.accepted", "vote.accepted",
+               "smile.detected", "character.react"}
 
 LOCK = threading.Lock()
 ROOMS: dict = {}
@@ -86,6 +88,15 @@ def _broadcast(room: dict, kind: str, public: dict) -> dict:
     _log(room["code"], kind, public)
     if kind not in NO_SNAPSHOT:
         _save_rooms()
+    # Mutuals-style reactions: semantic events, not LLM or TTS calls.
+    # Never treat these as laughter labels or scored votes.
+    reaction = party_reaction(kind)
+    if reaction is not None:
+        room["seq"] += 1
+        act = {"seq": room["seq"], "kind": "character.react", "t": _now(),
+               "actor": "host", "acting": reaction}
+        room["events"].append(act)
+        room["events"] = room["events"][-500:]
     return ev
 
 
@@ -264,8 +275,11 @@ def _save_rooms():
             snap[code] = {
                 "code": room["code"], "host_token": room["host_token"],
                 "phase": room["phase"], "mode": room["mode"],
-                "mode_state": room["mode_state"], "players": room["players"],
-                "seq": room["seq"], "events": room["events"][-100:],
+                "mode_state": room["mode_state"],
+                "players": {pid: {k: v for k, v in p.items() if k != "_last_smile"}
+                            for pid, p in room["players"].items()},
+                "seq": room["seq"], "events": [e for e in room["events"][-100:]
+                     if e.get("kind") not in ("smile.detected", "character.react", "character.act")],
                 "locked": room["locked"],
                 "seen_seq": {k: sorted(v) for k, v in
                              room.get("seen_seq", {}).items()},
@@ -372,8 +386,24 @@ def _mq_input(room: dict, player: dict, data: dict):
             return {"ok": True, "correct": True}
         st["guesses"].append({"by": player["name"], "text": guess})
         _broadcast(room, "guess", {"round": st["round"], "by": player["name"]})
+        _mq_bots_act(room, "guess")
         return {"ok": True, "correct": False}
     return {"ok": False, "error": "unknown input"}
+
+
+# ── pi-harness agent backend (ADDITIVE) ─────────────────────────────
+# Bots are agents with pi harness backends when PARTY_PI_AGENTS=1;
+# otherwise $0 deck fallback (tests never touch network). Fail-closed.
+
+def _pi_line(mode: str, prompt: str, seat: str) -> str | None:
+    try:
+        import sys as _s
+        from pathlib import Path as _P
+        _s.path.insert(0, str(_P(__file__).parent / "scripts"))
+        import party_pi_agents as _pi  # noqa
+        return _pi.agent_line(mode, prompt, seat)
+    except Exception:
+        return None
 
 
 def _mq_advance(room: dict, reason: str = ""):
@@ -387,6 +417,67 @@ def _mq_advance(room: dict, reason: str = ""):
         _pack_next(room)
         return
     _mq_start_round(room)
+    _mq_bots_act(room, "start")
+
+
+# ── freaktionary solo bots (ADDITIVE, solo-vs-agents) ─────────────────
+# Deck bots ($0, no API): bots guess from the word list + seeded decoys;
+# a bot drawer lays simple strokes so the room keeps moving. Humans always
+# play the same path; bots just fill seats. Jev-1.14 eyes (Box/Noul) and
+# Fish s2.1-pro-free voice are optional upgrades via scripts/party_agent_sdk
+# — same interface, bots become providers.
+
+MQ_BOT_DECOYS = [
+    "pigeon", "dentist", "karaoke", "air fryer", "traffic cone",
+    "haunted Roomba", "LinkedIn", "cryptocurrency", "divorce court", "Tesco",
+]
+
+MQ_BOT_DRAW_STROKES = [
+    [[0.2, 0.2], [0.8, 0.2], [0.8, 0.8], [0.2, 0.8], [0.2, 0.2]],
+    [[0.5, 0.1], [0.5, 0.9]],
+    [[0.1, 0.5], [0.9, 0.5]],
+]
+
+
+def _mq_bots_act(room: dict, stage: str):
+    """One seeded bot turn. Safe to call after any human input or round start."""
+    st = room["mode_state"]
+    if st.get("phase") != "drawing" or st.get("revealed"):
+        return
+    import random as _r
+    rng = _r.Random(hash(room["code"]) % (2 ** 31) + st.get("round", 0) * 131)
+    bots = [pid for pid, p in room["players"].items() if p.get("bot")]
+    if not bots:
+        return
+    # Bot drawer lays strokes so humans have something to guess at.
+    if stage == "start" and st.get("drawer") in bots and not st.get("strokes"):
+        st["strokes"].append({"by": st["drawer"],
+                              "points": list(rng.choice(MQ_BOT_DRAW_STROKES))})
+        _broadcast(room, "draw.batch", {"round": st["round"],
+                                        "points": st["strokes"][-1]["points"]})
+    # Bott guessers take one shot each (seeded word-list + decoys).
+    if stage in ("start", "guess"):
+        for pid in bots:
+            if pid == st.get("drawer") or st.get("revealed"):
+                continue
+            pool = WORDS + MQ_BOT_DECOYS
+            guess = (_pi_line("freaktionary", "Guess the drawing in a few words.", pid)
+                     or rng.choice(pool)).lower()[:60]
+            if guess == (st.get("word") or "").lower():
+                st["winner"] = pid
+                st["revealed"] = True
+                room["players"][pid]["score"] += 2
+                room["players"][st["drawer"]]["score"] += 1
+                _record_win(room, pid)
+                _broadcast(room, "round.won", {
+                    "round": st["round"],
+                    "winner": room["players"][pid]["name"],
+                    "word": st["word"], "scores": _public_players(room)})
+                return
+            st["guesses"].append({"by": room["players"][pid]["name"],
+                                  "text": guess})
+        _broadcast(room, "guess", {"round": st["round"],
+                                   "by": "bots", "count": len(st["guesses"])})
 
 
 def _rr_create(room: dict):
@@ -429,6 +520,9 @@ def _rr_input(room: dict, player: dict, data: dict):
                                            "needed": len(room["players"])})
         if len(st["lines"]) >= len(room["players"]) and room["players"]:
             _rr_reveal(room)
+            _rr_bots_act(room, "vote")
+        else:
+            _rr_bots_act(room, "collect")
         return {"ok": True}
     if kind == "vote":
         if st["phase"] != "voting":
@@ -445,6 +539,8 @@ def _rr_input(room: dict, player: dict, data: dict):
                                            "count": len(st["votes"])})
         if len(st["votes"]) >= len(room["players"]) and room["players"]:
             _rr_score(room)
+        else:
+            _rr_bots_act(room, "vote")
         return {"ok": True}
     return {"ok": False, "error": "unknown input"}
 
@@ -534,6 +630,7 @@ def _rr_advance(room: dict, reason: str = ""):
             _rr_reveal(room)
         else:
             _rr_start_round(room, st.get("target") or "")
+            _rr_bots_act(room, "collect")
     elif st["phase"] == "voting":
         _rr_score(room)
     else:
@@ -541,6 +638,713 @@ def _rr_advance(room: dict, reason: str = ""):
             _pack_next(room)
             return
         _rr_start_round(room, st.get("target") or "")
+        _rr_bots_act(room, "collect")
+
+
+# ── roast-relay solo bots (ADDITIVE, solo-vs-agents) ──────────────────
+# Deck bots ($0, no API): lines from a roast deck, votes seeded + no
+# self-vote. Fish s2.1-pro-free voice is the $0 audio upgrade (same TTS
+# endpoint, model header only) — room never waits for it.
+
+RR_BOT_LINES = [
+    "your air fryer has seen things. it told me. i believe it.",
+    "you roast like a microwave beep: loud, short, forgotten.",
+    "the pigeon landed on your punchline. it left.",
+    "your group chat died Tuesday. we held a eulogy. it slapped.",
+    "you defend soup badly and the soup knows.",
+    "blackout. one beep. even the usher gave up on you.",
+]
+
+
+def _rr_bots_act(room: dict, stage: str):
+    """Fill bot lines/votes. Safe to call after any human input or reveal."""
+    st = room["mode_state"]
+    import random as _r
+    rng = _r.Random(hash(room["code"]) % (2 ** 31) + st.get("round", 0) * 173)
+    for pid in room["players"]:
+        if pid not in st.get("order", []):
+            st["order"].append(pid)
+    bots = [pid for pid in st.get("order", [])
+            if pid in room["players"] and room["players"][pid].get("bot")]
+    if not bots:
+        return
+    if stage == "collect" and st.get("phase") == "collecting":
+        for pid in bots:
+            if pid not in st["lines"]:
+                used = set(st["lines"].values())
+                avail = [line for line in RR_BOT_LINES if line not in used] or RR_BOT_LINES
+                st["lines"][pid] = (
+                    _pi_line("roast-relay",
+                             f"Target: {st.get('target','')}. Roast them in one line.", pid)
+                    or rng.choice(avail))
+        if len(st["lines"]) >= len(room["players"]) and room["players"]:
+            _rr_reveal(room)
+            _rr_bots_act(room, "vote")
+    elif stage == "vote" and st.get("phase") == "voting":
+        for pid in bots:
+            if pid in st["votes"]:
+                continue
+            choices = [str(i) for i in range(len(st["order"]))
+                       if st["order"][int(i)] != pid]
+            if choices:
+                st["votes"][pid] = rng.choice(choices)
+        if len(st["votes"]) >= len(room["players"]) and room["players"]:
+            _rr_score(room)
+
+
+# ── stone-face (M1 STONE FACE / format #7 TRY NOT TO SMILE) ─────────────
+# Phones submit one funny-true info each. The room assembles a short set
+# weaving every confession together, then everyone holds a stone face while
+# the set plays line by line. Crack (self-report button) and you're out of
+# the survivor pool. Last stone faces standing split the glory.
+# Honest limits (v1): the set is template-assembled from submissions ($0,
+# no LLM call); cracks are self-reported taps. `smile_detected` is accepted
+# as a crack source for the future E1 webcam referee — nothing produces it
+# yet, and docs say so loudly.
+
+SF_BOT_INFOS = [
+    "I rehearse arguments in the shower and still lose",
+    "my plants have a group chat without me",
+    "I once waved back at someone who wasn't waving at me. Twice. Same person.",
+    "my search history could end a career that never started",
+    "I say 'you too' when the waiter says enjoy your meal",
+    "I have a PhD in overthinking texts with no reply",
+    "my gym membership is a monthly donation to a building I fear",
+    "I clap when the plane lands and I am not ashamed. Okay, a little.",
+]
+
+SF_CRACK_CHANCE = 0.35  # per bot per set line
+
+
+def _sf_create(room: dict):
+    room["mode_state"] = {
+        "round": 0, "phase": "collecting", "infos": {}, "order": [],
+        "set": [], "line_i": 0, "cracked": {}, "crack_order": [],
+        "deadline_at": None,
+    }
+
+
+def _sf_start_round(room: dict):
+    st = room["mode_state"]
+    st["round"] = st.get("round", 0) + 1
+    st["infos"] = {}
+    st["order"] = list(room["players"].keys())
+    st["set"] = []
+    st["line_i"] = 0
+    st["cracked"] = {}
+    st["crack_order"] = []
+    st["phase"] = "collecting"
+    st["deadline_at"] = _now() + 90
+    _broadcast(room, "collect.started", {"mode": "stone-face",
+                                        "deadline_at": st["deadline_at"]})
+
+
+def _sf_assemble(room: dict):
+    """Weave every confession into the night's set, then start the hold."""
+    st = room["mode_state"]
+    lines = [{"by": "ELLA",
+              "text": "Tonight's set was written by YOU. No refunds. Stone faces ON."}]
+    for pid in st["order"]:
+        if pid in st["infos"]:
+            name = room["players"][pid]["name"]
+            lines.append({"by": name,
+                          "text": f'{name} confessed: "{st["infos"][pid]}" '
+                                  f'— the room has ruled this is now canon.'})
+    lines.append({"by": "ELLA",
+                  "text": "Smile and you're done. The last stone face takes the points."})
+    st["set"] = lines
+    st["line_i"] = 0
+    st["phase"] = "performing"
+    st["deadline_at"] = _now() + 120
+    _broadcast(room, "set.revealed", {"mode": "stone-face",
+                                     "lines": len(lines),
+                                     "deadline_at": st["deadline_at"]})
+    _sf_bots_act(room, "perform")
+
+
+def _sf_input(room: dict, player: dict, data: dict):
+    st = room["mode_state"]
+    kind = data.get("kind")
+    if kind == "info":
+        if st["phase"] != "collecting":
+            return {"ok": False, "error": "not collecting now"}
+        info = _clean(data.get("text", ""), 120)
+        if not info:
+            return {"ok": False, "error": "empty info"}
+        st["infos"][player["id"]] = info  # resubmit overwrites
+        _broadcast(room, "info.accepted", {"by": player["name"],
+                                          "count": len(st["infos"]),
+                                          "needed": len(room["players"])})
+        if len(st["infos"]) >= len(room["players"]) and room["players"]:
+            _sf_assemble(room)
+        return {"ok": True}
+    if kind in ("crack", "smile_detected"):
+        if st["phase"] != "performing":
+            return {"ok": False, "error": "the set is not playing"}
+        if player["id"] in st["cracked"]:
+            return {"ok": False, "error": "already cracked"}
+        st["cracked"][player["id"]] = st["line_i"]
+        st["crack_order"].append(player["id"])
+        _broadcast(room, "face.cracked", {"by": player["name"],
+                                         "at_line": st["line_i"],
+                                         "source": kind,
+                                         "left": len(room["players"]) - len(st["cracked"])})
+        if len(st["cracked"]) >= len(room["players"]) and room["players"]:
+            _sf_score(room)
+        return {"ok": True}
+    return {"ok": False, "error": "unknown input"}
+
+
+def _sf_survivors(room: dict) -> list:
+    st = room["mode_state"]
+    return [pid for pid in st["order"]
+            if pid in room["players"] and pid not in st["cracked"]]
+
+
+def _sf_score(room: dict):
+    st = room["mode_state"]
+    survivors = _sf_survivors(room)
+    for pid in survivors:
+        room["players"][pid]["score"] += 3
+        _record_win(room, pid)
+    st["phase"] = "scored"
+    st["deadline_at"] = None
+    _broadcast(room, "score.updated",
+               {"survivors": [room["players"][p]["name"] for p in survivors],
+                "crack_order": [room["players"][p]["name"]
+                                for p in st["crack_order"]],
+                "scores": _public_players(room)})
+
+
+def _sf_advance(room: dict, reason: str = ""):
+    st = room["mode_state"]
+    if st["phase"] == "collecting":
+        if st["infos"]:
+            _sf_assemble(room)
+        else:
+            _sf_start_round(room)
+    elif st["phase"] == "performing":
+        st["line_i"] += 1
+        if st["line_i"] >= len(st["set"]):
+            _sf_score(room)
+        else:
+            st["deadline_at"] = _now() + 120
+            _broadcast(room, "line.advanced",
+                       {"mode": "stone-face", "line_i": st["line_i"],
+                        "of": len(st["set"]),
+                        "line": st["set"][st["line_i"]]})
+            _sf_bots_act(room, "perform")
+    else:
+        if _pack_quota_met(room):
+            _pack_next(room)
+            return
+        _sf_start_round(room)
+
+
+def _sf_bots_act(room: dict, stage: str):
+    """Deck bots: infos from the confession deck, cracks from seeded nerve."""
+    st = room["mode_state"]
+    if room.get("mode_state") is None or st.get("phase") == "scored":
+        return
+    import random as _r
+    rng = _r.Random(hash(room["code"]) % (2 ** 31)
+                    + st.get("round", 0) * 101 + st.get("line_i", 0))
+    # Mid-night seats (host bots cmd) join the round order, or the room
+    # would wait forever for confessions from players outside st["order"].
+    for pid in room["players"]:
+        if pid not in st["order"]:
+            st["order"].append(pid)
+    bots = [pid for pid in st["order"]
+            if pid in room["players"] and room["players"][pid].get("bot")]
+    if not bots:
+        return
+    if stage == "collect" and st["phase"] == "collecting":
+        for pid in bots:
+            if pid not in st["infos"]:
+                used = set(st["infos"].values())
+                avail = [l for l in SF_BOT_INFOS if l not in used] or SF_BOT_INFOS
+                st["infos"][pid] = (
+                    _pi_line("stone-face", "Confess something TRUE+funny about you.", pid)
+                    or rng.choice(avail))
+        if len(st["infos"]) >= len(room["players"]) and room["players"]:
+            _sf_assemble(room)
+    elif stage == "perform" and st["phase"] == "performing":
+        for pid in bots:
+            if pid in st["cracked"]:
+                continue
+            if rng.random() < SF_CRACK_CHANCE:
+                st["cracked"][pid] = st["line_i"]
+                st["crack_order"].append(pid)
+                _broadcast(room, "face.cracked",
+                           {"by": room["players"][pid]["name"],
+                            "at_line": st["line_i"], "source": "bot",
+                            "left": len(room["players"]) - len(st["cracked"])})
+        if len(st["cracked"]) >= len(room["players"]) and room["players"]:
+            _sf_score(room)
+
+
+def _sf_controller(room: dict, player: dict) -> dict:
+    """Phone screens for stone-face: confess, hold, scores."""
+    st = room["mode_state"]
+    out: dict = {"screen": "wait", "components": []}
+    if st["phase"] == "collecting":
+        out["screen"] = "prompt"
+        out["components"] = [
+            {"type": "text",
+             "text": "Give the set something TRUE + funny about you (one line). The room roasts it back."},
+            {"type": "textarea", "id": "info", "max_length": 120},
+            {"type": "submit", "label": "CONFESS"}]
+        return out
+    if st["phase"] == "performing":
+        if player["id"] in st["cracked"]:
+            at = st["cracked"][player["id"]] + 1
+            out["screen"] = "wait"
+            out["components"] = [
+                {"type": "text",
+                 "text": f"You CRACKED at line {at}. Sit back and watch the strong survive."}]
+            return out
+        line = st["set"][st["line_i"]] if st["set"] else {"by": "ELLA", "text": "…"}
+        out["screen"] = "hold"
+        out["components"] = [
+            {"type": "text",
+             "text": f"LINE {st['line_i'] + 1}/{len(st['set'])} — {line['by']}: “{line['text']}”"},
+            {"type": "text", "text": "HOLD IT. Stone face. Do not smile."},
+            {"type": "button", "id": "cracked", "label": "I CRACKED 😬"}]
+        return out
+    out["screen"] = "scores"
+    out["components"] = [{"type": "text", "text": "Set over. Stone faces collect."}]
+    return out
+
+
+# ── poker (fixed-limit Texas Hold'em: tells at the table) ─────────────
+# Phones hold SECRET hole cards; community + pot are public. Fixed betting
+# (2 preflop/flop, 4 turn/river), blinds 1/2, stacks of 100, side pots done
+# right. Bots play pot-odds poker with seeded bluffs (the level field).
+# Faces: presence roster shows who's on camera; video seats reuse the stage
+# monitor pattern (progressive enhancement, not required to play).
+
+PK_RANKS = "23456789TJQKA"
+PK_SB, PK_BB, PK_SMALL, PK_BIG, PK_STACK = 1, 2, 2, 4, 100
+
+
+def _pk_eval5(cards):
+    """Score 5 cards -> comparable tuple (bigger wins)."""
+    rs = sorted((PK_RANKS.index(c[0]) for c in cards), reverse=True)
+    flush = len({c[1] for c in cards}) == 1
+    uniq = sorted(set(rs), reverse=True)
+    straight_hi = None
+    if len(uniq) == 5:
+        if uniq[0] - uniq[4] == 4:
+            straight_hi = uniq[0]
+        elif uniq == [12, 3, 2, 1, 0]:  # wheel A-5
+            straight_hi = 3
+    from collections import Counter as _C
+    cnt = sorted(_C(rs).items(), key=lambda kv: (kv[1], kv[0]), reverse=True)
+    if flush and straight_hi is not None:
+        return (8, straight_hi)
+    if cnt[0][1] == 4:
+        return (7, cnt[0][0], cnt[1][0])
+    if cnt[0][1] == 3 and cnt[1][1] == 2:
+        return (6, cnt[0][0], cnt[1][0])
+    if flush:
+        return (5,) + tuple(rs)
+    if straight_hi is not None:
+        return (4, straight_hi)
+    if cnt[0][1] == 3:
+        kick = sorted((r for r in rs if r != cnt[0][0]), reverse=True)
+        return (3, cnt[0][0]) + tuple(kick)
+    if cnt[0][1] == 2 and cnt[1][1] == 2:
+        hi, lo = max(cnt[0][0], cnt[1][0]), min(cnt[0][0], cnt[1][0])
+        kicker = next(r for r in rs if r != hi and r != lo)
+        return (2, hi, lo, kicker)
+    if cnt[0][1] == 2:
+        kick = sorted((r for r in rs if r != cnt[0][0]), reverse=True)
+        return (1, cnt[0][0]) + tuple(kick)
+    return (0,) + tuple(rs)
+
+
+def _pk_best(cards7):
+    """Best 5-of-7 score."""
+    from itertools import combinations as _comb
+    return max(_pk_eval5(list(c)) for c in _comb(cards7, 5))
+
+
+def _pk_deck(rng):
+    suits = "shdc"
+    deck = [r + s for r in PK_RANKS for s in suits]
+    rng.shuffle(deck)
+    return deck
+
+
+def _pk_live(st, pid):
+    return (pid in st["hole"] and pid not in st["folded"]
+            and pid not in st.get("allin", []))
+
+
+def _pk_create(room: dict):
+    room["mode_state"] = {"hand": 0, "phase": "lobby", "stacks": {},
+                          "button": None, "history": []}
+
+
+def _pk_start_hand(room: dict):
+    import random as _r
+    st = room["mode_state"]
+    seated = [pid for pid in room["players"]]
+    if len([p for p in seated if room["players"][p].get("stack", PK_STACK) > 0]) < 2:
+        for pid in seated:
+            room["players"][pid]["stack"] = int(room["players"][pid].get("stack", 0) or PK_STACK)
+    for pid in seated:
+        if room["players"][pid].get("stack", 0) <= 0:
+            room["players"][pid]["stack"] = PK_STACK
+    order = [pid for pid in seated if room["players"][pid]["stack"] > 0]
+    if len(order) < 2:
+        return False
+    st["hand"] = st.get("hand", 0) + 1
+    rng = _r.Random(hash(room["code"]) % (2 ** 31) + st["hand"] * 7919)
+    st["deck"] = _pk_deck(rng)
+    st["community"] = []
+    st["street"] = "preflop"
+    st["hole"] = {}
+    st["folded"] = []
+    st["allin"] = []
+    st["pots"] = [{"amount": 0, "eligible": list(order)}]
+    st["committed"] = {pid: 0 for pid in order}  # this hand
+    st["street_bet"] = {pid: 0 for pid in order}  # this street
+    st["current_bet"] = 0
+    st["acted"] = []
+    st["raises"] = 0
+    st["winners"] = []
+    st["phase"] = "betting"
+    if st["button"] in order:
+        btn = (order.index(st["button"]) + 1) % len(order)
+    else:
+        btn = 0
+    st["button"] = order[btn]
+    st["order"] = order
+    n = len(order)
+    sb_i = (btn + 1) % n
+    bb_i = (btn + 2) % n if n > 2 else (btn + 1) % n
+    if n == 2:
+        sb_i, bb_i = btn, (btn + 1) % n
+    _pk_post(room, order[sb_i], PK_SB)
+    _pk_post(room, order[bb_i], PK_BB)
+    for pid in order:
+        st["hole"][pid] = [st["deck"].pop(), st["deck"].pop()]
+    st["actor"] = order[sb_i] if n == 2 else order[(bb_i + 1) % n]
+    if st["actor"] in st.get("allin", []):
+        _pk_next_actor(room)
+    st["deadline_at"] = _now() + 90
+    _broadcast(room, "hand.started", {"mode": "poker", "hand": st["hand"],
+                                     "button": room["players"][st["button"]]["name"],
+                                     "players": len(order)})
+    _pk_drive(room)
+    return True
+
+
+def _pk_post(room: dict, pid: str, amount: int):
+    st = room["mode_state"]
+    have = room["players"][pid].get("stack", 0)
+    put = max(0, min(have, amount))
+    room["players"][pid]["stack"] = have - put
+    st["committed"][pid] = st["committed"].get(pid, 0) + put
+    st["street_bet"][pid] = st["street_bet"].get(pid, 0) + put
+    st["pots"][0]["amount"] += put
+    if room["players"][pid]["stack"] <= 0 and pid not in st["allin"]:
+        st["allin"].append(pid)
+
+
+def _pk_to_match(room: dict, pid: str) -> int:
+    st = room["mode_state"]
+    return max(0, st["current_bet"] - st["street_bet"].get(pid, 0))
+
+
+def _pk_bet_size(room: dict) -> int:
+    return PK_SMALL if room["mode_state"]["street"] in ("preflop", "flop") else PK_BIG
+
+
+def _pk_next_actor(room: dict):
+    """Advance actor to next live player; None if betting round is closed."""
+    st = room["mode_state"]
+    order = st["order"]
+    live = [p for p in order if _pk_live(st, p)]
+    if len([p for p in order if p in st["hole"] and p not in st["folded"]]) <= 1:
+        st["actor"] = None
+        return
+    if not live:
+        st["actor"] = None
+        return
+    start = order.index(st["actor"]) if st.get("actor") in order else -1
+    for k in range(1, len(order) + 1):
+        cand = order[(start + k) % len(order)]
+        if not _pk_live(st, cand):
+            continue
+        if cand in st["acted"] and _pk_to_match(room, cand) <= 0:
+            continue
+        st["actor"] = cand
+        return
+    st["actor"] = None
+
+
+def _pk_apply(room: dict, pid: str, action: str):
+    """Apply one betting action. Returns (ok, error)."""
+    st = room["mode_state"]
+    if st.get("phase") != "betting" or st.get("actor") != pid:
+        return False, "not your turn"
+    if action == "fold":
+        st["folded"].append(pid)
+        st["acted"].append(pid)
+        _broadcast(room, "player.folded", {"by": room["players"][pid]["name"]})
+    elif action == "check":
+        if _pk_to_match(room, pid) > 0:
+            return False, "must call or fold"
+        st["acted"].append(pid)
+    elif action in ("call", "bet"):
+        need = _pk_to_match(room, pid)
+        if action == "bet":
+            if st.get("raises", 0) >= 3:
+                action = "call"  # capped: 3 raises per street, then call-only
+            else:
+                need += _pk_bet_size(room)
+        if need <= 0 and action == "call":
+            st["acted"].append(pid)
+        else:
+            had = _pk_to_match(room, pid)
+            _pk_post(room, pid, need)
+            if action == "bet" and _pk_to_match(room, pid) <= 0 and need > had:
+                st["current_bet"] = st["street_bet"][pid]
+                st["raises"] = st.get("raises", 0) + 1
+                st["acted"] = [pid]
+            else:
+                st["acted"].append(pid)
+            if room["players"][pid]["stack"] <= 0 and pid not in st["acted"]:
+                st["acted"].append(pid)
+        _broadcast(room, "player.bet", {"by": room["players"][pid]["name"],
+                                       "action": action})
+    else:
+        return False, "unknown action"
+    if len([p for p in st["order"] if p in st["hole"] and p not in st["folded"]]) <= 1:
+        _pk_award_uncontested(room)
+        return True, ""
+    _pk_next_actor(room)
+    if st.get("actor") is None:
+        _pk_next_street(room)
+    else:
+        st["deadline_at"] = _now() + 90
+    _pk_drive(room)
+    return True, ""
+
+
+def _pk_award_uncontested(room: dict):
+    st = room["mode_state"]
+    champ = next(p for p in st["order"] if p in st["hole"] and p not in st["folded"])
+    total = sum(p["amount"] for p in st["pots"])
+    room["players"][champ]["score"] += total
+    room["players"][champ]["stack"] += total
+    _record_win(room, champ)
+    st["winners"] = [{"name": room["players"][champ]["name"], "amount": total,
+                      "hand": "everyone else folded"}]
+    st["phase"] = "showdown"
+    st["actor"] = None
+    st["deadline_at"] = None
+    _broadcast(room, "hand.won", {"winner": room["players"][champ]["name"],
+                                 "amount": total, "uncontested": True})
+
+
+def _pk_next_street(room: dict):
+    st = room["mode_state"]
+    order = st["order"]
+    if len([p for p in order if p in st["hole"] and p not in st["folded"]]) <= 1:
+        _pk_award_uncontested(room)
+        return
+    flow = ["preflop", "flop", "turn", "river"]
+    nxt = flow[flow.index(st["street"]) + 1] if st["street"] in flow[:3] else None
+    if nxt is None:
+        _pk_showdown(room)
+        return
+    st["street"] = nxt
+    take = {"flop": 3, "turn": 1, "river": 1}[nxt]
+    for _ in range(take):
+        if st["deck"]:
+            st["community"].append(st["deck"].pop())
+    st["street_bet"] = {pid: 0 for pid in order}
+    st["current_bet"] = 0
+    st["acted"] = []
+    st["raises"] = 0
+    btn = order.index(st["button"])
+    st["actor"] = None
+    for k in range(1, len(order) + 1):
+        cand = order[(btn + k) % len(order)]
+        if _pk_live(st, cand):
+            st["actor"] = cand
+            break
+    st["deadline_at"] = _now() + 90
+    _broadcast(room, "street.dealt", {"mode": "poker", "street": nxt,
+                                     "community": st["community"]})
+    if st.get("actor") is None:
+        _pk_next_street(room) if nxt != "river" else _pk_showdown(room)
+    else:
+        _pk_drive(room)
+
+
+def _pk_showdown(room: dict):
+    st = room["mode_state"]
+    st["street"] = "showdown"
+    st["phase"] = "showdown"
+    st["actor"] = None
+    st["deadline_at"] = None
+    contenders = [p for p in st["order"] if p in st["hole"] and p not in st["folded"]]
+    scores = {p: _pk_best(st["hole"][p] + st["community"]) for p in contenders}
+    # side pots: peel contribution tiers
+    contrib = {p: st["committed"].get(p, 0) for p in st["order"] if p in st["hole"]}
+    tiers = sorted(set(contrib.values()))
+    prev, winners = 0, []
+    for tier in tiers:
+        if tier <= 0:
+            continue
+        amount = sum(min(max(0, contrib[p] - prev), tier - prev)
+                     for p in contrib if contrib[p] > prev)
+        if amount <= 0:
+            prev = tier
+            continue
+        eligible = [p for p in contenders if contrib[p] >= tier]
+        if not eligible:
+            prev = tier
+            continue
+        best = max(scores[p] for p in eligible)
+        champs = [p for p in eligible if scores[p] == best]
+        share, odd = divmod(amount, len(champs))
+        for i, p in enumerate(champs):
+            take = share + (1 if i < odd else 0)
+            room["players"][p]["stack"] += take
+            room["players"][p]["score"] += take
+            _record_win(room, p)
+            winners.append({"name": room["players"][p]["name"], "amount": take,
+                            "hole": st["hole"][p]})
+        prev = tier
+    st["winners"] = winners
+    _broadcast(room, "hand.showdown",
+               {"winners": [w["name"] for w in winners],
+                "community": st["community"]})
+
+
+def _pk_advance(room: dict, reason: str = ""):
+    st = room["mode_state"]
+    if st.get("phase") == "betting":
+        if st.get("actor") and reason == "timeout":
+            _pk_apply(room, st["actor"],
+                      "fold" if _pk_to_match(room, st["actor"]) > 0 else "check")
+        elif st.get("actor"):
+            _pk_next_street(room)
+        else:
+            _pk_next_street(room)
+    else:
+        if _pack_quota_met(room):
+            _pack_next(room)
+            return
+        _pk_start_hand(room)
+
+
+def _pk_input(room: dict, player: dict, data: dict):
+    kind = data.get("kind")
+    if kind in ("check", "call", "bet", "fold"):
+        ok, err = _pk_apply(room, player["id"], kind)
+        return {"ok": ok, **({"error": err} if not ok else {})}
+    return {"ok": False, "error": "unknown input"}
+
+
+def _pk_bot_strength(hole, community):
+    """Rough 0..1 hand strength for the bot policy."""
+    if not community:
+        a, b = sorted((PK_RANKS.index(c[0]) for c in hole), reverse=True)
+        pair = 0.85 if a == b else 0.0
+        hi = (a / 12.0) * 0.5 + (0.15 if b >= 8 else 0.0)
+        suited = 0.08 if hole[0][1] == hole[1][1] else 0.0
+        gap = max(0, 0.06 - 0.02 * (a - b - 1)) if a != b else 0.0
+        return min(1.0, pair + hi + suited + gap)
+    score = _pk_best(hole + community)
+    return min(1.0, 0.15 + score[0] / 8.0 * 0.85)
+
+
+def _pk_bot_act(room: dict, pid: str):
+    import random as _r
+    st = room["mode_state"]
+    rng = _r.Random(hash((room["code"], st["hand"], pid)) % (2 ** 31))
+    s = _pk_bot_strength(st["hole"][pid], st["community"])
+    need = _pk_to_match(room, pid)
+    pot = sum(p["amount"] for p in st["pots"])
+    if need <= 0:
+        if s > 0.62 or rng.random() < 0.12:
+            _pk_apply(room, pid, "bet")
+        else:
+            _pk_apply(room, pid, "check")
+    else:
+        odds = need / max(1, pot + need)
+        if s > 0.7 or (s > 0.45 and odds < 0.25) or rng.random() < 0.08:
+            _pk_apply(room, pid, "call" if rng.random() > 0.15 and s < 0.8 else "bet")
+        else:
+            _pk_apply(room, pid, "fold")
+
+
+def _pk_drive(room: dict):
+    """Bots never stall: act synchronously while action is on a bot."""
+    st = room["mode_state"]
+    guard = 0
+    while st.get("phase") == "betting" and st.get("actor"):
+        pid = st["actor"]
+        if not room["players"].get(pid, {}).get("bot"):
+            return
+        if pid not in st.get("hole", {}) or pid in st.get("folded", []):
+            _pk_next_actor(room)
+            if st.get("actor") is None:
+                _pk_next_street(room)
+                continue
+            else:
+                guard += 1
+                if guard > 20:
+                    return
+                continue
+        _pk_bot_act(room, pid)
+        guard += 1
+        if guard > 20:
+            return
+
+
+def _pk_controller(room: dict, player: dict) -> dict:
+    st = room["mode_state"]
+    out: dict = {"screen": "wait", "components": []}
+    if st.get("phase") in (None, "lobby"):
+        out["screen"] = "wait"
+        out["components"] = [{"type": "text", "text": "Waiting for the deal…"}]
+        return out
+    if st.get("phase") == "showdown":
+        lines = ", ".join(f"{w['name']} +{w['amount']}" for w in st.get("winners", []))
+        out["screen"] = "scores"
+        out["components"] = [{"type": "text", "text": f"Hand over: {lines or 'split'}. Host deals again."}]
+        return out
+    hole = (st.get("hole") or {}).get(player["id"], [])
+    yours = "your cards: " + (" ".join(hole) if hole else "(sitting out)")
+    pub = (f"{st.get('street', '').upper()} · pot {sum(p['amount'] for p in st['pots'])} · "
+           f"board {' '.join(st.get('community', [])) or '—'}")
+    if st.get("actor") == player["id"]:
+        need = _pk_to_match(room, player["id"])
+        size = _pk_bet_size(room)
+        comps = [{"type": "text", "text": yours},
+                 {"type": "text", "text": pub + f" · to call {need} · your stack {player.get('stack', 0)}"}]
+        if need <= 0:
+            comps.append({"type": "button", "id": "pk-check", "label": "CHECK"})
+        else:
+            comps.append({"type": "button", "id": "pk-call", "label": f"CALL {need}"})
+        comps.append({"type": "button", "id": "pk-bet",
+                      "label": f"{'RAISE' if need > 0 else 'BET'} {size if need <= 0 else need + size}"})
+        comps.append({"type": "button", "id": "pk-fold", "label": "FOLD"})
+        out["screen"] = "vote"
+        out["components"] = comps
+        return out
+    folded = " (you folded)" if player["id"] in st.get("folded", []) else ""
+    out["screen"] = "wait"
+    out["components"] = [{"type": "text", "text": yours + folded},
+                         {"type": "text", "text": pub}]
+    return out
 
 
 # ── freeze-night (MVP improv evening) ───────────────────────────────────
@@ -694,7 +1498,10 @@ def _fz_bots_act(room: dict, stage: str):
                 if pid not in st["entries"]:
                     used = set(v for k, v in st["entries"].items()
                                if not k.endswith(":cb"))
-                    st["entries"][pid] = _fz_bot_pick(rng, deck, used)
+                    st["entries"][pid] = (
+                        _pi_line("freeze-night",
+                                 f"Prompt: {st.get('prompt','')}", pid)
+                        or _fz_bot_pick(rng, deck, used))
             if len(st["entries"]) >= len(_fz_players(room)) and _fz_players(room):
                 _fz_reveal(room)
                 _fz_bots_act(room, "vote")
@@ -1521,7 +2328,9 @@ def _qc_bots_act(room: dict, stage: str):
             if pid not in st["entries"]:
                 used = set(st["entries"].values())
                 avail = [l for l in QC_BOT_LINES if l not in used] or QC_BOT_LINES
-                st["entries"][pid] = rng.choice(avail)
+                st["entries"][pid] = (
+                    _pi_line("quip", f"Prompt: {st.get('prompt','')}", pid)
+                    or rng.choice(avail))
                 if st["twist"] == "liar":
                     st["secrets"][pid] = rng.choice([True, False])
         if len(st["entries"]) >= len(_qc_order(room)) and _qc_order(room):
@@ -1565,6 +2374,10 @@ def _start_mode(room: dict, mode: str, target: str = ""):
         _mq_start_round(room)
     elif mode == "freeze-night":
         _fz_next_round(room)
+    elif mode == "stone-face":
+        _sf_start_round(room)
+    elif mode == "poker":
+        _pk_start_hand(room)
     elif mode.startswith("quip-"):
         _qc_start_round(room, MODES[mode].get("deck", "endings"))
     else:
@@ -1608,6 +2421,14 @@ MODES = {
                      "blurb": "Improv night: endings, walk-ins, ritual, wheel, final.",
                      "create": _fz_create, "input": _fz_input,
                      "advance": _fz_advance},
+    "stone-face": {"title": "STONE FACE", "min": 2, "max": 8,
+                   "blurb": "Confess something funny, survive the set without smiling. Solo: bots play.",
+                   "create": _sf_create, "input": _sf_input,
+                   "advance": _sf_advance},
+    "poker": {"title": "POKER NIGHT", "min": 2, "max": 8,
+              "blurb": "Fixed-limit Hold'em. Secret hole cards, real side pots. Solo: bots play.",
+              "create": _pk_create, "input": _pk_input,
+              "advance": _pk_advance},
 }
 
 PACKS = {
@@ -1691,6 +2512,12 @@ def _controller_view(room: dict, player: dict | None) -> dict:
             base["components"] = [
                 {"type": "text", "text": "Scores below. Host advances."}]
         return base
+    if room["mode"] == "stone-face":
+        base.update(_sf_controller(room, player))
+        return base
+    if room["mode"] == "poker":
+        base.update(_pk_controller(room, player))
+        return base
     if room["mode"] == "freeze-night":
         base.update(_fz_controller(room, player))
         return base
@@ -1750,6 +2577,9 @@ def _fz_controller(room: dict, player: dict) -> dict:
             out["components"] = [
                 {"type": "text", "text": st["prompt"] or ""},
                 {"type": "textarea", "id": "entry", "max_length": limit},
+                {"type": "text",
+                 "text": "Callback? Optional event id for x1.5 (see stage archive). Leave blank if none."},
+                {"type": "textarea", "id": "callback", "max_length": 64},
                 {"type": "submit", "label": "SEND IT"}]
         return out
     if st["phase"] == "voting":
@@ -1759,7 +2589,8 @@ def _fz_controller(room: dict, player: dict) -> dict:
             {"type": "choice", "id": "winner",
              "action": {"kind": "vote", "as": "choice",
                        "multi": 3 if st["kind"] == "last-lash" else 1},
-             "options": [{"id": str(c["i"]), "text": c["text"]} for c in opts]}]
+             "options": [{"id": str(c["i"]), "text": c["text"]} for c in opts]},
+            {"type": "button", "id": "caught", "label": "I CAUGHT THAT"}]
         return out
     if st["phase"] == "passfail":
         spot = st["ritual"]["spotlight"]
@@ -1847,6 +2678,37 @@ def _stage_public(room: dict) -> dict:
                          for pid, v in (st.get("secrets_revealed") or {}).items()
                          if pid in room["players"]}
                         if st["phase"] == "scored" else None),
+            "deadline_at": st.get("deadline_at")}
+    elif room["mode"] == "stone-face":
+        out["stone-face"] = {
+            "round": st["round"], "phase": st["phase"],
+            "set": st.get("set") or [],
+            "line_i": st.get("line_i", 0),
+            "current": (st["set"][st["line_i"]]
+                        if st.get("set") and st.get("line_i", 0) < len(st["set"])
+                        else None),
+            "cracked": [{"name": room["players"][pid]["name"],
+                         "at_line": (st["cracked"][pid] + 1)}
+                        for pid in st.get("crack_order", [])
+                        if pid in room["players"]],
+            "survivors": ([room["players"][pid]["name"]
+                           for pid in _sf_survivors(room)]
+                          if st["phase"] == "scored" else None),
+            "submitted": len(st["infos"]), "needed": len(room["players"]),
+            "deadline_at": st.get("deadline_at")}
+    elif room["mode"] == "poker":
+        st = room["mode_state"]
+        out["poker"] = {
+            "hand": st.get("hand", 0), "street": st.get("street"),
+            "phase": st.get("phase"), "community": st.get("community", []),
+            "pot": sum(p["amount"] for p in st.get("pots", [])),
+            "actor": (room["players"][st["actor"]]["name"]
+                      if st.get("actor") in room["players"] else None),
+            "folded": [room["players"][p]["name"] for p in st.get("folded", [])
+                       if p in room["players"]],
+            "stacks": {room["players"][p]["name"]: room["players"][p].get("stack", 0)
+                       for p in room["players"]},
+            "winners": st.get("winners", []),
             "deadline_at": st.get("deadline_at")}
     elif room["mode"] == "freeze-night":
         out["freeze-night"] = {
@@ -1993,12 +2855,18 @@ def host_cmd(code):
             MODES[mode]["create"](room)
             if mode == "freaktionary":
                 _mq_start_round(room)
+                _mq_bots_act(room, "start")
             elif mode == "freeze-night":
                 _fz_next_round(room)
+            elif mode == "stone-face":
+                _sf_start_round(room)
+            elif mode == "poker":
+                _pk_start_hand(room)
             elif mode.startswith("quip-"):
                 _qc_start_round(room, data.get("deck") or MODES[mode].get("deck", "endings"))
             else:
                 _rr_start_round(room, data.get("target", ""))
+                _rr_bots_act(room, "collect")
             # persistent-freak memory: the room now knows who these
             # performers are, not just what they typed tonight.
             _record_game(room)
@@ -2018,16 +2886,38 @@ def host_cmd(code):
                 n = 3
             free = MAX_PLAYERS - len(room["players"])
             n = max(0, min(n, free))
-            if room.get("mode") not in (None, "freeze-night") and not str(room.get("mode") or "").startswith("quip-"):
-                return jsonify({"ok": False, "error": "bots need freeze-night or quip games"}), 400
+            if room.get("mode") not in (None, "freeze-night", "stone-face", "poker", "roast-relay", "freaktionary") and not str(room.get("mode") or "").startswith("quip-"):
+                return jsonify({"ok": False, "error": "bots need freeze-night, stone-face, poker, roast-relay, freaktionary or quip games"}), 400
+            before = set(room["players"])
             made = _fz_add_bots(room, n)
+            # _fz_add_bots returns display names; resolve to player ids.
+            made_pids = [pid for pid in room["players"] if pid not in before]
             if room["phase"] == "playing":
                 st = room["mode_state"]
                 if st.get("phase") == "collecting":
                     if str(room.get("mode") or "").startswith("quip-"):
                         _qc_bots_act(room, "collect")
+                    elif room.get("mode") == "stone-face":
+                        _sf_bots_act(room, "collect")
+                    elif room.get("mode") == "roast-relay":
+                        _rr_bots_act(room, "collect")
+                    elif room.get("mode") == "freaktionary":
+                        _mq_bots_act(room, "start")
                     else:
                         _fz_bots_act(room, "collect")
+                elif st.get("phase") in ("voting", "drawing"):
+                    if room.get("mode") == "roast-relay":
+                        _rr_bots_act(room, "vote")
+                    elif room.get("mode") == "freaktionary":
+                        _mq_bots_act(room, "guess")
+                elif room.get("mode") == "poker":
+                    for pid in made_pids:
+                        room["players"][pid]["stack"] = PK_STACK
+                    _pk_drive(room)
+            else:
+                for pid in made_pids:
+                    if room["players"][pid].get("stack", 0) <= 0:
+                        room["players"][pid]["stack"] = PK_STACK
             return jsonify({"ok": True, "bots": made})
         if cmd == "reject":
             # moderator action: drop one submission before reveal
@@ -2039,6 +2929,48 @@ def host_cmd(code):
                 return jsonify({"ok": True})
             return jsonify({"ok": False, "error": "nothing to reject"}), 400
         return jsonify({"ok": False, "error": "unknown cmd"}), 400
+
+
+@party_bp.route("/party/<code>/harness", methods=["POST"])
+def harness_party_input(code):
+    """Trusted upstream harness extension relay; event output is PUBLIC.
+
+    This endpoint does not run, or charge for, any model. A room host token
+    is required. No conversation history, mic audio or user memories accepted.
+    """
+    room = _get_room(code)
+    if not room:
+        return jsonify({"ok": False, "error": "no such room"}), 404
+    data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict) or not _is_host(room, data.get("host_token", "")):
+        return jsonify({"ok": False, "error": "not host"}), 403
+    actor = _clean(data.get("actor", ""), 48)
+    text = _clean(data.get("text", ""), 400)
+    raw = data.get("beats", [])
+    if not actor or not text or not isinstance(raw, list) or len(raw) > 16:
+        return jsonify({"ok": False, "error": "invalid actor, text or beats"}), 400
+    from harness_adapter import EMOTIONS, GESTURES, CAMERAS
+    beat_list = []
+    for b in raw:
+        if not isinstance(b, dict):
+            return jsonify({"ok": False, "error": "invalid beat"}), 400
+        e, g, c = b.get("emotion"), b.get("gesture"), b.get("camera")
+        if (e and e not in EMOTIONS or g and g not in (*GESTURES, "none")
+                or c and c not in (*CAMERAS, "none", "hold")):
+            return jsonify({"ok": False, "error": "invalid acting vocabulary"}), 400
+        beat_list.append({"span": _clean(b.get("span", ""), 120),
+                          "emotion": e or "", "gesture": g or "none",
+                          "camera": c or "none", "register": _clean(b.get("register", ""), 24)})
+    with LOCK:
+        if room["phase"] != "playing":
+            return jsonify({"ok": False, "error": "room not playing"}), 409
+        room["seq"] += 1
+        # Volatile public stream only. No disk log, no player secrets.
+        ev = {"seq": room["seq"], "kind": "character.act", "t": _now(),
+              "actor": actor, "text": text, "beats": beat_list}
+        room["events"].append(ev)
+        room["events"] = room["events"][-500:]
+    return jsonify({"ok": True, "seq": ev["seq"]})
 
 
 @party_bp.route("/party/<code>/ready", methods=["POST"])
@@ -2083,6 +3015,21 @@ def player_input(code):
         if data.get("kind") == "laugh":
             _broadcast(room, "laugh", {"by": p["name"]})
             return jsonify({"ok": True})
+        if data.get("kind") == "smile":
+            # Explicit camera opt-in happens client-side. Accept a boolean
+            # ONLY; no frames, landmarks, probabilities or calibration data.
+            if data.get("smiling") is not True:
+                return jsonify({"ok": False, "error": "expected smiling=true"}), 400
+            now = _now()
+            if now - p.get("_last_smile", 0) < 3:
+                return jsonify({"ok": False, "error": "smile cooldown"}), 429
+            p["_last_smile"] = now
+            room["seq"] += 1
+            ev = {"seq": room["seq"], "kind": "smile.detected", "t": now,
+                  "by": p["name"], "acting": party_reaction("smile.detected", smiling=True)}
+            room["events"].append(ev)
+            room["events"] = room["events"][-500:]
+            return jsonify({"ok": True})
         return jsonify(MODES[room["mode"]]["input"](room, p, data))
 
 
@@ -2111,6 +3058,7 @@ def stream(code):
     except Exception:
         last = 0
     with LOCK:
+        room["_seen_at"] = _now()  # someone is watching (chatter viewer gate)
         missed = [e for e in room["events"] if e["seq"] > last]
         snap = _stage_public(room)
         seq = room["seq"]
@@ -2186,6 +3134,7 @@ STAGE_TEMPLATE = """<!DOCTYPE html><html><head><meta charset=utf-8>
 <img src='/party/__CODE__/qr.png' style='width:120px;margin:6px' alt='join qr'>
 <div><canvas id=cv width=560 height=360></canvas></div>
 <div id=cap></div>
+<div id=acting style='min-height:24px;color:#ffb7dc;font-size:13px' aria-live=polite></div>
 <div id=scores></div>
 <div id=host style='margin:12px'>
 <button onclick="hostCmd('lock')">LOCK</button>
@@ -2230,6 +3179,16 @@ async function poll(){
     (d.events||[]).forEach(ev=>{
       if(ev.kind === 'draw.batch') drawStroke(ev.points);
       if(ev.kind === 'round.started'){ ctx.clearRect(0,0,cv.width,cv.height); };
+      if(ev.kind === 'character.react' || ev.kind === 'smile.detected' || ev.kind === 'character.act'){
+        const mood = ev.acting && ev.acting.emotion;
+        const who = ev.kind === 'smile.detected' ? (ev.by+' smiled') :
+          (ev.kind === 'character.act' ? ev.actor+': '+ev.text : 'host reacted');
+        document.getElementById('acting').textContent = who + (mood ? ' · '+mood : '');
+      }
+      if(ev.kind === 'chat'){
+        document.getElementById('acting').textContent =
+          (ev.by||'bot') + ': ' + (ev.text||'');
+      }
     });
   }catch(e){}
   setTimeout(poll, 800);
@@ -2330,6 +3289,12 @@ textarea{width:100%;background:#111;border:1px solid #333;color:#eee;border-radi
 <div style='color:#ff2fa8;font-size:11px;letter-spacing:2px'>FUNNIER PARTY · __CODE__</div>
 <h2 id=t></h2><div id=sub style='color:#888'></div>
 <div id=body style='max-width:520px;margin:0 auto'></div>
+<div style='margin:12px auto;max-width:520px'>
+<button id=smile-toggle onclick='toggleSmile()'>ENABLE CAMERA SMILES (OPTIONAL)</button>
+<div id=smile-msg style='font-size:12px;color:#aaa'>Local detection; only yes/no smile events leave this device.</div>
+<video id=smile-video muted autoplay playsinline style='display:none;width:120px'></video>
+</div>
+<script src='/static/smile-referee.js'></script>
 <script>
 const CODE = '__CODE__';
 let seat = new URLSearchParams(location.search).get('seat') || '';
@@ -2393,10 +3358,13 @@ function titleFor(v){
   return v.mode ? v.mode.toUpperCase() : 'FUNNIER';
 }
 async function submit(c){
-  const t = document.querySelector('textarea');
-  const fid = t ? t.id : '';
-  const kind = fid === 'fld_guess' ? 'guess' : (fid === 'fld_line' ? 'line' : 'entry');
-  const extra = {text: t?t.value:''};
+  const areas = Array.from(document.querySelectorAll('textarea'));
+  const get = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+  const first = areas.length ? areas[0].id : '';
+  const kind = first === 'fld_guess' ? 'guess' : (first === 'fld_line' ? 'line' : (first === 'fld_info' ? 'info' : 'entry'));
+  const extra = {text: get(first) || (areas.length ? areas[0].value : '')};
+  const cb = get('fld_callback');
+  if(cb && cb.trim()) extra.callback = cb.trim();
   const tg = document.querySelector('input[type=checkbox][id^=fld_]');
   if(tg) extra[tg.id.replace('fld_','')] = tg.checked;
   await sendInput(kind, extra);
@@ -2416,6 +3384,61 @@ async function press(id){
     body: JSON.stringify({seat_token: seat, ready: true})});
   if(id==='laugh') await fetch('/party/'+CODE+'/input',{method:'POST',headers:{'Content-Type':'application/json'},
     body: JSON.stringify({seat_token: seat, client_seq: ++cseq, kind:'laugh'})});
+  if(id==='caught'){
+    const ev = window.prompt('Which event id did you catch? (see stage archive)');
+    if(ev && ev.trim()) await sendInput('caught', {event: ev.trim()});
+  }
+  if(id==='cracked') await sendInput('crack', {});
+  if(id==='pk-check') await sendInput('check', {});
+  if(id==='pk-call') await sendInput('call', {});
+  if(id==='pk-bet') await sendInput('bet', {});
+  if(id==='pk-fold') await sendInput('fold', {});
+}
+let smileStream = null, smileRef = null, smilePoll = null;
+let smileWasHigh = false;
+function loadScript(url){
+  return new Promise((resolve,reject)=>{const s=document.createElement('script');
+    s.src=url; s.onload=resolve; s.onerror=reject; document.head.appendChild(s);});
+}
+async function toggleSmile(){
+  const msg=document.getElementById('smile-msg');
+  const btn=document.getElementById('smile-toggle');
+  if(smileStream){
+    clearInterval(smilePoll); smilePoll=null;
+    smileStream.getTracks().forEach(t=>t.stop()); smileStream=null;
+    if(smileRef){smileRef.dispose(); smileRef=null;}
+    document.getElementById('smile-video').srcObject=null;
+    smileWasHigh=false; btn.textContent='ENABLE CAMERA SMILES (OPTIONAL)';
+    msg.textContent='Camera stopped. No frames were sent.';
+    return;
+  }
+  try {
+    if(!seat){msg.textContent='Only seated players can enable this option.';return;}
+    btn.disabled=true;
+    if(typeof tf==='undefined') await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest');
+    const v=document.getElementById('smile-video');
+    smileStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false});
+    v.srcObject=smileStream; await v.play(); v.style.display='inline-block';
+    msg.textContent='Calibrating: follow neutral/smile prompts.';
+    smileRef=await SmileReferee.calibrate(v,{samples:30,ephemeral:true,
+      onStep:s=>{ if(s.smiling!==undefined) msg.textContent=s.smiling?'Smile now':'Hold a neutral face'; }});
+    const cv=document.createElement('canvas'), ctx=cv.getContext('2d');
+    let cooldown=0;
+    smilePoll=setInterval(()=>{
+      if(!smileRef||!v.videoWidth)return;
+      cv.width=v.videoWidth;cv.height=v.videoHeight;ctx.drawImage(v,0,0);
+      const p=smileRef.predict(cv), high=p>0.82, now=Date.now();
+      if(high && !smileWasHigh && now>cooldown){
+        cooldown=now+4000;sendInput('smile',{smiling:true}).catch(()=>{});
+      }
+      smileWasHigh=high;
+      msg.textContent='Camera on · smile detection local · '+(high?'smile':'neutral');
+    },350);
+    btn.textContent='DISABLE CAMERA SMILES';
+  }catch(e){
+    if(smileStream){smileStream.getTracks().forEach(t=>t.stop());smileStream=null;}
+    msg.textContent='Camera unavailable or declined: '+String(e);
+  }finally{btn.disabled=false;}
 }
 function wireDraw(cv){
   const ctx = cv.getContext('2d');

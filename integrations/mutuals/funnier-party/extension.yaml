@@ -1,0 +1,7 @@
+# Install under character-harness/extensions/funnier-party, AFTER director.
+# Non-blocking: party relay cannot stall conversation or TTS playback.
+name: funnier-party
+handler: index.ts
+hooks:
+  on_sentence: { blocking: false }
+requires_env: [FUNNIER_PARTY_ENDPOINT, FUNNIER_HOST_TOKEN]

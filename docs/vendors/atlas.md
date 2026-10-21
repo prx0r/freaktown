@@ -1,5 +1,13 @@
 # Atlas — vendor brief (imported 2026-09-11)
 
+> DISAMBIGUATION 2026-10-17: TWO different products share the name.
+> (A) Atlas.design (below) — mesh generation API. (B) Marble Atlas by
+> World Labs (atlas-beta.worldlabs.ai) — world MODEL (prompt → posed
+> views → splats → GLB). Owner holds Marble beta access. Section B added
+> at the bottom; nothing below was rewritten.
+
+## Mesh pipeline (the part we care about)
+
 Sources: https://docs.atlas.design/ (llms.txt + per-page .md + ?ask= agent
 query). Site: https://atlas.design/. Vienna outfit, SEGA/Square Enix
 customers, Google Cloud Marketplace. Pricing Pro €50/mo = 5,000 pooled
@@ -104,3 +112,61 @@ Raw: ~2M tris / 79MB per clip. Factory decimate 0.1 → ~200k tris / 11MB
 with all 41 bones + skin intact; intake battery passes; watch/AR/record
 all 200. No facial morphs (as predicted — puppet mode stays the face).
 animation_3.glb had not landed in the bucket at intake time.
+
+---
+
+## (B) Marble Atlas — World Labs world model (refreshed 2026-10-17)
+
+Sources (fetched today): docs.worldlabs.ai/llms.txt index + api quickstart,
+models, pricing, worlds/export reference, chisel-basics, mesh export.
+Old beta (`atlas-beta.worldlabs.ai/api/v2`, `atlasChisel`/`atlasGenerate`/
+`splats2Mesh` names) is SUPERSEDED — current API below. Key
+`WLT_API_KEY` (header `WLT-Api-Key`, NOT on box — owner holds beta access).
+
+Base: `https://api.worldlabs.ai`. Auth header: `WLT-Api-Key: YOUR_API_KEY`.
+Flow: `POST /marble/v1/worlds:generate` → returns `operation_id` →
+poll `GET /marble/v1/operations/{id}` until `done:true` (~5 min) →
+`GET /marble/v1/worlds/{id}` for asset URLs → view at
+`marble.worldlabs.ai/world/{id}` → `POST /marble/v1/worlds/{id}:export`
+for GLB.
+
+Generate inputs: `text` / `image` (uri or media_asset) / `multi-image`
+(azimuth per view) / `video` / pano. For Cauldron we use TEXT (profile
+prompt is the world prompt) — optionally multi-image later from the 10
+posed views. Models: `marble-1.1` (rooms), `marble-1.1-plus` (biggest
+rooms, variable cost), `marble-1.0`, `marble-1.0-draft` (cheap layout
+proof). Chisel today = web-app 3D blocking (walls/pano-camera/GLB-FBX
+upload → Generate button); no public Chisel POST — blockout lives in
+our `cauldron.json` + profile prompt, submitted as text.
+
+Export: `{"asset_type":"mesh","format":"glb"}` → async HQ mesh op
+(up to ~1h, Pro plan, ~600k-tri textured + ~1M-tri vertex-colored,
+typically 100–200MB — WE decimate to ≤30MB before lock). Collider mesh
+is physics-only, not visual. PLY splat export is free. Cached exports
+cost nothing twice (existing op returned, no charge).
+
+COST (ask-first, $0 rule — owner approves every live call):
+1,250 credits = $1.00. Text→world on marble-1.1 = 80 + 1,500 = 1,580
+(~$1.26). Draft text→world = 80 + 150 = 230 (~$0.18). HQ mesh export =
+3,500 (~$2.80). Cauldron lock budget: draft proof $0.18 + real
+$1.26 + mesh $2.80 ≈ **$4.24 max**. Credits are Platform-only
+(platform.worldlabs.ai/billing) — Marble app credits do NOT work.
+402 = out of credits. Polling + uploads are free.
+
+COMPATIBILITY (verified in code, not claimed):
+- Marble GLB (club, static) + Mutuals/FUNNIER VRM (performers) compose
+  in ONE three.js scene. VRM 1.0 is glTF under the hood; our importmap
+  already loads it (@pixiv/three-vrm 3.3.0).
+- Mutuals avatars are `.vrm` models + `.vrma` clips baked onto the
+  skeleton (`extras.mutualsHarness` table) — NOT plain GLB. FoxGlove uses
+  a cooked player profile. Do not convert VRM→GLB and expect motion to
+  survive; keep performers VRM, rooms GLB.
+- Align frames: Marble camera math page before compositing (Y-up vs
+  camera conventions); floor-position cast against predicted (approx)
+  metric scale.
+- Non-humanoids stay clips/props (retargeter can't wear them).
+
+CLUB PLAN: atlasChisel blockout (stage box + seat rows as depth) →
+generate 8–12 posed views → splat → GLB → our stage. Comedians (VRM)
+and hecklers (pips/faces) composite live. Static crowd as inpainted
+objects via atlasMasked; live crowd stays ours.

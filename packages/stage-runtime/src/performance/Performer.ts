@@ -26,6 +26,20 @@ const FACE_MAP: Record<string, Partial<Emotions>> = {
   'face.surprised': { surprised: 1 },
   'face.deadpan': { relaxed: 0.35 },
   'face.disgusted': { angry: 0.6, sad: 0.35 },
+  // Extended vocabulary (delivery beats + reactor; GlbAvatar renders the
+  // full FACS recipes, VRM falls back to these presets):
+  'face.happy': { happy: 1 },
+  'face.love': { happy: 0.9 },
+  'face.sad': { sad: 1 },
+  'face.angry': { angry: 1 },
+  'face.grin': { happy: 1 },
+  'face.confused': { surprised: 0.5 },
+  'face.afraid': { surprised: 0.8 },
+  'face.contempt': { angry: 0.6 },
+  'face.excited': { happy: 0.9 },
+  'face.whisper': { relaxed: 0.35 },
+  'face.shout': { surprised: 0.8 },
+  'face.normal': { relaxed: 0.6 },
   'reaction.confused': { surprised: 0.5 },
   'reaction.annoyed': { angry: 0.8 },
   'reaction.shock': { surprised: 1 },
@@ -97,6 +111,8 @@ export class Performer {
 
   /** Fire a cue (plan cue on the media clock, or a live event). */
   trigger(action: string, intensity: number, durationMs: number, atMs: number): void {
+    // One normalizer for both stacks: face_* aliases + bare harness
+    // emotions/gestures (face/vocab). Supersedes hand-rolled patches.
     action = normalizeFaceAction(action);
     if (action.startsWith('gaze.')) {
       this.gazeTarget = GAZE_TARGETS[action] ?? this.gazeTarget;
