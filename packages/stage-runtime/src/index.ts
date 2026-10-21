@@ -18,3 +18,4 @@ export * from './performance/Performer';
 export * from './avatars/types';
 export { loadAvatar, type AvatarSpec, type LoadedAvatar } from './avatars/loadAvatar';
 export { BasicAvatar } from './avatars/BasicAvatar';
+export * from './sets';
