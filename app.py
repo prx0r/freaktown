@@ -6466,6 +6466,27 @@ def killella_page():
     return _KILLELLA_HTML
 
 
+# ── Sealed sets from characters3 (rendered minutes) ──────────────────
+# Served CORS-open: funnier's cinema screen plays these as media:'audio'
+# clips, and the live stage may fetch timeline.json cross-origin.
+_CHARS3 = Path("/root/characters3/characters")
+_SEALED_OK = {"set.mp3", "set.wav", "timeline.json", "mouth_cues.json",
+              "set_plan.json"}
+
+
+@app.route("/sealed/<slug>/<path:fname>")
+def sealed_set(slug, fname):
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:64]
+    if fname not in _SEALED_OK:
+        return jsonify({"ok": False, "error": "no such file"}), 404
+    p = _CHARS3 / slug / "sealed" / fname
+    if not p.is_file():
+        return jsonify({"ok": False, "error": "no sealed set for this act"}), 404
+    resp = send_file(p)
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
 # ── Funnier skin (response layer — must stay after every route) ──
 import funnier_skin
 funnier_skin.init(app)
