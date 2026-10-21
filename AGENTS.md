@@ -66,7 +66,7 @@ except bundles and events.
 
 ## Where things are
 
-`docs/STATUS.md` (honest state — read first) · `HANDOVER-2026-10-21.md` (latest: show runtime + chatter) · `NORTHSTAR.md` (avatar doctrine) · `docs/` (map in `docs/README.md`) · `docs/FACE-VOICE-REACT.md` (face/viseme/AU stack) · `docs/DIRECTOR-VOCAB.md` (cue vocabulary) · `party.py` (party game — the live multiplayer loop) · `cauldron_show.py` (Cauldron show backend — phases/laugh-track/interview) · `party_chatter.py` (proactive table talk) · `lab.py` (tech-lab rigs only, never called by game) · `comedy/` (theory engine — currently NEVER imported by `party.py`) · `game-packs/freeze-night-v1.freak-game.json` (pack spec — currently NEVER loaded by `party.py`, hardcoded `FZ_ROUNDS` rules instead) · `static/smile-referee.js` + `static/affect-servo.js` (served by lab only, no `<script>` tag in stage/controller) · `backend/services/` (delivery, audio, ella, judge, scoring) · `contracts/` (schema authority) · `packages/stage-runtime/` (live performer) · `edge/worker/` (episode room + ella live) · `apps/live/` (web client; live stage: `docs/LIVE-STAGE.md`, `docs/LIVE-STAGE-EXTENDING.md`) · `freaks/` (bundle storage, gitignored) · `archive/` (retired engine, read-only).
+`docs/STATUS.md` (honest state — read first) · `HANDOVER-2026-10-21.md` (latest: show runtime + chatter) · `NORTHSTAR.md` (avatar doctrine) · `docs/` (map in `docs/README.md`) · `docs/FACE-VOICE-REACT.md` (face/viseme/AU stack) · `docs/DIRECTOR-VOCAB.md` (cue vocabulary) · `docs/LIVEKIT-NOTES.md` (self-hosted rooms + delivery→agent adapter) · `party.py` (party game — the live multiplayer loop) · `cauldron_show.py` (Cauldron show backend — phases/laugh-track/interview) · `party_chatter.py` (proactive table talk) · `lab.py` (tech-lab rigs only, never called by game) · `comedy/` (theory engine — currently NEVER imported by `party.py`) · `game-packs/freeze-night-v1.freak-game.json` (pack spec — currently NEVER loaded by `party.py`, hardcoded `FZ_ROUNDS` rules instead) · `static/smile-referee.js` + `static/affect-servo.js` (served by lab only, no `<script>` tag in stage/controller) · `backend/services/` (delivery, audio, ella, judge, scoring) · `contracts/` (schema authority) · `packages/stage-runtime/` (live performer) · `edge/worker/` (episode room + ella live) · `apps/live/` (web client; live stage: `docs/LIVE-STAGE.md`, `docs/LIVE-STAGE-EXTENDING.md`) · `freaks/` (bundle storage, gitignored) · `archive/` (retired engine, read-only).
 
 ## Commands
 
@@ -74,6 +74,7 @@ except bundles and events.
 /usr/bin/python3 test_allbots.py && /usr/bin/python3 test_freeze_night.py && /usr/bin/python3 test_party.py && /usr/bin/python3 test_stone_face.py
 /usr/bin/python3 test_quip_clash.py && /usr/bin/python3 test_solo_night.py && /usr/bin/python3 test_tech_lab.py && /usr/bin/python3 test_poker.py
 /usr/bin/python3 test_show.py && /usr/bin/python3 test_chatter.py && /usr/bin/python3 test_funnier_skin.py
+/usr/bin/python3 scripts/delivery_agent.py    # LiveKit live voice E2E (server: systemctl status livekit)
 pytest tests/contract -q      # contract suite (1 pre-existing env failure: livekit not installed)
 curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8090/play   # on-box check
 curl -s -o /dev/null -w "%{http_code}\n" https://party.funnier.si/play # public check
