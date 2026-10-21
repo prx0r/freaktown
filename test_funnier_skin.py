@@ -7,7 +7,6 @@ import wave
 from pathlib import Path
 
 import funnier_skin
-import app as appmod
 from app import app
 
 passed = failed = 0
@@ -31,9 +30,7 @@ def ids_classes(html):
 
 tmp = Path(tempfile.mkdtemp())
 orig_dir = funnier_skin.FREAK_DIR
-orig_app_dir = appmod.FREAK_DIR
 funnier_skin.FREAK_DIR = tmp
-appmod.FREAK_DIR = tmp
 
 
 def bundle(slug, name, **extra):
@@ -120,7 +117,6 @@ try:
     r.close()
 finally:
     funnier_skin.FREAK_DIR = orig_dir
-    appmod.FREAK_DIR = orig_app_dir
     shutil.rmtree(tmp, ignore_errors=True)
 
 print(f"{passed} passed, {failed} failed")

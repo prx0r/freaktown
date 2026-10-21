@@ -1,0 +1,5 @@
+name = "freaktown-perform"
+main = "index.js"
+compatibility_date = "2025-09-01"
+workers_dev = false
+routes = [ { pattern = "www.funnier.si/perform*", zone_id = "3dd22586c63792e8064ff7150f0233d4" } ]

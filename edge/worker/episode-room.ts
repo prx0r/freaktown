@@ -16,7 +16,7 @@
 
 import { DurableObject } from 'cloudflare:workers';
 
-import { validateCameraCut, type EllaSenseV1 } from '../src/contracts/show';
+import { applyEpisodeEvent, validateCameraCut, type EllaSenseV1 } from '../src/contracts/show';
 
 export type EpisodeState = {
   episodeId: string;
@@ -524,36 +524,9 @@ export class EpisodeRoom extends DurableObject {
     // Persist event BEFORE broadcasting
     await this.ctx.storage.put(this.eventKey(seq), event);
 
-    // Update live state
-    switch (type) {
-      case 'show.start':
-        this.episodeState.phase = 'intro';
-        this.episodeState.startedAt = new Date().toISOString();
-        break;
-      case 'show.phase':
-      case 'phase.change':
-        if (typeof payload.phase === 'string') this.episodeState.phase = payload.phase;
-        break;
-      case 'character.enter':
-        if (typeof payload.appearanceId === 'string') {
-          this.episodeState.activeAppearanceId = payload.appearanceId;
-        }
-        break;
-      case 'character.exit':
-        this.episodeState.activeAppearanceId = null;
-        break;
-      case 'show.pause':
-        this.episodeState.isPaused = true;
-        break;
-      case 'show.resume':
-        this.episodeState.isPaused = false;
-        break;
-      case 'show.end':
-        this.episodeState.phase = 'ended';
-        break;
-      default:
-        break;
-    }
+    // Update live state — the shared pure reducer (also used by the
+    // offline LocalRoom), so both transports agree on show state.
+    applyEpisodeEvent(this.episodeState, type, payload, event.created_at);
 
     // Persist updated state
     await this.ctx.storage.put('episodeState', this.episodeState);

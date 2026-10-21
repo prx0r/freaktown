@@ -1,0 +1,103 @@
+{
+ "schema": "pog.setplan.v1",
+ "character_id": "pog.captain-ata-ashcroft",
+ "mesh": "arunangshubanerjee-airplane-2088.glb",
+ "premise": "Divorce proceedings as a captain's announcement.",
+ "mechanisms": {
+  "register_transpose": 0.95,
+  "rigidify": 0.9,
+  "snowball_chain": 0.85,
+  "literalize": 0.6
+ },
+ "comic_intent": {
+  "audience_should_notice": "The procedure is the panic",
+  "character_belief": "Calm authority keeps everyone safe",
+  "reveal": "He is narrating his own delay"
+ },
+ "delivery": {
+  "version": "freaktown.delivery.v1",
+  "voice": {
+   "voice_id": "edge:x"
+  },
+  "beats": [
+   {
+    "id": "b1",
+    "type": "setup",
+    "text": "Folks, this is your captain. We are currently third in line for takeoff, which is also how I rank my marriages.",
+    "delivery": {
+     "pace": 0.95,
+     "energy": 0.7
+    }
+   },
+   {
+    "id": "b2",
+    "type": "escalation",
+    "text": "We have a slight delay on the runway. The runway is my twenties. The tower has questions about my flight plan, and frankly so does Brenda.",
+    "delivery": {
+     "pace": 0.95,
+     "energy": 0.7
+    }
+   },
+   {
+    "id": "b3",
+    "type": "escalation",
+    "text": "Your baggage may have shifted during the relationship. Please check the overhead compartment, where I keep my apologies.",
+    "delivery": {
+     "pace": 0.95,
+     "energy": 0.7
+    }
+   },
+   {
+    "id": "b4",
+    "type": "escalation",
+    "text": "The fasten-seatbelt sign is on. It has been on since 2019. Brenda says I use it to avoid conversations, and Brenda is extremely correct.",
+    "delivery": {
+     "pace": 0.95,
+     "energy": 0.7
+    }
+   },
+   {
+    "id": "b5",
+    "type": "punchline",
+    "text": "We know you have choices in airlines, and even more choices in husbands. Thank you for choosing poorly, again.",
+    "delivery": {
+     "pace": 0.95,
+     "energy": 0.7
+    },
+    "pause_before_ms": 240,
+    "pause_after_ms": 850,
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold",
+     "look": "audience"
+    }
+   },
+   {
+    "id": "b6",
+    "type": "closer",
+    "text": "We will be landing shortly in Denver, emotionally speaking. Please remain seated until I have fully stopped caring. Thank you.",
+    "delivery": {
+     "pace": 0.95,
+     "energy": 0.7
+    },
+    "pause_after_ms": 850
+   }
+  ],
+  "profile": {
+   "mechanism": "escalation",
+   "rhythm": "dry_misdirection",
+   "energy": 0.7
+  }
+ },
+ "lines": [
+  "Folks, this is your captain. We are currently third in line for takeoff, which is also how I rank my marriages.",
+  "We have a slight delay on the runway. The runway is my twenties. The tower has questions about my flight plan, and frankly so does Brenda.",
+  "Your baggage may have shifted during the relationship. Please check the overhead compartment, where I keep my apologies.",
+  "The fasten-seatbelt sign is on. It has been on since 2019. Brenda says I use it to avoid conversations, and Brenda is extremely correct.",
+  "We know you have choices in airlines, and even more choices in husbands. Thank you for choosing poorly, again.",
+  "We will be landing shortly in Denver, emotionally speaking. Please remain seated until I have fully stopped caring. Thank you."
+ ],
+ "built_from": {
+  "p0-sets": "pog.captain-ata-ashcroft"
+ }
+}

@@ -11,7 +11,7 @@ account icon). It also adds a privacy gate on the public bill.
 | `funnier_skin.py` | New. Response layer: reskins every HTML page on `/perform*`, `/play`, `/party*`, `/join/*`, and gates the bill (`listed` flag). CLI to list/unlist acts. |
 | `app.py` | Three lines at the bottom (before `__main__`): `import funnier_skin; funnier_skin.init(app)`. Nothing else. |
 | `test_funnier_skin.py` | New. 40 checks: listing rules, 404s, bill filter, every mode card and JS id/class kept on stage/controller/join, JSON/PNG/SSE untouched. |
-| `edge/perform-worker/` | Source of the live `freaktown-perform` Cloudflare Worker (interim edge filter, see below). |
+| `edge/perform-worker/` | Source of the live `freaktown-perform` Cloudflare Worker: privacy filter + the JS port of the skin (`funnier-skin.js`), see below. |
 | `docs/funnier-skin/*.png` | Before/after screenshots. |
 
 ### Why a response layer and not template edits
@@ -66,20 +66,48 @@ Not listed, so hidden: family sets `cathy-prior-f3ac25`, `cathy-prior-da4460`, `
   bundle, family ones included, to anyone who goes straight to the box (`party.funnier.si` is DNS-only, so no
   Cloudflare Worker can sit in front of it). To take the family sets fully offline, move their `freaks/<slug>`
   dirs out of `freaks/` (or delete them).
-- The bill's `/icon-512.png` placeholders 404 on www.funnier.si (that path goes to GitHub Pages, not the box).
-  The skin swaps them for monogram posters on the bill. The act page's own fallback image still needs the path
-  served from the box (add `www.funnier.si/icon-512.png` to a Worker route, or use an absolute party.funnier.si URL).
+- `/icon-512.png` and `/icon-192.png` on www.funnier.si are now served from the box by the `funnier-web` Worker
+  (cached a day), so the act page's entrance image loads; the bill still shows monogram posters for acts without a portrait.
 
-## Interim edge filter (live now)
+## Live now: the skin at the Cloudflare edge (no box deploy needed)
 
-Until the box runs this branch, the `freaktown-perform` Worker (route `www.funnier.si/perform*`, source in
-`edge/perform-worker/`) strips cards and links to slugs matching `(^|-)(prior|e2e|test)(-|$)` from `/perform` HTML
-and returns 404 for their `/perform/<slug>` pages. Once the branch is live and the acts are listed, set the Worker back
-to a plain proxy (or keep it as a second line of defence; it does no harm):
+Since 2026-10-18 the skin runs in the two Workers in front of the box, so www.funnier.si already looks like this
+branch even though the box still runs `3acedc6`:
 
+| Worker | Routes | Source | Does |
+|---|---|---|---|
+| `freaktown-perform` | `www.funnier.si/perform*` | `edge/perform-worker/` (this repo) | privacy filter (below) + skin on every `/perform` HTML page; links to box-only pages (`/@char`, `/f/`, `/w/`, `/r/`, `/ar/`, `/record/`, `/edit`, `/takes`) rewritten to `https://party.funnier.si/…` (they 404 on www) |
+| `funnier-web` | `www.funnier.si`, `funnier.si` | prx0r/characters `funnier/web-worker/` | party proxy (`/party`, `/party/*`, `/play`, `/join/*`) + skin on its HTML; `/icon-512.png`, `/icon-192.png` from the box |
+
+`edge/perform-worker/funnier-skin.js` is the canonical JS port of `reskin()` (same regexes, same `SKIN_CSS`); it is
+copied verbatim into the characters repo. On the live box pages (bill, act, /party, lab, join, controller, stage)
+its output is byte-identical to `funnier_skin.reskin()` run with the edge's hidden-slug rule. Only `GET` `text/html`
+responses are buffered and rewritten; JSON, images, audio, the SSE `/party/<code>/stream`, POSTs and HEADs pass
+through as the original streaming response. `?skin=0` on any URL returns the unskinned page (privacy filter still on).
+Response header `x-funnier-skin: edge` marks a skinned page. If you change `SKIN_CSS`, change both files.
+
+Two edge-only fixes the box should also get:
+- **Stage script SyntaxError** (party.py, stage template, also on main): the deck buttons are built with
+  `onclick=\"hostCmd('start','quip-"+d+"')\"` inside a normal Python string, so the `\"` collapses to `"` and the
+  whole stage `<script>` fails to parse (no polling, no host buttons). `funnier-web` re-escapes it on the way out.
+  Fix on the box: make that template a raw string or write `\\"`.
+- **Browser caching of live room state**: the zone's 4 h browser-cache TTL was being stamped on `/party/<code>/view`
+  and `/stream?once=1` responses (JSON without cache-control), which can freeze controllers/stages. `funnier-web`
+  now fetches the box with `cache: 'no-store'` and sends `cache-control: no-store` on everything but images.
+
+Privacy filter (`freaktown-perform`, until the box runs the `listed` flag): slugs matching `(^|-)(prior|e2e|test)(-|$)`
+are stripped from every `/perform` HTML page (cards and `/perform|f|w/<slug>` links, act count fixed) and their
+`/perform/<slug>` pages return a skinned 404. That is the 10 acts listed above as hidden.
+
+After the box merge nothing at the edge has to change: a page that already carries `<style id='funnier-skin'>`
+(skinned by the box) is passed through without a second reskin (`x-funnier-skin: box`); the privacy filter keeps
+running as a second line of defence.
+
+Deploy (from a copy; the token is the vault's Cloudflare token in `CLOUDFLARE_API_TOKEN`):
 ```
-cd edge/perform-worker && CLOUDFLARE_ACCOUNT_ID=954612afb5a97bb15dddcdc70176813d npx wrangler deploy
+cp -r edge/perform-worker /tmp/pw && cd /tmp/pw && CLOUDFLARE_ACCOUNT_ID=954612afb5a97bb15dddcdc70176813d npx wrangler deploy
 ```
+Live screenshots (headless Chromium, Google Fonts served from a local copy): `docs/funnier-skin/edge/`.
 
 ## Deploy on the box (party.funnier.si, 138.199.223.35)
 

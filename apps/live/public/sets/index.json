@@ -1,0 +1,33 @@
+{
+ "schema": "freaktown.live.sets.v1",
+ "sets": [
+  {
+   "id": "captain-ata-ashcroft",
+   "title": "Captain Ata Ashcroft \u2014 Divorce as a captain's announcement",
+   "character_name": "Captain Ata Ashcroft",
+   "character_id": "pog.captain-ata-ashcroft",
+   "premise": "Divorce proceedings as a captain's announcement.",
+   "set_url": "sets/captain-ata-ashcroft",
+   "audio_url": "sets/captain-ata-ashcroft/set.mp3",
+   "avatar_url": "avatars/default-v1.vrm",
+   "avatar_note": "VRM humanoid (pixiv VRM1 sample, static/avatars/default-v1.vrm)",
+   "beats": 6,
+   "duration_ms": 51919,
+   "source": "scripts/build_set.py --character pog.captain-ata-ashcroft (edge-TTS, $0)"
+  },
+  {
+   "id": "the-algorithm",
+   "title": "The Algorithm \u2014 The Optimization",
+   "character_name": "The Algorithm",
+   "character_id": "pog.the-algorithm",
+   "premise": "The Optimization (flagship bit).",
+   "set_url": "sets/the-algorithm",
+   "audio_url": "sets/the-algorithm/set.mp3",
+   "avatar_url": "basic:robot",
+   "avatar_note": "BASIC procedural body (robot variant)",
+   "beats": 6,
+   "duration_ms": 63216,
+   "source": "scripts/build_set.py --character pog.the-algorithm (edge-TTS, $0)"
+  }
+ ]
+}
