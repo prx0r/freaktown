@@ -1,0 +1,88 @@
+/**
+ * SetEventExecutor — room events → SetStage, strictly in seq order.
+ *   set.load {setId, cast?}      build the set (+ cast)
+ *   set.cast {cast}              (re)fill seats
+ *   set.camera {cue}             seat-aware cut ("close:seat2", "two-shot:host+guest", "wide", "auto")
+ *   camera.cut {camera}          accepted too when the camera is a cue of this set
+ *   set.auto_director {on}
+ *   dialogue.line {seat,text}    speaker mouth + auto cut (skipped on replay once it's over)
+ *   overlay.lower_third / overlay.ticker / overlay.headline
+ *   seat.join {seat,name,avatar_url}  a human/bot takes a seat (BASIC by default)
+ *   poker.*                      cards / chips / reactions
+ */
+import type { ShowEvent } from '@freaktown/contracts';
+import type { EventConsumer } from '../EventConsumer';
+import type { SetStage } from './SetStage';
+import { estimateLineMs } from './textMouth';
+
+export interface SetExecutorOptions { onError?: (m: string) => void; now?: () => number }
+
+export class SetEventExecutor {
+  private queue: Promise<void> = Promise.resolve();
+  private off: (() => void) | null = null;
+  readonly executed: Array<{ seq: number; type: string }> = [];
+
+  constructor(private stage: SetStage, private consumer: EventConsumer, private opts: SetExecutorOptions = {}) {}
+
+  attach(): void {
+    this.off = this.consumer.onEvent((e) => {
+      this.queue = this.queue.then(() => this.execute(e)).catch((err: unknown) => this.opts.onError?.(err instanceof Error ? err.message : String(err)));
+    });
+  }
+  detach(): void { this.off?.(); this.off = null; }
+
+  async execute(event: ShowEvent): Promise<void> {
+    const p = event.payload ?? {};
+    const s = this.stage;
+    switch (event.type) {
+      case 'set.load':
+        await s.loadSet(String(p.setId), Array.isArray(p.cast) ? p.cast : []);
+        break;
+      case 'set.cast':
+        if (Array.isArray(p.cast)) await s.cast(p.cast);
+        break;
+      case 'seat.join': {
+        const def = s.definition;
+        const seat = def?.seats[Number(p.seat)];
+        if (seat) await s.cast([{ seat: seat.id, character_id: `human.${p.name}`, name: String(p.name ?? 'Player'), avatar_url: p.avatar_url ?? 'basic', kind: p.kind ?? 'human' }]);
+        break;
+      }
+      case 'set.camera':
+        if (typeof p.cue === 'string') s.cut(p.cue, p.source === 'auto_director' ? 'auto_director' : 'human_director');
+        break;
+      case 'camera.cut':
+        if (typeof p.camera === 'string' && s.definition && !/^[A-Z_]+$/.test(p.camera)) s.cut(p.camera, 'human_director');
+        break;
+      case 'set.auto_director':
+        s.setAutoDirector(p.on !== false);
+        break;
+      case 'dialogue.line': {
+        const dur = Number(p.duration_ms ?? estimateLineMs(String(p.text ?? '')));
+        const age = this.ageMs(event);
+        if (age !== null && age > dur + 1000) break; // replay: the line is over
+        s.say({ seat: String(p.seat), text: String(p.text ?? ''), duration_ms: dur, audio_url: p.audio_url, cue: p.cue });
+        break;
+      }
+      case 'overlay.lower_third':
+        s.lowerThird({ name: String(p.name ?? ''), title: p.title, show: p.show });
+        break;
+      case 'overlay.ticker':
+        s.ticker(Array.isArray(p.items) ? p.items.map(String) : []);
+        break;
+      case 'overlay.headline':
+        s.headline(String(p.text ?? ''), p.kicker);
+        break;
+      default:
+        if (event.type.startsWith('poker.') && event.type !== 'poker.intent') s.poker(event.type, p);
+        else return;
+    }
+    this.executed.push({ seq: event.seq, type: event.type });
+  }
+
+  private ageMs(e: ShowEvent): number | null {
+    if (!e.created_at) return null;
+    const t = Date.parse(e.created_at);
+    if (!Number.isFinite(t)) return null;
+    return (this.opts.now?.() ?? Date.now()) - t;
+  }
+}

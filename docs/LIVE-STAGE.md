@@ -5,6 +5,10 @@ WebAudio clock, plan-driven mouth, body and face, crowd reactions. Blender
 stays for offline sealed renders (`scripts/render_set.py`); this is the
 realtime lane. Extending it: [`LIVE-STAGE-EXTENDING.md`](LIVE-STAGE-EXTENDING.md).
 
+**Sets (2026-10-22):** besides the comedy club there are a news studio, a podcast and a
+poker table (`set.load {setId}`; Set panel in /control; human poker seat at
+`/play/:ep/seat/4`). See LIVE-STAGE-EXTENDING.md §8 "Adding a set".
+
 ```text
  /control ──command()──►  LiveTransport  ──► room (persist → broadcast) ──► /stage
  (operator)              ├─ LocalTransport  (BroadcastChannel + localStorage, LocalRoom)

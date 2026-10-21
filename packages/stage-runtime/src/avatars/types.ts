@@ -71,6 +71,8 @@ export interface AvatarDriver {
   setPose(pose: PoseState): void;
   /** Gaze target in world space (VRM lookAt; others ignore or aim head). */
   setGazeTarget(target: THREE.Object3D): void;
+  /** Optional seated variant (sets): bend hips/knees, drop the pelvis onto a 0.48 m seat. */
+  setSeated?(seated: boolean): void;
   update(dt: number): void;
   dispose(): void;
 }

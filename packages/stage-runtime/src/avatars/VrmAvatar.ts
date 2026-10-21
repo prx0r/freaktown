@@ -13,6 +13,7 @@ export class VrmAvatar implements AvatarDriver {
   private vrm: VRM;
   private has = new Set<string>();
   private baseHipsY = 0;
+  private seated = false;
 
   constructor(vrm: VRM, name: string) {
     this.vrm = vrm;
@@ -61,7 +62,7 @@ export class VrmAvatar implements AvatarDriver {
     const bone = (n: Parameters<typeof h.getNormalizedBoneNode>[0]) => h.getNormalizedBoneNode(n);
     const hips = bone('hips');
     if (hips) {
-      hips.position.y = this.baseHipsY + p.bob;
+      hips.position.y = this.baseHipsY + p.bob - (this.seated ? this.baseHipsY * 0.46 : 0);
       hips.position.x = p.swayX;
       hips.rotation.z = -p.swayX * 0.6;
     }
@@ -96,7 +97,16 @@ export class VrmAvatar implements AvatarDriver {
     };
     arm('left', p.armL);
     arm('right', p.armR);
+    // seated: thighs forward (-X rot lifts the foot to +Z), shins back down
+    for (const side of ['left', 'right'] as const) {
+      const ul = bone(`${side}UpperLeg` as any);
+      const ll = bone(`${side}LowerLeg` as any);
+      if (ul) { ul.rotation.x = this.seated ? -1.45 : 0; ul.rotation.z = this.seated ? (side === 'left' ? 0.08 : -0.08) : 0; }
+      if (ll) ll.rotation.x = this.seated ? 1.45 : 0;
+    }
   }
+
+  setSeated(seated: boolean): void { this.seated = seated; }
 
   update(dt: number): void { this.vrm.update(dt); }
 

@@ -1,0 +1,156 @@
+/**
+ * The four built-in sets. Numbers are metres; avatars face +Z at yaw 0.
+ * Each set renders procedurally with zero downloads (sets/builders); a CC0
+ * GLB can be layered on as decor (environment.glb) — see assets/sets/LICENSES.md.
+ */
+import type { SeatAnchor, SetDefinition } from './types';
+
+const seat = (id: string, x: number, z: number, rotation: number, role: string, pose: SeatAnchor['pose'] = 'seated', open = false): SeatAnchor =>
+  ({ id, position: [x, 0, z], rotation, role, pose, ...(open ? { open } : {}) });
+
+/** A seat on a circle/ellipse around the origin, facing the centre. φ measured from -Z (the far side). */
+function around(id: string, phi: number, a: number, b: number, role: string, open = false): SeatAnchor {
+  const x = a * Math.sin(phi);
+  const z = -b * Math.cos(phi);
+  return seat(id, round(x), round(z), round(Math.atan2(-x, -z)), role, 'seated', open);
+}
+const round = (v: number) => Math.round(v * 1000) / 1000;
+
+// ── 1. comedy club (classic StageRuntime renders it; listed for the picker/registry) ──
+export const COMEDY_CLUB: SetDefinition = {
+  id: 'comedy-club',
+  name: 'Comedy club',
+  description: 'Brick wall, neon sign, mic stand, seated crowd — the original live stage.',
+  environment: { builder: 'comedy-club' },
+  seats: [seat('stage', 0, 0, 0, 'performer', 'standing')],
+  cameras: {
+    wide: { position: [0, 2.4, 7.8], target: [0, 1.3, 0], fov: 46, label: 'Wide' },
+    medium: { position: [0, 1.48, 2.35], target: [0, 1.33, 0], fov: 30, label: 'Mid' },
+    close: { position: [0.08, 1.58, 1.6], target: [0, 1.52, 0], fov: 26, label: 'Close-up' },
+    side: { position: [-2.6, 1.6, 2.4], target: [0, 1.35, 0], fov: 34, label: 'Side' },
+  },
+  defaultCamera: 'wide',
+  lighting: {
+    ambient: { color: '#3a2a4a', intensity: 0.5 },
+    key: { color: '#fff1d6', intensity: 70, position: [0, 6, 3] },
+    background: '#05030a',
+  },
+  props: ['mic-stand', 'stool', 'neon-sign', 'audience'],
+  overlays: [],
+  controlCameras: ['wide', 'medium', 'close', 'side'],
+};
+
+// ── 2. news studio ──
+export const NEWS_STUDIO: SetDefinition = {
+  id: 'news-studio',
+  name: 'News studio',
+  description: 'Anchor desk on a riser, video wall with the headline, lower third + ticker.',
+  environment: {
+    builder: 'news-studio',
+    glb: {
+      url: 'https://cdn.3dassets.dev/assets/35527/v1/model.glb',
+      license: 'CC0-1.0',
+      source: 'https://3dassets.dev/assets/tv-studio-and-broadcast-gallery-studio-f-0d3b5716-starter-scene',
+      // Framing not verified (the CDN was unreachable from the build sandbox); opt in with ?setglb=1.
+      transform: { position: [0, 0, -9], rotation: 0, scale: 1 },
+      verified: false,
+    },
+  },
+  seats: [
+    seat('anchor1', 0.75, -0.55, 0, 'anchor'),
+    seat('anchor2', -0.75, -0.55, 0, 'co-anchor'),
+  ],
+  cameras: {
+    wide: { position: [0, 2.1, 6.6], target: [0, 1.35, -0.9], fov: 42, label: 'Wide' },
+    'anchor1-single': { seat: 'anchor1', position: [-0.15, 0.12, 2.3], target: [0, -0.1, 0], fov: 30, label: 'Anchor 1' },
+    'anchor2-single': { seat: 'anchor2', position: [0.15, 0.12, 2.3], target: [0, -0.1, 0], fov: 30, label: 'Anchor 2' },
+    'two-shot': { position: [0, 1.45, 3.7], target: [0, 1.2, -0.6], fov: 32, label: 'Two-shot' },
+    screen: { position: [2.7, 1.55, 2.3], target: [-0.7, 1.55, -1.8], fov: 36, label: 'Over-shoulder screen' },
+  },
+  defaultCamera: 'wide',
+  lighting: {
+    ambient: { color: '#9fb4d8', intensity: 0.9 },
+    key: { color: '#ffffff', intensity: 2.6, position: [1.5, 4, 4] },
+    fill: { color: '#b8d0ff', intensity: 1.0, position: [-3, 3, 3] },
+    rim: { color: '#3a7bff', intensity: 1.4, position: [0, 3.5, -3] },
+    background: '#04070f',
+  },
+  props: ['desk', 'riser', 'video-wall', 'cyclorama', 'cameras'],
+  overlays: ['lower_third', 'ticker', 'headline'],
+  controlCameras: ['wide', 'anchor1-single', 'anchor2-single', 'two-shot', 'screen'],
+};
+
+// ── 3. podcast ──
+const PR = 1.2;
+const podSeat = (id: string, deg: number, role: string) => around(id, (deg * Math.PI) / 180, PR, PR, role);
+export const PODCAST: SetDefinition = {
+  id: 'podcast',
+  name: 'Podcast',
+  description: 'Round table, boom-arm mics, headphones, acoustic panels, ON AIR sign.',
+  environment: {
+    builder: 'podcast',
+    glb: {
+      url: 'https://cdn.3dassets.dev/assets/38878/v1/model.glb',
+      license: 'CC0-1.0',
+      source: 'https://3dassets.dev/assets/computers-and-desk-gadgets-studio-desk-s-bc42c4fb-starter-scene',
+      transform: { position: [0, 0, -3.4], rotation: 0, scale: 1 },
+      verified: false,
+    },
+  },
+  seats: [
+    podSeat('seat1', -35, 'host'),
+    podSeat('seat2', 35, 'guest'),
+    podSeat('seat3', -100, 'cohost'),
+    podSeat('seat4', 100, 'guest2'),
+  ],
+  cameras: {
+    wide: { position: [0, 2.0, 4.4], target: [0, 1.0, -0.4], fov: 44, label: 'Wide' },
+    'two-shot': { position: [0, 1.5, 2.6], target: [0, 1.15, -0.95], fov: 40, label: 'Two-shot' },
+    'seat1-single': { seat: 'seat1', position: [0.25, 0.05, 1.7], target: [0, -0.05, 0], fov: 30, label: 'Host' },
+    'seat2-single': { seat: 'seat2', position: [-0.25, 0.05, 1.7], target: [0, -0.05, 0], fov: 30, label: 'Guest' },
+    'seat3-single': { seat: 'seat3', position: [0.25, 0.05, 1.7], target: [0, -0.05, 0], fov: 30, label: 'Co-host' },
+    'seat4-single': { seat: 'seat4', position: [-0.25, 0.05, 1.7], target: [0, -0.05, 0], fov: 30, label: 'Guest 2' },
+  },
+  defaultCamera: 'wide',
+  lighting: {
+    ambient: { color: '#6b4a3a', intensity: 0.8 },
+    key: { color: '#ffd9a8', intensity: 2.2, position: [1, 3.5, 2.5] },
+    fill: { color: '#a8c8ff', intensity: 0.7, position: [-3, 2.5, 1] },
+    rim: { color: '#ff5a8a', intensity: 1.1, position: [0, 3, -3] },
+    background: '#0d0907',
+  },
+  props: ['round-table', 'boom-mic', 'headphones', 'acoustic-panels', 'on-air-sign'],
+  overlays: ['on_air', 'speaker_strap'],
+  controlCameras: ['wide', 'two-shot', 'seat1-single', 'seat2-single', 'seat3-single', 'seat4-single'],
+};
+
+// ── 4. poker table (oval 3.0 × 1.4 m felt, top 0.78 m; 8 seats + dealer slot at -Z) ──
+const POKER_SEATS = 8;
+const pokerSeats: SeatAnchor[] = Array.from({ length: POKER_SEATS }, (_, i) => {
+  const phi = ((i + 1) * 2 * Math.PI) / (POKER_SEATS + 1);
+  return around(`seat${i}`, phi, 2.05, 1.25, i === 0 ? 'button-left' : 'player', i === 4);
+});
+export const POKER_TABLE: SetDefinition = {
+  id: 'poker-table',
+  name: 'Poker table',
+  description: 'Oval felt table, 8 seats (any can be a bot or a human from /play), cards, chips, dealer button.',
+  environment: { builder: 'poker-table' },
+  seats: pokerSeats,
+  cameras: {
+    wide: { position: [0, 3.0, 5.4], target: [0, 0.85, 0], fov: 44, label: 'Wide' },
+    overhead: { position: [0, 5.6, 0.35], target: [0, 0.78, 0], fov: 46, label: 'Overhead' },
+    orbit: { position: [0, 2.4, 4.4], target: [0, 0.9, 0], fov: 42, orbit: 0.18, label: 'Orbit' },
+    board: { position: [0, 1.75, 1.5], target: [0, 0.8, 0], fov: 36, label: 'Board' },
+  },
+  defaultCamera: 'wide',
+  lighting: {
+    ambient: { color: '#3b4a3b', intensity: 0.7 },
+    key: { color: '#fff4d8', intensity: 3.2, position: [0, 4.2, 0] },
+    fill: { color: '#ffd28a', intensity: 0.6, position: [3, 2.5, 3] },
+    background: '#070806',
+  },
+  props: ['oval-table', 'cards', 'chips', 'dealer-button', 'pot'],
+  overlays: ['poker_hud'],
+  controlCameras: ['wide', 'overhead', 'orbit', 'board'],
+  maxCast: POKER_SEATS,
+};

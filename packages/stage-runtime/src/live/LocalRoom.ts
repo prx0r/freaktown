@@ -88,7 +88,13 @@ export class LocalRoom {
   }
 
   // ── commands (persist before broadcast; caller broadcasts) ────────
-  execute(type: string, payload: Record<string, unknown> = {}, commandId?: string):
+  /**
+   * `known`: events this tab already saw on the BroadcastChannel. Another tab's
+   * localStorage write can lag its broadcast (separate renderer processes), so a
+   * writer reacting to a just-broadcast event (e.g. the dealer answering a
+   * /play poker.intent) merges what it saw instead of reusing a stale seq.
+   */
+  execute(type: string, payload: Record<string, unknown> = {}, commandId?: string, known: ShowEvent[] = []):
     { status: 'ok' | 'already_executed' | 'rejected'; event?: ShowEvent; seq?: number; error?: string } {
     if (!type) return { status: 'rejected', error: 'type required' };
     const cmds = this.read<Record<string, number>>('cmds', {});
@@ -103,6 +109,11 @@ export class LocalRoom {
     }
     const state = this.state;
     if (!state.episodeId) state.episodeId = this.episodeId;
+    const log = this.log;
+    const top = log.length ? log[log.length - 1].seq : 0;
+    const missing = known.filter((e) => e.seq > top && !log.some((x) => x.seq === e.seq)).sort((a, b) => a.seq - b.seq);
+    for (const e of missing) log.push(e);
+    state.seq = Math.max(state.seq, log.length ? log[log.length - 1].seq : 0);
     state.seq += 1;
     const event: ShowEvent = {
       seq: state.seq,
@@ -111,7 +122,6 @@ export class LocalRoom {
       payload,
       created_at: new Date().toISOString(),
     };
-    const log = this.log;
     log.push(event);
     this.write('log', log);                       // 1. persist event
     applyEpisodeEvent(state, type, payload, event.created_at);

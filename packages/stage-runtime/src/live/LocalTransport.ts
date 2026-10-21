@@ -78,9 +78,14 @@ export class LocalTransport implements LiveTransport {
     this.channel = null;
   }
 
+  /** Recent events seen (wire or replay) — merged into the room on our next write. */
+  private recent: ShowEvent[] = [];
+
   private deliver(e: ShowEvent): void {
     if (e.seq <= this.lastSeq) return; // replay/duplicate safe
     this.lastSeq = e.seq;
+    this.recent.push(e);
+    if (this.recent.length > 50) this.recent.shift();
     this.handlers.event(e);
   }
 
@@ -96,6 +101,7 @@ export class LocalTransport implements LiveTransport {
       this.handlers.crowd(msg.data);
     } else if (msg.type === 'room.reset') {
       this.lastSeq = 0;
+      this.recent = [];
       if (this.room) this.handlers.snapshot(this.room.snapshot());
     }
   }
@@ -112,7 +118,7 @@ export class LocalTransport implements LiveTransport {
   }
 
   async command(type: string, payload: Record<string, unknown> = {}, commandId?: string): Promise<CommandResult> {
-    const res = this.requireRoom().execute(type, payload, commandId);
+    const res = this.requireRoom().execute(type, payload, commandId, this.recent);
     if (res.status === 'rejected') throw new Error(`command rejected: ${res.error}`);
     if (res.event) this.broadcast({ type: 'show.event', data: res.event });
     return { status: res.status, event: res.event, seq: res.seq };
