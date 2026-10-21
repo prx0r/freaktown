@@ -60,9 +60,18 @@ export class SetEventExecutor {
         const dur = Number(p.duration_ms ?? estimateLineMs(String(p.text ?? '')));
         const age = this.ageMs(event);
         if (age !== null && age > dur + 1000) break; // replay: the line is over
-        s.say({ seat: String(p.seat), text: String(p.text ?? ''), duration_ms: dur, audio_url: p.audio_url, cue: p.cue });
+        s.say({ seat: String(p.seat), text: String(p.text ?? ''), duration_ms: dur, audio_url: p.audio_url, cue: p.cue, emotion: p.emotion, words: p.words, beats: p.beats });
         break;
       }
+      case 'face.expression':
+        s.faceExpression(p);
+        break;
+      case 'face.blendshapes':
+        if (p.weights && typeof p.weights === 'object') s.faceBlendshapes(p.seat, p.weights);
+        break;
+      case 'face.affect':
+        s.faceAffect({ seat: p.seat, a: Number(p.a ?? 0), v: Number(p.v ?? 0), p: Number(p.p ?? 0), hold_ms: p.hold_ms });
+        break;
       case 'overlay.lower_third':
         s.lowerThird({ name: String(p.name ?? ''), title: p.title, show: p.show });
         break;

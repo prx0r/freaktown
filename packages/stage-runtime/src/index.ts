@@ -19,3 +19,4 @@ export * from './avatars/types';
 export { loadAvatar, type AvatarSpec, type LoadedAvatar } from './avatars/loadAvatar';
 export { BasicAvatar } from './avatars/BasicAvatar';
 export * from './sets';
+export * from './face';

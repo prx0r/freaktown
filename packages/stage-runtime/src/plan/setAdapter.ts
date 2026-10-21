@@ -18,6 +18,7 @@
  * every cut (replay invariant).
  */
 
+import { compileHarnessBeats } from '../face/harnessBeats';
 import type {
   CameraCue, CameraPresetV1, MotionCue, MouthSpan, PerformancePlan, PlanBeat, WordTiming,
 } from '@freaktown/contracts';
@@ -69,6 +70,10 @@ export interface SealedSetInput {
   appearanceId?: string;
   title?: string;
   bodyClass?: string;
+  /** MEASURED word timings (words.json: edge-TTS WordBoundary / forced alignment). Preferred over the envelope spread. */
+  words?: Array<{ word: string; start_ms: number; end_ms: number }>;
+  /** Mutuals acting overlay (mutuals-beats/v1). Applied only with measured `words`; fails closed (warnings). */
+  acting?: { schema?: string; beats: Array<{ span: string; emotion?: string; gesture?: string; camera?: string; register?: string }> };
 }
 
 // ── words ──────────────────────────────────────────────────────────
@@ -171,7 +176,13 @@ function lastSentenceStart(beat: TimelineBeat, words: WordTiming[]): number {
 export function adaptSealedSet(input: SealedSetInput): PerformancePlan {
   const timeline = [...input.timeline].sort((a, b) => a.start_ms - b.start_ms);
   const mouth = input.mouthCues ?? [];
-  const words = deriveWordTimings(timeline, mouth);
+  const measured = !!input.words?.length;
+  const words: WordTiming[] = measured
+    ? input.words!.map((w, index) => ({
+      word: w.word, start_ms: Math.round(w.start_ms), end_ms: Math.round(w.end_ms), index,
+      beat_id: (timeline.find((b) => w.start_ms >= b.start_ms - 50 && w.start_ms < b.end_ms + 50) ?? timeline[timeline.length - 1])?.beat_id,
+    }))
+    : deriveWordTimings(timeline, mouth);
   const lastBeat = timeline[timeline.length - 1];
   const duration = Math.round(input.durationMs
     ?? (lastBeat ? lastBeat.end_ms + (lastBeat.pause_after_ms ?? 0) : 0));
@@ -248,6 +259,23 @@ export function adaptSealedSet(input: SealedSetInput): PerformancePlan {
     }
   });
 
+  const actingWarnings: string[] = [];
+  if (input.acting?.beats?.length) {
+    if (!measured) actingWarnings.push('acting ignored: needs measured words (words.json)');
+    else {
+      try {
+        const text = timeline.map((b) => b.text).join(' ');
+        const acted = compileHarnessBeats(text, input.acting.beats, words);
+        cues.push(...acted.motion);
+        for (const c of acted.camera) pushCam(c.at_ms, c.camera, 'acting');
+        actingWarnings.push(...acted.warnings);
+      } catch (e) {
+        actingWarnings.push(`acting rejected: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+  }
+  cams.sort((a, b) => a.at_ms - b.at_ms);
+
   cues.sort((a, b) => a.at_ms - b.at_ms);
   const beats: PlanBeat[] = timeline.map((b) => ({
     id: b.beat_id, type: b.type, start_ms: b.start_ms, end_ms: b.end_ms, text: b.text,
@@ -275,7 +303,7 @@ export function adaptSealedSet(input: SealedSetInput): PerformancePlan {
     word_timings: words,
     mouth,
     camera_cues: cams.filter((c) => c.at_ms <= duration),
-    source: { adapter: 'sealed-set.v1', words: 'derived-from-envelope' },
+    source: { adapter: 'sealed-set.v1', words: measured ? 'measured' : 'derived-from-envelope', ...(input.acting ? { acting: 'mutuals-beats/v1', acting_warnings: actingWarnings } : {}) },
     ...faceTracks,
   };
 }
@@ -289,14 +317,18 @@ export async function loadSealedSet(baseUrl: string, opts: Partial<SealedSetInpu
       if (optional) return undefined;
       throw new Error(`sealed set: ${name} ${res.status}`);
     }
-    return (await res.json()) as T;
+    try { return (await res.json()) as T; } catch (e) { if (optional) return undefined; throw e; } // SPA fallback serves HTML for missing optional files
   };
-  const [timeline, mouthCues, setPlan, visemesDoc, ausDoc] = await Promise.all([
+  // Both sealed-set generations load: trial face stack (visemes/aus) +
+  // main #4 (words/acting). Each doc is optional; timeline is required.
+  const [timeline, mouthCues, setPlan, visemesDoc, ausDoc, words, acting] = await Promise.all([
     getJson<TimelineBeat[]>('timeline.json', false),
     getJson<MouthSpan[]>('mouth_cues.json', true),
     getJson<SealedSetInput['setPlan']>('set_plan.json', true),
     getJson<SealedSetInput['visemes']>('visemes.json', true),
     getJson<SealedSetInput['aus']>('aus.json', true),
+    getJson<SealedSetInput['words']>('words.json', true),
+    getJson<SealedSetInput['acting']>('acting.json', true),
   ]);
-  return adaptSealedSet({ ...opts, timeline: timeline ?? [], mouthCues, setPlan, visemes: visemesDoc, aus: ausDoc });
+  return adaptSealedSet({ ...opts, timeline: timeline ?? [], mouthCues, setPlan, visemes: visemesDoc, aus: ausDoc, words: Array.isArray(words) ? words : undefined, acting: acting && Array.isArray(acting.beats) ? acting : undefined });
 }

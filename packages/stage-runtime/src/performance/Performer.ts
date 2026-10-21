@@ -8,6 +8,7 @@
  *   body   → idle breath/sway + talking hands + gesture/pose cues
  */
 
+import { normalizeFaceAction } from '../face/vocab';
 import { neutralPose, type Emotions, type PoseState } from '../avatars/types';
 
 interface Active {
@@ -101,16 +102,9 @@ export class Performer {
 
   /** Fire a cue (plan cue on the media clock, or a live event). */
   trigger(action: string, intensity: number, durationMs: number, atMs: number): void {
-    // cues.py emits face_whisper-style actions; the map speaks face.*.
-    // Normalize here so beat expressions can't silently die in transit.
-    if (action.startsWith('face_')) action = 'face.' + action.slice(5);
-    // Bare gesture names (delivery sequencer / direct emitters that bypass
-    // harness_adapter's map) — gesture.* or pose.* so the switch can match.
-    if (['open', 'point', 'shrug', 'wave'].includes(action)) {
-      action = 'gesture.' + action;
-    } else if (action === 'lean_in' || action === 'lean') {
-      action = 'pose.lean_forward';
-    }
+    // One normalizer for both stacks: face_* aliases + bare harness
+    // emotions/gestures (face/vocab). Supersedes hand-rolled patches.
+    action = normalizeFaceAction(action);
     if (action.startsWith('gaze.')) {
       this.gazeTarget = GAZE_TARGETS[action] ?? this.gazeTarget;
       return;

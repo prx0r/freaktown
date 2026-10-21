@@ -30,11 +30,11 @@ export function newsDemo(): TimedCommand[] {
     out.push({ at_ms: t, type: 'overlay.headline', payload: { text: h.text, kicker: h.kicker } });
     out.push({ at_ms: t, type: 'set.camera', payload: { cue: i === 1 ? 'screen' : 'anchor1-single' } });
     out.push({ at_ms: t + 100, type: 'overlay.lower_third', payload: { name: 'Dana Deadline', title: h.text, show: true } });
-    out.push({ at_ms: t + 200, type: 'dialogue.line', payload: { seat: 'anchor1', text: h.a } });
+    out.push({ at_ms: t + 200, type: 'dialogue.line', payload: { seat: 'anchor1', text: h.a, emotion: i === 0 ? 'excited' : 'warm' } });
     t += 200 + h.a.split(' ').length * 330 + 500;
     out.push({ at_ms: t, type: 'set.camera', payload: { cue: i === 2 ? 'two-shot' : 'anchor2-single' } });
     out.push({ at_ms: t + 50, type: 'overlay.lower_third', payload: { name: 'The Algorithm', title: 'Co-anchor · probably sentient', show: true } });
-    out.push({ at_ms: t + 150, type: 'dialogue.line', payload: { seat: 'anchor2', text: h.b } });
+    out.push({ at_ms: t + 150, type: 'dialogue.line', payload: { seat: 'anchor2', text: h.b, emotion: 'deadpan' } });
     t += 150 + h.b.split(' ').length * 330 + 700;
   });
   out.push({ at_ms: t, type: 'overlay.lower_third', payload: { name: '', show: false } });
@@ -48,16 +48,16 @@ export const PODCAST_CAST: CastMemberV1[] = [
   { seat: 'seat3', character_id: 'pog.the-algorithm', name: 'The Algorithm', avatar_url: 'basic:robot', kind: 'character' },
 ];
 
-export const PODCAST_LINES: Array<[string, string]> = [
-  ['seat1', 'Welcome back to Freak Talk. Today: is a hot dog a sandwich?'],
-  ['seat2', 'It is not. A sandwich has dignity.'],
-  ['seat3', 'I have run the numbers. A hot dog is a taco wearing a tie.'],
-  ['seat1', 'A taco wearing a tie.'],
-  ['seat2', 'Absolutely not.'],
-  ['seat3', 'Statistically, yes.'],
-  ['seat1', 'Okay. Next question. Should robots pay rent?'],
-  ['seat3', 'I live in the cloud. The cloud is very expensive.'],
-  ['seat2', 'I knock things off the cloud. For free.'],
+export const PODCAST_LINES: Array<[string, string, string?]> = [
+  ['seat1', 'Welcome back to Freak Talk. Today: is a hot dog a sandwich?', 'excited'],
+  ['seat2', 'It is not. A sandwich has dignity.', 'smug'],
+  ['seat3', 'I have run the numbers. A hot dog is a taco wearing a tie.', 'deadpan'],
+  ['seat1', 'A taco wearing a tie.', 'surprised'],
+  ['seat2', 'Absolutely not.', 'annoyed'],
+  ['seat3', 'Statistically, yes.', 'deadpan'],
+  ['seat1', 'Okay. Next question. Should robots pay rent?', 'playful'],
+  ['seat3', 'I live in the cloud. The cloud is very expensive.', 'sad'],
+  ['seat2', 'I knock things off the cloud. For free.', 'smug'],
 ];
 
 export function podcastDemo(): TimedCommand[] {
@@ -66,8 +66,8 @@ export function podcastDemo(): TimedCommand[] {
     { at_ms: 500, type: 'set.auto_director', payload: { on: true } },
   ];
   let t = 1800;
-  PODCAST_LINES.forEach(([seat, text]) => {
-    out.push({ at_ms: t, type: 'dialogue.line', payload: { seat, text } });
+  PODCAST_LINES.forEach(([seat, text, emotion]) => {
+    out.push({ at_ms: t, type: 'dialogue.line', payload: { seat, text, ...(emotion ? { emotion } : {}) } });
     t += Math.max(900, text.split(' ').length * 330 + 300) + 150;
   });
   return out;

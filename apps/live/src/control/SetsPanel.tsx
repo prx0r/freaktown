@@ -13,6 +13,8 @@ import {
 import type { CastMemberV1, PokerActionV1 } from '@freaktown/contracts';
 import { createTransport, type TransportMode } from '../live/transport';
 
+const FACE_EMOTIONS = ['smile', 'smug', 'deadpan', 'surprised', 'annoyed', 'sad'];
+
 const DEFAULT_CAST: Record<string, CastMemberV1[]> = {
   'comedy-club': [],
   'news-studio': NEWS_CAST,
@@ -32,6 +34,20 @@ export function SetsPanel({ episodeId, mode, authKey }: { episodeId: string; mod
   const poker = useRef<PokerShow | null>(null);
   const humanName = useRef('Open seat');
   const def = SET_REGISTRY.get(setId)!;
+  const [faceSeat, setFaceSeat] = useState('seat1');
+  useEffect(() => { setFaceSeat(SET_REGISTRY.get(setId)!.seats[0].id); }, [setId]);
+  /** Sends ~2 s of synthetic ARKit-52 frames (what a phone's MediaPipe FaceLandmarker would stream). */
+  const puppet = () => {
+    for (let i = 0; i < 20; i++) {
+      timers.current.push(window.setTimeout(() => {
+        const t = i / 20;
+        void send('face.blendshapes', { seat: faceSeat, weights: {
+          jawOpen: Math.abs(Math.sin(t * Math.PI * 4)) * 0.8, mouthSmileLeft: t, mouthSmileRight: t,
+          cheekSquintLeft: t * 0.6, cheekSquintRight: t * 0.6, browInnerUp: 1 - t, eyeBlinkLeft: i % 7 === 0 ? 1 : 0, eyeBlinkRight: i % 7 === 0 ? 1 : 0,
+        } });
+      }, i * 100));
+    }
+  };
 
   const send = (type: string, payload: Record<string, unknown>) => transport.command(type, payload);
 
@@ -110,6 +126,17 @@ export function SetsPanel({ episodeId, mode, authKey }: { episodeId: string; mod
             {seatCues.map((c) => <button key={c} style={btn(cam === c ? '#2d6cdf' : '#262130')} onClick={() => cut(c)}>{c}</button>)}
           </div>
         </>
+      )}
+      {setId !== 'comedy-club' && (
+        <div style={{ ...row, marginTop: 6 }} data-testid="face-row">
+          <select value={faceSeat} onChange={(e) => setFaceSeat(e.target.value)} style={{ ...input, minWidth: 90, flex: 0 }} data-testid="face-seat">
+            {def.seats.map((s) => <option key={s.id} value={s.id}>{s.id}</option>)}
+          </select>
+          {FACE_EMOTIONS.map((e) => (
+            <button key={e} style={btn('#3a2a55')} onClick={() => void send('face.expression', { seat: faceSeat, emotion: e, intensity: 1, duration_ms: 2500 })} data-testid={`face-${e}`}>{e}</button>
+          ))}
+          <button style={btn('#553a2a')} onClick={puppet} data-testid="face-puppet">ARKit puppet test</button>
+        </div>
       )}
       {setId === 'poker-table' && (
         <div style={{ fontSize: 13, marginTop: 8 }}>

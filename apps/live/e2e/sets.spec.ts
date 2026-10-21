@@ -16,7 +16,7 @@ const Q = 'quality=low&cpuskin=1';
 
 type SetTele = {
   setId: string | null; camera: string; cuts: Array<{ cue: string; source: string }>; lines: number;
-  seats: Array<{ seat: string; name: string; avatar: string; speaking: boolean; mouth: number; seated: boolean }>;
+  seats: Array<{ seat: string; name: string; avatar: string; speaking: boolean; mouth: number; seated: boolean; emotions: Record<string, number>; faceSources: string[] }>;
   overlay: { lowerThird: unknown; ticker: string[]; headline: { text: string } | null; speaker: unknown };
   poker: null | { history: Array<{ seat: number }>; handId: string; pot: number; board: unknown[]; lastAction: { seat: number; action: string } | null; winners: Array<{ seat: number }>; names: Record<number, string> };
   props: null | { hole: number; board: number; pot: number };
@@ -100,6 +100,16 @@ test('podcast: 3 characters trade lines with active-speaker auto cuts', async ({
   expect(auto.some((c) => /seat1/.test(c))).toBe(true);
   expect(auto.some((c) => /seat2|seat3/.test(c))).toBe(true);
   await expect(stage.getByTestId('on-air')).toBeVisible();
+  // face: set-driven emotion cue + live ARKit stream reach the seat's face channel
+  await control.bringToFront();
+  await control.getByTestId('face-seat').selectOption('seat2');
+  await control.getByTestId('face-surprised').click();
+  await stage.bringToFront();
+  await stage.waitForFunction(() => (window.__setStage!.telemetry().seats.find((s) => s.seat === 'seat2')?.emotions.surprised ?? 0) > 0.4, null, { timeout: 15_000 });
+  await control.bringToFront();
+  await control.getByTestId('face-puppet').click();
+  await stage.bringToFront();
+  await stage.waitForFunction(() => window.__setStage!.telemetry().seats.find((s) => s.seat === 'seat2')?.faceSources.includes('live'), null, { timeout: 15_000 });
   await shots(control, stage, 'podcast', 'wide', 'seat2-single');
   expect(errors).toEqual([]);
 });

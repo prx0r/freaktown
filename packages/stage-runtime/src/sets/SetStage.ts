@@ -25,6 +25,9 @@ import { PokerProps } from './poker/PokerProps';
 import { loadAvatar } from '../avatars/loadAvatar';
 import type { AvatarDriver, AvatarCapabilities } from '../avatars/types';
 import { Performer } from '../performance/Performer';
+import { FaceChannel } from '../face/FaceChannel';
+import { compileHarnessBeats } from '../face/harnessBeats';
+import { emotionToFaceAction, HARNESS_SET_CAMERAS } from '../face/vocab';
 
 export interface SetStageConfig {
   container: HTMLElement;
@@ -46,6 +49,8 @@ interface SeatActor {
   speaking: { text: string; start: number; dur: number; audio?: HTMLAudioElement } | null;
   mouth: number;
   folded: boolean;
+  face: FaceChannel;
+  lastEmotions?: Record<string, number>;
 }
 
 export interface SetCut { cue: string; at_ms: number; source: 'auto_director' | 'human_director' | 'initial' }
@@ -82,7 +87,8 @@ export interface SetStageTelemetry {
   camera: string;
   cuts: SetCut[];
   autoDirector: boolean;
-  seats: Array<{ seat: string; name: string; avatar: AvatarCapabilities['kind']; mouthMode: string; speaking: boolean; mouth: number; seated: boolean }>;
+  seats: Array<{ seat: string; name: string; avatar: AvatarCapabilities['kind']; mouthMode: string; speaking: boolean; mouth: number; seated: boolean; emotions: Record<string, number>; faceSources: string[] }>;
+  actingWarnings: string[];
   activeSpeaker: string | null;
   lines: number;
   environment: 'procedural' | 'procedural+glb';
@@ -124,6 +130,7 @@ export class SetStage {
   private envGlb: THREE.Object3D | null = null;
   private envError: string | null = null;
   private lines = 0;
+  private actingWarnings: string[] = [];
   private aspect = 16 / 9;
   private resizeObs: ResizeObserver | null = null;
   overlay: OverlayState = { lowerThird: null, ticker: [], headline: null, speaker: null, onAir: true };
@@ -249,7 +256,7 @@ export class SetStage {
       performer.energy = 0.5;
       this.actors.set(seat.id, {
         seat, index: def.seats.indexOf(seat), member: m, holder, driver: loaded.driver, performer,
-        speaking: null, mouth: 0, folded: false,
+        speaking: null, mouth: 0, folded: false, face: new FaceChannel(),
       });
       const pi = def.seats.indexOf(seat);
       this.pokerView.names[pi] = m.name;
@@ -276,13 +283,62 @@ export class SetStage {
     const now = performance.now();
     actor.speaking = { text: line.text, start: now, dur, audio };
     this.lines++;
-    actor.performer.trigger(line.cue ?? (this.lines % 2 ? 'gesture.open' : 'face.smile'), 0.8, Math.min(dur, 2200), now);
+    const emo = line.emotion ? emotionToFaceAction(line.emotion) : null;
+    if (emo) actor.performer.trigger(emo, 0.9, dur, now);
+    actor.performer.trigger(line.cue ?? (this.lines % 2 ? 'gesture.open' : emo ? 'gesture.open' : 'face.smile'), 0.8, Math.min(dur, 2200), now);
     if (this.lines % 3 === 0) actor.performer.trigger('gesture.point', 0.6, 1200, now + 300);
+    let actedCamera = false;
+    if (line.beats?.length) {
+      if (!line.words?.length) this.actingWarnings.push(`line on ${seat.id}: beats ignored without measured words`);
+      else {
+        try {
+          const acted = compileHarnessBeats(line.text, line.beats, line.words, { humanoid: actor.driver.caps.hasSkeleton || actor.driver.caps.kind === 'basic' });
+          for (const m of acted.motion) actor.performer.trigger(m.action, m.intensity, m.duration_ms, now + m.at_ms);
+          const camBeats = line.beats.filter((x) => x.camera && HARNESS_SET_CAMERAS[x.camera.toLowerCase()]);
+          acted.camera.forEach((c, i) => {
+            const mk = camBeats[i] && HARNESS_SET_CAMERAS[camBeats[i].camera!.toLowerCase()];
+            if (!mk) return;
+            setTimeout(() => this.cut(mk(seat.id), 'auto_director'), c.at_ms);
+            actedCamera = true;
+          });
+          this.actingWarnings.push(...acted.warnings);
+        } catch (e) {
+          this.actingWarnings.push(`acting rejected: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+    }
     this.overlay.speaker = { seat: seat.id, name: actor.member.name, text: line.text };
-    if (this.auto) {
+    if (this.auto && !actedCamera) {
       const cue = this.director.onLine(seat.id, this.setTimeMs, dur);
       if (cue) this.cut(cue, 'auto_director');
     }
+  }
+
+  // ── face (face.expression / face.blendshapes / face.affect) ─────────
+
+  private actorFor(ref?: string): SeatActor | undefined {
+    if (!this.def) return undefined;
+    const seat = ref ? findSeat(this.def, ref) : this.def.seats[0];
+    return seat ? this.actors.get(seat.id) : undefined;
+  }
+  faceExpression(p: { seat?: string; emotion?: string; action?: string; intensity?: number; duration_ms?: number }): boolean {
+    const a = this.actorFor(p.seat);
+    const action = p.action ?? (p.emotion ? emotionToFaceAction(p.emotion) : null);
+    if (!a || !action) return false;
+    a.performer.trigger(action, p.intensity ?? 0.9, p.duration_ms ?? 2000, performance.now());
+    return true;
+  }
+  faceBlendshapes(seat: string | undefined, weights: Record<string, number>): boolean {
+    const a = this.actorFor(seat);
+    if (!a) return false;
+    a.face.setBlendshapes(weights, performance.now());
+    return true;
+  }
+  faceAffect(p: { seat?: string; a: number; v: number; p?: number; hold_ms?: number }): boolean {
+    const a = this.actorFor(p.seat);
+    if (!a) return false;
+    a.face.setAffect(p.a, p.v, p.p ?? 0, performance.now(), p.hold_ms ?? 4000);
+    return true;
   }
 
   // ── camera ────────────────────────────────────────────────────────
@@ -422,9 +478,9 @@ export class SetStage {
       }
       if (a.seat.pose === 'seated') { pose.swayX *= 0.3; pose.bob *= 0.3; }
       a.driver.setPose(pose);
-      a.driver.setExpression(frame.emotions);
-      a.driver.setMouth(a.mouth, vis);
-      a.driver.setBlink(frame.blink);
+      const face = a.face.sample(now, { open: a.mouth, visemes: vis, emotions: frame.emotions, blink: frame.blink });
+      a.lastEmotions = face.emotions;
+      FaceChannel.apply(a.driver, face);
       a.driver.update(dt);
     }
     if (speaker) this.lastSpeaker = speaker;
@@ -459,9 +515,11 @@ export class SetStage {
       seats: [...this.actors.values()].map((a) => ({
         seat: a.seat.id, name: a.member.name, avatar: a.driver.caps.kind, mouthMode: a.driver.caps.mouthMode,
         speaking: !!a.speaking, mouth: Math.round(a.mouth * 1000) / 1000, seated: a.seat.pose === 'seated',
+        emotions: Object.fromEntries(Object.entries(a.lastEmotions ?? {}).map(([k, v]) => [k, Math.round(v * 100) / 100])), faceSources: [...a.face.sources],
       })),
       activeSpeaker: speaking?.seat.id ?? null,
       lines: this.lines,
+      actingWarnings: this.actingWarnings.slice(-10),
       environment: this.envGlb ? 'procedural+glb' : 'procedural',
       envError: this.envError,
       overlay: { ...this.overlay },

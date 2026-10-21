@@ -9,6 +9,11 @@ realtime lane. Extending it: [`LIVE-STAGE-EXTENDING.md`](LIVE-STAGE-EXTENDING.md
 poker table (`set.load {setId}`; Set panel in /control; human poker seat at
 `/play/:ep/seat/4`). See LIVE-STAGE-EXTENDING.md §8 "Adding a set".
 
+**Faces (2026-10-22, live-face):** one face layer for VRM/GLB/BASIC — ARKit-52 blendshapes,
+Oculus→VRM visemes, harness emotion vocabulary, affect servo, `face.expression /
+face.blendshapes / face.affect` events, measured `words.json` + `acting.json` for sealed sets.
+See LIVE-STAGE-EXTENDING.md §10.
+
 ```text
  /control ──command()──►  LiveTransport  ──► room (persist → broadcast) ──► /stage
  (operator)              ├─ LocalTransport  (BroadcastChannel + localStorage, LocalRoom)
@@ -158,9 +163,8 @@ relying on them in prod. `LIVE_DEV_OPEN` must never be set in prod.
 - **Box `/api/perform` integration**: the catalog is static (`public/sets/index.json`).
   Next: a box endpoint listing sealed sets (`data/p0/*`, takes) with `set_url`/`audio_url`,
   and control fetching it instead; `performance.preload` already accepts any `set_url`.
-- **Real word timings**: edge-TTS emits `WordBoundary` events; capture them in
-  `build_set.py` (additive `words.json`) and the adapter will prefer them over the
-  envelope-derived spread. Rhubarb `mouth_cues_rhubarb.json` could map to visemes too.
+- **Real word timings**: the adapter now prefers a measured `words.json` (live-face);
+  still to do: capture edge-TTS `WordBoundary` events in `build_set.py` to write it. Rhubarb `mouth_cues_rhubarb.json` could map to visemes too.
 - **GLB cast**: fetch the meshes, sniff (`face_profiles`), add `BODY_CATALOG` entries,
   verify licences; confirm which actually have morphs/jaw.
 - **Auto-director from the crowd**: cut to WIDE on `crowd.update` laugh spikes
