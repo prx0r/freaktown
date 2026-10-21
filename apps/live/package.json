@@ -12,6 +12,7 @@
   "dependencies": {
     "@funnier/contracts": "*",
     "@funnier/newsroom": "*",
+    "@funnier/sketch": "*",
     "@funnier/stage-runtime": "*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

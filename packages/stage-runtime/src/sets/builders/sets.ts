@@ -76,7 +76,7 @@ const newsStudio: SetBuilder = (def, ctx) => {
     c.fillStyle = g; c.fillRect(0, 0, 1024, 256); c.fillStyle = ink; c.font = font; c.textAlign = 'center'; c.fillText(brand, 512, 160);
     c.fillStyle = rule; c.fillRect(0, 222, 1024, 10);
   };
-  const logoTex = canvasTexture(1024, 256, paintLogo('#0a2a6a', '#1960e0', '#fff', '#ffcc33', 'FREAK NEWS', 'bold 96px Inter, Arial, sans-serif'));
+  const logoTex = canvasTexture(1024, 256, paintLogo('#0a2a6a', '#1960e0', '#fff', '#ffcc33', 'FUNNIER NEWS', 'bold 96px Inter, Arial, sans-serif'));
   const deskFront = new THREE.Mesh(new THREE.CylinderGeometry(2.0, 1.9, 0.78, 48, 1, true, -0.62, 1.24), [new THREE.MeshStandardMaterial({ map: logoTex, emissive: 0xffffff, emissiveMap: logoTex, emissiveIntensity: 0.35, roughness: 0.4, side: THREE.DoubleSide })]);
   deskFront.position.set(0, 0.39, -1.75); group.add(deskFront);
   const top = new THREE.Mesh(new THREE.RingGeometry(1.5, 2.12, 48, 1, -Math.PI / 2 - 0.66, 1.32), new THREE.MeshStandardMaterial({ color: 0xe9eef7, roughness: 0.25, metalness: 0.1, side: THREE.DoubleSide }));

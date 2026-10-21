@@ -406,7 +406,7 @@ otherwise load the publisher's CC0 CDN URL (CORS) and rely on the procedural fal
 
 - **comedy-club** — set #1; one standing seat; rendered by the classic `StageRuntime`
   (sealed-set plans, VRM visemes). `set.load {setId:'comedy-club'}` switches back.
-- **news-studio** — anchors `anchor1`/`anchor2` seated behind a curved FREAK NEWS desk;
+- **news-studio** — anchors `anchor1`/`anchor2` seated behind a curved FUNNIER NEWS desk;
   video wall (canvas texture) shows `overlay.headline`; lower third + scrolling ticker.
   Cameras: wide, anchor1-single, anchor2-single, two-shot, screen (3/4 over-shoulder with
   the wall). Demo: 3 headlines, anchor + co-anchor tag, scripted cuts.

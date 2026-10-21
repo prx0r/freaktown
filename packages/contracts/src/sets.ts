@@ -39,6 +39,10 @@ export const SET_EVENT_TYPES = [
   // newsroom (additive): show-style theme + jingle/sting cue (stage ignores audio cues; render CLI mixes them)
   "set.theme",
   "audio.sting",
+  // sketch (additive): scripted looks, blocking moves between marks, blackout ending
+  "gaze.look",
+  "stage.move",
+  "overlay.blackout",
 ] as const;
 export type SetEventTypeV1 = (typeof SET_EVENT_TYPES)[number];
 
@@ -125,6 +129,27 @@ export interface SetThemePayloadV1 {
 
 /** audio.sting — a jingle/sting cue on the show clock (renderers may ignore it). */
 export interface AudioStingPayloadV1 { kind: "open" | "sting" | "close" | (string & {}); asset?: string; duration_ms: number }
+
+// ── sketch (additive) ───────────────────────────────────────────────
+
+/**
+ * gaze.look — a scripted look that overrides the default gaze (listeners watch the speaker).
+ * target: "<seat>" | "camera" | "audience" | "up" | "down" | "prop:<name>" (set props: wall, table, board, cards, pot)
+ * | { point: [x, y, z] } (world). Ends after duration_ms; the default gaze resumes.
+ */
+export interface GazeLookPayloadV1 {
+  seat: string;
+  target: string | { point: [number, number, number] };
+  duration_ms: number;
+  /** Turn speed multiplier (double-takes snap: 2–3). Default 1. */
+  snap?: number;
+}
+
+/** stage.move — walk/slide a character from its current seat to another seat anchor (a mark) of the set. */
+export interface StageMovePayloadV1 { seat: string; to: string; duration_ms: number }
+
+/** overlay.blackout — fade the picture to black (on) or back up (off). */
+export interface BlackoutPayloadV1 { on: boolean; fade_ms?: number }
 
 // ── poker ───────────────────────────────────────────────────────────
 

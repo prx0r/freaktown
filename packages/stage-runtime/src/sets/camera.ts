@@ -7,6 +7,7 @@
  *   "single:<seat>"       medium single
  *   "reaction:<seat>"     tight 3/4 close (reaction shots)
  *   "two-shot:a+b"        both heads framed, camera on the open side
+ *   "ots:a>b"             over a's shoulder onto b (dialogue coverage; a in soft foreground)
  *   "overhead" / "orbit"  preset if the set has one, else generic around the centre
  */
 import type { CameraPresetDef, SeatAnchor, SetDefinition, Vec3 } from './types';
@@ -102,6 +103,19 @@ export function resolveCameraCue(def: SetDefinition, cue: string, timeSec = 0): 
       }
       const dist = Math.max(2.1, sep * 1.25 + 1.0);
       return { position: add(add(mid, scale(dir, dist)), [0, 0.18, 0]), target: add(mid, [0, -0.1, 0]), fov: 34, cue: raw, seats: [a.id, b.id] };
+    }
+    case 'ots': {
+      const [fromRef, toRef] = arg.split('>').map((x) => x.trim());
+      if (!fromRef || !toRef) throw new UnknownCameraCue(`ots needs "from>to", got "${arg}"`);
+      const a = need(fromRef), b = need(toRef);
+      const ha = seatHead(a), hb = seatHead(b);
+      const ab = norm([hb[0] - ha[0], 0, hb[2] - ha[2]]);
+      // shoulder side: the side of a that is nearer the house (+Z), so the shot stays on the audience side of the line
+      let side: Vec3 = [ab[2], 0, -ab[0]];
+      if (side[2] < 0 || (Math.abs(side[2]) < 1e-3 && side[0] < 0)) side = scale(side, -1);
+      const position = add(add(add(ha, scale(ab, -0.62)), scale(side, 0.34)), [0, 0.14, 0]);
+      const target = add(hb, [0, -0.05, 0]);
+      return { position, target, fov: 30, cue: raw, seats: [b.id, a.id] };
     }
     case 'overhead': {
       const c = centre(def);

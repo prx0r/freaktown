@@ -114,6 +114,8 @@ export class StageRuntime {
 
   private avatar: AvatarDriver | null = null;
   private avatarFallback: string | null = null;
+  private mouthAnchor: THREE.Object3D | null = null;
+  private restMouth = new THREE.Vector3(0, 1.5, 0.1);
   private performer = new Performer();
   private face = new FaceChannel();
   private mouthTrack: MouthTrack | null = null;
@@ -240,6 +242,27 @@ export class StageRuntime {
     if (loaded.fallbackReason) console.warn('[stage]', loaded.fallbackReason);
     this.avatar.setGazeTarget(this.gaze);
     this.scene.add(this.avatar.root);
+    this.fitMicToAvatar();
+  }
+
+  /** Stand-up: the mic goes in front of this body's mouth; the performer works it. */
+  private fitMicToAvatar(): void {
+    const anchor = this.avatar?.mouthAnchor?.() ?? null;
+    this.mouthAnchor = anchor;
+    this.performer.micMode = true;
+    if (!anchor) return;
+    this.avatar!.root.updateMatrixWorld(true);
+    const mouth = anchor.getWorldPosition(new THREE.Vector3());
+    this.restMouth.copy(mouth);
+    this.set.fitMic(mouth);
+  }
+
+  /** Mic ↔ mouth geometry in metres (e2e + framing checks). */
+  micReport(): { mouth: number[]; mic: number[]; distance: number; restMouth: number[]; avatar: string | null } {
+    const mic = this.set.mic.grilleWorld();
+    const mouth = this.mouthAnchor ? this.mouthAnchor.getWorldPosition(new THREE.Vector3()) : this.restMouth.clone();
+    const r = (v: THREE.Vector3) => [v.x, v.y, v.z].map((x) => Math.round(x * 1000) / 1000);
+    return { mouth: r(mouth), mic: r(mic), distance: Math.round(mic.distanceTo(mouth) * 1000) / 1000, restMouth: r(this.restMouth), avatar: this.avatar?.caps.kind ?? null };
   }
 
   async loadAudio(url: string): Promise<void> { await this.transport.loadAudio(url); }
