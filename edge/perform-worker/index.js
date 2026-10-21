@@ -8,7 +8,7 @@
 import { reskin, skinnable, skinResponse } from './funnier-skin.js';
 
 const ORIGIN = 'https://party.funnier.si';
-const HIDDEN = /(^|-)(prior|e2e|test)(-|$)/; // slugs: <name>-<hash>; Cathy/Lara/Chris Prior, E2E Bot, Share Test, Face Test
+const HIDDEN = /(^|-)(prior|e2e|test)(-|$)/; // slugs: <name>-<hash>; hides internal/family test accounts, E2E Bot, Share Test, Face Test
 const hidden = (slug) => HIDDEN.test(String(slug).toLowerCase());
 const notFound = () => new Response(reskin('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Not found · FUNNIER</title></head><body style="text-align:center;padding:0 16px 80px"><h1 style="margin-top:60px">Not on the bill</h1><p style="color:#8d8b93">This act isn’t on tonight’s bill.</p><p><a style="color:#ff3d55" href="/perform">Back to tonight’s bill</a></p></body></html>', '/perform/x'), { status: 404, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'x-robots-tag': 'noindex' } });
 
