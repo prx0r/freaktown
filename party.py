@@ -386,8 +386,24 @@ def _mq_input(room: dict, player: dict, data: dict):
             return {"ok": True, "correct": True}
         st["guesses"].append({"by": player["name"], "text": guess})
         _broadcast(room, "guess", {"round": st["round"], "by": player["name"]})
+        _mq_bots_act(room, "guess")
         return {"ok": True, "correct": False}
     return {"ok": False, "error": "unknown input"}
+
+
+# ── pi-harness agent backend (ADDITIVE) ─────────────────────────────
+# Bots are agents with pi harness backends when PARTY_PI_AGENTS=1;
+# otherwise $0 deck fallback (tests never touch network). Fail-closed.
+
+def _pi_line(mode: str, prompt: str, seat: str) -> str | None:
+    try:
+        import sys as _s
+        from pathlib import Path as _P
+        _s.path.insert(0, str(_P(__file__).parent / "scripts"))
+        import party_pi_agents as _pi  # noqa
+        return _pi.agent_line(mode, prompt, seat)
+    except Exception:
+        return None
 
 
 def _mq_advance(room: dict, reason: str = ""):
@@ -401,6 +417,67 @@ def _mq_advance(room: dict, reason: str = ""):
         _pack_next(room)
         return
     _mq_start_round(room)
+    _mq_bots_act(room, "start")
+
+
+# ── freaktionary solo bots (ADDITIVE, solo-vs-agents) ─────────────────
+# Deck bots ($0, no API): bots guess from the word list + seeded decoys;
+# a bot drawer lays simple strokes so the room keeps moving. Humans always
+# play the same path; bots just fill seats. Jev-1.14 eyes (Box/Noul) and
+# Fish s2.1-pro-free voice are optional upgrades via scripts/party_agent_sdk
+# — same interface, bots become providers.
+
+MQ_BOT_DECOYS = [
+    "pigeon", "dentist", "karaoke", "air fryer", "traffic cone",
+    "haunted Roomba", "LinkedIn", "cryptocurrency", "divorce court", "Tesco",
+]
+
+MQ_BOT_DRAW_STROKES = [
+    [[0.2, 0.2], [0.8, 0.2], [0.8, 0.8], [0.2, 0.8], [0.2, 0.2]],
+    [[0.5, 0.1], [0.5, 0.9]],
+    [[0.1, 0.5], [0.9, 0.5]],
+]
+
+
+def _mq_bots_act(room: dict, stage: str):
+    """One seeded bot turn. Safe to call after any human input or round start."""
+    st = room["mode_state"]
+    if st.get("phase") != "drawing" or st.get("revealed"):
+        return
+    import random as _r
+    rng = _r.Random(hash(room["code"]) % (2 ** 31) + st.get("round", 0) * 131)
+    bots = [pid for pid, p in room["players"].items() if p.get("bot")]
+    if not bots:
+        return
+    # Bot drawer lays strokes so humans have something to guess at.
+    if stage == "start" and st.get("drawer") in bots and not st.get("strokes"):
+        st["strokes"].append({"by": st["drawer"],
+                              "points": list(rng.choice(MQ_BOT_DRAW_STROKES))})
+        _broadcast(room, "draw.batch", {"round": st["round"],
+                                        "points": st["strokes"][-1]["points"]})
+    # Bott guessers take one shot each (seeded word-list + decoys).
+    if stage in ("start", "guess"):
+        for pid in bots:
+            if pid == st.get("drawer") or st.get("revealed"):
+                continue
+            pool = WORDS + MQ_BOT_DECOYS
+            guess = (_pi_line("freaktionary", "Guess the drawing in a few words.", pid)
+                     or rng.choice(pool)).lower()[:60]
+            if guess == (st.get("word") or "").lower():
+                st["winner"] = pid
+                st["revealed"] = True
+                room["players"][pid]["score"] += 2
+                room["players"][st["drawer"]]["score"] += 1
+                _record_win(room, pid)
+                _broadcast(room, "round.won", {
+                    "round": st["round"],
+                    "winner": room["players"][pid]["name"],
+                    "word": st["word"], "scores": _public_players(room)})
+                return
+            st["guesses"].append({"by": room["players"][pid]["name"],
+                                  "text": guess})
+        _broadcast(room, "guess", {"round": st["round"],
+                                   "by": "bots", "count": len(st["guesses"])})
 
 
 def _rr_create(room: dict):
@@ -443,6 +520,9 @@ def _rr_input(room: dict, player: dict, data: dict):
                                            "needed": len(room["players"])})
         if len(st["lines"]) >= len(room["players"]) and room["players"]:
             _rr_reveal(room)
+            _rr_bots_act(room, "vote")
+        else:
+            _rr_bots_act(room, "collect")
         return {"ok": True}
     if kind == "vote":
         if st["phase"] != "voting":
@@ -459,6 +539,8 @@ def _rr_input(room: dict, player: dict, data: dict):
                                            "count": len(st["votes"])})
         if len(st["votes"]) >= len(room["players"]) and room["players"]:
             _rr_score(room)
+        else:
+            _rr_bots_act(room, "vote")
         return {"ok": True}
     return {"ok": False, "error": "unknown input"}
 
@@ -548,6 +630,7 @@ def _rr_advance(room: dict, reason: str = ""):
             _rr_reveal(room)
         else:
             _rr_start_round(room, st.get("target") or "")
+            _rr_bots_act(room, "collect")
     elif st["phase"] == "voting":
         _rr_score(room)
     else:
@@ -555,6 +638,58 @@ def _rr_advance(room: dict, reason: str = ""):
             _pack_next(room)
             return
         _rr_start_round(room, st.get("target") or "")
+        _rr_bots_act(room, "collect")
+
+
+# ── roast-relay solo bots (ADDITIVE, solo-vs-agents) ──────────────────
+# Deck bots ($0, no API): lines from a roast deck, votes seeded + no
+# self-vote. Fish s2.1-pro-free voice is the $0 audio upgrade (same TTS
+# endpoint, model header only) — room never waits for it.
+
+RR_BOT_LINES = [
+    "your air fryer has seen things. it told me. i believe it.",
+    "you roast like a microwave beep: loud, short, forgotten.",
+    "the pigeon landed on your punchline. it left.",
+    "your group chat died Tuesday. we held a eulogy. it slapped.",
+    "you defend soup badly and the soup knows.",
+    "blackout. one beep. even the usher gave up on you.",
+]
+
+
+def _rr_bots_act(room: dict, stage: str):
+    """Fill bot lines/votes. Safe to call after any human input or reveal."""
+    st = room["mode_state"]
+    import random as _r
+    rng = _r.Random(hash(room["code"]) % (2 ** 31) + st.get("round", 0) * 173)
+    for pid in room["players"]:
+        if pid not in st.get("order", []):
+            st["order"].append(pid)
+    bots = [pid for pid in st.get("order", [])
+            if pid in room["players"] and room["players"][pid].get("bot")]
+    if not bots:
+        return
+    if stage == "collect" and st.get("phase") == "collecting":
+        for pid in bots:
+            if pid not in st["lines"]:
+                used = set(st["lines"].values())
+                avail = [line for line in RR_BOT_LINES if line not in used] or RR_BOT_LINES
+                st["lines"][pid] = (
+                    _pi_line("roast-relay",
+                             f"Target: {st.get('target','')}. Roast them in one line.", pid)
+                    or rng.choice(avail))
+        if len(st["lines"]) >= len(room["players"]) and room["players"]:
+            _rr_reveal(room)
+            _rr_bots_act(room, "vote")
+    elif stage == "vote" and st.get("phase") == "voting":
+        for pid in bots:
+            if pid in st["votes"]:
+                continue
+            choices = [str(i) for i in range(len(st["order"]))
+                       if st["order"][int(i)] != pid]
+            if choices:
+                st["votes"][pid] = rng.choice(choices)
+        if len(st["votes"]) >= len(room["players"]) and room["players"]:
+            _rr_score(room)
 
 
 # ── stone-face (M1 STONE FACE / format #7 TRY NOT TO SMILE) ─────────────
@@ -728,7 +863,9 @@ def _sf_bots_act(room: dict, stage: str):
             if pid not in st["infos"]:
                 used = set(st["infos"].values())
                 avail = [l for l in SF_BOT_INFOS if l not in used] or SF_BOT_INFOS
-                st["infos"][pid] = rng.choice(avail)
+                st["infos"][pid] = (
+                    _pi_line("stone-face", "Confess something TRUE+funny about you.", pid)
+                    or rng.choice(avail))
         if len(st["infos"]) >= len(room["players"]) and room["players"]:
             _sf_assemble(room)
     elif stage == "perform" and st["phase"] == "performing":
@@ -1361,7 +1498,10 @@ def _fz_bots_act(room: dict, stage: str):
                 if pid not in st["entries"]:
                     used = set(v for k, v in st["entries"].items()
                                if not k.endswith(":cb"))
-                    st["entries"][pid] = _fz_bot_pick(rng, deck, used)
+                    st["entries"][pid] = (
+                        _pi_line("freeze-night",
+                                 f"Prompt: {st.get('prompt','')}", pid)
+                        or _fz_bot_pick(rng, deck, used))
             if len(st["entries"]) >= len(_fz_players(room)) and _fz_players(room):
                 _fz_reveal(room)
                 _fz_bots_act(room, "vote")
@@ -2188,7 +2328,9 @@ def _qc_bots_act(room: dict, stage: str):
             if pid not in st["entries"]:
                 used = set(st["entries"].values())
                 avail = [l for l in QC_BOT_LINES if l not in used] or QC_BOT_LINES
-                st["entries"][pid] = rng.choice(avail)
+                st["entries"][pid] = (
+                    _pi_line("quip", f"Prompt: {st.get('prompt','')}", pid)
+                    or rng.choice(avail))
                 if st["twist"] == "liar":
                     st["secrets"][pid] = rng.choice([True, False])
         if len(st["entries"]) >= len(_qc_order(room)) and _qc_order(room):
@@ -2713,6 +2855,7 @@ def host_cmd(code):
             MODES[mode]["create"](room)
             if mode == "freaktionary":
                 _mq_start_round(room)
+                _mq_bots_act(room, "start")
             elif mode == "freeze-night":
                 _fz_next_round(room)
             elif mode == "stone-face":
@@ -2723,6 +2866,7 @@ def host_cmd(code):
                 _qc_start_round(room, data.get("deck") or MODES[mode].get("deck", "endings"))
             else:
                 _rr_start_round(room, data.get("target", ""))
+                _rr_bots_act(room, "collect")
             # persistent-freak memory: the room now knows who these
             # performers are, not just what they typed tonight.
             _record_game(room)
@@ -2742,8 +2886,8 @@ def host_cmd(code):
                 n = 3
             free = MAX_PLAYERS - len(room["players"])
             n = max(0, min(n, free))
-            if room.get("mode") not in (None, "freeze-night", "stone-face", "poker") and not str(room.get("mode") or "").startswith("quip-"):
-                return jsonify({"ok": False, "error": "bots need freeze-night, stone-face, poker or quip games"}), 400
+            if room.get("mode") not in (None, "freeze-night", "stone-face", "poker", "roast-relay", "freaktionary") and not str(room.get("mode") or "").startswith("quip-"):
+                return jsonify({"ok": False, "error": "bots need freeze-night, stone-face, poker, roast-relay, freaktionary or quip games"}), 400
             before = set(room["players"])
             made = _fz_add_bots(room, n)
             # _fz_add_bots returns display names; resolve to player ids.
@@ -2755,8 +2899,17 @@ def host_cmd(code):
                         _qc_bots_act(room, "collect")
                     elif room.get("mode") == "stone-face":
                         _sf_bots_act(room, "collect")
+                    elif room.get("mode") == "roast-relay":
+                        _rr_bots_act(room, "collect")
+                    elif room.get("mode") == "freaktionary":
+                        _mq_bots_act(room, "start")
                     else:
                         _fz_bots_act(room, "collect")
+                elif st.get("phase") in ("voting", "drawing"):
+                    if room.get("mode") == "roast-relay":
+                        _rr_bots_act(room, "vote")
+                    elif room.get("mode") == "freaktionary":
+                        _mq_bots_act(room, "guess")
                 elif room.get("mode") == "poker":
                     for pid in made_pids:
                         room["players"][pid]["stack"] = PK_STACK
@@ -2905,6 +3058,7 @@ def stream(code):
     except Exception:
         last = 0
     with LOCK:
+        room["_seen_at"] = _now()  # someone is watching (chatter viewer gate)
         missed = [e for e in room["events"] if e["seq"] > last]
         snap = _stage_public(room)
         seq = room["seq"]
@@ -3030,6 +3184,10 @@ async function poll(){
         const who = ev.kind === 'smile.detected' ? (ev.by+' smiled') :
           (ev.kind === 'character.act' ? ev.actor+': '+ev.text : 'host reacted');
         document.getElementById('acting').textContent = who + (mood ? ' · '+mood : '');
+      }
+      if(ev.kind === 'chat'){
+        document.getElementById('acting').textContent =
+          (ev.by||'bot') + ': ' + (ev.text||'');
       }
     });
   }catch(e){}

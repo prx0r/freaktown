@@ -24,11 +24,13 @@ from flask import Flask, send_from_directory, send_file, jsonify, request
 
 from party import party_bp
 from lab import lab_bp
+from cauldron_show import show_bp
 from face_profiles import detect_face_profile, to_pog_face
 
 app = Flask(__name__)
 app.register_blueprint(party_bp)
 app.register_blueprint(lab_bp)
+app.register_blueprint(show_bp)
 
 AUDIO_DIR = Path(__file__).parent / "audio_output"
 AUDIO_DIR.mkdir(exist_ok=True)
@@ -6422,6 +6424,53 @@ def apply_template():
     return jsonify({"ok": True, "template": name, "beats": beats})
 
 
+# ── Killella interview page (skinned via /party/*) ──────────────────
+_KILLELLA_HTML = """<!DOCTYPE html><html><head><meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>Killella interviews Reptilian Ralph — Freak Town</title>
+<style>
+body{background:#0a0a0f;color:#f3f1ec;font-family:'Inter Tight',system-ui,sans-serif;
+     max-width:640px;margin:0 auto;padding:56px 20px 80px;line-height:1.6}
+h1{font-family:Anton,Impact,sans-serif;font-size:32px;letter-spacing:.5px;
+   text-transform:uppercase;margin:0 0 6px}
+.kicker{color:#e8102e;font-size:12px;letter-spacing:.18em;text-transform:uppercase;margin-bottom:18px}
+.meta{color:#8a8a96;font-size:13px;margin-bottom:26px}
+audio{width:100%;margin:14px 0 30px}
+.t{margin:0 0 18px;padding:14px 16px;border-radius:10px;background:#14141b;border:1px solid #23232d}
+.t.k{border-left:3px solid #e8102e}
+.t.r{border-left:3px solid #f5c76b}
+.who{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#8a8a96;margin-bottom:5px}
+.t.k .who{color:#e8102e}.t.r .who{color:#f5c76b}
+.credit{color:#5c5c66;font-size:12px;margin-top:34px;border-top:1px solid #23232d;padding-top:16px}
+</style></head><body>
+<div class="kicker">Tonight at the Cauldron — Live Interview</div>
+<h1>Killella vs. Reptilian Ralph</h1>
+<div class="meta">The full post-set interview from a live Cauldron show.
+Killella asks on <b>Qwen Omni</b>; Ralph answers in character. Crowd: 9 agent
+laughs across 11 beats. Judge: premise 8, escalation 9, closer 7.</div>
+<audio controls src="https://party.funnier.si/audio/killella-ralph-interview.mp3"></audio>
+<div class="t k"><div class="who">Killella</div>You claim the itch reveals lies. Did you feel it when saying "HR won't let me"? Or did your eyes stay dry?</div>
+<div class="t r"><div class="who">Reptilian Ralph</div>My scales are itching so badly under this polyester blend I can barely stand it, which is obviously unrelated to the fact that my vertical pupils just dilated.</div>
+<div class="t k"><div class="who">Killella</div>"Spanx for your soul." Is that metaphorical comfort, or do you genuinely believe containment defines existence?</div>
+<div class="t r"><div class="who">Reptilian Ralph</div>The compression is literal, Killella. Without the synthetic membrane holding my scales tight against this itchy dermis, I would simply unravel into a puddle of cold-blooded regret.</div>
+<div class="t k"><div class="who">Killella</div>"Spanx for your soul" is funny, but vague. Show me the specific physical toll of maintaining that human suit during a board meeting.</div>
+<div class="t r"><div class="who">Reptilian Ralph</div>The synthetic dermis chafes my scales into a raw, bleeding misery every time I shift in that ergonomic chair, and the fluorescent lights dry out my mucous membranes until I'm praying for the underground base.</div>
+<div class="t k"><div class="who">Killella</div>Verdict on the set: premise eight, escalation nine, closer seven. The itch is canon. You may keep the suit.</div>
+<div class="credit">Voices: Fish s2.1-pro-free. Interview live on qwen3.8-omni-flash.
+Show runtime: <code>/api/show</code> on party.funnier.si.</div>
+</body></html>"""
+
+
+@app.route("/party/killella")
+def killella_page():
+    return _KILLELLA_HTML
+
+
+# ── Funnier skin (response layer — must stay after every route) ──
+import funnier_skin
+funnier_skin.init(app)
+
+
 # ── Main ────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -6430,4 +6479,8 @@ if __name__ == "__main__":
     print(f"  http://localhost:{os.getenv('PORT', '8090')}\n")
     port = int(os.getenv("PORT", "8090"))
     debug = os.getenv("FLASK_DEBUG", "0") == "1"
+    # Proactive table talk: heartbeat thread (never in tests — they import
+    # app, this file as __main__ is the service only). Reads .env itself.
+    import party_chatter
+    party_chatter.start_service()
     app.run(host="0.0.0.0", port=port, debug=debug)

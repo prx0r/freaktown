@@ -1,7 +1,24 @@
-# STATUS — freaktown honest state (2026-10-16)
+# STATUS — freaktown honest state (2026-10-16 · delta 2026-10-21)
 
 Read this first. Everything else is detail. This file is the anti-mess:
 vision, what's done, what's not, what's theatre, what's next.
+
+## 2026-10-21 delta (see HANDOVER-2026-10-21.md for detail)
+
+- **funnier-skin live**: Funnier look on all public pages + privacy-gated
+  bill (only `listed:true` acts; family sets 404). 40/40.
+- **All party modes have solo bots** now (roast-relay + freaktionary were
+  the last two; open-thread #1 CLOSED). allbots 17/17.
+- **Qwen agent backend** for bots (`PARTY_PI_AGENTS=1`, key in .env only,
+  dry deck default). qwen-flash-character for persona seats; omni-flash is
+  the multimodal/realtime upgrade path.
+- **SHOW RUNTIME shipped** (`cauldron_show.py`, `docs/SHOW-RUNTIME.md`): the Cauldron
+  show — walkout sting → minute → Killella interview → crowd verdict — as a
+  JSON backend the stage renders. test_show.py 32/32, walked live.
+- Open-thread #1 (bots) done; NEW open thread: stage renders the show
+  (stage agent's lane); commit/push of this tree pending owner.
+- Disk: box rescued 98%→93% (bitt pushed+deleted, playwright cleared —
+  reinstall chromium before eyes scripts).
 
 ## Vision (one paragraph)
 

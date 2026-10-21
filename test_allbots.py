@@ -42,18 +42,19 @@ def sim_night(mode, nbots=4, deck=None, label=""):
     code, ht = r["code"], r["host_token"]
     c.post(f"/party/{code}/host", json={"host_token": ht, "cmd": "lock"})
     kw = {"deck": deck} if deck else {}
-    if mode in ("freeze-night",) or mode.startswith("quip-"):
+    if mode in ("freeze-night", "roast-relay", "freaktionary") or mode.startswith("quip-"):
         host(code, ht, "bots", n=nbots)
     else:
-        # roast/freaktionary have no bot seats yet: seed bot players via join
-        # is human-only; all-bot needs engine seats — covered when wired.
+        # poker/stone-face seat via join-is-human-only path; covered by own sims.
         return None
     r = host(code, ht, "start", mode=mode, **kw)
     assert r.get("ok"), r
     room = ROOMS[code]
     rounds, steps = 0, 0
     last_phase = None
-    while room["phase"] != "done" and steps < 60:
+    # single-round modes never reach "done" — cap advances, same assertions.
+    cap = 4 if mode in ("roast-relay", "freaktionary") else 60
+    while room["phase"] != "done" and steps < cap:
         host(code, ht, "advance")
         steps += 1
         st = room["mode_state"]
@@ -103,6 +104,22 @@ def main():
               st.get("round", 0) >= 2)
         check(f"quip-{deck} scores moved",
               sum(p["score"] for p in room["players"].values()) > 0)
+
+    # ADDITIVE solo cover: roast-relay + freaktionary all-bot nights ($0 decks)
+    room = sim_night("roast-relay", label="roast-relay")
+    check("roast-relay completes with zero humans",
+          room is not None and room["mode_state"].get("phase") == "scored")
+    if room is not None:
+        check("roast lines filled",
+              len(room["mode_state"].get("lines", {})) >= 4)
+        check("roast votes filled",
+              len(room["mode_state"].get("votes", {})) >= 4)
+    room = sim_night("freaktionary", label="freaktionary")
+    check("freaktionary starts with zero humans", room is not None)
+    if room is not None:
+        st = room["mode_state"]
+        check("freaktionary bot drawer draws or guesses flow",
+              len(st.get("strokes", [])) >= 1 or len(st.get("guesses", [])) >= 1)
 
     print("\n--- timings (mode, phase-changes, advances, seconds) ---")
     for row in TIMINGS:
