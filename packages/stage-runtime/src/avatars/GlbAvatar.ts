@@ -145,6 +145,15 @@ export class GlbAvatar implements AvatarDriver {
     }
   }
 
+  /** ARKit (or any) morph names straight onto the meshes — only names present in the bytes. */
+  setBlendshapes(weights: Partial<Record<string, number>>): void {
+    for (const [name, v] of Object.entries(weights)) {
+      const refs = this.morphs.get(name);
+      if (!refs || v === undefined) continue;
+      for (const r of refs) if (r.mesh.morphTargetInfluences) r.mesh.morphTargetInfluences[r.index] = Math.max(0, Math.min(1, v));
+    }
+  }
+
   update(dt: number): void { this.mixer?.update(dt); }
 
   dispose(): void { this.root.parent?.remove(this.root); }
