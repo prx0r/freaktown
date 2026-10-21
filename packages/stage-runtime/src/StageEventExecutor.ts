@@ -157,6 +157,17 @@ export class StageEventExecutor {
         else if (name) this.runtime.playSfx(name);
         break;
       }
+      case 'face.expression': {
+        const e = (payload.action ?? payload.emotion) as string | undefined;
+        if (typeof e === 'string' && !payload.seat) this.runtime.faceExpression(e, Number(payload.intensity ?? 0.9), Number(payload.duration_ms ?? 2000));
+        break;
+      }
+      case 'face.blendshapes':
+        if (payload.weights && typeof payload.weights === 'object' && !payload.seat) this.runtime.faceBlendshapes(payload.weights as Record<string, number>);
+        break;
+      case 'face.affect':
+        if (!payload.seat) this.runtime.faceAffect(Number(payload.a ?? 0), Number(payload.v ?? 0), Number(payload.p ?? 0), Number(payload.hold_ms ?? 4000));
+        break;
       case 'character.enter':
         await this.runtime.lookAtAudience().catch(() => {});
         break;
