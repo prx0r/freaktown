@@ -3,7 +3,7 @@
  * play → advance → pause → resume → seek → end, all deterministic.
  */
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { Transport } from './Transport';
+import { Transport } from '../src/Transport';
 
 interface FakeSource {
   buffer: unknown;

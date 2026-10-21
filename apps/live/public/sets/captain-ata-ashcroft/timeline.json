@@ -1,0 +1,72 @@
+[
+ {
+  "beat_id": "b1",
+  "type": "setup",
+  "start_ms": 0,
+  "dur_ms": 7076,
+  "end_ms": 7076,
+  "pause_before_ms": 0,
+  "pause_after_ms": 300,
+  "text": "Folks, this is your captain. We are currently third in line for takeoff, which is also how I rank my marriages.",
+  "performance": {}
+ },
+ {
+  "beat_id": "b2",
+  "type": "escalation",
+  "start_ms": 7376,
+  "dur_ms": 9304,
+  "end_ms": 16680,
+  "pause_before_ms": 0,
+  "pause_after_ms": 300,
+  "text": "We have a slight delay on the runway. The runway is my twenties. The tower has questions about my flight plan, and frankly so does Brenda.",
+  "performance": {}
+ },
+ {
+  "beat_id": "b3",
+  "type": "escalation",
+  "start_ms": 16980,
+  "dur_ms": 6819,
+  "end_ms": 23799,
+  "pause_before_ms": 0,
+  "pause_after_ms": 300,
+  "text": "Your baggage may have shifted during the relationship. Please check the overhead compartment, where I keep my apologies.",
+  "performance": {}
+ },
+ {
+  "beat_id": "b4",
+  "type": "escalation",
+  "start_ms": 24099,
+  "dur_ms": 10274,
+  "end_ms": 34373,
+  "pause_before_ms": 0,
+  "pause_after_ms": 300,
+  "text": "The fasten-seatbelt sign is on. It has been on since 2019. Brenda says I use it to avoid conversations, and Brenda is extremely correct.",
+  "performance": {}
+ },
+ {
+  "beat_id": "b5",
+  "type": "punchline",
+  "start_ms": 34913,
+  "dur_ms": 6944,
+  "end_ms": 41857,
+  "pause_before_ms": 240,
+  "pause_after_ms": 850,
+  "text": "We know you have choices in airlines, and even more choices in husbands. Thank you for choosing poorly, again.",
+  "performance": {
+   "expression": "deadpan",
+   "gesture": "hold",
+   "look": "audience"
+  }
+ },
+ {
+  "beat_id": "b6",
+  "type": "closer",
+  "start_ms": 42707,
+  "dur_ms": 8362,
+  "end_ms": 51069,
+  "pause_before_ms": 0,
+  "pause_after_ms": 850,
+  "text": "We will be landing shortly in Denver, emotionally speaking. Please remain seated until I have fully stopped caring. Thank you.",
+  "performance": {}
+ }
+]

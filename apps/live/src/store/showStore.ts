@@ -11,30 +11,17 @@
 
 import { create } from 'zustand';
 
-import type { CameraPresetV1 } from '../contracts/show';
-import { CAMERA_PRESETS } from '../stage/CameraDirector';
+import type {
+  CameraPresetV1, MotionCue, PerformancePlan, ShowEvent, ShowPhase, WordTiming,
+} from '@freaktown/contracts';
+import type { RoomStore } from '@freaktown/stage-runtime';
 
-export { CAMERA_PRESETS };
+// Shared shapes now live in @freaktown/contracts (one place); re-exported
+// so existing imports from this module keep working.
+export type { MotionCue, PerformancePlan, ShowEvent, ShowPhase, WordTiming };
 
 // ── Types ──────────────────────────────────────────────────────────
 
-export type ShowPhase =
-  | 'pre_show'
-  | 'intro'
-  | 'lineup'
-  | 'character_enter'
-  | 'set_active'
-  | 'post_set'
-  | 'judging'
-  | 'roast'
-  | 'transition'
-  | 'live_test'
-  | 'model_reveal'
-  | 'elimination'
-  | 'finale'
-  | 'winner'
-  | 'outro'
-  | 'ended';
 
 export type CameraPreset = CameraPresetV1;
 
@@ -46,14 +33,6 @@ export interface CameraCut {
   source: 'human_director' | 'auto_director';
 }
 
-export interface ShowEvent {
-  seq: number;
-  type: string;
-  actor: string;
-  payload: Record<string, any>;
-  created_at: string;
-  effective_at?: string;
-}
 
 export interface Appearance {
   id: string;
@@ -89,37 +68,6 @@ export interface CrowdState {
   groans: number;
 }
 
-// ── Performance Plan Types (shared with StageRuntime) ─────────────
-
-export interface WordTiming {
-  word: string;
-  start_ms: number;
-  end_ms: number;
-  index: number;
-}
-
-export interface MotionCue {
-  at_ms: number;
-  action: string;
-  motion_asset_id: string | null;
-  duration_ms: number;
-  intensity: number;
-  bone_mask: string;
-  layer: 'base' | 'upper' | 'head' | 'face';
-  metadata?: Record<string, any>;
-}
-
-export interface PerformancePlan {
-  appearance_id: string;
-  body_class: string;
-  duration_ms: number;
-  base_idle_asset_id: string | null;
-  energy: number;
-  stillness: number;
-  gesture_density: number;
-  cue_count: number;
-  cues: MotionCue[];
-}
 
 // ── Store ──────────────────────────────────────────────────────────
 
@@ -328,3 +276,20 @@ export const useShowStore = create<ShowState>((set, get) => ({
     }
   },
 }));
+
+/** The zustand store as the runtime's RoomStore port (injected, never imported by the runtime). */
+export const showRoomStore: RoomStore = {
+  applyEvent: (e) => useShowStore.getState().applyEvent(e),
+  setEpisode: (id) => useShowStore.getState().setEpisode(id),
+  setPhase: (p) => useShowStore.getState().setPhase(p),
+  setCrowd: (c) => useShowStore.getState().setCrowd(c),
+};
+
+/** The zustand store as the runtime's ClockSink port. */
+export const showClockSink = {
+  setCurrentTime: (ms: number) => {
+    // ~10 Hz is plenty for a UI readout; avoid re-rendering React every frame.
+    const s = useShowStore.getState();
+    if (Math.abs(s.currentTimeMs - ms) >= 100 || ms === 0) s.setCurrentTime(ms);
+  },
+};

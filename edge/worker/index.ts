@@ -26,6 +26,8 @@ export type Env = {
   ANTHROPIC_API_KEY: string;
   ELEVENLABS_API_KEY: string;
   STAGE_TOKEN_SECRET: string;
+  /** LOCAL DEV ONLY: "1" lets /command + /stage-token skip admin auth (set in .dev.vars, never in prod). */
+  LIVE_DEV_OPEN?: string;
   ASSETS: { fetch: typeof fetch };
 };
 
@@ -64,7 +66,9 @@ app.get('/live/:episodeId/ws', async (c) => {
   // plus the episodeId the DO instance is authoritative for.
   const params = new URLSearchParams(url.search);
   params.set('episodeId', episodeId);
-  return stub.fetch(`https://episode-room/ws?${params.toString()}`);
+  // Forward the ORIGINAL request (Upgrade/Sec-WebSocket-* headers) — a bare
+  // URL fetch drops them and the DO's 101 response is refused.
+  return stub.fetch(new Request(`https://episode-room/ws?${params.toString()}`, c.req.raw));
 });
 
 app.get('/live/:episodeId/state', async (c) => {
@@ -81,7 +85,14 @@ app.get('/live/:episodeId/sense', async (c) => {
   return stub.fetch('https://episode-room/sense');
 });
 
-app.post('/live/:episodeId/command', authMiddleware, requireAdmin, async (c) => {
+// Local `wrangler dev` convenience: with LIVE_DEV_OPEN=1 (only via .dev.vars)
+// operator routes skip admin auth so the offline control page can drive the
+// DO without a D1 api key row. Fail closed: unset → normal auth.
+const devOpen = (c: { env: Env }) => c.env.LIVE_DEV_OPEN === '1';
+const operatorAuth = async (c: any, next: () => Promise<void>) => (devOpen(c) ? next() : authMiddleware(c, next));
+const operatorAdmin = async (c: any, next: () => Promise<void>) => (devOpen(c) ? next() : requireAdmin(c, next));
+
+app.post('/live/:episodeId/command', operatorAuth, operatorAdmin, async (c) => {
   const episodeId = c.req.param('episodeId');
   if (!episodeId) return c.json({ error: 'episodeId required' }, 400);
   const stub = getRoom(c, episodeId);
@@ -93,7 +104,7 @@ app.post('/live/:episodeId/command', authMiddleware, requireAdmin, async (c) => 
   });
 });
 
-app.post('/live/:episodeId/stage-token', authMiddleware, requireAdmin, async (c) => {
+app.post('/live/:episodeId/stage-token', operatorAuth, operatorAdmin, async (c) => {
   const episodeId = c.req.param('episodeId');
   if (!episodeId) return c.json({ error: 'episodeId required' }, 400);
   const stub = getRoom(c, episodeId);
