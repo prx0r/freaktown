@@ -72,6 +72,8 @@ export class StageEventExecutor {
           plan: payload.plan,
           wordTimings: payload.word_timings ?? [],
           walkoutUrl: payload.walkout_url,
+          visemes: payload.visemes,
+          aus: payload.aus,
         });
         this.consumer.sendStageAck({
           event: 'performance.ready',

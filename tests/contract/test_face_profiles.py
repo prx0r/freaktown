@@ -57,7 +57,33 @@ class TestPogFace:
     def test_expression_unknown_is_empty(self):
         assert fp.map_expression("schmorp", 1.0) == []
         happy = dict(fp.map_expression("happy", 0.5))
-        assert happy == {"smile_left": 0.5, "smile_right": 0.5}
+        assert happy == {"smile_left": 0.5, "smile_right": 0.5,
+                         "cheek_squint_left": 0.3,
+                         "cheek_squint_right": 0.3}
+
+    def test_full_face_recipes(self):
+        sad = dict(fp.map_expression("sad", 1.0))
+        assert sad["brow_inner_up"] == 0.9
+        assert sad["frown_left"] == 0.8
+        angry = dict(fp.map_expression("angry", 1.0))
+        assert angry["brow_down_left"] == 1.0
+        assert angry["eye_squint_right"] == 0.5
+        assert fp.map_expression("moonwalk", 1.0) == []
+        morphs = dict(fp.expression_morphs("surprised", 1.0))
+        assert morphs["jawOpen"] == 0.8
+        assert morphs["eyeWideLeft"] == 0.9
+        assert morphs["browOuterUpRight"] == 0.7
+        assert fp.expression_morphs("moonwalk") == []
+
+    def test_new_intents_resolve(self):
+        names = ["browDownLeft", "browInnerUp", "eyeWideLeft",
+                 "noseSneerRight", "cheekPuff"]
+        m = fp.to_pog_face(names)
+        assert m["intents"]["brow_down_left"] == "browDownLeft"
+        assert m["intents"]["brow_inner_up"] == "browInnerUp"
+        assert m["intents"]["eye_wide_left"] == "eyeWideLeft"
+        assert m["intents"]["nose_sneer_right"] == "noseSneerRight"
+        assert m["intents"]["cheek_puff"] == "cheekPuff"
 
 
 class TestVRM:
@@ -138,3 +164,46 @@ class TestBasicManifest:
         assert d["ok"] and d["avatarUrl"]
         assert d["face_profile"]["profile"] == "JAW"
         assert "jaw_open" in d["face_profile"]["pog_face_v1"]
+
+
+class TestFacsCalibration:
+    """Recipes follow the FACS canonical table (AUBlendNet ICCV'25 T2):
+    Happy 6+12, Sad 1+4+15, Surprise 1+2+5+27, Fear 1+2+4+5+7+20+26,
+    Anger 4+5+7+9+23, Disgust 9+5+16, Contempt 4+14+64."""
+
+    def test_sad_has_au4(self):
+        sad = dict(fp.map_expression("sad", 1.0))
+        assert sad["brow_inner_up"] == 0.9   # AU1
+        assert sad["brow_down_left"] == 0.5  # AU4
+        assert sad["frown_left"] == 0.8      # AU15
+
+    def test_fear_has_stretch(self):
+        fear = dict(fp.map_expression("fear", 1.0)) if False else None
+        afraid = dict(fp.map_expression("afraid", 1.0))
+        assert afraid["mouth_stretch_left"] == 0.6   # AU20
+        assert afraid["eye_wide_left"] == 1.0        # AU5
+        assert afraid["brow_down_right"] == 0.4      # AU4
+
+    def test_disgust_is_nose_not_frown(self):
+        d = dict(fp.map_expression("disgust", 1.0))
+        assert d["nose_sneer_left"] == 0.9            # AU9
+        assert d["mouth_lower_down_left"] == 0.7      # AU16
+        assert "frown_left" not in d
+
+    def test_anger_has_press_and_nose(self):
+        a = dict(fp.map_expression("angry", 1.0))
+        assert a["mouth_press_left"] == 0.7           # AU23
+        assert a["nose_sneer_right"] == 0.5           # AU9
+
+    def test_contempt_exists(self):
+        c = dict(fp.map_expression("contempt", 1.0))
+        assert c["smile_left"] == 0.8
+        assert c["brow_down_left"] == 0.5
+
+    def test_new_intents_resolve(self):
+        m = fp.to_pog_face(["mouthStretchLeft", "mouthPressRight",
+                            "mouthLowerDownLeft"])
+        assert m["intents"]["mouth_stretch_left"] == "mouthStretchLeft"
+        assert m["intents"]["mouth_press_right"] == "mouthPressRight"
+        assert m["intents"]["mouth_lower_down_left"] == \
+            "mouthLowerDownLeft"

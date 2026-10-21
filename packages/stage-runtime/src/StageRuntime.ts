@@ -16,6 +16,8 @@ import { Transport } from './Transport';
 import { AudioBus } from './AudioBus';
 import { CameraDirector, CameraPresetName } from './CameraDirector';
 import { LipSyncAdapter } from './LipSync';
+import { ExpressionLayer, type ProsodyFrame } from './ExpressionLayer';
+import { MorphVisemePlayer, type VisemeDoc } from './MorphVisemePlayer';
 import { EventConsumer } from './EventConsumer';
 import { useShowStore, MotionCue, WordTiming, PerformancePlan } from '../store/showStore';
 
@@ -29,6 +31,12 @@ export interface PreloadSpec {
   plan: PerformancePlan;
   wordTimings?: WordTiming[];
   walkoutUrl?: string;
+  /** speakAudio-shape viseme doc (take visemes.json). Plays on the
+   *  GLB-direct morph path when present; ignored otherwise. */
+  visemes?: VisemeDoc;
+  /** AU prosody frames (take aus.json). Brow/eye lifts + phrase blinks
+   *  under beat emotions; ignored without a morph writer. */
+  aus?: { frames: ProsodyFrame[] };
 }
 
 export interface StageConfig {
@@ -53,6 +61,9 @@ export class StageRuntime {
   private audioBus: AudioBus;
   private cameraDirector: CameraDirector;
   private lipSync: LipSyncAdapter;
+  private expressions: ExpressionLayer;
+  /** GLB-direct mouth (non-VRM avatars with viseme/ARKit morphs). */
+  private morphMouth: MorphVisemePlayer;
   private eventConsumer: EventConsumer;
 
   // Performance plan
@@ -122,6 +133,12 @@ export class StageRuntime {
     // Lip sync reads the bus voice tap; mouth channel only.
     this.lipSync = new LipSyncAdapter();
     this.lipSync.attach(this.audioBus.getVoiceAnalyser());
+
+    // Emotion channel: beats + reactions, smoothed. Never touches mouth.
+    this.expressions = new ExpressionLayer();
+
+    // GLB-direct mouth for non-VRM avatars (TalkingHead-style).
+    this.morphMouth = new MorphVisemePlayer();
 
     // Event consumer
     this.eventConsumer = new EventConsumer();
@@ -198,25 +215,36 @@ export class StageRuntime {
         url,
         async (gltf) => {
           const vrm = gltf.userData.vrm as VRM;
-          if (!vrm) {
-            reject(new Error('No VRM found in GLB'));
+          if (vrm) {
+            this.vrm = vrm;
+            this.scene.add(vrm.scene);
+            this.mixer = new THREE.AnimationMixer(vrm.scene);
+
+            // VRM LookAt tracks our persistent gaze target
+            if (vrm.lookAt) {
+              vrm.lookAt.target = this.gazeTarget;
+            }
+
+            // Set default pose
+            vrm.humanoid?.resetNormalizedPose();
+
+            // Connect lip sync
+            this.lipSync.setVRM(vrm);
+
+            resolve();
             return;
           }
 
-          this.vrm = vrm;
-          this.scene.add(vrm.scene);
-          this.mixer = new THREE.AnimationMixer(vrm.scene);
-
-          // VRM LookAt tracks our persistent gaze target
-          if (vrm.lookAt) {
-            vrm.lookAt.target = this.gazeTarget;
-          }
-
-          // Set default pose
-          vrm.humanoid?.resetNormalizedPose();
-
-          // Connect lip sync
-          this.lipSync.setVRM(vrm);
+          // No VRM: GLB-direct path (TalkingHead-style). Bind whatever
+          // viseme/ARKit mouth morphs the file actually carries; VRM-only
+          // channels (gaze tracking, blink timer) stay dormant. The
+          // emotion layer gets a morph writer over the same file, so
+          // beats and reactions move brows/eyes/cheeks too.
+          this.scene.add(gltf.scene);
+          this.mixer = new THREE.AnimationMixer(gltf.scene);
+          const bound = this.morphMouth.attachToObject(gltf.scene);
+          this.expressions.morphWriter = this.morphMouth.writer();
+          console.log('[Stage] GLB-direct mouth, bound morphs:', bound.join(',') || 'none');
 
           resolve();
         },
@@ -268,6 +296,10 @@ export class StageRuntime {
     await this.loadAvatar(spec.avatarUrl);
     await this.loadAudio(spec.audioUrl);
     this.setPlan(spec.plan, spec.wordTimings ?? []);
+    // GLB-direct mouth: real viseme timeline when the take ships one.
+    this.morphMouth.playDoc(spec.visemes);
+    // Upper-face prosody: brows/eyes/blink synced to the same audio.
+    this.expressions.playProsody(spec.aus?.frames);
     this.setStatus('READY');
   }
 
@@ -377,6 +409,12 @@ export class StageRuntime {
       // Update lip sync
       this.lipSync.update();
 
+      // GLB-direct mouth timeline (no-op without bound morphs/frames)
+      this.morphMouth.update(currentTimeMs);
+
+      // Update emotion channel (same clock, never clears mouth/blink)
+      this.expressions.update(currentTimeMs, this.vrm?.expressionManager);
+
       // Update word highlighting
       this.updateWordHighlight(currentTimeMs);
 
@@ -465,38 +503,14 @@ export class StageRuntime {
     // In production: fetch motion asset from R2, create AnimationClip, play
   }
 
-  // Emotion expressions driven by semantic beats. Targeted writes ONLY —
-  // never resetValues() here: that would also clear the mouth visemes
-  // (lipsync channel) and blink (timer channel) mid-frame and make them
-  // fight. Channels: mouth = analyser, face = beats, blink = timer.
-  private static readonly EMOTION_EXPRESSIONS = ['happy', 'angry', 'sad', 'surprised', 'neutral'];
-
+  // Emotion expressions driven by semantic beats. Delegated to the
+  // ExpressionLayer: same targets as before, now with attack/hold/decay
+  // envelopes instead of instant pops. Targeted writes ONLY — the layer
+  // never touches mouth visemes or blink. Channels: mouth = analyser,
+  // face = beats, blink = timer.
   private executeFace(action: string, intensity: number): void {
     if (!this.vrm?.expressionManager) return;
-
-    const em = this.vrm.expressionManager;
-
-    const exprMap: Record<string, string> = {
-      'face.smile': 'happy',
-      'face.frown': 'sad',
-      'face.annoyed': 'angry',
-      'face.surprised': 'surprised',
-      'face.deadpan': 'neutral',
-      'face.smug': 'happy',
-      'face.disgusted': 'angry',
-      'reaction.confused': 'surprised',
-      'reaction.annoyed': 'angry',
-      'reaction.shock': 'surprised',
-      'reaction.dead_stare': 'neutral',
-    };
-
-    const expr = exprMap[action];
-    if (!expr) return;
-
-    for (const name of StageRuntime.EMOTION_EXPRESSIONS) {
-      if (name !== expr) em.setValue(name, 0);
-    }
-    em.setValue(expr, intensity);
+    this.expressions.setExpression(action, intensity);
   }
 
   private executePose(action: string, cue: MotionCue): void {
