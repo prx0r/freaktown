@@ -33,6 +33,9 @@ export const SET_EVENT_TYPES = [
   "poker.intent",
   "seat.join",
   "seat.leave",
+  "face.expression",
+  "face.blendshapes",
+  "face.affect",
 ] as const;
 export type SetEventTypeV1 = (typeof SET_EVENT_TYPES)[number];
 
@@ -71,6 +74,12 @@ export interface DialogueLinePayloadV1 {
   /** Optional face/gesture cue for the speaker ("face.smile", "gesture.point"). */
   cue?: string;
   line_id?: string;
+  /** Harness emotion for the whole line ("smug", "deadpan", "excited"). */
+  emotion?: string;
+  /** Measured word timings relative to the line start (e.g. edge-TTS WordBoundary). */
+  words?: Array<{ word: string; start_ms: number; end_ms: number }>;
+  /** mutuals-beats/v1 acting beats; applied only with measured `words` (fails closed). */
+  beats?: Array<{ span: string; emotion?: string; gesture?: string; camera?: string; register?: string }>;
 }
 
 export interface LowerThirdPayloadV1 { name: string; title?: string; show?: boolean }

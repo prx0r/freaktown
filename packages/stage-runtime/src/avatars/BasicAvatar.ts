@@ -210,6 +210,18 @@ export class BasicAvatar implements AvatarDriver {
 
   setGazeTarget(): void { /* head aim via setPose */ }
 
+  /** BASIC by construction: asymmetric brows, sneer/smile side shift, cheek puff, eye wide. */
+  setBlendshapes(w: Partial<Record<string, number>>): void {
+    const g = (k: string) => Math.max(0, Math.min(1, w[k] ?? 0));
+    this.browL.position.y += (g('browOuterUpLeft') - g('browDownLeft')) * 0.02;
+    this.browR.position.y += (g('browOuterUpRight') - g('browDownRight')) * 0.02;
+    const side = (g('mouthSmileLeft') - g('mouthSmileRight')) * 0.012 + (g('mouthLeft') - g('mouthRight')) * 0.015;
+    this.mouth.position.x = side;
+    const wide = Math.max(g('eyeWideLeft'), g('eyeWideRight'));
+    for (const p of this.pupils) p.scale.setScalar(1 - wide * 0.25);
+    if (this.jaw) this.jaw.scale.x = 1 + g('cheekPuff') * 0.25;
+  }
+
   setSeated(seated: boolean): void {
     this.legsStanding.visible = !seated;
     this.legsSeated.visible = seated;

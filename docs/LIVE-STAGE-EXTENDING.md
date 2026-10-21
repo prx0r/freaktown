@@ -568,3 +568,89 @@ auth or `LIVE_DEV_OPEN`). Hole cards are public in the log (broadcast show only)
 5. Overlays (optional) in `SetStagePage.tsx`; new events in `contracts/src/sets.ts` + executor.
 6. Tests: registry/camera assertions in `sets.test.ts`; a block in `e2e/sets.spec.ts`.
 7. Licences: any third-party asset → `assets/sets/LICENSES.md`.
+
+---
+
+## 10. Faces: expressions, ARKit blendshapes, visemes, affect (live-face)
+
+One interface for every body tier. `packages/stage-runtime/src/face/`:
+
+| File | What | Ported from |
+|---|---|---|
+| `arkit.ts` | `ARKIT_52`, `ARKIT_MOUTH`, `OCULUS_15`, `OCULUS_TO_VRM` (Oculus-15 → VRM-5), `arkitToFace()` (52 blendshapes → visemes/emotions/blink), `faceToArkit()` (our plan face → ARKit for ARKit-only GLBs), `smileFusion()` | `app.py` `ARKIT_MOUTH`/`OCULUS_MOUTH`, `WAWA_MAP`, `applyFace` (MediaPipe → VRM) and `static/affect-servo.js` `smileFusion` on **`feature/mutuals-acting-party-smiles` (008d4f5, 2026-10-17)** |
+| `affect.ts` | `affectToDelivery(a,v,p)` (exact port, parity-tested) + `affectToEmotions(a,v,p)` (new: A/V/P → VRM emotions) | `static/affect-servo.js` (lab rig, same branch / main 4cfe7c3) |
+| `vocab.ts` | harness emotion/gesture/camera vocabulary, `FACE_ALIASES` (`face_excited`, `reaction.smile`, `lean_in` …), `normalizeFaceAction`, `emotionToFaceAction`, set-camera equivalents | `harness_adapter.py` + the `face_*` map added to `StageRuntime.ts` on the same branch (vocabulary inspired by github.com/mutuals-inc/character-harness, Apache-2.0) |
+| `harnessBeats.ts` | `compileHarnessBeats(text, beats, words)` — mutuals-beats/v1 acting beats on **measured** word timings, fails closed | `compile_harness_beats` (same branch) |
+| `FaceChannel.ts` | composes base (Performer + plan/text mouth) + affect hold + live ARKit stream, and `FaceChannel.apply(driver, frame)` | new |
+
+Also ported: the **sealed SDK export contract test** from **`sdk-sealed-export` (8acd6b0,
+2026-10-21)** — `tests/sealedSdkExport.test.ts` + `tests/fixtures/sealed-buddha/`
+(characters-repo `seal_set.py` output → `adaptSealedSet`, deadpan face, koan freeze).
+Neither feature branch was merged; only what the stage needs was copied.
+
+### Driver interface
+
+```ts
+interface AvatarDriver {
+  setMouth(open, visemes); setExpression(emotions); setBlink(amount);   // every tier (unchanged)
+  setBlendshapes?(weights: Record<string, number>): void;                // NEW, optional: raw ARKit names
+}
+```
+
+- **VRM** (`VrmAvatar`): presets `aa ih ou ee oh` + `happy angry sad surprised relaxed` +
+  `blink` as before; `setBlendshapes` writes ARKit names the VRM carries as **custom
+  expressions** (VRM 1.0 allows any name), never overwrites presets.
+- **GLB** (`GlbAvatar`): sniffed visemes/`jawOpen`/emotions as before; `setBlendshapes`
+  writes any morph whose name is in the bytes (ARKit-52 GLBs, MetaPerson, Ready Player Me).
+  ARKit-only GLBs now perform text/plan mouths and emotion cues via `faceToArkit`.
+- **BASIC**: emotions/visemes/blink by construction; `setBlendshapes` adds asymmetric brows
+  (`browOuterUp*`/`browDown*`), smile/mouth side shift, `eyeWide*` pupils, `cheekPuff`.
+
+Rule kept: **never fake a mouth** — a GLB with no mouth morphs/jaw still reports
+`mouthMode: none`, and `setBlendshapes` ignores names that aren't in its bytes.
+
+### Driving faces
+
+```ts
+// 1. per line, from the set/dialogue (harness vocabulary or face actions)
+send('dialogue.line', { seat: 'seat2', text: 'Absolutely not.', emotion: 'annoyed' });
+// 2. a cue any time (classic stage: omit seat)
+send('face.expression', { seat: 'seat2', emotion: 'surprised', intensity: 1, duration_ms: 2500 });
+// 3. live puppeteering: ARKit-52 frames (MediaPipe FaceLandmarker categories → name: score)
+send('face.blendshapes', { seat: 'seat1', weights: { jawOpen: 0.6, mouthSmileLeft: 0.8, eyeBlinkLeft: 0 } });
+// 4. affect servo: three numbers steer the face for hold_ms
+send('face.affect', { seat: 'anchor1', a: 0.7, v: 0.6, p: 0.2, hold_ms: 4000 });
+// 5. acted lines: beats on measured word timings (e.g. edge-TTS WordBoundary), relative to line start
+send('dialogue.line', { seat: 'seat1', text: 'It filed a complaint.', words: [{ word: 'It', start_ms: 0, end_ms: 120 }, …],
+  beats: [{ span: 'complaint', emotion: 'deadpan', camera: 'push-in' }] });
+```
+
+Sealed sets: drop `words.json` (measured `[{word,start_ms,end_ms}]`) and optionally
+`acting.json` (`{schema:'mutuals-beats/v1', beats:[…]}`) next to `timeline.json`;
+`loadSealedSet` picks them up, prefers measured words over the envelope spread
+(`plan.source.words = 'measured'`) and merges acting cues/cameras (warnings in
+`plan.source.acting_warnings`). Without measured words the overlay is refused, as on the
+branch ("never estimate timings for an acted punchline").
+
+Layering (`FaceChannel.sample`): Performer face cues (`face.*`, aliases normalised) → max-blend
+affect emotions → live ARKit overrides mouth + blink while fresh (450 ms stale timeout,
+smoothing 0.5) unless the plan mouth is speaking louder; emotions always max-blend.
+Telemetry: `window.__setStage.telemetry().seats[i].emotions / faceSources`,
+`window.__stage.runtime.faceSources`.
+
+### Extending
+
+- New semantic face: add to `FACE_MAP` in `performance/Performer.ts` (and an alias in `vocab.ts`).
+- New source vocabulary (e.g. Apple Live Link names, Oculus visemes from Rhubarb/wawa):
+  convert to ARKit or VRM-5 in `arkit.ts` and send `face.blendshapes` / visemes.
+- A per-character face profile (gain/offsets per channel): wrap `FaceChannel.apply` —
+  e.g. `frame.emotions.happy *= profile.smileGain` — before writing the driver.
+- Not ported (lab/audience only on the branch): the webcam smile referee (`smile-referee.js`),
+  WebRTC monitor, face A/B harness pages, MFCC in-browser lipsync, Kalidokit body solve.
+  The A/B-tested `WAWA_MAP` table is what the stage uses from that work.
+
+Tests: `packages/stage-runtime/tests/face.test.ts` (maps, smileFusion/affect parity with
+`affect-servo.js`, alias normalisation, Performer alias render, harness beats incl.
+fail-closed cases, sealed-set measured words + acting overlay, FaceChannel layering/staleness,
+BASIC + GLB `setBlendshapes`); e2e podcast test sends `face.expression` and a synthetic
+ARKit stream from the Set panel and checks the seat's face telemetry.

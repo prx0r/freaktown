@@ -6,6 +6,7 @@ import type { AvatarCapabilities, AvatarDriver, Emotions, PoseState, Visemes } f
 
 const VISEMES = ['aa', 'ih', 'ou', 'ee', 'oh'] as const;
 const EMOTIONS = ['happy', 'angry', 'sad', 'surprised', 'relaxed'] as const;
+const PRESETS = new Set<string>([...VISEMES, ...EMOTIONS, 'blink', 'blinkLeft', 'blinkRight', 'neutral', 'lookUp', 'lookDown', 'lookLeft', 'lookRight']);
 
 export class VrmAvatar implements AvatarDriver {
   readonly root: THREE.Object3D;
@@ -107,6 +108,14 @@ export class VrmAvatar implements AvatarDriver {
   }
 
   setSeated(seated: boolean): void { this.seated = seated; }
+
+  /** ARKit names that the VRM carries as custom expressions (VRM1 allows any name). Presets are untouched. */
+  setBlendshapes(weights: Partial<Record<string, number>>): void {
+    for (const [name, v] of Object.entries(weights)) {
+      if (v === undefined || !this.has.has(name) || PRESETS.has(name)) continue;
+      this.set(name, v);
+    }
+  }
 
   update(dt: number): void { this.vrm.update(dt); }
 
