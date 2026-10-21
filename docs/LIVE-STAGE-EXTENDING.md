@@ -4,6 +4,10 @@ Companion to [`LIVE-STAGE.md`](LIVE-STAGE.md). Every recipe keeps the three
 rules: **contracts in one place** (`packages/contracts`), **control only sends
 commands**, **the stage only obeys events**. Paths are from the repo root.
 
+> **News shows:** for rundown-driven news (anchors, reporters, wall headlines,
+> a BBC-Ed-style camera director, show styles, headless MP4 render) use the
+> newsroom SDK: [`docs/NEWSROOM-SDK.md`](NEWSROOM-SDK.md) (`packages/newsroom`).
+
 ---
 
 ## 1. Add a character
@@ -654,3 +658,13 @@ Tests: `packages/stage-runtime/tests/face.test.ts` (maps, smileFusion/affect par
 fail-closed cases, sealed-set measured words + acting overlay, FaceChannel layering/staleness,
 BASIC + GLB `setBlendshapes`); e2e podcast test sends `face.expression` and a synthetic
 ARKit stream from the Set panel and checks the seat's face telemetry.
+
+## 11. News shows: the newsroom SDK
+
+Rundown-driven news on the `news-studio` set lives in `packages/newsroom`.
+It covers a Sofie-style rundown (show → segment → story → piece), show styles
+(`goodnight` calm, `default-news` brisk), a camera director that follows BBC
+R&D's Ed rules plus broadcast grammar, `compile()` to the set events above,
+procedural wall cards, the `/newsroom/:id` page and a headless render CLI.
+Channel adapters live in the channel's own repo. Full guide:
+[`docs/NEWSROOM-SDK.md`](NEWSROOM-SDK.md).

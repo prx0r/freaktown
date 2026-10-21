@@ -66,6 +66,8 @@ export const NEWS_STUDIO: SetDefinition = {
     'anchor2-single': { seat: 'anchor2', position: [0.15, 0.12, 2.3], target: [0, -0.1, 0], fov: 30, label: 'Anchor 2' },
     'two-shot': { position: [0, 1.45, 3.7], target: [0, 1.2, -0.6], fov: 32, label: 'Two-shot' },
     screen: { position: [2.7, 1.55, 2.3], target: [-0.7, 1.55, -1.8], fov: 36, label: 'Over-shoulder screen' },
+    // newsroom: 3/4 on anchor1 with the whole video wall in frame (headline / numbers cards)
+    'wall-ots': { position: [2.35, 1.8, 3.0], target: [-0.1, 1.8, -1.7], fov: 39, label: '3/4 + wall', portrait: { position: [1.9, 1.75, 4.1], target: [-0.5, 1.3, -1.9], fov: 56 } },
   },
   defaultCamera: 'wide',
   lighting: {

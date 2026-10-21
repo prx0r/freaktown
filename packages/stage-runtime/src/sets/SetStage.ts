@@ -10,17 +10,19 @@
  *   say(line)          speaker mouth (text-timed, or audio) + gestures + auto cut
  *   cut(cue)           "wide" | preset | close:<seat> | two-shot:a+b | orbit …
  *   poker(type, p)     cards / chips / button / reactions
+ *   theme(p)           set.theme show style (lighting tint, wall painter theme)
+ *   renderAt(ms)       deterministic frame for show time ms (config.manual: no RAF)
  */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import type { CastMemberV1, CardV1, DialogueLinePayloadV1 } from '@freaktown/contracts';
+import type { CastMemberV1, CardV1, DialogueLinePayloadV1, HeadlinePayloadV1, SetThemePayloadV1 } from '@freaktown/contracts';
 import type { SetDefinition, SeatAnchor } from './types';
 import { SET_REGISTRY, SetRegistry, findSeat } from './registry';
 import { resolveCameraCue, seatForward, seatHead, seatSide, type CameraShot } from './camera';
 import { ActiveSpeakerDirector } from './autoDirector';
 import { estimateLineMs, textMouth } from './textMouth';
 import { SET_BUILDERS } from './builders/sets';
-import type { BuiltSet } from './builders/common';
+import type { BuiltSet, WallPainter } from './builders/common';
 import { PokerProps } from './poker/PokerProps';
 import { loadAvatar } from '../avatars/loadAvatar';
 import type { AvatarDriver, AvatarCapabilities } from '../avatars/types';
@@ -37,7 +39,19 @@ export interface SetStageConfig {
   glb?: boolean;
   registry?: SetRegistry;
   resolveUrl?: (url: string) => string;
+  /**
+   * Deterministic clock: no requestAnimationFrame loop; the host calls
+   * renderAt(ms) and every timer inside the stage reads that show time.
+   * Used by headless capture (newsroom render CLI). Default false.
+   */
+  manual?: boolean;
+  /** Draws the video-wall card (newsroom). Sets without a wall ignore it. */
+  wallPainter?: WallPainter;
 }
+
+/** An eased camera move / slow creep (set.camera move_ms / creep). */
+export interface CameraMoveOptions { move_ms?: number; ease?: 'smooth' | 'linear'; creep?: number; creep_ms?: number }
+interface CamPose { position: [number, number, number]; target: [number, number, number]; fov: number }
 
 interface SeatActor {
   seat: SeatAnchor;
@@ -58,7 +72,8 @@ export interface SetCut { cue: string; at_ms: number; source: 'auto_director' | 
 export interface OverlayState {
   lowerThird: { name: string; title?: string } | null;
   ticker: string[];
-  headline: { text: string; kicker?: string } | null;
+  headline: ({ text: string; kicker?: string } & Partial<HeadlinePayloadV1>) | null;
+  theme?: SetThemePayloadV1 | null;
   speaker: { seat: string; name: string; text: string } | null;
   onAir: boolean;
 }
@@ -120,9 +135,14 @@ export class SetStage {
   private cuts: SetCut[] = [];
   private director = new ActiveSpeakerDirector();
   private auto = true;
-  private t0 = performance.now();
+  private manualNow = 0;
+  private t0 = 0;
+  private move: { from: CamPose; start: number; dur: number; ease: 'smooth' | 'linear' } | null = null;
+  private creep: { k: number; start: number; dur: number } | null = null;
+  private pose: CamPose | null = null;
+  private themeP: SetThemePayloadV1 | null = null;
   private frameId: number | null = null;
-  private last = performance.now();
+  private last = 0;
   private frames = 0;
   private fpsWin: number[] = [];
   private disposed = false;
@@ -138,6 +158,8 @@ export class SetStage {
 
   constructor(config: SetStageConfig) {
     this.config = config;
+    this.t0 = this.nowMs();
+    this.last = this.nowMs();
     this.registry = config.registry ?? SET_REGISTRY;
     const { clientWidth: w, clientHeight: h } = config.container;
     const low = config.quality === 'low';
@@ -154,12 +176,31 @@ export class SetStage {
     this.handleResize();
     window.addEventListener('resize', this.handleResize);
     if (typeof ResizeObserver !== 'undefined') { this.resizeObs = new ResizeObserver(this.handleResize); this.resizeObs.observe(config.container); }
-    this.startLoop();
+    if (!config.manual) this.startLoop();
+  }
+
+  /** Stage clock: performance.now(), or the host-driven show time in manual mode. */
+  private nowMs(): number { return this.config.manual ? this.manualNow : performance.now(); }
+
+  /**
+   * Manual mode: advance the clock to show time ms and render exactly that frame.
+   * Returns the canvas for capture. Safe to call in realtime mode too (renders an extra frame).
+   */
+  renderAt(ms: number): HTMLCanvasElement {
+    const prev = this.manualNow;
+    this.manualNow = ms;
+    const dt = Math.max(0, Math.min(0.1, (ms - prev) / 1000));
+    this.last = ms;
+    this.renderFrame(this.nowMs(), dt);
+    return this.renderer.domElement;
   }
 
   get canvas(): HTMLCanvasElement { return this.renderer.domElement; }
   get definition(): SetDefinition | null { return this.def; }
-  get setTimeMs(): number { return performance.now() - this.t0; }
+  /** Manual mode: move the clock without rendering (apply timed events at their own instant). */
+  advanceClock(ms: number): void { if (this.config.manual) { this.manualNow = ms; this.last = ms; } }
+
+  get setTimeMs(): number { return this.nowMs() - this.t0; }
 
   private handleResize = (): void => {
     const w = this.config.container.clientWidth, h = this.config.container.clientHeight;
@@ -177,7 +218,8 @@ export class SetStage {
     const token = ++this.loadToken;
     this.clearSet();
     this.def = def;
-    this.t0 = performance.now();
+    this.t0 = this.nowMs();
+    this.move = null; this.creep = null; this.pose = null;
     this.scene.background = new THREE.Color(def.lighting.background);
     this.scene.fog = new THREE.Fog(def.lighting.background, 12, 40);
     const builder = SET_BUILDERS[def.environment.builder];
@@ -185,7 +227,9 @@ export class SetStage {
     this.built = builder(def, { shadows: this.config.quality !== 'low', low: this.config.quality === 'low' });
     this.scene.add(this.built.group);
     if (def.id === 'poker-table') { this.props = new PokerProps(def); this.scene.add(this.props.group); }
-    this.overlay = { lowerThird: null, ticker: [], headline: null, speaker: null, onAir: true };
+    this.overlay = { lowerThird: null, ticker: [], headline: null, speaker: null, onAir: true, theme: null };
+    this.themeP = null;
+    if (this.config.wallPainter) this.built.setWallPainter?.(this.config.wallPainter);
     this.pokerView = emptyPoker();
     this.director = new ActiveSpeakerDirector({ wide: 'wide' });
     this.cuts = [];
@@ -280,7 +324,7 @@ export class SetStage {
     const dur = line.duration_ms ?? estimateLineMs(line.text);
     let audio: HTMLAudioElement | undefined;
     if (line.audio_url) { audio = new Audio(this.resolve(line.audio_url)); void audio.play().catch(() => {}); }
-    const now = performance.now();
+    const now = this.nowMs();
     actor.speaking = { text: line.text, start: now, dur, audio };
     this.lines++;
     const emo = line.emotion ? emotionToFaceAction(line.emotion) : null;
@@ -325,19 +369,19 @@ export class SetStage {
     const a = this.actorFor(p.seat);
     const action = p.action ?? (p.emotion ? emotionToFaceAction(p.emotion) : null);
     if (!a || !action) return false;
-    a.performer.trigger(action, p.intensity ?? 0.9, p.duration_ms ?? 2000, performance.now());
+    a.performer.trigger(action, p.intensity ?? 0.9, p.duration_ms ?? 2000, this.nowMs());
     return true;
   }
   faceBlendshapes(seat: string | undefined, weights: Record<string, number>): boolean {
     const a = this.actorFor(seat);
     if (!a) return false;
-    a.face.setBlendshapes(weights, performance.now());
+    a.face.setBlendshapes(weights, this.nowMs());
     return true;
   }
   faceAffect(p: { seat?: string; a: number; v: number; p?: number; hold_ms?: number }): boolean {
     const a = this.actorFor(p.seat);
     if (!a) return false;
-    a.face.setAffect(p.a, p.v, p.p ?? 0, performance.now(), p.hold_ms ?? 4000);
+    a.face.setAffect(p.a, p.v, p.p ?? 0, this.nowMs(), p.hold_ms ?? 4000);
     return true;
   }
 
@@ -345,7 +389,7 @@ export class SetStage {
 
   setAutoDirector(on: boolean): void { this.auto = on; }
 
-  cut(cue: string, source: SetCut['source'] = 'human_director'): boolean {
+  cut(cue: string, source: SetCut['source'] = 'human_director', opts: CameraMoveOptions = {}): boolean {
     const def = this.def;
     if (!def) return false;
     if (cue === 'auto') { this.auto = true; return true; }
@@ -355,6 +399,10 @@ export class SetStage {
       console.warn('[set]', e instanceof Error ? e.message : e);
       return false;
     }
+    const now = this.nowMs();
+    this.move = opts.move_ms && opts.move_ms > 0 && this.pose ? { from: this.pose, start: now, dur: opts.move_ms, ease: opts.ease ?? 'smooth' } : null;
+    const k = Math.max(0, Math.min(0.3, opts.creep ?? 0));
+    this.creep = k > 0 ? { k, start: now + (opts.move_ms ?? 0), dur: Math.max(1000, opts.creep_ms ?? 12000) } : null;
     this.cueName = cue;
     this.director.note(cue, this.setTimeMs);
     this.cuts.push({ cue, at_ms: Math.round(this.setTimeMs), source });
@@ -362,11 +410,43 @@ export class SetStage {
     return true;
   }
 
-  private applyShot(): void {
-    const s = this.shot;
-    if (!s) return;
+  /** Current camera pose: shot, eased from the previous pose during a move, plus creep. */
+  private portraitFov = false;
+  private currentPose(): CamPose | null {
+    let s = this.shot;
+    if (!s) return null;
+    const portrait = this.aspect < 1 ? this.def?.cameras[this.cueName]?.portrait : undefined;
+    this.portraitFov = !!portrait;
+    if (portrait) s = { ...s, position: portrait.position, target: portrait.target, fov: portrait.fov };
+    const now = this.nowMs();
+    let pos: [number, number, number] = [...s.position];
+    let tgt: [number, number, number] = [...s.target];
     let fov = s.fov;
-    if (this.aspect < 1.4) fov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(fov) / 2) * Math.min(2.2, Math.sqrt(1.78 / this.aspect))));
+    if (this.creep) {
+      const u = Math.max(0, Math.min(1, (now - this.creep.start) / this.creep.dur));
+      const e = 0.5 - 0.5 * Math.cos(Math.PI * u);
+      const k = this.creep.k * e;
+      pos = [pos[0] + (tgt[0] - pos[0]) * k, pos[1] + (tgt[1] - pos[1]) * k, pos[2] + (tgt[2] - pos[2]) * k];
+    }
+    if (this.move) {
+      const u = Math.max(0, Math.min(1, (now - this.move.start) / this.move.dur));
+      const e = this.move.ease === 'linear' ? u : 0.5 - 0.5 * Math.cos(Math.PI * u);
+      const f = this.move.from;
+      const L = (a: number, b: number) => a + (b - a) * e;
+      pos = [L(f.position[0], pos[0]), L(f.position[1], pos[1]), L(f.position[2], pos[2])];
+      tgt = [L(f.target[0], tgt[0]), L(f.target[1], tgt[1]), L(f.target[2], tgt[2])];
+      fov = L(f.fov, fov);
+      if (u >= 1) this.move = null;
+    }
+    return { position: pos, target: tgt, fov };
+  }
+
+  private applyShot(): void {
+    const s = this.currentPose();
+    if (!s) return;
+    this.pose = s;
+    let fov = s.fov;
+    if (this.aspect < 1.4 && !this.portraitFov) fov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(fov) / 2) * Math.min(2.2, Math.sqrt(1.78 / this.aspect))));
     this.camera.fov = Math.min(80, fov);
     this.camera.position.set(...s.position);
     this.camera.lookAt(...s.target);
@@ -377,14 +457,31 @@ export class SetStage {
 
   lowerThird(p: { name: string; title?: string; show?: boolean }): void { this.overlay.lowerThird = p.show === false ? null : { name: p.name, title: p.title }; }
   ticker(items: string[]): void { this.overlay.ticker = items; }
-  headline(text: string, kicker?: string): void { this.overlay.headline = { text, kicker }; this.built?.setHeadline?.(text, kicker); }
+  headline(text: string, kicker?: string, card?: Partial<HeadlinePayloadV1>): void {
+    this.overlay.headline = { ...(card ?? {}), text, kicker };
+    if (this.built?.setWall && (this.config.wallPainter || card?.layout)) this.built.setWall({ ...(card ?? {}), text, kicker }, this.themeP);
+    else this.built?.setHeadline?.(text, kicker);
+  }
+
+  /** set.theme: tint the lights/background and hand the theme to the wall painter. */
+  theme(p: SetThemePayloadV1): void {
+    this.themeP = p;
+    this.overlay.theme = p;
+    const L = p.lighting;
+    if (L?.background) { this.scene.background = new THREE.Color(L.background); this.scene.fog = new THREE.Fog(L.background, 12, 40); }
+    if (L?.exposure) this.renderer.toneMappingExposure = L.exposure;
+    this.built?.setTheme?.(p);
+    if (this.overlay.headline && this.built?.setWall) this.built.setWall(this.overlay.headline, p);
+  }
+
+  setWallPainter(painter: WallPainter): void { this.config.wallPainter = painter; this.built?.setWallPainter?.(painter); }
 
   // ── poker ─────────────────────────────────────────────────────────
 
   poker(type: string, p: Record<string, any>): void {
     const v = this.pokerView;
     const props = this.props;
-    const react = (seat: number, action: string, k = 1, dur = 1400) => this.actorAtIndex(seat)?.performer.trigger(action, k, dur, performance.now());
+    const react = (seat: number, action: string, k = 1, dur = 1400) => this.actorAtIndex(seat)?.performer.trigger(action, k, dur, this.nowMs());
     switch (type) {
       case 'poker.hand_start':
         props?.reset();
@@ -417,7 +514,7 @@ export class SetStage {
       case 'poker.board':
         v.board = p.cards; v.street = p.street;
         props?.setBoard(p.cards);
-        for (const a of this.actors.values()) if (!a.folded) a.performer.trigger('pose.lean_forward', 0.6, 1200, performance.now());
+        for (const a of this.actors.values()) if (!a.folded) a.performer.trigger('pose.lean_forward', 0.6, 1200, this.nowMs());
         break;
       case 'poker.showdown': {
         v.winners = (p.winners ?? []).map((w: any) => ({ seat: w.seat, amount: w.amount, ranking: w.ranking }));
@@ -494,7 +591,7 @@ export class SetStage {
     // orbit shots follow the clock
     if (this.def && this.shot && (this.cueName === 'orbit' || this.def.cameras[this.cueName]?.orbit)) {
       try { this.shot = resolveCameraCue(this.def, this.cueName, this.setTimeMs / 1000); this.applyShot(); } catch { /* keep */ }
-    }
+    } else if (this.move || this.creep) this.applyShot();
     this.built?.update(dt, now);
     this.props?.update(dt);
     this.renderer.render(this.scene, this.camera);

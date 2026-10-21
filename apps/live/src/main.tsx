@@ -7,6 +7,7 @@ import { LivePage } from './pages/LivePage';
 import { HomePage } from './pages/HomePage';
 import { NotFound } from './pages/NotFound';
 import { PlayPage } from './pages/PlayPage';
+import { NewsroomPage } from './pages/NewsroomPage';
 
 // NOTE (migration): creator routes (/studio /green-room /demo) are
 // deliberately ABSENT. Freak Town Studio is the one creator. This app
@@ -27,6 +28,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/control" element={<ControlPage />} />
         <Route path="/live/:episodeId" element={<LivePage />} />
         <Route path="/play/:episodeId/seat/:seat" element={<PlayPage />} />
+        <Route path="/newsroom/:showId" element={<NewsroomPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
