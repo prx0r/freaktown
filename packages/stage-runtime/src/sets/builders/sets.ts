@@ -135,7 +135,7 @@ const podcast: SetBuilder = (def, ctx) => {
     const toward = (k: number): THREE.Vector3 => new THREE.Vector3(s.position[0] * k, 0, s.position[2] * k);
     const clamp = toward(0.8 / 1.2 * 0.92); // table edge in front of the seat
     const mount = cyl(0.025, 0.025, 0.45, metal, clamp.x, 0.98, clamp.z, 8); group.add(mount);
-    const [mx, my, mz] = seatLocal(s, [0.0, -0.12, 0.3]);
+    const [mx, my, mz] = seatLocal(s, [-0.2, -0.16, 0.26]); // off to the side so close-ups stay clear
     const elbow = new THREE.Vector3(clamp.x * 0.85 + mx * 0.15, 1.38, clamp.z * 0.85 + mz * 0.15);
     const arm = (a: THREE.Vector3, b: THREE.Vector3) => {
       const len = a.distanceTo(b);
