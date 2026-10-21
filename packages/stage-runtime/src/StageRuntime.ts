@@ -29,6 +29,8 @@ import { loadAvatar } from './avatars/loadAvatar';
 import type { AvatarCapabilities, AvatarDriver, Emotions, Visemes } from './avatars/types';
 import { MouthTrack } from './performance/MouthTrack';
 import { Performer } from './performance/Performer';
+import { FaceChannel } from './face/FaceChannel';
+import { emotionToFaceAction } from './face/vocab';
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -113,6 +115,7 @@ export class StageRuntime {
   private avatar: AvatarDriver | null = null;
   private avatarFallback: string | null = null;
   private performer = new Performer();
+  private face = new FaceChannel();
   private mouthTrack: MouthTrack | null = null;
   private analyserData: Uint8Array<ArrayBuffer>;
 
@@ -369,6 +372,17 @@ export class StageRuntime {
 
   playSfx(name: string): void { this.sfx.play(name); }
 
+  // ── face (face.expression / face.blendshapes / face.affect) ─────────
+  faceExpression(emotionOrAction: string, intensity = 0.9, durationMs = 2000): boolean {
+    const action = emotionToFaceAction(emotionOrAction);
+    if (!action) return false;
+    this.performer.trigger(action, intensity, durationMs, this.performerClock());
+    return true;
+  }
+  faceBlendshapes(weights: Record<string, number>): void { this.face.setBlendshapes(weights, performance.now()); }
+  faceAffect(a: number, v: number, p = 0, holdMs = 4000): void { this.face.setAffect(a, v, p, performance.now(), holdMs); }
+  get faceSources(): string[] { return [...this.face.sources]; }
+
   duckMusic(): void { this.audioBus.duckMusic(); }
   unduckMusic(): void { this.audioBus.unduckMusic(); }
 
@@ -425,11 +439,11 @@ export class StageRuntime {
     this.emotions = frame.emotions;
     if (frame.blink > 0.5 && this.blink <= 0.5) this.blinks++;
     this.blink = frame.blink;
+    const face = this.face.sample(wallMs, { open: this.mouthOpen, visemes: vis, emotions: frame.emotions, blink: frame.blink });
+    this.emotions = face.emotions;
     if (this.avatar) {
       this.avatar.setPose(frame.pose);
-      this.avatar.setExpression(frame.emotions);
-      this.avatar.setMouth(this.mouthOpen, vis);
-      this.avatar.setBlink(frame.blink);
+      FaceChannel.apply(this.avatar, face);
       this.avatar.update(dt);
     }
     this.gaze.position.set(frame.pose.headYaw * 4, 1.5 - frame.pose.headPitch * 4, 6);
