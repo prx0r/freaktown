@@ -21,6 +21,10 @@
 import type {
   CameraCue, CameraPresetV1, MotionCue, MouthSpan, PerformancePlan, PlanBeat, WordTiming,
 } from '@freaktown/contracts';
+// One PhoneticViseme source of truth (MouthTrack); redefining it here made
+// the package index export the same name twice (TS2308).
+import type { PhoneticViseme } from '../performance/MouthTrack';
+export type { PhoneticViseme };
 
 export interface TimelineBeat {
   beat_id: string;
@@ -34,12 +38,8 @@ export interface TimelineBeat {
   performance?: { expression?: string; gesture?: string; look?: string; [k: string]: unknown };
 }
 
-/** One real phonetic viseme (take visemes.json: TalkingHead-en). */
-export interface PhoneticViseme {
-  viseme: string;
-  time: number;
-  end: number;
-}
+/** One real phonetic viseme (take visemes.json: TalkingHead-en) — type lives
+ *  in performance/MouthTrack; imported above, re-exported for callers. */
 
 /** AU prosody frame (take aus.json: au_track.py). */
 export interface ProsodyFrameInput {
