@@ -59,6 +59,7 @@ except bundles and events.
 `docs/` (index below) · `contracts/` (schema authority) ·
 `backend/services/` (delivery, audio, ella, judge, scoring, bundles) ·
 `packages/stage-runtime/` (live performer) ·
+`packages/newsroom/` (news rundowns → directed news-studio shows: `docs/NEWSROOM-SDK.md`) ·
 `edge/worker/` (episode room + ella live) ·
 `apps/live/` (web client; live stage: `docs/LIVE-STAGE.md`, `docs/LIVE-STAGE-EXTENDING.md`) ·
 `freaks/` (bundle storage, gitignored) ·
