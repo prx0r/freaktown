@@ -79,6 +79,8 @@ export class Performer {
   private rand = rng(7);
   private nextBlink = 1800;
   private blinkStart = -1;
+  /** Blinks started so far (frame-rate independent; a 150 ms blink can fall between slow frames). */
+  blinkCount = 0;
   energy = 0.7;
   /**
    * Stand-up at a mic: head motion stays small and addressed to the mic/audience while
@@ -204,7 +206,7 @@ export class Performer {
 
     // blink (own channel, wall clock)
     let blink = 0;
-    if (this.blinkStart < 0 && wallMs >= this.nextBlink) this.blinkStart = wallMs;
+    if (this.blinkStart < 0 && wallMs >= this.nextBlink) { this.blinkStart = wallMs; this.blinkCount++; }
     if (this.blinkStart >= 0) {
       const u = (wallMs - this.blinkStart) / 150;
       if (u >= 1) {

@@ -13,6 +13,8 @@ export interface StageSetOptions {
   audienceRows?: number;
   audienceSeats?: number;
   shadows?: boolean;
+  /** quality=low: skip the brick washes, back light, inner beam and haze (keeps key/rim/fill). */
+  lite?: boolean;
 }
 
 function canvasTexture(w: number, h: number, draw: (ctx: CanvasRenderingContext2D) => void): THREE.CanvasTexture {
@@ -241,7 +243,7 @@ export class StageSet {
     fill.position.set(-3, 2.5, 4);
     this.group.add(fill);
     // brick wash: grazing light from above so mortar lines and texture read
-    for (const x of [-2.6, 2.6]) {
+    for (const x of opts.lite ? [] : [-2.6, 2.6]) {
       const wash = new THREE.SpotLight(0xffa080, 7, 7, 0.7, 0.85, 1.3);
       wash.position.set(x, 6.2, -1.2);
       wash.target.position.set(x * 0.7, 1.8, -2.3);
@@ -251,7 +253,7 @@ export class StageSet {
     const back = new THREE.SpotLight(0xdfe8ff, 30, 7, 0.4, 0.6, 1.4);
     back.position.set(0, 3.9, -1.9);
     back.target.position.set(0, 1.4, 0.2);
-    this.group.add(back, back.target);
+    if (!opts.lite) this.group.add(back, back.target);
     for (const [x, color] of [[-3.2, 0x40d0ff], [3.2, 0xff40c0]] as const) {
       const rim = new THREE.SpotLight(color, 40, 10, 0.5, 0.6, 1.5);
       rim.position.set(x, 4.2, -1.6);
@@ -273,10 +275,10 @@ export class StageSet {
     this.group.add(this.beam);
     const inner = new THREE.Mesh(new THREE.ConeGeometry(0.6, 6.9, 32, 1, true).translate(0, -3.45, 0), beamMaterial(0xfff6e6, 0.2));
     inner.position.copy(this.beam.position); inner.quaternion.copy(this.beam.quaternion);
-    this.group.add(inner);
+    if (!opts.lite) this.group.add(inner);
     // haze: slow-drifting soft sprites inside the beam
     const hz = hazeTexture();
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < (opts.lite ? 0 : 14); i++) {
       const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: hz, color: 0xfff0dc, transparent: true, opacity: 0.07 + (i % 4) * 0.015, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }));
       const u = i / 13;
       const p = new THREE.Vector3(0.6 - 0.55 * u + Math.sin(i * 2.1) * 0.5, 5.6 - 4.3 * u, 4.4 - 4.1 * u + Math.cos(i * 1.3) * 0.3);

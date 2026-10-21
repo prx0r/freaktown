@@ -7,6 +7,11 @@ commands**, **the stage only obeys events**. Paths are from the repo root.
 > **News shows:** for rundown-driven news (anchors, reporters, wall headlines,
 > a BBC-Ed-style camera director, show styles, headless MP4 render) use the
 > newsroom SDK: [`docs/NEWSROOM-SDK.md`](NEWSROOM-SDK.md) (`packages/newsroom`).
+>
+> **Sketches:** for scripted comedy in any set (beats, stage directions,
+> persistent identities, laugh holds, a comedy shot grammar, headless MP4
+> render) use the sketch layer: [`docs/SKETCH-SHOW.md`](SKETCH-SHOW.md)
+> (`packages/sketch`).
 
 ---
 
@@ -668,3 +673,16 @@ R&D's Ed rules plus broadcast grammar, `compile()` to the set events above,
 procedural wall cards, the `/newsroom/:id` page and a headless render CLI.
 Channel adapters live in the channel's own repo. Full guide:
 [`docs/NEWSROOM-SDK.md`](NEWSROOM-SDK.md).
+
+## 12. Sketches: the sketch layer
+
+Scripted sketches in any set live in `packages/sketch`. A
+`funnier.sketch/v1` script contains a cast of persistent `pog.*`
+identities on seats, plus scenes → beats → lines and stage directions
+(look, react, gesture, move, pause, hold_for_laugh, headline, prop,
+camera, button, blackout). `compileSketch()` lays it on one clock, plans
+gaze, directs cameras (Ed timing plus a comedy grammar: game-reveal wide,
+reaction cutaways, no cuts inside laugh windows) and emits the set events
+above. It has a `/sketch` page and a headless render CLI
+(`npm run sketch:render`). Full guide, direction reference and timing
+knobs: [`docs/SKETCH-SHOW.md`](SKETCH-SHOW.md).

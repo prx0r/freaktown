@@ -170,7 +170,7 @@ export class StageRuntime {
     this.renderer.domElement.style.display = 'block';
     config.container.appendChild(this.renderer.domElement);
 
-    this.set = new StageSet(this.scene, { shadows: config.shadows ?? !low, sign: config.sign });
+    this.set = new StageSet(this.scene, { shadows: config.shadows ?? !low, sign: config.sign, lite: low });
     this.gaze.position.set(0, 1.5, 6);
     this.scene.add(this.gaze);
 
@@ -460,7 +460,7 @@ export class StageRuntime {
 
     const frame = this.performer.update(this.performerClock(), wallMs, dt, this.mouthOpen);
     this.emotions = frame.emotions;
-    if (frame.blink > 0.5 && this.blink <= 0.5) this.blinks++;
+    this.blinks = this.performer.blinkCount;
     this.blink = frame.blink;
     const face = this.face.sample(wallMs, { open: this.mouthOpen, visemes: vis, emotions: frame.emotions, blink: frame.blink });
     this.emotions = face.emotions;
