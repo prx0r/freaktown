@@ -87,6 +87,15 @@ export class Performer {
 
   /** Fire a cue (plan cue on the media clock, or a live event). */
   trigger(action: string, intensity: number, durationMs: number, atMs: number): void {
+    // Normalize Python-side spellings (merged from feature branch 2026-10-22):
+    //   face_grin → face.grin  (underscore form was silently dropped)
+    //   shrug|point|wave|lean_in → gesture.*  (bare names from beat performance)
+    if (action.startsWith('face_')) action = `face.${action.slice(5)}`;
+    if (['open', 'point', 'shrug', 'wave'].includes(action)) {
+      action = `gesture.${action}`;
+    } else if (action === 'lean_in') {
+      action = 'pose.lean_forward';
+    }
     if (action.startsWith('gaze.')) {
       this.gazeTarget = GAZE_TARGETS[action] ?? this.gazeTarget;
       return;
