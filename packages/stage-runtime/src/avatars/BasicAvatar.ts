@@ -54,6 +54,9 @@ export class BasicAvatar implements AvatarDriver {
   private pupils: THREE.Mesh[] = [];
   private emotions: Emotions = { happy: 0, angry: 0, sad: 0, surprised: 0, relaxed: 0 };
   private mouthOpen = 0;
+  private legsStanding = new THREE.Group();
+  private legsSeated = new THREE.Group();
+  private hipY = 0.88;
 
   constructor(opts: BasicAvatarOptions = {}) {
     const variant = opts.variant ?? 'human';
@@ -64,17 +67,28 @@ export class BasicAvatar implements AvatarDriver {
     const dark = mat(0x140a0a, 0.9);
     const white = mat(0xffffff, 0.3);
 
-    // legs + shoes
+    // legs + shoes (standing) and a seated variant (thighs forward, shins down)
+    this.root.add(this.legsStanding, this.legsSeated);
+    this.legsSeated.visible = false;
     for (const x of [-0.11, 0.11]) {
       const leg = capsule(0.085, 0.72, pants);
       leg.position.set(x, 0.45, 0);
-      this.root.add(leg);
+      this.legsStanding.add(leg);
       const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.08, 0.26), dark);
       shoe.position.set(x, 0.04, 0.05);
       shoe.castShadow = true;
-      this.root.add(shoe);
+      this.legsStanding.add(shoe);
+      const thigh = capsule(0.088, 0.36, pants);
+      thigh.rotation.x = Math.PI / 2;
+      thigh.position.set(x, 0.53, 0.2);
+      this.legsSeated.add(thigh);
+      const shin = capsule(0.075, 0.36, pants);
+      shin.position.set(x, 0.27, 0.42);
+      this.legsSeated.add(shin);
+      const sshoe = shoe.clone();
+      sshoe.position.set(x, 0.04, 0.47);
+      this.legsSeated.add(sshoe);
     }
-
     // torso pivot at hips
     this.torso.position.y = 0.88;
     this.root.add(this.torso);
@@ -196,9 +210,16 @@ export class BasicAvatar implements AvatarDriver {
 
   setGazeTarget(): void { /* head aim via setPose */ }
 
+  setSeated(seated: boolean): void {
+    this.legsStanding.visible = !seated;
+    this.legsSeated.visible = seated;
+    this.hipY = seated ? 0.53 : 0.88;
+    this.torso.position.y = this.hipY;
+  }
+
   setPose(p: PoseState): void {
     this.root.position.x = p.swayX;
-    this.torso.position.y = 0.88 + p.bob;
+    this.torso.position.y = this.hipY + p.bob;
     this.torso.rotation.set(p.spinePitch, 0, p.spineRoll - p.swayX * 0.4);
     this.torso.scale.set(1 + p.breath * 0.012, 1, 1 + p.breath * 0.02);
     this.head.rotation.set(p.headPitch, p.headYaw, p.headRoll);
