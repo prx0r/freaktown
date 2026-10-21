@@ -30,8 +30,8 @@ from urllib.parse import urlparse
 
 from .face_voice import ReactionPolicy
 
-WS_URL = ("wss://ws-h6o7g3oq9mc7u24u.ap-southeast-1.maas.aliyuncs.com"
-          "/api-ws/v1/realtime")
+WS_URL = ("wss://dashscope-intl.aliyuncs.com"
+          "/api-ws/v1/realtime?model=qwen3.8-omni-flash-realtime")
 WS_MODEL = "qwen3.8-omni-flash-realtime"
 
 # 16 kHz s16le mono in (what Omni expects), 24 kHz PCM out (mouth food).
@@ -128,7 +128,7 @@ class OmniReactor:
 
     # -- minimal RFC6455 client (stdlib) ---------------------------
 
-    def _connect(self):
+    def _connect(self, extra_headers=None):
         u = urlparse(self._url)
         host, port = u.hostname, u.port or 443
         path = u.path or "/"
@@ -138,12 +138,18 @@ class OmniReactor:
         sock = ssl.create_default_context().wrap_socket(
             raw, server_hostname=host)
         nonce = base64.b64encode(os.urandom(16)).decode()
-        req = (
-            "GET %s HTTP/1.1\r\nHost: %s\r\nUpgrade: websocket\r\n"
-            "Connection: Upgrade\r\nSec-WebSocket-Key: %s\r\n"
-            "Sec-WebSocket-Version: 13\r\n"
-            "Authorization: Bearer %s\r\n\r\n"
-            % (path, host, nonce, self._key))
+        headers = [
+            "GET %s HTTP/1.1" % path,
+            "Host: %s" % host,
+            "Upgrade: websocket",
+            "Connection: Upgrade",
+            "Sec-WebSocket-Key: %s" % nonce,
+            "Sec-WebSocket-Version: 13",
+            "Authorization: Bearer %s" % self._key,
+        ]
+        for k, v in (extra_headers or {}).items():
+            headers.append("%s: %s" % (k, v))
+        req = "\r\n".join(headers) + "\r\n\r\n"
         sock.sendall(req.encode())
         head = b""
         while b"\r\n\r\n" not in head:
