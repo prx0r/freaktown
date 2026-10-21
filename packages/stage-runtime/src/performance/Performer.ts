@@ -8,6 +8,7 @@
  *   body   → idle breath/sway + talking hands + gesture/pose cues
  */
 
+import { normalizeFaceAction } from '../face/vocab';
 import { neutralPose, type Emotions, type PoseState } from '../avatars/types';
 
 interface Active {
@@ -87,6 +88,7 @@ export class Performer {
 
   /** Fire a cue (plan cue on the media clock, or a live event). */
   trigger(action: string, intensity: number, durationMs: number, atMs: number): void {
+    action = normalizeFaceAction(action);
     if (action.startsWith('gaze.')) {
       this.gazeTarget = GAZE_TARGETS[action] ?? this.gazeTarget;
       return;
