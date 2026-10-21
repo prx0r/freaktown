@@ -10,7 +10,7 @@
  *   everything after it.
  */
 
-import type { ShowEvent } from '@freaktown/contracts';
+import type { ShowEvent } from '@funnier/contracts';
 import {
   HandlerSet, newSessionId,
   type CommandResult, type LiveConnectOptions, type LiveHandlers, type LiveRole, type LiveTransport,

@@ -1,6 +1,6 @@
 """Procedural walkout synth — the instant engine.
 
-Ported from freaktown sound_synth.py (Black Room): genre + mood + energy
+Ported from funnier sound_synth.py (Black Room): genre + mood + energy
 + shape in, exact WAV out. Deterministic per (recipe, seed). Stdlib only —
 no GPU, no API, no network.
 

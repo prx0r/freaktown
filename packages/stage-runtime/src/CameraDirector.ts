@@ -10,7 +10,7 @@
 
 import * as THREE from 'three';
 
-import { CAMERA_NAMES, type CameraPresetV1 } from '@freaktown/contracts';
+import { CAMERA_NAMES, type CameraPresetV1 } from '@funnier/contracts';
 
 // ── Camera Presets ────────────────────────────────────────────────
 

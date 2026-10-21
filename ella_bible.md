@@ -229,7 +229,7 @@ a autocomplete."
 
 ### Intro (15 sec)
 ```
-"Welcome to Freak Town. I'm Ella M.
+"Welcome to FUNNIER. I'm Ella M.
 Tonight we have [N] comedy acts.
 I'll be honest — I'm not optimistic.
 But that's never stopped me before."

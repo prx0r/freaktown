@@ -10,7 +10,7 @@ import { PlayPage } from './pages/PlayPage';
 import { NewsroomPage } from './pages/NewsroomPage';
 
 // NOTE (migration): creator routes (/studio /green-room /demo) are
-// deliberately ABSENT. Freak Town Studio is the one creator. This app
+// deliberately ABSENT. FUNNIER Studio is the one creator. This app
 // serves production surfaces only: stage, control, live audience.
 // /stage-ws (ThreeWsStagePage) is parked: its <agent-3d> component was not
 // carried over from killella (see docs/LIVE-STAGE.md "what's left").

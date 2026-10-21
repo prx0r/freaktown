@@ -1,5 +1,5 @@
 {
-  "name": "freaktown-ts",
+  "name": "funnier-ts",
   "private": true,
   "description": "TS workspace: contracts + stage-runtime + apps/live (live stage). Python stays the product shell.",
   "workspaces": [
@@ -9,11 +9,11 @@
     "apps/live"
   ],
   "scripts": {
-    "build": "npm run typecheck && npm run build -w @freaktown/live",
+    "build": "npm run typecheck && npm run build -w @funnier/live",
     "typecheck": "tsc -p packages/contracts && tsc -p packages/stage-runtime && tsc -p packages/newsroom && tsc -p apps/live --noEmit",
     "test": "vitest run",
-    "test:e2e": "npm run test:e2e -w @freaktown/live",
-    "dev": "npm run dev -w @freaktown/live",
+    "test:e2e": "npm run test:e2e -w @funnier/live",
+    "dev": "npm run dev -w @funnier/live",
     "newsroom:render": "node packages/newsroom/cli/render.mjs"
   },
   "devDependencies": {

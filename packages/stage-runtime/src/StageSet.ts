@@ -116,7 +116,7 @@ export class StageSet {
     this.group.add(wall);
 
     // neon sign
-    this.signMat = new THREE.MeshBasicMaterial({ map: neonTexture(opts.sign ?? 'FREAK TOWN'), transparent: true, depthWrite: false, toneMapped: false });
+    this.signMat = new THREE.MeshBasicMaterial({ map: neonTexture(opts.sign ?? 'FUNNIER'), transparent: true, depthWrite: false, toneMapped: false });
     const sign = new THREE.Mesh(new THREE.PlaneGeometry(4, 1), this.signMat);
     sign.position.set(0, 3.25, -2.25);
     this.group.add(sign);

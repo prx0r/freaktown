@@ -1,6 +1,6 @@
 """Delivery Sequencer — canonical freaktown.delivery.v1 format.
 
-Freak Town owns exact timing. TTS models are actors, Freak Town is the director.
+FUNNIER owns exact timing. TTS models are actors, FUNNIER is the director.
 
   flat text
        ↓
@@ -31,7 +31,7 @@ import shutil
 import uuid
 from dataclasses import dataclass, field
 
-logger = logging.getLogger("freak_town.delivery")
+logger = logging.getLogger("funnier.delivery")
 
 SCHEMA_VERSION = "freaktown.delivery.v1"
 
@@ -149,7 +149,7 @@ def arrange(text: str) -> DeliveryScore:
             type=btype, text=sent, energy=energy,
             pause_after_ms=pause_after,
             stage="hold" if btype == "punchline" else "",
-            # Black Room direction defaults (mirror freaktown detect_beats):
+            # Black Room direction defaults (mirror funnier detect_beats):
             # punchlines freeze + rimshot on close camera; closers on close.
             gesture="still" if btype in ("punchline", "closer") else "",
             camera="close" if btype in ("punchline", "closer") else "medium",

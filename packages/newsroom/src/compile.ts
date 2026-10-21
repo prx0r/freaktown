@@ -7,13 +7,13 @@
  * SetEventExecutor in order (the newsroom page / render CLI do), or map them
  * to ShowEvents with toShowEvents() for a live room.
  */
-import type { CastMemberV1, ShowEvent } from '@freaktown/contracts';
+import type { CastMemberV1, ShowEvent } from '@funnier/contracts';
 import { assertRundown, imageAllowed, type RundownV1, type WallPiece } from './schema';
 import { getShowStyle, themePayload, type ShowStyle } from './styles';
 import { figureTime, layoutProgram, type Program, type TimingsInput } from './timing';
 import { directShots, newsStudioCameras, type CueInfo, type Shot } from './director';
 
-export const TIMELINE_SCHEMA = 'freaktown.newsroom.timeline/v1' as const;
+export const TIMELINE_SCHEMA = 'funnier.newsroom.timeline/v1' as const;
 
 export interface TimedEvent { t_ms: number; type: string; payload: Record<string, unknown> }
 

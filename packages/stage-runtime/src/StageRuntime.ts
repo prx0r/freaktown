@@ -1,5 +1,5 @@
 /**
- * StageRuntime — the single renderer for Freak Town.
+ * StageRuntime — the single renderer for FUNNIER.
  *
  * One Three.js scene. One AudioContext. One Transport (the show clock).
  * Data/events in, performance out. No React, no app imports: the host
@@ -16,7 +16,7 @@
  */
 
 import * as THREE from 'three';
-import type { CameraCue, MotionCue, PerformancePlan, WordTiming } from '@freaktown/contracts';
+import type { CameraCue, MotionCue, PerformancePlan, WordTiming } from '@funnier/contracts';
 import { Transport } from './Transport';
 import { AudioBus } from './AudioBus';
 import { CameraDirector, type CameraPresetName } from './CameraDirector';

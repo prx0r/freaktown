@@ -15,7 +15,7 @@
  */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import type { CastMemberV1, CardV1, DialogueLinePayloadV1, HeadlinePayloadV1, SetThemePayloadV1 } from '@freaktown/contracts';
+import type { CastMemberV1, CardV1, DialogueLinePayloadV1, HeadlinePayloadV1, SetThemePayloadV1 } from '@funnier/contracts';
 import type { SetDefinition, SeatAnchor } from './types';
 import { SET_REGISTRY, SetRegistry, findSeat } from './registry';
 import { resolveCameraCue, seatForward, seatHead, seatSide, type CameraShot } from './camera';

@@ -25,7 +25,7 @@ def _delivery(**kw):
 
 class TestDeliveryValidation:
     def test_valid_full_beat(self):
-        from backend.services.freaktown import validate_delivery
+        from backend.services.funnier import validate_delivery
 
         d = _delivery(beats=[_beat(
             id="b2", type="punchline", text="Short closer.",
@@ -37,7 +37,7 @@ class TestDeliveryValidation:
         assert validate_delivery(d).ok is True
 
     def test_rejects_bad_inputs(self):
-        from backend.services.freaktown import validate_delivery
+        from backend.services.funnier import validate_delivery
 
         assert validate_delivery({}).ok is False
         assert validate_delivery(_delivery(version="v0")).ok is False
@@ -48,7 +48,7 @@ class TestDeliveryValidation:
         assert validate_delivery(_delivery(voice={})).ok is False
 
     def test_bundle_validation(self):
-        from backend.services.freaktown import validate_bundle
+        from backend.services.funnier import validate_bundle
 
         ok = validate_bundle({
             "character": {"name": "Test Freak"},
@@ -64,7 +64,7 @@ class TestDeliveryValidation:
 
 class TestBundleToScore:
     def test_preserves_performance_intent(self):
-        from backend.services.freaktown import bundle_to_score
+        from backend.services.funnier import bundle_to_score
 
         score = bundle_to_score(_delivery(beats=[
             _beat(id="b1", type="setup", text="Setup line here.",
@@ -86,7 +86,7 @@ class TestBundleToScore:
         assert rt.beats[0].expression == "whisper"
 
     def test_rejects_invalid(self):
-        from backend.services.freaktown import bundle_to_score
+        from backend.services.funnier import bundle_to_score
 
         with pytest.raises(ValueError):
             bundle_to_score(_delivery(beats=[]))
@@ -103,7 +103,7 @@ class TestBundleToScore:
 
 class TestSpeciesAndSlugs:
     def test_species_map(self):
-        from backend.services.freaktown import species_to_body
+        from backend.services.funnier import species_to_body
 
         assert species_to_body("police sniffer dog") == "dog"
         assert species_to_body("customer service robot") == "robot"
@@ -113,7 +113,7 @@ class TestSpeciesAndSlugs:
         assert species_to_body("") == "mystery"
 
     def test_bundle_slug(self):
-        from backend.services.freaktown import bundle_slug
+        from backend.services.funnier import bundle_slug
 
         s = bundle_slug("Martin Lamp", "moth likes lamps")
         assert s.startswith("martin-lamp-") and len(s) == len("martin-lamp-") + 6
@@ -125,7 +125,7 @@ class TestSpeciesAndSlugs:
 
 class TestWordsFromBeats:
     def test_offsets_split_words(self):
-        from backend.services.freaktown import (
+        from backend.services.funnier import (
             spans_from_offsets, words_from_beats,
         )
 
@@ -146,7 +146,7 @@ class TestWordsFromBeats:
             assert words[i].start_ms >= words[i - 1].start_ms  # monotonic
 
     def test_estimate_spans(self):
-        from backend.services.freaktown import estimate_spans, words_from_beats
+        from backend.services.funnier import estimate_spans, words_from_beats
 
         beats = [{"id": "b1", "text": "a b c", "pause_after_ms": 300}]
         spans = estimate_spans(beats)
@@ -158,7 +158,7 @@ class TestWordsFromBeats:
         import json
 
         from backend.services.delivery.sequencer import DeliveryScore, arrange
-        from backend.services.freaktown import (
+        from backend.services.funnier import (
             build_performance_manifest, estimate_spans, words_from_beats,
         )
 
@@ -312,7 +312,7 @@ class TestIntakeRoutes:
 
 class TestJudgeMode:
     def test_modes_valid(self):
-        from backend.services.freaktown import validate_modes
+        from backend.services.funnier import validate_modes
 
         assert validate_modes(None).ok is True
         assert validate_modes({}).ok is True
@@ -329,7 +329,7 @@ class TestJudgeMode:
         }).ok is True
 
     def test_modes_rejects_bad(self):
-        from backend.services.freaktown import validate_modes
+        from backend.services.funnier import validate_modes
 
         assert validate_modes({"judge": {"seat": "middle"}}).ok is False
         assert validate_modes({"judge": {"authority": "god"}}).ok is False
@@ -339,7 +339,7 @@ class TestJudgeMode:
 
     def test_manifest_carries_modes(self):
         from backend.services.delivery.sequencer import arrange
-        from backend.services.freaktown import (
+        from backend.services.funnier import (
             build_performance_manifest, estimate_spans, words_from_beats,
         )
 

@@ -4,7 +4,7 @@
  * profile the camera director reads. Ship: `goodnight` (calm, sleep) and
  * `default-news` (brisk). Add your own with registerShowStyle().
  */
-import type { SetThemePayloadV1 } from '@freaktown/contracts';
+import type { SetThemePayloadV1 } from '@funnier/contracts';
 
 export interface CadenceProfile {
   /** Ed: minimum / maximum shot length (ms). Even spacing = (lmax+lmin)/2, pull ≤ (lmax−lmin)/4. */

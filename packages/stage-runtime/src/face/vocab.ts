@@ -1,10 +1,10 @@
 /**
- * Acting vocabulary (Mutuals character-harness "mutuals-beats/v1" → Freaktown cues).
+ * Acting vocabulary (Mutuals character-harness "mutuals-beats/v1" → FUNNIER cues).
  * From harness_adapter.py on feature/mutuals-acting-party-smiles (008d4f5;
  * inspiration github.com/mutuals-inc/character-harness, Apache-2.0) plus the
  * face_* aliases added to StageRuntime on that branch.
  */
-import type { CameraPresetV1 } from '@freaktown/contracts';
+import type { CameraPresetV1 } from '@funnier/contracts';
 
 export const HARNESS_EMOTIONS: Record<string, string> = {
   happy: 'face.smile', playful: 'face.smile', warm: 'face.smile', amused: 'face.smile', smug: 'face.smug',

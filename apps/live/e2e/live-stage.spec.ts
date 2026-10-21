@@ -16,7 +16,7 @@ import { test, expect, type Page, type BrowserContext, type ConsoleMessage } fro
 import fs from 'node:fs';
 import path from 'node:path';
 
-const SHOTS = process.env.SHOTS_DIR || '/workspace/work/freaktown-live/shots';
+const SHOTS = process.env.SHOTS_DIR || '/workspace/work/funnier-live/shots';
 fs.mkdirSync(SHOTS, { recursive: true });
 
 type Tele = {

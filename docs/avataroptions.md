@@ -17,7 +17,7 @@ The market is better than "three.ws or bust." Strongest current candidates for
 Their current API explicitly says: one photo → **rigged, game-ready full-body
 avatar with facial blendshapes**, downloadable as GLB/glTF/FBX. Export API can
 embed both a roughly ARKit-style mobile blendshape set and **15 visemes**
-directly into the GLB. Almost exactly the asset contract Freaktown needs.
+directly into the GLB. Almost exactly the asset contract FUNNIER needs.
 (https://avatarsdk.com/avatar-api/) Consumer generator advertises the
 **first avatar free to create and export** — immediately testable without
 enterprise API access. (https://avatarsdk.com/ai-avatar-generator/)
@@ -42,7 +42,7 @@ marketing without inspecting exports, but belongs in the benchmark.
 ## Meshy (better than expected)
 
 Now advertises: text/image → textured 3D character → **auto-rig** → hundreds
-of animation presets → downloadable GLB/FBX. Very useful for Freaktown
+of animation presets → downloadable GLB/FBX. Very useful for FUNNIER
 characters that don't need to resemble a real person.
 (https://www.meshy.ai/use-cases/3d-avatar) Weakness remains the face —
 humanoid skeletons are easy now; **a standardized expressive facial rig is
@@ -129,7 +129,7 @@ Removes dependence on any single avatar generator.
 
 Lanes: Avatar SDK / MetaPerson · Threedium Julian NXT · three.ws · Neural4D ·
 Meshy + facial-rig postprocess. References: photoreal human · grotesque
-Freaktown human · stylized humanoid · animal-ish humanoid · genuinely weird
+FUNNIER human · stylized humanoid · animal-ish humanoid · genuinely weird
 character. Auto-score: identity similarity, topology, texture, skeleton
 validity, ARKit morph count, viseme count, blink, jawOpen, mouthSmile, phoneme
 test, Mixamo compat, Three.js load, VRM conversion, file size, generation

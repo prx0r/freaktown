@@ -5,8 +5,8 @@
  *   ?debug=1  telemetry · ?quality=low · ?cpuskin=1 · ?setglb=1 (load unverified CC0 GLB decor)
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { EventConsumer, SetEventExecutor, SetStage, type SetStageTelemetry } from '@freaktown/stage-runtime';
-import type { CardV1 } from '@freaktown/contracts';
+import { EventConsumer, SetEventExecutor, SetStage, type SetStageTelemetry } from '@funnier/stage-runtime';
+import type { CardV1 } from '@funnier/contracts';
 import { createTransport, resolveAsset, type TransportMode } from '../live/transport';
 
 declare global {

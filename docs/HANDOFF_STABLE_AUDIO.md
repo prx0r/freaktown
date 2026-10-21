@@ -1,6 +1,6 @@
 # Handoff: Stable Audio Open Small → Killella build
 
-> For the Killella agent. Freak Town side is done up to the disk limit;
+> For the Killella agent. FUNNIER side is done up to the disk limit;
 > this doc is everything needed to finish music integration over there.
 
 ## Status: link works, weights authorized, not downloaded here
@@ -9,7 +9,7 @@
   and verified** (range request returns 206 with real bytes).
 - The HF token in agent-vault (`HF_TOKEN`) has license access. Use it via
   `Authorization: Bearer` header or `HF_TOKEN` env with huggingface_hub.
-- NOT downloaded on the Freak Town VPS: disk is at 96% (~3GB free) and the
+- NOT downloaded on the FUNNIER VPS: disk is at 96% (~3GB free) and the
   model + torch working set needs ~2GB with safe headroom. Do it on a box
   with room.
 
@@ -19,7 +19,7 @@
 pip install diffusers accelerate safetensors torch  # torch CPU is fine
 ```
 
-Pin what resolves for you; Freak Town venv has diffusers 0.40.0 /
+Pin what resolves for you; FUNNIER venv has diffusers 0.40.0 /
 accelerate 1.14.0 / torch 2.14.0 (CPU) if you want version parity.
 
 ## What to download
@@ -52,7 +52,7 @@ output = generate_diffusion_cond(
 Expected CPU behavior: unknown on your hardware — benchmark one 10s render
 first. If 10s audio takes >45s wall clock, use the background-job UX below.
 
-## Prompt compiler (already proven in Freak Town)
+## Prompt compiler (already proven in FUNNIER)
 
 Keep the frontend contract exactly:
 
@@ -109,7 +109,7 @@ notes, dry cartoon comedy sting, fast decay"
   or a prompt-compiler change will serve stale audio for the same recipe.
 - `AGAIN` = same recipe, new seed only. Never mutate the prompt on AGAIN.
 - Save into the freak bundle as `walkout.wav` (or `.mp3`) + `walkout.json`
-  recipe sidecar. Freak Town's `save_set` already writes this shape —
+  recipe sidecar. FUNNIER's `save_set` already writes this shape —
   point it at real renders when available:
   `{"genre","mood","energy","shape","seed","provider","duration","audio"}`.
 

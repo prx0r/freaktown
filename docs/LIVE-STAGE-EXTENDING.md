@@ -156,7 +156,7 @@ and `performance.{expression,gesture,look}` in the delivery. To precompute inste
 (e.g. a server endpoint), send the plan inline:
 
 ```ts
-import { adaptSealedSet } from '@freaktown/stage-runtime';
+import { adaptSealedSet } from '@funnier/stage-runtime';
 const plan = adaptSealedSet({ timeline, mouthCues, setPlan, durationMs });
 await client.preloadPerformance({ performance_id, audio_url, avatar_url, plan });
 ```
@@ -301,7 +301,7 @@ CHROMIUM_PATH=/usr/bin/chromium NO_PROXY=127.0.0.1 npx playwright test
 #   live-stage.spec.ts  control→stage (local): clock, mouth, face, blink, cuts,
 #                       pause/resume, reactions, screenshots; BASIC + mobile; late join
 #   room.spec.ts        same over wrangler dev EpisodeRoom (needs ROOM_URL)
-SHOTS_DIR=/tmp/shots npx playwright test   # where screenshots go (default /workspace/work/freaktown-live/shots)
+SHOTS_DIR=/tmp/shots npx playwright test   # where screenshots go (default /workspace/work/funnier-live/shots)
 ```
 
 Python stays as before: `pytest tests/contract -q`, `python3 test_party.py`.

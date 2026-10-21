@@ -14,10 +14,10 @@
  * at the story start when nothing follows).
  *
  * Pure data + a dependency-free validator (no zod/ajv: the workspace keeps
- * packages dependency-light). JSON Schema id: freaktown.newsroom.rundown/v1.
+ * packages dependency-light). JSON Schema id: funnier.newsroom.rundown/v1.
  */
 
-export const RUNDOWN_SCHEMA = 'freaktown.newsroom.rundown/v1' as const;
+export const RUNDOWN_SCHEMA = 'funnier.newsroom.rundown/v1' as const;
 
 /** One measured word, relative to the start of its line (face layer format). */
 export interface WordTiming { word: string; start_ms: number; end_ms: number }

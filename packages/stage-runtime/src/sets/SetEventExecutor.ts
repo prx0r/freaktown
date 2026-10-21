@@ -12,7 +12,7 @@
  *   seat.join {seat,name,avatar_url}  a human/bot takes a seat (BASIC by default)
  *   poker.*                      cards / chips / reactions
  */
-import type { SetThemePayloadV1, ShowEvent } from '@freaktown/contracts';
+import type { SetThemePayloadV1, ShowEvent } from '@funnier/contracts';
 import type { EventConsumer } from '../EventConsumer';
 import type { SetStage } from './SetStage';
 import { estimateLineMs } from './textMouth';

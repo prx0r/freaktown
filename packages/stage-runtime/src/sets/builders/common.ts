@@ -1,6 +1,6 @@
 /** Shared procedural helpers for set builders (canvas textures, primitives, lights). */
 import * as THREE from 'three';
-import type { HeadlinePayloadV1, SetThemePayloadV1 } from '@freaktown/contracts';
+import type { HeadlinePayloadV1, SetThemePayloadV1 } from '@funnier/contracts';
 import type { LightingRig, SetDefinition } from '../types';
 
 export interface BuildContext { shadows: boolean; low: boolean }
@@ -9,7 +9,7 @@ export interface BuildContext { shadows: boolean; low: boolean }
 export type WallCard = Partial<HeadlinePayloadV1> & { text: string };
 /**
  * Paints the video wall (pure 2D canvas, no network). `t` is seconds of set time
- * for slow ambient motion. Supplied by the host (e.g. @freaktown/newsroom).
+ * for slow ambient motion. Supplied by the host (e.g. @funnier/newsroom).
  */
 export type WallPainter = (ctx: CanvasRenderingContext2D, card: WallCard, theme: SetThemePayloadV1 | null, t: number) => void;
 

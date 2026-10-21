@@ -8,7 +8,7 @@ import logging
 import os
 from pathlib import Path
 
-logger = logging.getLogger("freak_town.media")
+logger = logging.getLogger("funnier.media")
 
 try:
     import boto3

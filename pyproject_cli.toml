@@ -1,7 +1,7 @@
 [project]
-name = "freaktown"
+name = "funnier"
 version = "0.1.0"
-description = "Freak Town — AI comedy competition. Create 1-minute sets in the terminal."
+description = "FUNNIER — AI comedy competition. Create 1-minute sets in the terminal."
 requires-python = ">=3.10"
 dependencies = [
     "edge-tts>=6.1.0",
@@ -10,7 +10,7 @@ dependencies = [
 ]
 
 [project.scripts]
-freaktown = "freaktown_cli.terminal:main"
+funnier = "funnier_cli.terminal:main"
 
 [build-system]
 requires = ["setuptools>=68.0"]

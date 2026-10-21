@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Freak Town — Live Script Editor v2.
+"""FUNNIER — Live Script Editor v2.
 
 TTS provider with exact timing control.
 Audio compositor owns silence. TTS just speaks.
@@ -802,12 +802,12 @@ def preload_set(slug):
     {avatarUrl|null, portrait, audioUrl, plan, wordTimings, walkoutUrl}.
     Audio + performance are the READY gate; avatar is optional (§21):
     portrait carries the show until 3D is ready. Never black."""
-    from backend.services.freaktown.bundle import (
+    from backend.services.funnier.bundle import (
         build_performance_manifest, bundle_to_score, estimate_spans,
         performance_avatar, resolve_avatar, spans_from_offsets,
         words_from_beats,
     )
-    from backend.services.freaktown.cues import resolve_cues
+    from backend.services.funnier.cues import resolve_cues
     slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
     bdir = FREAK_DIR / slug
     if not bdir.is_dir() or not (bdir / "set.wav").exists():
@@ -1359,7 +1359,7 @@ def respond():
         idea = (idea or f"Answer {pchar.get('name', 'them')} back, but meaner").strip().strip('"')
 
     minute, _ = _cf_chat(
-        "You are a comedy writer for Freak Town. Write a 60-second standup minute. "
+        "You are a comedy writer for FUNNIER. Write a 60-second standup minute. "
         "80-150 words. First line IS the joke. Escalating absurdity. Specific details. "
         "Killer closer under 10 words. Direct audience address. Stay in character voice. "
         "Reply ONLY with the set text, no title, no quotes.",
@@ -1413,7 +1413,7 @@ def takes_browser():
     body = "\n".join(cards) or "<p style='text-align:center;color:#666'>No takes yet — be the first.</p>"
     page = ("""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Takes — Freak Town</title>
+<title>Takes — FUNNIER</title>
 <style>*{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a0f;color:#eee;font-family:monospace;padding:16px 10px 60px}
 h1{text-align:center;font-size:16px;color:#ff2fa8;margin:6px 0 2px}
@@ -1513,10 +1513,10 @@ def character_page(char):
                   _html.escape(", ".join(sorted(rivals))) + "</p>") if rivals else ""
     return f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{name} — Freak Town</title>
+<title>{name} — FUNNIER</title>
 <style>body{{background:#0a0a0f;color:#eee;font-family:monospace;text-align:center;padding:32px 16px}}
 a{{color:#ff2fa8}}</style></head><body>
-<div style="font-size:12px;letter-spacing:2px;color:#ff2fa8;">🎪 FREAK TOWN</div>
+<div style="font-size:12px;letter-spacing:2px;color:#ff2fa8;">🎪 FUNNIER</div>
 <h1>{name}</h1><p style="color:#888;">{premise}</p>
 <p style="color:#555;">{len(bundles)} performance{'s' if len(bundles) != 1 else ''}</p>
 {''.join(cards)}{rival_line}
@@ -1550,7 +1550,7 @@ def og_card(slug):
         img = Image.new("RGB", (1200, 630), (10, 10, 15))
         d = ImageDraw.Draw(img)
         d.rectangle([0, 0, 1200, 630], outline=(255, 47, 168), width=6)
-        d.text((60, 40), "FREAK TOWN", fill=(255, 47, 168))
+        d.text((60, 40), "FUNNIER", fill=(255, 47, 168))
         d.text((60, 120), (char.get("name") or slug)[:28].upper(), fill=(255, 255, 255))
         d.text((60, 220), (char.get("premise") or "")[:90], fill=(150, 150, 160))
         d.text((60, 340), f"{meta.get('duration_s', 0)} seconds · watch it, then answer back",
@@ -1680,7 +1680,7 @@ def _render_watch(slug):
     # must never disagree about when a line lands.)
     beats = []
     try:
-        from backend.services.freaktown.bundle import (
+        from backend.services.funnier.bundle import (
             estimate_spans, spans_from_offsets,
         )
         delivery = json.loads((bdir / "delivery.json").read_text())
@@ -1789,16 +1789,16 @@ def _render_watch(slug):
 WATCH_TEMPLATE = """<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>__NAME__ — Freak Town</title>
+<title>__NAME__ — FUNNIER</title>
 <link rel="canonical" href="__CANON__">
-<meta property="og:title" content="__NAME__ — Freak Town">
+<meta property="og:title" content="__NAME__ — FUNNIER">
 <meta property="og:description" content="__PREMISE__ (__DUR__s set). Watch it, then answer back.">
 <meta property="og:image" content="__CARD__">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="__NAME__ trading card">
 <meta property="og:url" content="__CANON__">
-<meta property="og:site_name" content="Freak Town">
+<meta property="og:site_name" content="FUNNIER">
 <meta property="og:type" content="video.other">
 <meta property="video:duration" content="__DUR__">
 <meta name="theme-color" content="#ff2fa8">
@@ -1866,7 +1866,7 @@ a.cta{color:#fff}
 .ghost{background:none}
 </style>
 </head><body>
-<div class="top"><span class="logo">FREAK TOWN</span><button class="share" onclick="passItOn()">↗ share</button></div>
+<div class="top"><span class="logo">FUNNIER</span><button class="share" onclick="passItOn()">↗ share</button></div>
 __REPLYBANNER__
 <div id="stage">
   <canvas id="vrmStage"></canvas>
@@ -2124,7 +2124,7 @@ async function sendResponse() {
   const custom = document.getElementById('replyText').value.trim();
   const line = document.getElementById('genline');
   line.style.display = 'block';
-  line.textContent = 'Your response is entering Freak Town…';
+  line.textContent = 'Your response is entering FUNNIER…';
   funnel('respond_started', {mode: ideaMode, edited: !!custom});
   try {
     const res = await fetch('/api/respond', {
@@ -2415,7 +2415,7 @@ try {
 AR_TEMPLATE = """<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>__NAME__ in your room — Freak Town</title>
+<title>__NAME__ in your room — FUNNIER</title>
 <meta name="theme-color" content="#ff2fa8">
 <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
 <script src="https://cdn.jsdelivr.net/npm/@8thwall/xrextras@1/dist/xrextras.js" crossorigin="anonymous"></script>
@@ -2694,7 +2694,7 @@ def go_badger():
 RECORD_TEMPLATE = """<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Record as __NAME__ — Freak Town</title>
+<title>Record as __NAME__ — FUNNIER</title>
 <meta name="theme-color" content="#ff2fa8">
 <script type="importmap">
 {"imports": {
@@ -3170,7 +3170,7 @@ def revoice_page(slug, fname):
                     for b in _bank_voices())
     return f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Revoice — Freak Town</title>
+<title>Revoice — FUNNIER</title>
 <style>*{{margin:0;padding:0;box-sizing:border-box}}
 body{{background:#0a0a0f;color:#eee;font-family:monospace;padding:16px 12px 60px}}
 h1{{text-align:center;font-size:15px;color:#ff2fa8}}
@@ -3377,7 +3377,7 @@ def api_agent_manifest():
 @app.route("/llms.txt", methods=["GET"])
 def llms_txt():
     """Compact machine index. Agents: start here, then /api/agent."""
-    txt = """# Freak Town (trial) — for agents
+    txt = """# FUNNIER (trial) — for agents
 Trial comedy-club API. No key. Observe, act, assess.
 - Manifest: /api/agent
 - Watch: /f/<slug>  AR: /a/<slug>  Record: /r/<slug>  Takes: /takes
@@ -3521,7 +3521,7 @@ def list_submissions():
 
 # ── Generate (CF free-tier writer) ────────────────────────────────────
 
-GEN_SYSTEM = """You are a comedy writer for Freak Town, a live AI comedy club.
+GEN_SYSTEM = """You are a comedy writer for FUNNIER, a live AI comedy club.
 Write a 60-second standup minute. Rules:
 - 80-150 words. First line IS the joke (no warmup, no "So...").
 - Escalating absurdity. Specific details (numbers, names). Killer closer under 10 words.
@@ -4467,7 +4467,7 @@ funnier_skin.init(app)
 # ── Main ────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    print(f"\n  FREAK TOWN — Live Script Editor v2")
+    print(f"\n  FUNNIER — Live Script Editor v2")
     print(f"  TTS: edge-tts | Compositor: exact silence")
     print(f"  http://localhost:{os.getenv('PORT', '8090')}\n")
     port = int(os.getenv("PORT", "8090"))

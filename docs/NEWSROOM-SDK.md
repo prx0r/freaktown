@@ -143,7 +143,7 @@ breaking-news furniture. The sun on its wall "breathes" over a 22 s period.
 
 ```json
 {
-  "schema": "freaktown.newsroom.rundown/v1",
+  "schema": "funnier.newsroom.rundown/v1",
   "id": "my-show-2026-10-22", "title": "My Show", "show_style": "goodnight", "date": "2026-10-22",
   "cast": {
     "anchors":   [{ "chair": "anchor", "name": "Anchor", "seat": "anchor1" }],
@@ -172,7 +172,7 @@ breaking-news furniture. The sun on its wall "breathes" over a 22 s period.
 To compile in code:
 
 ```ts
-import { compile, validateRundown } from '@freaktown/newsroom';
+import { compile, validateRundown } from '@funnier/newsroom';
 const v = validateRundown(json);            // { ok, errors[] }: never throws
 const show = compile(json, { episodeWords }); // or {} for estimates
 show.events  // [{ t_ms, type, payload }] in order
@@ -203,7 +203,7 @@ per-second camera log. Speed on 2 ARM cores with SwiftShader, 1280×720 at
 ## 3. Adding a show style
 
 ```ts
-import { registerShowStyle, withOverrides, DEFAULT_NEWS } from '@freaktown/newsroom';
+import { registerShowStyle, withOverrides, DEFAULT_NEWS } from '@funnier/newsroom';
 registerShowStyle({
   ...withOverrides(DEFAULT_NEWS, { id: 'late-desk', cadence: { lmin_ms: 4000, lmax_ms: 9000, move_ms: 900 } }),
   name: 'Late desk', brand: 'Late Desk',
@@ -240,7 +240,7 @@ Change one knob and run `npx vitest run packages/newsroom`. The snapshot in
 ## 5. Writing an adapter for another channel
 
 An adapter turns a channel's own script format into a rundown. It lives in
-**that channel's repo**, never in freaktown. Goodnight News has one at
+**that channel's repo**, never in funnier. Goodnight News has one at
 `damn/projects/goodnight-news/studio/adapter.py`. The same shape works for
 damn's `absurd-news` or `tonight-on-earth`:
 

@@ -60,7 +60,7 @@ class Authorship(str, enum.Enum):
 
 
 class InterviewController(str, enum.Enum):
-    FREAK_TOWN_AI = "freak_town_ai"
+    FUNNIER_AI = "freak_town_ai"
     HUMAN = "human"
     EXTERNAL_AGENT = "external_agent"
 

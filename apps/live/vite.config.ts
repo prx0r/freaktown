@@ -18,7 +18,7 @@ function repoAssets(): Plugin {
     '/meshes/': path.resolve(__dirname, '../../data/character-meshes'),
   };
   return {
-    name: 'freaktown-repo-assets',
+    name: 'funnier-repo-assets',
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
         const url = (req.url ?? '').split('?')[0];

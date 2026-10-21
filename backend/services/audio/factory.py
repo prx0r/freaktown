@@ -17,7 +17,7 @@ import random
 from dataclasses import dataclass, field
 from pathlib import Path
 
-logger = logging.getLogger("freak_town.audio")
+logger = logging.getLogger("funnier.audio")
 
 MODEL_ID = "stabilityai/stable-audio-open-small"
 MAX_DURATION = 11.0
@@ -60,7 +60,7 @@ SFX_DEFS = {
     "boo": {"duration": 2.0, "source": "arena crowd", "action": "crowd booing, disapproval", "production": "live room ambience, natural decay"},
     "laugh": {"duration": 2.0, "source": "studio audience", "action": "warm sitcom laughter", "production": "close-miked crowd, natural decay"},
     "drum_hit": {"duration": 1.0, "source": "snare drum", "action": "single sharp comedy punctuation hit", "production": "dry studio, immediate attack"},
-    # ── Imported from freaktown sound_bank.py (Black Room band/crowd) ──
+    # ── Imported from funnier sound_bank.py (Black Room band/crowd) ──
     # Prompts preserved verbatim as the action; durations match theirs.
     "rimshot_long": {"duration": 3.0, "source": "drum kit and crash cymbal", "action": "Extended comedy rimshot, ba-dum-tss-crash, triumphant drum sting", "production": "tight studio recording, decisive ending"},
     "ba_dum_tss": {"duration": 2.0, "source": "snare, kick and cymbal", "action": "Classic ba-dum-tss comedy drums, two hits and a cymbal", "production": "dry studio recording, immediate attack"},
@@ -75,7 +75,7 @@ SFX_DEFS = {
     "suspense": {"duration": 3.0, "source": "low strings and pulse", "action": "Suspenseful build, tension rising, dramatic pause music, 3 seconds", "production": "tense minimal production, builds throughout"},
 }
 
-# ── Character walkouts, imported from freaktown sound_bank.py ──────────
+# ── Character walkouts, imported from funnier sound_bank.py ──────────
 # Full prompts (too specific for the genre/mood recipe grid). Used when
 # a walkout recipe has genre == "character"; flavor selects the entry.
 CHARACTER_WALKOUTS = {
@@ -132,7 +132,7 @@ class SoundRecipe:
 def build_walkout_prompt(recipe: SoundRecipe) -> str:
     """Compile structured intent → Stable Audio prompt."""
     # Character walkouts bypass the recipe grid: their prompts are
-    # hand-written per freak (imported from freaktown sound_bank.py).
+    # hand-written per freak (imported from funnier sound_bank.py).
     if recipe.genre == "character":
         base = CHARACTER_WALKOUTS.get(recipe.flavor, "")
         if base:

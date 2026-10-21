@@ -11,7 +11,7 @@
  * An image is drawn only when card.image_url is set — compile() sets it only
  * for licence lanes that allow it (verbatim-ok).
  */
-import type { SetThemePayloadV1 } from '@freaktown/contracts';
+import type { SetThemePayloadV1 } from '@funnier/contracts';
 
 export interface WallCardInput {
   text: string;

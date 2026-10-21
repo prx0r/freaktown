@@ -1,10 +1,10 @@
-"""Black Room adapter — freaktown artifacts in, killella performances out.
+"""Black Room adapter — funnier artifacts in, killella performances out.
 
-Read-only with respect to the freaktown repo: schema authority stays
+Read-only with respect to the funnier repo: schema authority stays
 freaktown.delivery.v1, we just accept the full schema here.
 """
 
-from backend.services.freaktown.bundle import (
+from backend.services.funnier.bundle import (
     SCHEMA_VERSION,
     PERFORMANCE_SCHEMA_VERSION,
     AVATAR_SCHEMA_VERSION,

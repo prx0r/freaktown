@@ -1,5 +1,5 @@
 {
-  "name": "@freaktown/live",
+  "name": "@funnier/live",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,9 +10,9 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@freaktown/contracts": "*",
-    "@freaktown/newsroom": "*",
-    "@freaktown/stage-runtime": "*",
+    "@funnier/contracts": "*",
+    "@funnier/newsroom": "*",
+    "@funnier/stage-runtime": "*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.0",

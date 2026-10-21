@@ -63,7 +63,7 @@ const out = path.resolve(args.out ?? `${path.basename(rundownPath, '.json')}.mp4
 // 1) the live app build
 if (args.build || !fs.existsSync(path.join(dist, 'index.html'))) {
   console.log('[render] building apps/live …');
-  const b = spawnSync('npm', ['run', 'build', '-w', '@freaktown/live'], { cwd: repo, stdio: 'inherit' });
+  const b = spawnSync('npm', ['run', 'build', '-w', '@funnier/live'], { cwd: repo, stdio: 'inherit' });
   if (b.status !== 0) process.exit(b.status ?? 1);
 }
 
