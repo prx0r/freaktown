@@ -1,0 +1,98 @@
+{
+ "id": "standup-club",
+ "about": "Comedy club: bigger, livelier room, handheld mic (more drift, more plosives), no bed by default.",
+ "room": {
+  "enabled": true,
+  "size_m": 9.0,
+  "rt60_s": 0.55,
+  "early_count": 9,
+  "early_db": -11.0,
+  "tail_db": -19.0,
+  "damping_hz": 4200,
+  "wet": 1.0
+ },
+ "mic_drift": {
+  "enabled": true,
+  "corr_s": 3.5,
+  "depth": 0.6,
+  "dip_db": 3.0,
+  "hf_split_hz": 4200,
+  "hf_loss_db": 5.0,
+  "prox_split_hz": 220,
+  "prox_loss_db": 3.5,
+  "turn_prob": 0.3,
+  "turn_amount": 0.9
+ },
+ "plosive": {
+  "enabled": true,
+  "prob": 0.3,
+  "level_db": -22.0,
+  "lean_prob": 0.08,
+  "lean_db": 2.0
+ },
+ "breaths": {
+  "enabled": true,
+  "min_gap_s": 0.55,
+  "prob": 0.75,
+  "level_db": -31.0
+ },
+ "chain": {
+  "enabled": true,
+  "params": {
+   "hpf_hz": 75,
+   "mud_db": -1.5,
+   "presence_db": 1.2,
+   "air_db": 0.8,
+   "deess": {
+    "threshold_db": -32.0,
+    "max_red_db": 6.0
+   },
+   "comp": {
+    "threshold_db": -26.0,
+    "ratio": 2.2,
+    "attack_ms": 12,
+    "release_ms": 180
+   }
+  }
+ },
+ "room_tone": {
+  "enabled": true,
+  "level_rel_db": -40.0,
+  "lowpass_hz": 4000,
+  "hum_hz": 50,
+  "hum_rel_db": -18.0
+ },
+ "foley": {
+  "enabled": true,
+  "paper_prob": 0.0,
+  "creak_prob": 0.0,
+  "clink_max": 0,
+  "clink_prob": 0.35,
+  "levels_db": {
+   "paper": -27.0,
+   "creak": -33.0,
+   "clink": -30.0
+  }
+ },
+ "music": {
+  "enabled": true,
+  "key": "D",
+  "bar_s": 8.0,
+  "jingle_db": 0.0,
+  "jingle_rel_db": -3.0,
+  "bed_db": -120.0,
+  "bed_fade_in_s": 2.5,
+  "bed_fade_out_s": 3.0
+ },
+ "mix": {
+  "vo_rms_db": -20.0,
+  "vo_over_bed_db": 16.0,
+  "duck_db": 8.0,
+  "duck_attack_ms": 180,
+  "duck_release_ms": 450
+ },
+ "master": {
+  "target_lufs": -14.0,
+  "ceiling_dbtp": -1.5
+ }
+}

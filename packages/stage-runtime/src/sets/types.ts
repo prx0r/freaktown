@@ -89,6 +89,8 @@ export interface SetDefinition {
   props: string[];
   overlays: OverlayHook[];
   /** Ordered camera buttons for /control. */
+  /** Hide seat props (chair, papers) at seats nobody is cast in, e.g. a single-anchor news desk. */
+  hideEmptySeats?: boolean;
   controlCameras: string[];
   /** Max seats a cast may fill (defaults to seats.length). */
   maxCast?: number;

@@ -63,7 +63,7 @@ export const NEWS_STUDIO: SetDefinition = {
   ],
   marks: [seat('wall-mark', -1.95, -1.45, 0.45, 'mark', 'standing'), seat('floor-mark', 1.9, 0.5, -0.5, 'mark', 'standing')],
   cameras: {
-    wide: { position: [0, 2.1, 6.6], target: [0, 1.35, -0.9], fov: 42, label: 'Wide' },
+    wide: { position: [0, 2.1, 6.6], target: [0, 1.35, -0.9], fov: 42, label: 'Wide', portrait: { position: [-0.6, 1.5, 6.2], target: [-0.6, 0.55, -1.6], fov: 50 } },
     'anchor1-single': { seat: 'anchor1', position: [-0.15, 0.12, 2.3], target: [0, -0.1, 0], fov: 30, label: 'Anchor 1' },
     'anchor2-single': { seat: 'anchor2', position: [0.15, 0.12, 2.3], target: [0, -0.1, 0], fov: 30, label: 'Anchor 2' },
     'two-shot': { position: [0, 1.45, 3.7], target: [0, 1.2, -0.6], fov: 32, label: 'Two-shot' },
@@ -82,6 +82,7 @@ export const NEWS_STUDIO: SetDefinition = {
   props: ['desk', 'riser', 'video-wall', 'cyclorama', 'cameras'],
   overlays: ['lower_third', 'ticker', 'headline'],
   controlCameras: ['wide', 'anchor1-single', 'anchor2-single', 'two-shot', 'screen'],
+  hideEmptySeats: true,
 };
 
 // ── 3. podcast ──

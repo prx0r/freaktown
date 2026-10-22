@@ -279,6 +279,31 @@ cd apps/live && CHROMIUM_PATH=/usr/bin/chromium NO_PROXY=127.0.0.1 npx playwrigh
 #   wall headline appears (DOM mirror + telemetry + bright wall pixels), desktop + mobile; numbers + country cards
 ```
 
+
+## 8. Driving the SDK from an engine (audio on the picture's clock)
+
+A daily engine (damn `engine/`, see its `GOODNIGHT-ENGINE.md`) needs the audio and the picture
+on one clock. The flow:
+
+1. TTS one wav per read, align each wav to its words → `{"lines": {"<lineId>": [{word,start_ms,end_ms}]}}`.
+2. `node packages/newsroom/cli/timeline.mjs rundown.json --words lines.json -o timeline.json`
+   compiles in Node (esbuild bundle of `src/`, no browser). The output has the program clock:
+   `lines[{id,start_ms,end_ms,words}]`, `jingles`, `stories`, `segments`, `shots`, `events`.
+3. Place each wav at its line's `start_ms` (and the jingles at `jingles[i].start_ms`).
+4. `render.mjs rundown.json --words lines.json` renders the same layout, so cuts, cards and
+   mouths land on those milliseconds.
+
+The mouth follows the measured words: `dialogue.line.words` → `wordsMouth()` in the stage
+runtime (closed between words, one open/close per vowel group inside each word's measured span).
+Without words it falls back to the even `textMouth()` spread.
+
+The studio sound is `packages/audiopost` (Python, reusable by sketches and stand-up):
+room IR, off-axis mic drift, breaths, room tone, foley, broadcast chain, procedural jingle/bed
+with ducking, −14 LUFS / true-peak master. See `packages/audiopost/README.md`.
+
+Set notes: `NEWS_STUDIO.hideEmptySeats` hides an uncast seat's chair and papers. The wide has a
+`portrait` framing. Moves use a smootherstep ease.
+
 ## Credits
 
 * **Sofie** TV automation (NRK, SuperFly.tv), for the rundown → segment → part → piece model: https://github.com/nrkno/sofie-core

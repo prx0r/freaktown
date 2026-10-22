@@ -39,3 +39,24 @@ export function textMouth(text: string, durationMs: number, tMs: number): TextMo
   }
   return { open: 0, visemes: zero, word: words.length - 1 };
 }
+
+/**
+ * Mouth from MEASURED word timings (words.json, relative to the line start): the mouth is
+ * closed between words, and each word opens/closes once per vowel group inside its own
+ * measured span, so lips land on real speech instead of an even spread over the line.
+ */
+export function wordsMouth(words: Array<{ word: string; start_ms: number; end_ms: number }>, tMs: number): TextMouthSample {
+  const zero: Visemes = { aa: 0, ih: 0, ou: 0, ee: 0, oh: 0 };
+  if (!words.length || tMs < words[0].start_ms || tMs >= words[words.length - 1].end_ms) return { open: 0, visemes: zero, word: -1 };
+  let lo = 0, hi = words.length - 1;
+  while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (words[mid].start_ms <= tMs) lo = mid; else hi = mid - 1; }
+  const w = words[lo];
+  if (tMs >= w.end_ms) return { open: 0, visemes: zero, word: lo };
+  const vowels = w.word.toLowerCase().match(/[aeiouy]+/g) ?? ['a'];
+  const local = ((tMs - w.start_ms) / Math.max(1, w.end_ms - w.start_ms)) * vowels.length;
+  const syl = Math.min(vowels.length - 1, Math.floor(local));
+  const phase = local - Math.floor(local);
+  const v = vowels[syl][0];
+  const open = Math.sin(Math.PI * Math.min(1, phase)) * 0.85;
+  return { open, visemes: { ...zero, [VOWEL_VIS[v] ?? 'aa']: open }, word: lo };
+}

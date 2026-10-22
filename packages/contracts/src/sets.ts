@@ -72,7 +72,7 @@ export interface SetCameraPayloadV1 {
   source?: "human_director" | "auto_director";
   /** Optional eased move into the shot instead of a hard cut (ms). Additive (newsroom). */
   move_ms?: number;
-  /** Easing for move_ms: "smooth" (default, ease-in-out sine) | "linear". */
+  /** Easing for move_ms: "smooth" (default, smootherstep ease-in-out) | "linear". */
   ease?: "smooth" | "linear";
   /** Slow push-in while the shot holds: fraction of the camera→target distance (0..0.3). */
   creep?: number;

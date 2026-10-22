@@ -93,6 +93,7 @@ export function placeAtSeats(def: SetDefinition, make: () => THREE.Object3D, gro
     const o = make();
     o.position.set(s.position[0] - Math.sin(s.rotation) * back, s.position[1], s.position[2] - Math.cos(s.rotation) * back);
     o.rotation.y = s.rotation;
+    o.userData.seatId = s.id;
     group.add(o);
   }
 }
