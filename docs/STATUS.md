@@ -1,4 +1,4 @@
-# STATUS — funnier honest state (2026-10-16 · delta 2026-10-21)
+# STATUS — funnier honest state (2026-10-16 · delta 2026-10-21) · session 2026-10-22: HANDOVER-2026-10-22.md
 
 Read this first. Everything else is detail. This file is the anti-mess:
 vision, what's done, what's not, what's theatre, what's next.
