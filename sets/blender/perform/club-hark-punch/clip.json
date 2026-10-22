@@ -1,0 +1,9 @@
+{
+ "set": "set-hark-lantern-3m-hqbn",
+ "from_ms": 8500,
+ "to_ms": 15300,
+ "duration_ms": 6800,
+ "fps": 25,
+ "frames": 170,
+ "note": "Hark Lantern opener punch: the look, 'Hark. You have arrived. Some time ago.', the laugh and the reaction. Voice: Fish s2.1-pro-free (free model), crowd: procedural laugh (club_clip.py)."
+}

@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import type { VRM } from '@pixiv/three-vrm';
 import { attachMouthAnchor } from './mouthAnchor';
+import { ExpressiveFace, type Channels, type FaceCheck } from '../face/expressive';
 import type { AvatarCapabilities, AvatarDriver, Emotions, PoseState, Visemes } from './types';
 
 const VISEMES = ['aa', 'ih', 'ou', 'ee', 'oh'] as const;
@@ -37,8 +38,27 @@ export class VrmAvatar implements AvatarDriver {
   }
 
   private set(name: string, v: number): void {
+    // in expressive mode the raw morphs carry mouth/blink/emotion; the presets stay at 0 so nothing doubles
+    if (this.expressiveFace && PRESETS.has(name)) v = 0;
     if (this.has.has(name)) this.vrm.expressionManager?.setValue(name, Math.max(0, Math.min(1, v)));
   }
+
+  /**
+   * Expressive mode (face/expressive.ts): for VRMs whose meshes carry a rig in expressive-map.json (VRoid Fcl_*,
+   * ARKit), the face is written as raw morphs with the map's gains (aa reaches 1.35, one-sided smiles are
+   * generated) AFTER vrm.update(), because the expression manager rewrites every bound morph each update.
+   */
+  private expressiveFace: ExpressiveFace | null = null;
+  private pending: Channels | null = null;
+  setExpressive(ch: Channels): void {
+    if (!this.expressiveFace) {
+      const f = new ExpressiveFace(this.vrm.scene);
+      if (!f.binding.rig || f.binding.rig === 'vrm' || f.check.level === 'fail') return;
+      this.expressiveFace = f;
+    }
+    this.pending = ch;
+  }
+  get faceCheck(): FaceCheck { return (this.expressiveFace ?? new ExpressiveFace(this.vrm.scene, { generate: false })).check; }
 
   setMouth(open: number, vis: Visemes): void {
     if (this.caps.mouthMode === 'viseme') {
@@ -128,7 +148,10 @@ export class VrmAvatar implements AvatarDriver {
     }
   }
 
-  update(dt: number): void { this.vrm.update(dt); }
+  update(dt: number): void {
+    this.vrm.update(dt);
+    if (this.expressiveFace && this.pending) this.expressiveFace.apply(this.pending);
+  }
 
   dispose(): void {
     this.root.parent?.remove(this.root);

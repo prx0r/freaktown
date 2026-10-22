@@ -257,8 +257,25 @@ def beam_material():
     fade.inputs["To Min"].default_value = 1.0
     fade.inputs["To Max"].default_value = 0.0
     nt.links.new(a.outputs["Factor"], fade.inputs["Value"])
+    # ... and fade IN from the lens: the first metres of cone hang right over the house cameras, where a lens-bright
+    # cone read as a strong white bar across the wide shot
+    fin = nt.nodes.new("ShaderNodeMapRange"); fin.interpolation_type = "SMOOTHSTEP"
+    fin.inputs["From Min"].default_value = 0.05
+    fin.inputs["From Max"].default_value = 0.35
+    nt.links.new(a.outputs["Factor"], fin.inputs["Value"])
+    # ... and fade out within ~3.5 m of whatever camera is looking (Camera Data view distance), so no shot ever sits
+    # inside a bright slab of beam
+    cam = nt.nodes.new("ShaderNodeCameraData")
+    near = nt.nodes.new("ShaderNodeMapRange"); near.interpolation_type = "SMOOTHSTEP"
+    near.inputs["From Min"].default_value = 1.2
+    near.inputs["From Max"].default_value = 3.5
+    nt.links.new(cam.outputs["View Distance"], near.inputs["Value"])
+    both = nt.nodes.new("ShaderNodeMath"); both.operation = "MULTIPLY"
+    nt.links.new(fade.outputs[0], both.inputs[0]); nt.links.new(fin.outputs[0], both.inputs[1])
+    both2 = nt.nodes.new("ShaderNodeMath"); both2.operation = "MULTIPLY"
+    nt.links.new(both.outputs[0], both2.inputs[0]); nt.links.new(near.outputs[0], both2.inputs[1])
     mul = nt.nodes.new("ShaderNodeMath"); mul.operation = "MULTIPLY"
-    nt.links.new(inv.outputs[0], mul.inputs[0]); nt.links.new(fade.outputs[0], mul.inputs[1])
+    nt.links.new(inv.outputs[0], mul.inputs[0]); nt.links.new(both2.outputs[0], mul.inputs[1])
     st = nt.nodes.new("ShaderNodeAttribute"); st.attribute_type, st.attribute_name = "GEOMETRY", "club_beam_strength"
     mul2 = nt.nodes.new("ShaderNodeMath"); mul2.operation = "MULTIPLY"
     nt.links.new(mul.outputs[0], mul2.inputs[0]); nt.links.new(st.outputs["Factor"], mul2.inputs[1])
@@ -1022,11 +1039,13 @@ def lights(sc, mod, look):
     W, D, wy, R = value(mod, "Room Width"), value(mod, "Room Depth"), value(mod, "Back Wall Y"), value(mod, "Riser Height")
     neon_c = value(mod, "Neon Color")
     lamp = (0.45, -throw, H - 0.45)
-    tgt = (0.0, 0.15, 0.0)
+    # aimed at the comic's chest, cone sized to a body-wide pool (not the whole deck): the old floor-aimed cone at
+    # Spot Radius x 1.1 spilt a hard bright patch over the back wall and curtains behind the comic
+    tgt = (0.0, 0.0, 1.0)
     dist = math.dist(lamp, tgt)
-    cone = 2 * math.degrees(math.atan2(rad * 1.1, dist))
+    cone = 2 * math.degrees(math.atan2(min(rad, 0.9) * 0.85, dist))
     add_light(sc, "Key Spot", "SPOT", lamp, look.get("key", 900.0) * (dist / 6.6) ** 2,
-              S.srgb(look.get("key_color", "#FFF0DC")), tgt, size=0.08, spot_deg=cone, blend=0.25)
+              S.srgb(look.get("key_color", "#FFF0DC")), tgt, size=0.08, spot_deg=cone, blend=0.55)
     for sx, c in ((-1, look.get("rim_left", "#40D0FF")), (1, look.get("rim_right", "#FF40C0"))):
         add_light(sc, f"Rim {sx}", "SPOT", (sx * 3.0, wy - 0.7, min(H - 0.3, 4.2)), look.get("rim", 160.0), S.srgb(c),
                   (0.0, 0.0, 1.3), size=0.2, spot_deg=50, blend=0.6)
@@ -1044,16 +1063,52 @@ def lights(sc, mod, look):
     sc.world = w
 
 
-def cameras(sc, mod):
-    wy, D, R = value(mod, "Back Wall Y"), value(mod, "Room Depth"), value(mod, "Riser Height")
-    H = value(mod, "Ceiling Height")
-    back = wy - D
-    wide_y = max(back + 0.6, -8.2)
-    rows = value(mod, "Theatre Rows")
-    wide = S.camera("Wide", lens=24.0, loc=(0.25, wide_y, min(1.85 + (1.0 if rows else 0.0), H - 0.9)),
-                    target=(0.0, 0.0, 1.1))
-    eye = S.camera("Performer Eye", lens=20.0, loc=(0.0, 0.05, 1.62), target=(0.0, back, 0.7 - R))
-    return {"wide": wide[0], "eye": eye[0]}
+ROOM_KEYS = ("Room Width", "Room Depth", "Ceiling Height", "Riser Height", "Stage Width", "Stage Depth",
+             "Back Wall Y", "Theatre Rows", "Rake", "Row Pitch")
+
+
+def room_numbers(mod):
+    return {k: value(mod, k) for k in ROOM_KEYS}
+
+
+def crowd_centroid(mod, near=6.0):
+    """Centroid of the seated people (club_part 14) within `near` m of the stage lip, from the evaluated set."""
+    import numpy as np
+    ob = mod.id_data
+    dg = bpy.context.evaluated_depsgraph_get()
+    me = ob.evaluated_get(dg).to_mesh()
+    try:
+        n = len(me.polygons)
+        pa = me.attributes.get("club_part")
+        if not n or pa is None:
+            return None
+        part = np.zeros(n, dtype=np.int32)
+        pa.data.foreach_get("value", part)
+        cen = np.zeros(n * 3)
+        me.polygons.foreach_get("center", cen)
+        cen = cen.reshape(-1, 3)[part == 14]
+        front = value(mod, "Back Wall Y") - value(mod, "Stage Depth")
+        cen = cen[(front - cen[:, 1]) < near]
+        if not len(cen):
+            return None
+        c = cen.mean(axis=0)
+        return (float(c[0]), float(c[1]), float(c[2]))
+    finally:
+        ob.evaluated_get(dg).to_mesh_clear()
+
+
+def cameras(sc, mod, eye=1.45):
+    """The club camera kit (club_cameras.py): CAM_WIDE, CAM_MEDIUM, CAM_CLOSE, CAM_XCU, CAM_OTS, CAM_PUSH_A/B,
+    CAM_CROWD + marks, from the room numbers and the comic's eye height; plus the performer's-eye view. "wide" and
+    "eye" stay as aliases for the old names."""
+    import club_cameras as CK
+    cams, _ = CK.build(bpy, sc, room_numbers(mod), eye, crowd=crowd_centroid(mod))
+    back = value(mod, "Back Wall Y") - value(mod, "Room Depth")
+    pe = S.camera("CAM_PERFORMER_EYE", lens=20.0, loc=(0.0, -0.32, eye + 0.04),
+                  target=(0.0, back, 0.7 - value(mod, "Riser Height")))[0]
+    cams["CAM_PERFORMER_EYE"] = pe
+    cams["wide"], cams["eye"] = cams["CAM_WIDE"], pe
+    return cams
 
 
 def post(sc, look):
@@ -1080,7 +1135,12 @@ def render_setup(sc, width, height, samples):
     sc.render.engine = "CYCLES"
     sc.cycles.device = "CPU"
     sc.cycles.samples = samples
-    sc.cycles.use_denoising = True
+    # OIDN on x86 CI; CLUB_DENOISE=0 for local aarch64 previews (OIDN there dies with SIGILL)
+    sc.cycles.use_denoising = os.environ.get("CLUB_DENOISE", "1") != "0"
+    try:
+        sc.cycles.denoiser = "OPENIMAGEDENOISE"
+    except TypeError:
+        pass
     sc.cycles.max_bounces = 6
     sc.cycles.transparent_max_bounces = 16
     sc.render.resolution_x, sc.render.resolution_y = width, height
@@ -1366,7 +1426,8 @@ def main():
     ap.add_argument("--preset", default="dive")
     ap.add_argument("--out", default="")
     ap.add_argument("--render", default="", help="directory for stills")
-    ap.add_argument("--views", default="wide,eye")
+    ap.add_argument("--views", default="wide,eye", help='comma list of camera names, or "kit" for every CAM_*')
+    ap.add_argument("--comic", default="", help="VRM/GLB to stand at the mic for the stills (eye-line framing)")
     ap.add_argument("--width", type=int, default=1600)
     ap.add_argument("--samples", type=int, default=64)
     ap.add_argument("--glb", default="")
@@ -1381,6 +1442,7 @@ def main():
     a = ap.parse_args(_ARGV)
 
     pname, inputs, look = load_preset(a.preset)
+    sys.path.insert(0, str(HERE))
     sc = S.reset()
     sc.name = "Club"
     group = build()
@@ -1397,7 +1459,21 @@ def main():
     if a.dump:
         inspect.dump_groups(a.dump, prefix="Club ")
     lights(sc, mod, look)
-    cams = cameras(sc, mod)
+    eye = 1.45
+    comic = None
+    if a.comic:
+        import comic as C
+        comic = C.import_comic(sc, a.comic)
+        eye = comic["eye"]
+        C.bind_face(comic)
+        # the mic sits at the chin, a hand in front: never across the lips from the kit's eye-line cameras
+        inspect.set_modifier_inputs(mod, {"Mouth Height": comic["mouth"] - 0.07, "Mic Gap": 0.13})
+        ks = bpy.data.objects.get("Key Spot")
+        if ks is not None:
+            ks.data.energy *= look.get("key_on_comic", 0.32)
+        C.comic_lights(sc, eye, look, (0.45, -value(mod, "Spot Throw"), value(mod, "Ceiling Height") - 0.45))
+        print(f"COMIC eye {eye:.3f} m, face {comic['check']['rig']} {comic['check']['level']}")
+    cams = cameras(sc, mod, eye)
     post(sc, look)
     if a.out:
         out = pathlib.Path(a.out).resolve()
@@ -1410,8 +1486,9 @@ def main():
         render_setup(sc, a.width, round(a.width * 9 / 16 / 2) * 2, a.samples)
         if bpy.context.window:
             bpy.context.window.scene = sc
-        for v in a.views.split(","):
-            inspect.set_modifier_inputs(mod, {"Show Beam": v != "eye"})
+        views = [k for k in cams if k.startswith("CAM_")] if a.views == "kit" else a.views.split(",")
+        for v in views:
+            inspect.set_modifier_inputs(mod, {"Show Beam": v not in ("eye", "CAM_PERFORMER_EYE", "CAM_OTS", "CAM_CROWD")})
             sc.camera = cams[v]
             sc.render.filepath = str(rd / f"club_{pname}_{v}.png")
             bpy.ops.render.render(write_still=True, scene=sc.name)
@@ -1459,4 +1536,5 @@ def main():
         print("GLB", p, p.stat().st_size, json.dumps(counts))
 
 
-main()
+if __name__ == "__main__":
+    main()

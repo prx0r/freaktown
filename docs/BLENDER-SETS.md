@@ -152,3 +152,42 @@ load, the procedural room comes back. `runtime.setVariantStatus()` reports which
   macro panel, presets, validate). Used unmodified at commit `bfeca3ff77d1468f3f9c6a801342cb6286e3f6b1`, cloned at
   build time, not vendored.
 - [Blender](https://www.blender.org/) 5.2.2 (GPL); the generated GLBs are output, not Blender code.
+
+## Camera kit (sets/blender/club_cameras.py)
+
+One kit for every preset and every show, derived from the room numbers and the comic's **measured** eye height:
+`CAM_WIDE` (from the house, above that row's heads, lens fitted to the stage lip, capped at 8.5 m of stage so a
+theatre doesn't shrink the comic to a speck), `CAM_MEDIUM` (waist-up), `CAM_CLOSE` (head and shoulders, 3/4 from
+camera-right so the mic never crosses the lips), `CAM_XCU` (eyes and mouth, f/2), `CAM_OTS` (over the comic's right
+shoulder onto the house), `CAM_PUSH_A/B` (the two ends of the slow push-in), `CAM_CROWD` (low from the stage lip,
+aimed at the measured centroid of the seated people near the stage, so a sparse open mic still has faces in it),
+`CAM_PERFORMER_EYE`, plus marks `MARK_EYE / MARK_MOUTH / MARK_CROWD / MARK_LIP`. Medium, close and push frame the
+eyes exactly on the upper third (camera pitch solved for cameras above or below the eye line).
+
+Shot grammar, `pick_shots(timeline)`: open wide; push in across a bit's setups; close-up on the look before a punch;
+XCU into the hit word; crowd reverse (OTS, then CROWD) on a big laugh and back to the close-up for the reaction; tag
+laughs stay on the comic; act-outs go medium; the last laugh of a closer pulls out wide; no shot shorter than 1.4 s.
+Tests: `tests/contract/test_club_cameras.py` (eye line, wide inside the room and above the heads, stage-lip corners
+in frame, the mic clear of the mouth in the close-up, the grammar).
+
+`club_build.py --comic static/avatars/default-v1.vrm --views kit` renders every kit camera with the comic standing at
+the mic (the mic is dropped to chin height, 0.13 m in front, so it never covers the mouth).
+
+Look fixes in this round:
+- **Beam near the camera:** the cone now fades in from the lens (first 5-35% of its length) and fades out within
+  ~3.5 m of whatever camera looks at it (Camera Data view distance), on top of the earlier fade before the floor (no
+  dome). OTS, crowd and performer-eye shots hide it.
+- **Spill:** the key spot aims at the comic's chest with a body-sized cone and a soft 0.55 blend, instead of a deck-
+  sized cone aimed at the floor that splashed the back wall and curtains; the comic gets a motivated soft key from the
+  spot's direction, a cool and a warm rim from upstage and a low bounce (`comic.py`), and the spot is dimmed on the
+  bright MToon albedo (`key_on_comic`).
+- **Basement / theatre wide:** the wide is no longer a fixed 24 mm from y = -8.2 (inside the theatre rows, a fish-eye
+  in the basement): it is solved per room (see above).
+- OIDN denoising is explicit on CI; `CLUB_DENOISE=0` for local aarch64 previews (OIDN dies with SIGILL there).
+
+## Expressive face proof (sets/blender/club_face.py)
+
+See docs/FACE-EXPRESSIVE.md. CI renders ten emotion close-ups through the expressive channels (talk aa/oh, happy,
+smirk, the look, surprised, sad, angry, eye dart, wink) and a ~7 s test performance with audio
+(`sets/blender/perform/club-hark-punch`: the look, "Hark. You have arrived. Some time ago.", the laugh and the
+reaction; Fish s2.1-pro-free voice, procedural crowd laugh, built by `sets/blender/club_clip.py`).

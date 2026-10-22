@@ -9,6 +9,7 @@
 
 import * as THREE from 'three';
 import { attachMouthAnchor } from './mouthAnchor';
+import { ExpressiveFace, type Channels, type FaceCheck } from '../face/expressive';
 import type { AvatarCapabilities, AvatarDriver, Emotions, PoseState, Visemes, VisemeKey } from './types';
 
 type MorphRef = { mesh: THREE.Mesh; index: number };
@@ -203,6 +204,17 @@ export class GlbAvatar implements AvatarDriver {
       if (!refs || v === undefined) continue;
       for (const r of refs) if (r.mesh.morphTargetInfluences) r.mesh.morphTargetInfluences[r.index] = Math.max(0, Math.min(1, v));
     }
+  }
+
+  private expressiveFace: ExpressiveFace | null = null;
+  /** Expressive channels straight onto the bound morphs (written last in FaceChannel.apply, so they win). */
+  setExpressive(ch: Channels): void {
+    if (!this.expressiveFace) this.expressiveFace = new ExpressiveFace(this.root);
+    if (this.expressiveFace.binding.rig) this.expressiveFace.apply(ch);
+  }
+  get faceCheck(): FaceCheck {
+    if (!this.expressiveFace) this.expressiveFace = new ExpressiveFace(this.root);
+    return this.expressiveFace.check;
   }
 
   update(dt: number): void { this.mixer?.update(dt); }
