@@ -6,7 +6,7 @@ word timings measured on the dry voice stay valid on the processed voice.
 from __future__ import annotations
 
 import numpy as np
-from scipy.signal import fftconvolve
+from scipy.signal import oaconvolve as fftconvolve
 
 from .dsp import SR, rng, lowpass, highpass
 

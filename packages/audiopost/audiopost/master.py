@@ -27,17 +27,29 @@ def measure(path: str) -> dict:
 
 def measure_array(x: np.ndarray, sr: int = SR) -> dict:
     with tempfile.NamedTemporaryFile(suffix=".wav") as f:
-        sf.write(f.name, x, sr, subtype="FLOAT")
+        sf.write(f.name, np.asarray(x, dtype=np.float32), sr, subtype="FLOAT")
         return measure(f.name)
+
+
+def _true_peaks(x: np.ndarray, chunk: int = 1 << 19, pad: int = 64) -> np.ndarray:
+    """Per-sample 4x-oversampled peak (max over channels), computed in chunks to bound memory."""
+    n = len(x)
+    out = np.empty(n, dtype=np.float32)
+    for a in range(0, n, chunk):
+        b = min(n, a + chunk)
+        lo, hi = max(0, a - pad), min(n, b + pad)
+        up = resample_poly(np.asarray(x[lo:hi], dtype=np.float64), 4, 1, axis=0)
+        p = np.abs(up).max(axis=1) if up.ndim == 2 else np.abs(up)
+        p = p[: (len(p) // 4) * 4].reshape(-1, 4).max(1)
+        seg = p[a - lo: a - lo + (b - a)]
+        out[a:b] = seg if len(seg) == b - a else np.pad(seg, (0, b - a - len(seg)), mode="edge")
+    return out
 
 
 def true_peak_limit(x: np.ndarray, sr: int = SR, ceiling_dbtp: float = -1.5, release_ms: float = 80.0) -> np.ndarray:
     """4x-oversampled peak detector, look-ahead gain (zero-phase smoothing), never raises gain."""
     ceil = 10 ** (ceiling_dbtp / 20)
-    up = resample_poly(x, 4, 1, axis=0)
-    pk = np.abs(up).max(axis=1) if up.ndim == 2 else np.abs(up)
-    pk = pk[: len(pk) // 4 * 4].reshape(-1, 4).max(1)
-    pk = np.pad(pk, (0, len(x) - len(pk)), mode="edge") if len(pk) < len(x) else pk[: len(x)]
+    pk = _true_peaks(x)
     need = np.minimum(1.0, ceil / np.maximum(pk, 1e-9))
     hop = 48
     nb = len(need) // hop + 1
