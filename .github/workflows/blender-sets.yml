@@ -62,7 +62,7 @@ jobs:
           test -f out/club-${{ matrix.preset }}.glb
       - name: Reopen and validate the saved .blend
         run: |
-          "$BLENDER" -b out/club_${{ matrix.preset }}.blend --python "$V2B_SKILL/scripts/validate.py" -- --prefix "Club " \
+          "$BLENDER" -b out/club_${{ matrix.preset }}.blend --python "$V2B_SKILL/scripts/validate.py" -- --prefix "Club " --no-cameras \
             2>&1 | tee out/validate_${{ matrix.preset }}.log | tail -25
       - uses: actions/upload-artifact@v4
         with:

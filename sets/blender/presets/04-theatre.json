@@ -45,9 +45,10 @@
   "neon": 120,
   "house": 260,
   "wash": 220,
-  "haze": 0.55,
+  "haze": 0.3,
   "haze_color": "#2C2026",
   "haze_depth": 26,
-  "ambient": "#140C10"
+  "ambient": "#140C10",
+  "haze_start": 4.0
  }
 }

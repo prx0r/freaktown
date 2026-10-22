@@ -30,12 +30,13 @@
  "Stage Width": 6.0,
  "Stage Depth": 3.4,
  "_look": {
-  "key": 900,
-  "rim": 160,
+  "key": 1300,
+  "rim": 200,
   "neon": 60,
-  "house": 90,
+  "house": 45,
   "haze": 0.45,
   "haze_color": "#2A2230",
-  "ambient": "#120C18"
+  "ambient": "#120C18",
+  "wash": 220
  }
 }

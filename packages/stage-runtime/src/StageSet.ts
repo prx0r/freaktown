@@ -161,6 +161,8 @@ export class StageSet {
   private decor: THREE.Object3D[] = [];
   private sign: THREE.Mesh;
   private variantRoot: THREE.Object3D | null = null;
+  private innerBeam: THREE.Mesh | null = null;
+  private lampHome: { spot: THREE.Vector3; beam: THREE.Vector3; quat: THREE.Quaternion; haze: THREE.Vector3[] } | null = null;
   /** Which environment is showing: 'procedural', 'loading:<id>', '<id>' or 'error:<id>: <reason>'. */
   variantStatus = 'procedural';
 
@@ -291,6 +293,7 @@ export class StageSet {
     const inner = new THREE.Mesh(new THREE.ConeGeometry(0.6, 6.9, 32, 1, true).translate(0, -3.45, 0), beamMaterial(0xfff6e6, 0.2));
     inner.position.copy(this.beam.position); inner.quaternion.copy(this.beam.quaternion);
     if (!opts.lite) this.group.add(inner);
+    this.innerBeam = inner;
     // haze: slow-drifting soft sprites inside the beam
     const hz = hazeTexture();
     for (let i = 0; i < (opts.lite ? 0 : 14); i++) {
@@ -379,6 +382,8 @@ export class StageSet {
         this.sign.position.set(c.x, c.y, box.max.z + 0.02);
         this.sign.scale.setScalar(Math.min(1, (size.x * 0.9) / 4, (size.y * 0.9) / 1));
       }
+      const lamp = root.getObjectByName('club_key_lamp');
+      if (lamp) this.hangSpot(lamp.getWorldPosition(new THREE.Vector3()));
       this.variantStatus = v.id;
     } catch (e) {
       this.clearVariant();
@@ -387,8 +392,44 @@ export class StageSet {
     }
   }
 
+  /** Move the key spot, its visible cone and the haze to a lamp position (a variant's ceiling may be lower). */
+  private hangSpot(lamp: THREE.Vector3): void {
+    if (!this.lampHome) {
+      this.lampHome = { spot: this.spot.position.clone(), beam: this.beam.position.clone(),
+        quat: this.beam.quaternion.clone(), haze: this.hazeBase.map((p) => p.clone()) };
+    }
+    const floor = new THREE.Vector3(0, -0.4, -0.15);
+    this.spot.position.copy(lamp);
+    for (const b of [this.beam, this.innerBeam]) {
+      if (!b) continue;
+      b.position.copy(lamp);
+      b.quaternion.identity();
+      b.lookAt(floor);
+      b.rotateX(-Math.PI / 2);
+      const len = lamp.distanceTo(floor);
+      b.scale.set(1, len / 6.9, 1);
+    }
+    for (let i = 0; i < this.hazeBase.length; i++) {
+      const u = i / Math.max(1, this.hazeBase.length - 1);
+      const p = lamp.clone().lerp(new THREE.Vector3(0, 1.3, 0.2), 0.15 + 0.8 * u);
+      p.x += Math.sin(i * 2.1) * 0.4;
+      p.z += Math.cos(i * 1.3) * 0.25;
+      this.hazeBase[i].copy(p);
+    }
+  }
+
   /** Back to the procedural room. */
   clearVariant(): void {
+    if (this.lampHome) {
+      const h = this.lampHome;
+      this.spot.position.copy(h.spot);
+      for (const b of [this.beam, this.innerBeam]) {
+        if (!b) continue;
+        b.position.copy(h.beam); b.quaternion.copy(h.quat); b.scale.set(1, 1, 1);
+      }
+      h.haze.forEach((p, i) => this.hazeBase[i].copy(p));
+      this.lampHome = null;
+    }
     if (this.variantRoot) this.group.remove(this.variantRoot);
     this.variantRoot = null;
     for (const d of this.decor) d.visible = true;
