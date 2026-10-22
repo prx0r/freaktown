@@ -47,6 +47,7 @@
   "rim": 260,
   "neon": 90,
   "house": 200,
+  "house_spill": 120,
   "wash": 160,
   "wash_color": "#8FB0FF",
   "rim_left": "#5AB8FF",

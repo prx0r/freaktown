@@ -14,6 +14,7 @@
 import type { AvatarDriver, Emotions, Visemes } from '../avatars/types';
 import { arkitToFace, faceToArkit, type Blendshapes, type FaceFrame } from './arkit';
 import { affectToEmotions } from './affect';
+import { channelsFromState } from './expressive';
 
 export interface FaceChannelOptions { staleMs?: number; smoothing?: number }
 
@@ -83,5 +84,17 @@ export class FaceChannel {
       // (lets ARKit-only GLBs perform text/plan mouths and emotion cues)
       driver.setBlendshapes(f.blendshapes ?? faceToArkit(f));
     }
+    if (driver.setExpressive) driver.setExpressive(FaceChannel.expressive(f));
+  }
+
+  /** The frame as expressive channels (expressive-map.json) — what the Blender bake keys for the same frame. */
+  static expressive(f: FaceFrame) {
+    const x = f.expressive ?? {};
+    return channelsFromState({
+      open: f.open, visemes: f.visemes, emotions: f.emotions,
+      blinkL: Math.max(f.blink, x.blinkL ?? 0), blinkR: Math.max(f.blink, x.blinkR ?? 0),
+      browUp: x.browUp, browDown: x.browDown, squint: x.squint, smirk: x.smirk, lookX: x.lookX, lookY: x.lookY,
+      speaking: f.open > 0.05,
+    });
   }
 }

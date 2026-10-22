@@ -1,12 +1,13 @@
 name: blender sets
 
 # Builds the procedural comedy-club set (sets/blender/club_build.py) in Blender 5.2.2 on x86 Linux:
-# library checks, Cycles stills, baked GLBs and a ~10 s camera-move clip (4 parallel frame chunks + an encode job),
-# uploaded as artifacts.
+# library checks, the camera-kit stills per preset (every CAM_* with the comic at the mic), baked GLBs, the
+# expressive-face proof (emotion close-ups + a ~7 s test performance with audio, sets/blender/club_face.py) and, on
+# manual dispatch only, the old ~10 s camera-move clip. Uploaded as artifacts.
 # Blender has no official linux-arm64 build, so the heavy lifting happens here (docs/BLENDER-SETS.md).
 on:
   push:
-    branches: [sets-blender-club]
+    branches: [sets-blender-club, club-hero-render]
     paths: ['sets/blender/**', '.github/workflows/blender-sets.yml']
   workflow_dispatch:
     inputs:
@@ -38,6 +39,11 @@ jobs:
       - run: bash sets/blender/ci_setup.sh
       - name: nodes_tools.py check (build, lint, evaluate every NK group)
         run: python3 "$V2B_SKILL/scripts/nodes_tools.py" check
+      - name: Camera kit + expressive face contract tests (no Blender)
+        run: |
+          python3 -m pip install -q pytest
+          python3 -m pytest -q tests/contract/test_club_cameras.py tests/contract/test_face_expressive.py
+          python3 sets/blender/face_express.py check static/avatars/default-v1.vrm
 
   preset:
     name: preset ${{ matrix.preset }}
@@ -52,12 +58,13 @@ jobs:
       - uses: actions/cache@v4
         with: { path: ~/blender, key: "blender-${{ env.BLENDER_VERSION }}-linux-x64" }
       - run: bash sets/blender/ci_setup.sh
-      - name: Build, render stills (wide + performer eye), export GLB with baked albedo
+      - name: Build, render the camera kit (every CAM_* with the comic at the mic), export GLB with baked albedo
         run: |
           mkdir -p out
           "$BLENDER" -b --factory-startup --python sets/blender/club_build.py -- --skill "$V2B_SKILL" \
             --preset ${{ matrix.preset }} --out out/club_${{ matrix.preset }}.blend \
-            --render out/renders --views wide,eye --width 1600 --samples ${{ inputs.samples || '96' }} \
+            --comic static/avatars/default-v1.vrm \
+            --render out/renders --views kit --width 1280 --samples ${{ inputs.samples || '64' }} \
             --glb out/club-${{ matrix.preset }}.glb --bake 2048 --dump out/club_${{ matrix.preset }}.graph.json \
             2>&1 | tee out/build_${{ matrix.preset }}.log | grep -vE "INFO|^\s*$|Fra:" || true
           test -f out/club-${{ matrix.preset }}.glb
@@ -74,8 +81,89 @@ jobs:
             out/*.log
             out/*.graph.json
 
+  face:
+    name: expressive face close-ups
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with: { path: ~/blender, key: "blender-${{ env.BLENDER_VERSION }}-linux-x64" }
+      - run: bash sets/blender/ci_setup.sh
+      - name: Emotion close-ups through the expressive channels (--strict fails a mesh that cannot express)
+        run: |
+          mkdir -p out
+          "$BLENDER" -b --factory-startup --python sets/blender/club_face.py -- --skill "$V2B_SKILL" --strict \
+            --preset late-night-tv --stills out/face --width 1280 --samples 64 2>&1 | tee out/face.log \
+            | grep -E "FACECHECK|FACESTILL|Error|Traceback" || true
+          test "$(ls out/face/*.png | wc -l)" -eq 10
+      - uses: actions/upload-artifact@v4
+        with:
+          name: face-stills
+          path: |
+            out/face
+            out/face.log
+
+  perform:
+    name: test performance ${{ matrix.chunk }}/5
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        chunk: [0, 1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with: { path: ~/blender, key: "blender-${{ env.BLENDER_VERSION }}-linux-x64" }
+      - run: bash sets/blender/ci_setup.sh
+      - name: Bake the punch clip through the expressive channels, render a fifth of it
+        run: |
+          mkdir -p out
+          "$BLENDER" -b --factory-startup --python sets/blender/club_face.py -- --skill "$V2B_SKILL" --strict \
+            --preset late-night-tv --perform sets/blender/perform/club-hark-punch --keys out/frames/keys.json \
+            --frames out/frames --chunk ${{ matrix.chunk }}/5 --width 960 --samples 32 2>&1 \
+            | grep -E "FACECHECK|BAKED|FRAMETIME|PERFSTATS|Error|Traceback" || true
+          test "$(ls out/frames/*.png | wc -l)" -gt 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: perf-frames-${{ matrix.chunk }}
+          path: out/frames
+
+  perform-encode:
+    name: encode test performance (+ audio)
+    needs: perform
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { pattern: perf-frames-*, merge-multiple: true, path: dl }
+      - run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg >/dev/null
+          F=$(dirname "$(find dl -name 'f_0001.png' | head -1)")
+          ls "$F" | wc -l
+          ffmpeg -y -loglevel error -framerate 25 -start_number 1 -i "$F/f_%04d.png" \
+            -i sets/blender/perform/club-hark-punch/vo.m4a -map 0:v -map 1:a -c:v libx264 -pix_fmt yuv420p -crf 18 \
+            -c:a aac -b:a 160k -shortest -movflags +faststart club_face_test.mp4
+          ffmpeg -i club_face_test.mp4 -vf blackdetect=d=0.1:pix_th=0.05 -an -f null - 2>&1 | grep blackdetect || echo "no black frames"
+          python3 - <<'PY'
+          import glob, json
+          s = [json.load(open(p)) for p in glob.glob("dl/**/stats_*.json", recursive=True)]
+          fr = sum(x["frames"] for x in s); t = sum(x["render_s"] for x in s)
+          json.dump({"chunks": s, "frames": fr, "render_s": round(t, 1), "s_per_frame": round(t / max(1, fr), 2)}, open("throughput.json", "w"), indent=1)
+          print(open("throughput.json").read())
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: club-face-test
+          path: |
+            club_face_test.mp4
+            throughput.json
+
   turntable:
     name: camera move ${{ matrix.chunk }}/4
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     strategy:
@@ -102,6 +190,7 @@ jobs:
   encode:
     name: encode camera move
     needs: turntable
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:

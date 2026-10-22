@@ -1,0 +1,141 @@
+{
+  "schema": "funnier.face-expressive/v1",
+  "about": "One expressive face for every mesh. Semantic channels -> per-rig shape targets (weighted, gain > 1 allowed up to max_gain), emotion -> channel mix, and the channel check. Read by packages/stage-runtime/src/face/expressive.ts (three.js runtime) AND sets/blender/face_express.py (Blender bake), so both drive the same shapes with the same numbers. Golden parity: tests/fixtures/face-expressive-golden.json.",
+  "max_gain": 1.5,
+  "channels": {
+    "open":     {"group": "mouth", "desc": "jaw / mouth open (text or plan mouth amplitude)"},
+    "aa":       {"group": "mouth", "desc": "viseme aa (father)"},
+    "ih":       {"group": "mouth", "desc": "viseme ih (sit)"},
+    "ou":       {"group": "mouth", "desc": "viseme ou (boot)"},
+    "ee":       {"group": "mouth", "desc": "viseme ee (see)"},
+    "oh":       {"group": "mouth", "desc": "viseme oh (go)"},
+    "blinkL":   {"group": "blink", "desc": "left eyelid closed"},
+    "blinkR":   {"group": "blink", "desc": "right eyelid closed"},
+    "smileL":   {"group": "smile", "desc": "left mouth corner up (smirk = one side)"},
+    "smileR":   {"group": "smile", "desc": "right mouth corner up"},
+    "grin":     {"group": "smile", "desc": "open smile, lips parted (the big happy, the laugh): a closed smile alone barely reads on toon faces"},
+    "frown":    {"group": "frown", "desc": "mouth corners down"},
+    "browUp":   {"group": "brow",  "desc": "brows raised (interest, surprise, the setup flash)"},
+    "browDown": {"group": "brow",  "desc": "brows lowered / furrowed (the look, anger)"},
+    "browSad":  {"group": "brow",  "desc": "inner brows up (worry, sorrow)"},
+    "squint":   {"group": "eyes",  "desc": "lower lids up (amused, suspicious)"},
+    "eyeWide":  {"group": "eyes",  "desc": "eyes wide open"},
+    "lookX":    {"group": "gaze",  "desc": "eyes left(-1)..right(+1), from the face's own point of view; bones or morphs"},
+    "lookY":    {"group": "gaze",  "desc": "eyes down(-1)..up(+1)"}
+  },
+  "check": {
+    "core": ["mouth", "blink", "smile", "brow"],
+    "extended": ["visemes", "smileSides", "frown", "browSad", "squint", "eyeWide", "gaze"],
+    "rule": "fail when a core group has no channel at all (the mesh cannot express); warn for each missing extended capability (it expresses, with less range)"
+  },
+  "rigs": {
+    "vroid": {
+      "detect": ["Fcl_MTH_A", "Fcl_EYE_Close_L", "Fcl_BRW_Angry"],
+      "shapes": {
+        "open":     [["Fcl_MTH_A", 1.35]],
+        "aa":       [["Fcl_MTH_A", 1.35]],
+        "ih":       [["Fcl_MTH_I", 1.0], ["Fcl_MTH_A", 0.35]],
+        "ou":       [["Fcl_MTH_U", 1.0], ["Fcl_MTH_O", 0.3]],
+        "ee":       [["Fcl_MTH_E", 1.0], ["Fcl_MTH_A", 0.4]],
+        "oh":       [["Fcl_MTH_O", 1.2], ["Fcl_MTH_A", 0.25]],
+        "blinkL":   [["Fcl_EYE_Close_L", 1.0]],
+        "blinkR":   [["Fcl_EYE_Close_R", 1.0]],
+        "smileL":   [["Fcl_MTH_Fun_L", 1.0], ["Fcl_MTH_Joy_L", 0.45]],
+        "smileR":   [["Fcl_MTH_Fun_R", 1.0], ["Fcl_MTH_Joy_R", 0.45]],
+        "grin":     [["Fcl_MTH_Joy", 0.8]],
+        "frown":    [["Fcl_MTH_Sorrow", 0.9]],
+        "browUp":   [["Fcl_BRW_Surprised", 1.2]],
+        "browDown": [["Fcl_BRW_Angry", 1.3]],
+        "browSad":  [["Fcl_BRW_Sorrow", 1.2]],
+        "squint":   [["Fcl_EYE_Joy", 0.42]],
+        "eyeWide":  [["Fcl_EYE_Surprised", 1.0]]
+      },
+      "generate": {
+        "Fcl_MTH_Fun_L": {"from": "Fcl_MTH_Fun", "side": "L", "gain": 2.0},
+        "Fcl_MTH_Fun_R": {"from": "Fcl_MTH_Fun", "side": "R", "gain": 2.0},
+        "Fcl_MTH_Joy_L": {"from": "Fcl_MTH_Joy", "side": "L", "gain": 1.0},
+        "Fcl_MTH_Joy_R": {"from": "Fcl_MTH_Joy", "side": "R", "gain": 1.0}
+      },
+      "gaze_bones": {"left": "J_Adj_L_FaceEye", "right": "J_Adj_R_FaceEye", "yaw_deg": 16, "pitch_deg": 9}
+    },
+    "arkit": {
+      "detect": ["jawOpen", "eyeBlinkLeft", "mouthSmileLeft"],
+      "shapes": {
+        "open":     [["jawOpen", 1.0]],
+        "aa":       [["jawOpen", 0.9]],
+        "ih":       [["jawOpen", 0.35], ["mouthStretchLeft", 0.4], ["mouthStretchRight", 0.4]],
+        "ou":       [["mouthPucker", 0.9], ["jawOpen", 0.2]],
+        "ee":       [["mouthStretchLeft", 0.6], ["mouthStretchRight", 0.6], ["jawOpen", 0.3]],
+        "oh":       [["mouthFunnel", 0.8], ["jawOpen", 0.45]],
+        "blinkL":   [["eyeBlinkLeft", 1.0]],
+        "blinkR":   [["eyeBlinkRight", 1.0]],
+        "smileL":   [["mouthSmileLeft", 1.0], ["cheekSquintLeft", 0.3]],
+        "smileR":   [["mouthSmileRight", 1.0], ["cheekSquintRight", 0.3]],
+        "grin":     [["mouthSmileLeft", 0.6], ["mouthSmileRight", 0.6], ["jawOpen", 0.25], ["cheekSquintLeft", 0.3], ["cheekSquintRight", 0.3]],
+        "frown":    [["mouthFrownLeft", 0.9], ["mouthFrownRight", 0.9]],
+        "browUp":   [["browOuterUpLeft", 0.8], ["browOuterUpRight", 0.8], ["browInnerUp", 0.6]],
+        "browDown": [["browDownLeft", 1.0], ["browDownRight", 1.0]],
+        "browSad":  [["browInnerUp", 1.0]],
+        "squint":   [["eyeSquintLeft", 0.8], ["eyeSquintRight", 0.8], ["cheekSquintLeft", 0.4], ["cheekSquintRight", 0.4]],
+        "eyeWide":  [["eyeWideLeft", 1.0], ["eyeWideRight", 1.0]]
+      },
+      "gaze_morphs": {
+        "right": [["eyeLookOutRight", 1.0], ["eyeLookInLeft", 1.0]],
+        "left":  [["eyeLookOutLeft", 1.0], ["eyeLookInRight", 1.0]],
+        "up":    [["eyeLookUpLeft", 1.0], ["eyeLookUpRight", 1.0]],
+        "down":  [["eyeLookDownLeft", 1.0], ["eyeLookDownRight", 1.0]]
+      }
+    },
+    "oculus": {
+      "detect": ["viseme_aa", "viseme_O"],
+      "shapes": {
+        "open":   [["viseme_aa", 0.8]],
+        "aa":     [["viseme_aa", 1.0]],
+        "ih":     [["viseme_I", 1.0]],
+        "ou":     [["viseme_U", 1.0]],
+        "ee":     [["viseme_E", 1.0]],
+        "oh":     [["viseme_O", 1.0]],
+        "blinkL": [["eyeBlinkLeft", 1.0], ["eyeBlink_L", 1.0]],
+        "blinkR": [["eyeBlinkRight", 1.0], ["eyeBlink_R", 1.0]],
+        "smileL": [["mouthSmileLeft", 1.0], ["mouthSmile_L", 1.0]],
+        "smileR": [["mouthSmileRight", 1.0], ["mouthSmile_R", 1.0]],
+        "grin":   [["mouthSmileLeft", 0.6], ["mouthSmileRight", 0.6], ["mouthSmile_L", 0.6], ["mouthSmile_R", 0.6], ["viseme_aa", 0.3]],
+        "browUp": [["browInnerUp", 0.8], ["browUp", 1.0]],
+        "browDown": [["browDownLeft", 1.0], ["browDownRight", 1.0]]
+      }
+    },
+    "vrm": {
+      "detect": ["aa", "blink", "happy"],
+      "shapes": {
+        "open":     [["aa", 0.9]],
+        "aa":       [["aa", 1.0]],
+        "ih":       [["ih", 1.0]],
+        "ou":       [["ou", 1.0]],
+        "ee":       [["ee", 1.0]],
+        "oh":       [["oh", 1.0]],
+        "blinkL":   [["blinkLeft", 1.0]],
+        "blinkR":   [["blinkRight", 1.0]],
+        "smileL":   [["happy", 0.5]],
+        "smileR":   [["happy", 0.5]],
+        "grin":     [["happy", 0.6], ["aa", 0.2]],
+        "frown":    [["sad", 0.5]],
+        "browUp":   [["surprised", 0.6]],
+        "browDown": [["angry", 0.7]],
+        "browSad":  [["sad", 0.5]],
+        "squint":   [["relaxed", 0.4]],
+        "eyeWide":  [["surprised", 0.4]]
+      }
+    }
+  },
+  "emotions": {
+    "happy":     {"smileL": 0.8, "smileR": 0.8, "grin": 0.7, "squint": 0.5, "browUp": 0.15},
+    "relaxed":   {"smileL": 0.3, "smileR": 0.3, "squint": 0.15},
+    "angry":     {"browDown": 0.9, "squint": 0.4, "frown": 0.25},
+    "sad":       {"browSad": 0.9, "frown": 0.7},
+    "surprised": {"browUp": 0.9, "eyeWide": 0.9, "open": 0.35}
+  },
+  "speech": {
+    "about": "While the mouth is speaking, expression shapes that fight the lips are scaled down; brows and eyes keep full range.",
+    "while_speaking": {"smileL": 0.6, "smileR": 0.6, "grin": 0.25, "frown": 0.5, "open": 1.0}
+  }
+}
