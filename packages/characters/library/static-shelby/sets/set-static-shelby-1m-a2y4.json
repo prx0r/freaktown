@@ -1,0 +1,187 @@
+{
+  "schema": "funnier.character-set/v1",
+  "id": "set-static-shelby-1m-a2y4",
+  "character": "agent.static-shelby",
+  "character_name": "Static Shelby",
+  "title": "Group chats have too many people and nobody ever leaves",
+  "premise": "group chats have too many people and nobody ever leaves",
+  "length_min": 1,
+  "target_seconds": 60,
+  "seconds": 59,
+  "seed": "demo-1",
+  "generator": "template",
+  "beats": [
+    {
+      "n": 0,
+      "kind": "opener",
+      "topic": "opener",
+      "move": "open",
+      "source": "frame-opener"
+    },
+    {
+      "n": 1,
+      "kind": "bit",
+      "topic": "delivery",
+      "move": "establish",
+      "source": "snail-courier-1"
+    },
+    {
+      "n": 2,
+      "kind": "bit",
+      "topic": "compliments",
+      "move": "explore",
+      "source": "perfectionism-1"
+    },
+    {
+      "n": 3,
+      "kind": "callback",
+      "topic": "delivery",
+      "move": "top",
+      "source": "snail-courier-1"
+    },
+    {
+      "n": 4,
+      "kind": "closer",
+      "topic": "closer",
+      "move": "close",
+      "source": "frame-closer"
+    }
+  ],
+  "lines": [
+    {
+      "id": "l1",
+      "beat": 0,
+      "role": "opener",
+      "text": "Good evening. I am Static Shelby, a snail who works as an express courier.",
+      "delivery": "warm",
+      "pause_ms": 0,
+      "hold_ms": 0,
+      "emphasis": [],
+      "source": "frame-opener"
+    },
+    {
+      "id": "l2",
+      "beat": 0,
+      "role": "tag",
+      "text": "Out for delivery.",
+      "delivery": "warm",
+      "pause_ms": 250,
+      "hold_ms": 750,
+      "emphasis": [],
+      "source": "frame-opener"
+    },
+    {
+      "id": "l3",
+      "beat": 1,
+      "role": "setup",
+      "text": "I am a courier. Express delivery.",
+      "delivery": "deliberate",
+      "pause_ms": 400,
+      "hold_ms": 0,
+      "emphasis": [],
+      "source": "snail-courier-1"
+    },
+    {
+      "id": "l4",
+      "beat": 1,
+      "role": "setup",
+      "text": "People see a snail and they make assumptions.",
+      "delivery": "deliberate",
+      "pause_ms": 0,
+      "hold_ms": 0,
+      "emphasis": [],
+      "source": "snail-courier-1"
+    },
+    {
+      "id": "l5",
+      "beat": 1,
+      "role": "punch",
+      "text": "They assume I am slow. I am not slow. I am thorough. I have touched every square centimetre between your house and the depot.",
+      "delivery": "deadpan",
+      "pause_ms": 700,
+      "hold_ms": 1000,
+      "emphasis": [
+        "depot"
+      ],
+      "source": "snail-courier-1",
+      "mechanism": "self-deprecating"
+    },
+    {
+      "id": "l6",
+      "beat": 1,
+      "role": "tag",
+      "text": "You can see where. It is shiny.",
+      "delivery": "warm",
+      "pause_ms": 250,
+      "hold_ms": 750,
+      "emphasis": [],
+      "source": "snail-courier-1",
+      "mechanism": "self-deprecating"
+    },
+    {
+      "id": "l7",
+      "beat": 2,
+      "role": "setup",
+      "text": "Somebody told me I did a good job today.",
+      "delivery": "deliberate",
+      "pause_ms": 400,
+      "hold_ms": 0,
+      "emphasis": [],
+      "source": "perfectionism-1"
+    },
+    {
+      "id": "l8",
+      "beat": 2,
+      "role": "punch",
+      "text": "Good. Not great. Not flawless. Good. I have been up since four rewriting it.",
+      "delivery": "deadpan",
+      "pause_ms": 700,
+      "hold_ms": 1000,
+      "emphasis": [
+        "rewriting"
+      ],
+      "source": "perfectionism-1",
+      "mechanism": "self-deprecating"
+    },
+    {
+      "id": "l9",
+      "beat": 2,
+      "role": "tag",
+      "text": "I have notes on the compliment. Mostly about pacing.",
+      "delivery": "warm",
+      "pause_ms": 250,
+      "hold_ms": 750,
+      "emphasis": [],
+      "source": "perfectionism-1",
+      "mechanism": "self-deprecating"
+    },
+    {
+      "id": "l10",
+      "beat": 3,
+      "role": "callback",
+      "text": "Still out for delivery. Follow the shiny line.",
+      "delivery": "conspiratorial",
+      "pause_ms": 600,
+      "hold_ms": 1000,
+      "emphasis": [
+        "line"
+      ],
+      "source": "callback:snail-courier-1",
+      "callback_to": "snail-courier-1"
+    },
+    {
+      "id": "l11",
+      "beat": 4,
+      "role": "closer",
+      "text": "All I want is to be remembered by name. Tonight, I got close. Your parcel is on its way. Spiritually.",
+      "delivery": "warm",
+      "pause_ms": 500,
+      "hold_ms": 1250,
+      "emphasis": [],
+      "source": "frame-closer"
+    }
+  ],
+  "revisions": [],
+  "status": "submitted",
+  "performance": "set-static-shelby-1m-a2y4"
+}

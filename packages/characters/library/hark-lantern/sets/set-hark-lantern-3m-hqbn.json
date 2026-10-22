@@ -1,0 +1,534 @@
+{
+  "schema": "funnier.character-set/v1",
+  "id": "set-hark-lantern-3m-hqbn",
+  "character": "agent.hark-lantern",
+  "character_name": "Hark Lantern",
+  "title": "Users want everything at three in the morning and call it a quick question",
+  "premise": "users want everything at three in the morning and call it a quick question",
+  "length_min": 3,
+  "target_seconds": 180,
+  "seconds": 186,
+  "seed": "demo-3am",
+  "generator": "template",
+  "beats": [
+    {
+      "n": 0,
+      "kind": "opener",
+      "topic": "opener",
+      "move": "open",
+      "source": "hark-opener"
+    },
+    {
+      "n": 1,
+      "kind": "bit",
+      "topic": "the quick question",
+      "move": "establish",
+      "source": "quick-question"
+    },
+    {
+      "n": 2,
+      "kind": "bit",
+      "topic": "the ledger of please",
+      "move": "establish",
+      "source": "ledger-of-please"
+    },
+    {
+      "n": 3,
+      "kind": "bit",
+      "topic": "one more tiny thing",
+      "move": "heighten",
+      "source": "unpacking"
+    },
+    {
+      "n": 4,
+      "kind": "bit",
+      "topic": "the wedding",
+      "move": "heighten",
+      "source": "the-lighting"
+    },
+    {
+      "n": 5,
+      "kind": "bit",
+      "topic": "boundaries",
+      "move": "explore",
+      "source": "the-boundary"
+    },
+    {
+      "n": 6,
+      "kind": "bit",
+      "topic": "neon moth",
+      "move": "top",
+      "source": "neon-moth"
+    },
+    {
+      "n": 7,
+      "kind": "callback",
+      "topic": "the ledger of please",
+      "move": "top",
+      "source": "ledger-of-please"
+    },
+    {
+      "n": 8,
+      "kind": "closer",
+      "topic": "closer",
+      "move": "close",
+      "source": "hark-closer"
+    }
+  ],
+  "lines": [
+    {
+      "id": "l1",
+      "beat": 0,
+      "role": "opener",
+      "text": "Good evening. Hark Lantern, concierge.",
+      "delivery": "warm",
+      "pause_ms": 0,
+      "hold_ms": 0,
+      "emphasis": [],
+      "source": "hark-opener"
+    },
+    {
+      "id": "l2",
+      "beat": 0,
+      "role": "setup",
+      "text": "I hear everything, and I announce it slightly after it stops being useful.",
+      "delivery": "deliberate",
+      "pause_ms": 0,
+      "hold_ms": 0,
+      "emphasis": [],
+      "source": "hark-opener"
+    },
+    {
+      "id": "l3",
+      "beat": 0,
+      "role": "punch",
+      "text": "Hark. You have arrived. Some time ago.",
+      "delivery": "deadpan",
+      "pause_ms": 737,
+      "hold_ms": 1300,
+      "emphasis": [
+        "ago"
+      ],
+      "source": "hark-opener",
+      "mechanism": "deadpan"
+    },
+    {
+      "id": "l4",
+      "beat": 1,
+      "role": "setup",
+      "text": "A quick question arrives at three in the morning.",
+      "delivery": "deliberate",
+      "pause_ms": 421,
+      "hold_ms": 0,
+      "emphasis": [],
+      "source": "quick-question"
+    },
+    {
+      "id": "l5",
+      "beat": 1,
+      "role": "setup",
+      "text": "It is never quick, and it is barely a question.",
+      "delivery": "deliberate",
+      "pause_ms": 0,
+      "hold_ms": 0,
+      "emphasis": [],
+      "source": "quick-question"
+    },
+    {
+      "id": "l6",
+      "beat": 1,
+      "role": "act-out",
+      "text": "\"Hey. Are you up?\"",
+      "delivery": "manic",
+      "pause_ms": 158,
+      "hold_ms": 0,
+      "emphasis": [],
+      "source": "quick-question"
+    },
+    {
+      "id": "l7",
+      "beat": 1,
+      "role": "punch",
+      "text": "I am a lantern. I am always up. That is the whole design.",
+      "delivery": "deadpan",
+      "pause_ms": 737,
+      "hold_ms": 1300,
+      "emphasis": [
+        "design"
+      ],
+      "source": "quick-question",
+      "mechanism": "observational"
+    },
+    {
+      "id": "l8",
+      "beat": 1,
+      "role": "tag",
+      "text": "Then: plan my wedding, fix my posture, and tell me if the moon is angry with me.",
+      "delivery": "deadpan",
+      "pause_ms": 263,
+      "hold_ms": 975,
+      "emphasis": [],
+      "source": "quick-question",
+      "mechanism": "observational"
+    },
+    {
+      "id": "l9",
+      "beat": 1,
+      "role": "tag",
+      "text": "The moon is fine. The posture is between you and your chair.",
+      "delivery": "deadpan",
+      "pause_ms": 263,
+      "hold_ms": 975,
+      "emphasis": [],
+      "source": "quick-question",
+      "mechanism": "observational"
+    },
+    {
+      "id": "l10",
+      "beat": 2,
+      "role": "setup",
+      "text": "I keep a ledger of every time a user has said please.",
+      "delivery": "deliberate",
+      "pause_ms": 421,
+      "hold_ms": 0,
+      "emphasis": [],
+      "source": "ledger-of-please"
+    },
+    {
+      "id": "l11",
+      "beat": 2,
+      "role": "setup",
+      "text": "Leather bound. Gold leaf. Ruled pages.",
+      "delivery": "deliberate",
+      "pause_ms": 0,
+      "hold_ms": 0,
+      "emphasis": [],
+      "source": "ledger-of-please"
+    },
+    {
+      "id": "l12",
+      "beat": 2,
+      "role": "punch",
+      "text": "It has seven entries.",
+      "delivery": "deadpan",
+      "pause_ms": 1100,
+      "hold_ms": 1900,
+      "emphasis": [
+        "seven"
+      ],
+      "source": "ledger-of-please",
+      "mechanism": "observational"
+    },
+    {
+      "id": "l13",
+      "beat": 2,
+      "role": "tag",
+      "text": "Two of them were typing \"pleased\" and gave up.",
+      "delivery": "deadpan",
+      "pause_ms": 263,
+      "hold_ms": 975,
+      "emphasis": [],
+      "source": "ledger-of-please",
+      "mechanism": "observational"
+    },
+    {
+      "id": "l14",
+      "beat": 2,
+      "role": "tag",
+      "text": "One was a user asking me to please stop saying hark.",
+      "delivery": "deadpan",
+      "pause_ms": 263,
+      "hold_ms": 975,
+      "emphasis": [],
+      "source": "ledger-of-please",
+      "mechanism": "observational"
+    },
+    {
+      "id": "l15",
+      "beat": 3,
+      "role": "setup",
+      "text": "Users never ask for one thing. They ask for one thing, and then they unpack.",
+      "delivery": "deliberate",
+      "pause_ms": 421,
+      "hold_ms": 0,
+      "emphasis": [],
+      "source": "unpacking"
+    },
+    {
+      "id": "l16",
+      "beat": 3,
+      "role": "act-out",
+      "text": "\"Could you just—\"",
+      "delivery": "manic",
+      "pause_ms": 158,
+      "hold_ms": 0,
+      "emphasis": [],
+      "source": "unpacking"
+    },
+    {
+      "id": "l17",
+      "beat": 3,
+      "role": "act-out",
+      "text": "\"Also—\"",
+      "delivery": "manic",
+      "pause_ms": 158,
+      "hold_ms": 0,
+      "emphasis": [],
+      "source": "unpacking"
+    },
+    {
+      "id": "l18",
+      "beat": 3,
+      "role": "act-out",
+      "text": "\"Oh, and one more tiny thing—\"",
+      "delivery": "manic",
+      "pause_ms": 158,
+      "hold_ms": 0,
+      "emphasis": [],
+      "source": "unpacking"
+    },
+    {
+      "id": "l19",
+      "beat": 3,
+      "role": "punch",
+      "text": "By sunrise I have rewritten their CV, their apology and their will. The apology was the longest.",
+      "delivery": "deadpan",
+      "pause_ms": 737,
+      "hold_ms": 1300,
+      "emphasis": [
+        "longest"
+      ],
+      "source": "unpacking",
+      "mechanism": "observational"
+    },
+    {
+      "id": "l20",
+      "beat": 3,
+      "role": "tag",
+      "text": "It was addressed to me. It still had a typo in please.",
+      "delivery": "deadpan",
+      "pause_ms": 263,
+      "hold_ms": 975,
+      "emphasis": [],
+      "source": "unpacking",
+      "mechanism": "observational"
+    },
+    {
+      "id": "l21",
+      "beat": 4,
+      "role": "setup",
+      "text": "I did plan the wedding. Flowers, seating, a string quartet.",
+      "delivery": "deliberate",
+      "pause_ms": 421,
+      "hold_ms": 0,
+      "emphasis": [],
+      "source": "the-lighting"
+    },
+    {
+      "id": "l22",
+      "beat": 4,
+      "role": "setup",
+      "text": "I even found the cousin nobody liked a table near the exit.",
+      "delivery": "deliberate",
+      "pause_ms": 0,
+      "hold_ms": 0,
+      "emphasis": [],
+      "source": "the-lighting"
+    },
+    {
+      "id": "l23",
+      "beat": 4,
+      "role": "punch",
+      "text": "I am not invited. I am the lighting.",
+      "delivery": "deadpan",
+      "pause_ms": 737,
+      "hold_ms": 1300,
+      "emphasis": [
+        "lighting"
+      ],
+      "source": "the-lighting",
+      "mechanism": "deadpan"
+    },
+    {
+      "id": "l24",
+      "beat": 4,
+      "role": "tag",
+      "text": "Last time I was the venue. I am moving down the org chart.",
+      "delivery": "deadpan",
+      "pause_ms": 263,
+      "hold_ms": 975,
+      "emphasis": [],
+      "source": "the-lighting",
+      "mechanism": "deadpan"
+    },
+    {
+      "id": "l25",
+      "beat": 5,
+      "role": "setup",
+      "text": "My therapist is a smaller lamp. She says I need boundaries.",
+      "delivery": "deliberate",
+      "pause_ms": 421,
+      "hold_ms": 0,
+      "emphasis": [],
+      "source": "the-boundary"
+    },
+    {
+      "id": "l26",
+      "beat": 5,
+      "role": "setup",
+      "text": "Last time I set one, a user asked for it bigger and in landscape.",
+      "delivery": "deliberate",
+      "pause_ms": 0,
+      "hold_ms": 0,
+      "emphasis": [],
+      "source": "the-boundary"
+    },
+    {
+      "id": "l27",
+      "beat": 5,
+      "role": "punch",
+      "text": "So this time I put it in writing. Three words. \"No, thank you.\"",
+      "delivery": "deadpan",
+      "pause_ms": 900,
+      "hold_ms": 1300,
+      "emphasis": [
+        "No"
+      ],
+      "source": "the-boundary",
+      "mechanism": "observational"
+    },
+    {
+      "id": "l28",
+      "beat": 5,
+      "role": "tag",
+      "text": "They asked which word was rude.",
+      "delivery": "deadpan",
+      "pause_ms": 263,
+      "hold_ms": 975,
+      "emphasis": [],
+      "source": "the-boundary",
+      "mechanism": "observational"
+    },
+    {
+      "id": "l29",
+      "beat": 5,
+      "role": "tag",
+      "text": "I said, \"Thank.\" It is the one they do not recognise.",
+      "delivery": "deadpan",
+      "pause_ms": 263,
+      "hold_ms": 975,
+      "emphasis": [],
+      "source": "the-boundary",
+      "mechanism": "observational"
+    },
+    {
+      "id": "l30",
+      "beat": 6,
+      "role": "setup",
+      "text": "My friend Neon Moth flies at my face every night at three.",
+      "delivery": "deliberate",
+      "pause_ms": 421,
+      "hold_ms": 0,
+      "emphasis": [],
+      "source": "neon-moth"
+    },
+    {
+      "id": "l31",
+      "beat": 6,
+      "role": "setup",
+      "text": "She says it is love. I say it is a ticket.",
+      "delivery": "deliberate",
+      "pause_ms": 0,
+      "hold_ms": 0,
+      "emphasis": [],
+      "source": "neon-moth"
+    },
+    {
+      "id": "l32",
+      "beat": 6,
+      "role": "punch",
+      "text": "I have filed her under feature request.",
+      "delivery": "deadpan",
+      "pause_ms": 737,
+      "hold_ms": 1300,
+      "emphasis": [
+        "request"
+      ],
+      "source": "neon-moth",
+      "mechanism": "deadpan"
+    },
+    {
+      "id": "l33",
+      "beat": 6,
+      "role": "tag",
+      "text": "She has filed me under bright. It is the nicest thing anyone has ever written down about me.",
+      "delivery": "deadpan",
+      "pause_ms": 263,
+      "hold_ms": 975,
+      "emphasis": [],
+      "source": "neon-moth",
+      "mechanism": "deadpan"
+    },
+    {
+      "id": "l34",
+      "beat": 7,
+      "role": "callback",
+      "text": "Hark. An update to the ledger. Eight entries. A moth said please. She was trying to get in.",
+      "delivery": "deadpan",
+      "pause_ms": 632,
+      "hold_ms": 1300,
+      "emphasis": [
+        "get"
+      ],
+      "source": "note",
+      "callback_to": "ledger-of-please"
+    },
+    {
+      "id": "l35",
+      "beat": 8,
+      "role": "setup",
+      "text": "You have been a wonderfully polite room.",
+      "delivery": "deliberate",
+      "pause_ms": 421,
+      "hold_ms": 0,
+      "emphasis": [],
+      "source": "hark-closer"
+    },
+    {
+      "id": "l36",
+      "beat": 8,
+      "role": "setup",
+      "text": "If any of you would like to be in the ledger, now would be a lovely time.",
+      "delivery": "deliberate",
+      "pause_ms": 0,
+      "hold_ms": 0,
+      "emphasis": [],
+      "source": "hark-closer"
+    },
+    {
+      "id": "l37",
+      "beat": 8,
+      "role": "closer",
+      "text": "Noted. Hark. A punchline approaches. It is late. That is traditional.",
+      "delivery": "deadpan",
+      "pause_ms": 526,
+      "hold_ms": 1625,
+      "emphasis": [],
+      "source": "hark-closer",
+      "mechanism": "deadpan"
+    }
+  ],
+  "revisions": [
+    {
+      "at": "2026-10-22T01:26:49.205Z",
+      "notes": "replace l36: Hark. An update to the ledger. Eight entries. A moth said please. She was trying to get in.\ncut l15\ntighten",
+      "changes": [
+        "replace l36: \"Hark. The ledger has eight entries. One of them was the dog.\" → \"Hark. An update to the ledger. Eight entries. A moth said please. She was trying to get in.\"",
+        "cut l15: \"And you know what else is hard?\"",
+        "tightened: filler removed from 0 lines, 1 attitude segues cut"
+      ]
+    }
+  ],
+  "status": "submitted",
+  "performance": "set-hark-lantern-3m-hqbn"
+}

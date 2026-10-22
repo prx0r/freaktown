@@ -1,0 +1,25 @@
+{
+  "name": "@funnier/characters",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "/characters3 studio: persistent comedy characters with a schema'd theory (want/need, flaw, status, game, voice, taste...), a deterministic set writer + voice checker, delivery, stage preview, funnier.sketch/v1 submission and Try-Not-To-Smile seats. Exposed as an MCP server (stdio + streamable HTTP). Template-based by default; LLM hook is off.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./node": "./src/node/index.ts",
+    "./catalog": "./library/index.json"
+  },
+  "bin": { "characters-mcp": "bin/characters-mcp.ts" },
+  "scripts": {
+    "mcp": "vite-node bin/characters-mcp.ts",
+    "mcp:http": "vite-node bin/characters-mcp.ts -- --http"
+  },
+  "dependencies": {
+    "@funnier/party": "*",
+    "@funnier/sketch": "*",
+    "@modelcontextprotocol/sdk": "^1.20.0",
+    "zod": "^3.25.0"
+  }
+}

@@ -1,0 +1,777 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://funnier.si/schemas/character-theory.v1.json",
+  "title": "funnier.character-theory/v1",
+  "description": "A persistent comedy character's theory. See docs/CHARACTER-THEORY.md for what each field means and where it comes from.",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "const": "funnier.character-theory/v1"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9.-]{2,48}$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "logline": {
+      "type": "string",
+      "minLength": 1
+    },
+    "premise": {
+      "type": "string",
+      "minLength": 1
+    },
+    "intro": {
+      "type": "string",
+      "minLength": 1
+    },
+    "origin": {
+      "enum": [
+        "premise",
+        "agent-choice",
+        "adopted"
+      ]
+    },
+    "comic_want": {
+      "type": "string",
+      "minLength": 1
+    },
+    "need": {
+      "type": "string",
+      "minLength": 1
+    },
+    "flaw": {
+      "type": "object",
+      "properties": {
+        "flaw": {
+          "type": "string",
+          "minLength": 1
+        },
+        "blind_spot": {
+          "type": "string",
+          "minLength": 1
+        },
+        "misinterpretation_rule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "misreads": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "trigger": {
+                "type": "string",
+                "minLength": 1
+              },
+              "as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "trigger",
+              "as"
+            ]
+          }
+        }
+      },
+      "required": [
+        "flaw",
+        "blind_spot",
+        "misinterpretation_rule",
+        "misreads"
+      ]
+    },
+    "status": {
+      "type": "object",
+      "properties": {
+        "plays": {
+          "enum": [
+            "high",
+            "low",
+            "shifting"
+          ]
+        },
+        "to_audience": {
+          "enum": [
+            "high",
+            "low",
+            "shifting"
+          ]
+        },
+        "felt": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actual": {
+          "type": "string",
+          "minLength": 1
+        },
+        "see_saw": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "plays",
+        "to_audience",
+        "felt",
+        "actual",
+        "see_saw"
+      ]
+    },
+    "point_of_view": {
+      "type": "object",
+      "properties": {
+        "attitude": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "weird",
+              "hard",
+              "scary",
+              "stupid",
+              "wonderful",
+              "unfair"
+            ]
+          },
+          "minItems": 1
+        },
+        "take": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lens": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "attitude",
+        "take",
+        "lens"
+      ]
+    },
+    "game": {
+      "type": "object",
+      "properties": {
+        "base_reality": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unusual_thing": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pattern": {
+          "type": "string",
+          "minLength": 1
+        },
+        "heighten": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "explore": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "base_reality",
+        "unusual_thing",
+        "pattern",
+        "heighten",
+        "explore"
+      ]
+    },
+    "voice": {
+      "type": "object",
+      "properties": {
+        "register": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sentence_shape": {
+          "type": "string",
+          "minLength": 1
+        },
+        "max_sentence_words": {
+          "type": "integer",
+          "minimum": 4
+        },
+        "contractions": {
+          "enum": [
+            "never",
+            "sparingly",
+            "freely"
+          ]
+        },
+        "exclamations": {
+          "type": "boolean"
+        },
+        "verbal_tics": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 0
+        },
+        "signature_words": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 0
+        },
+        "forbidden_words": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 0
+        },
+        "substitutions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "register",
+        "sentence_shape",
+        "max_sentence_words",
+        "contractions",
+        "exclamations",
+        "verbal_tics",
+        "signature_words",
+        "forbidden_words",
+        "substitutions"
+      ]
+    },
+    "physicality": {
+      "type": "object",
+      "properties": {
+        "delivery_default": {
+          "enum": [
+            "deadpan",
+            "deliberate",
+            "manic",
+            "warm",
+            "conspiratorial"
+          ]
+        },
+        "energy": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "pace": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "punchline_hold_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stillness": {
+          "type": "string",
+          "minLength": 1
+        },
+        "gestures": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "delivery_default",
+        "energy",
+        "pace",
+        "punchline_hold_ms",
+        "stillness",
+        "gestures"
+      ]
+    },
+    "taste": {
+      "type": "object",
+      "properties": {
+        "weights": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 1
+          }
+        },
+        "composure": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "volatility": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.5
+        },
+        "reaction_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "smiles_at": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 0
+        },
+        "stone_face_at": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "weights",
+        "composure",
+        "volatility",
+        "reaction_ms",
+        "smiles_at",
+        "stone_face_at"
+      ]
+    },
+    "writes": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "wordplay",
+          "absurd",
+          "observational",
+          "deadpan",
+          "misdirection",
+          "self-deprecating",
+          "meta",
+          "callback"
+        ]
+      },
+      "minItems": 1
+    },
+    "worldview": {
+      "type": "object",
+      "properties": {
+        "ontology": {
+          "type": "string",
+          "minLength": 1
+        },
+        "epistemology": {
+          "type": "string",
+          "minLength": 1
+        },
+        "axiology": {
+          "type": "string",
+          "minLength": 1
+        },
+        "causality": {
+          "type": "string",
+          "minLength": 1
+        },
+        "agency": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "ontology",
+        "epistemology",
+        "axiology",
+        "causality",
+        "agency"
+      ]
+    },
+    "contradictions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 0
+    },
+    "backstory_anchors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 0
+    },
+    "catchphrases": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 0
+    },
+    "callbacks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "runner": {
+            "type": "string",
+            "minLength": 1
+          },
+          "seed_line": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id",
+          "runner",
+          "seed_line"
+        ]
+      }
+    },
+    "taboo": {
+      "type": "object",
+      "properties": {
+        "never_targets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 0
+        },
+        "never_topics": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 0
+        },
+        "never_says": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 0
+        },
+        "safety_rails": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "never_targets",
+        "never_topics",
+        "never_says",
+        "safety_rails"
+      ]
+    },
+    "relationships": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "who": {
+            "type": "string",
+            "minLength": 1
+          },
+          "identity": {
+            "type": "string",
+            "minLength": 1
+          },
+          "dynamic": {
+            "type": "string",
+            "minLength": 1
+          },
+          "metaphor": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": [
+              "above",
+              "below",
+              "equal",
+              "shifting"
+            ]
+          }
+        },
+        "required": [
+          "who",
+          "dynamic",
+          "status"
+        ]
+      }
+    },
+    "humanity": {
+      "type": "string",
+      "minLength": 1
+    },
+    "arc": {
+      "type": "object",
+      "properties": {
+        "shape": {
+          "enum": [
+            "flat",
+            "slow-change",
+            "circular"
+          ]
+        },
+        "stages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "n": {
+                "type": "integer"
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1
+              },
+              "shift": {
+                "type": "string",
+                "minLength": 1
+              },
+              "status": {
+                "enum": [
+                  "done",
+                  "current",
+                  "planned"
+                ]
+              }
+            },
+            "required": [
+              "n",
+              "title",
+              "shift",
+              "status"
+            ]
+          }
+        },
+        "reset_rule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "appearances": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "at": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "enum": [
+                  "set",
+                  "tnts",
+                  "preview"
+                ]
+              },
+              "ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "note": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "at",
+              "kind",
+              "ref"
+            ]
+          }
+        }
+      },
+      "required": [
+        "shape",
+        "stages",
+        "reset_rule",
+        "appearances"
+      ]
+    },
+    "material": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "topic": {
+            "type": "string",
+            "minLength": 1
+          },
+          "keywords": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 0
+          },
+          "attitude": {
+            "enum": [
+              "weird",
+              "hard",
+              "scary",
+              "stupid",
+              "wonderful",
+              "unfair"
+            ]
+          },
+          "premise": {
+            "type": "string",
+            "minLength": 1
+          },
+          "setups": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "act_out": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 0
+          },
+          "punch": {
+            "type": "string",
+            "minLength": 1
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 0
+          },
+          "mechanism": {
+            "enum": [
+              "wordplay",
+              "absurd",
+              "observational",
+              "deadpan",
+              "misdirection",
+              "self-deprecating",
+              "meta",
+              "callback"
+            ]
+          },
+          "move": {
+            "enum": [
+              "establish",
+              "heighten",
+              "explore",
+              "top"
+            ]
+          },
+          "callback": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id",
+          "topic",
+          "keywords",
+          "attitude",
+          "premise",
+          "setups",
+          "punch",
+          "tags",
+          "mechanism",
+          "move"
+        ]
+      }
+    },
+    "props": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 0
+    },
+    "changelog": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "minLength": 1
+          },
+          "by": {
+            "type": "string",
+            "minLength": 1
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "at",
+          "by",
+          "note"
+        ]
+      }
+    }
+  },
+  "required": [
+    "schema",
+    "id",
+    "name",
+    "logline",
+    "premise",
+    "origin",
+    "comic_want",
+    "need",
+    "flaw",
+    "status",
+    "point_of_view",
+    "game",
+    "voice",
+    "physicality",
+    "taste",
+    "writes",
+    "worldview",
+    "contradictions",
+    "backstory_anchors",
+    "catchphrases",
+    "callbacks",
+    "taboo",
+    "relationships",
+    "humanity",
+    "arc",
+    "material",
+    "props",
+    "changelog"
+  ]
+}

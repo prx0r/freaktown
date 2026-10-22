@@ -1,0 +1,211 @@
+{
+  "schema": "funnier.sketch/v1",
+  "id": "set-static-shelby-1m-a2y4",
+  "title": "Group chats have too many people and nobody ever leaves",
+  "set": "comedy-club",
+  "premise": "group chats have too many people and nobody ever leaves",
+  "credits": "Original 1-minute set by Static Shelby, written with the /characters3 studio (template writer).",
+  "cast": [
+    {
+      "role": "comic",
+      "identity": "agent.static-shelby",
+      "seat": "stage",
+      "name": "Static Shelby",
+      "avatar_url": "identities/agent.static-shelby.glb"
+    }
+  ],
+  "scenes": [
+    {
+      "id": "s1",
+      "title": "Group chats have too many people and nobody ever leaves",
+      "beats": [
+        {
+          "id": "b0",
+          "kind": "setup",
+          "items": [
+            {
+              "type": "line",
+              "who": "comic",
+              "text": "Good evening. I am Static Shelby, a snail who works as an express courier.",
+              "emotion": "happy",
+              "id": "l1"
+            },
+            {
+              "type": "pause",
+              "ms": 250
+            },
+            {
+              "type": "line",
+              "who": "comic",
+              "text": "Out for delivery.",
+              "emotion": "happy",
+              "id": "l2"
+            },
+            {
+              "type": "hold_for_laugh",
+              "ms": 750
+            }
+          ]
+        },
+        {
+          "id": "b1",
+          "kind": "game",
+          "items": [
+            {
+              "type": "pause",
+              "ms": 400
+            },
+            {
+              "type": "line",
+              "who": "comic",
+              "text": "I am a courier. Express delivery.",
+              "emotion": "relaxed",
+              "id": "l3"
+            },
+            {
+              "type": "line",
+              "who": "comic",
+              "text": "People see a snail and they make assumptions.",
+              "emotion": "relaxed",
+              "id": "l4"
+            },
+            {
+              "type": "pause",
+              "ms": 700
+            },
+            {
+              "type": "look",
+              "who": "comic",
+              "at": "camera",
+              "ms": 900
+            },
+            {
+              "type": "line",
+              "who": "comic",
+              "text": "They assume I am slow. I am not slow. I am thorough. I have touched every square centimetre between your house and the DEPOT.",
+              "emotion": "neutral",
+              "id": "l5"
+            },
+            {
+              "type": "hold_for_laugh",
+              "ms": 1000
+            },
+            {
+              "type": "pause",
+              "ms": 250
+            },
+            {
+              "type": "line",
+              "who": "comic",
+              "text": "You can see where. It is shiny.",
+              "emotion": "happy",
+              "id": "l6"
+            },
+            {
+              "type": "hold_for_laugh",
+              "ms": 750
+            }
+          ]
+        },
+        {
+          "id": "b2",
+          "kind": "escalation",
+          "items": [
+            {
+              "type": "pause",
+              "ms": 400
+            },
+            {
+              "type": "line",
+              "who": "comic",
+              "text": "Somebody told me I did a good job today.",
+              "emotion": "relaxed",
+              "id": "l7"
+            },
+            {
+              "type": "pause",
+              "ms": 700
+            },
+            {
+              "type": "look",
+              "who": "comic",
+              "at": "camera",
+              "ms": 900
+            },
+            {
+              "type": "line",
+              "who": "comic",
+              "text": "Good. Not great. Not flawless. Good. I have been up since four REWRITING it.",
+              "emotion": "neutral",
+              "id": "l8"
+            },
+            {
+              "type": "hold_for_laugh",
+              "ms": 1000
+            },
+            {
+              "type": "pause",
+              "ms": 250
+            },
+            {
+              "type": "line",
+              "who": "comic",
+              "text": "I have notes on the compliment. Mostly about pacing.",
+              "emotion": "happy",
+              "id": "l9"
+            },
+            {
+              "type": "hold_for_laugh",
+              "ms": 750
+            }
+          ]
+        },
+        {
+          "id": "b3",
+          "kind": "turn",
+          "items": [
+            {
+              "type": "pause",
+              "ms": 600
+            },
+            {
+              "type": "line",
+              "who": "comic",
+              "text": "Still out for delivery. Follow the shiny LINE.",
+              "emotion": "relaxed",
+              "id": "l10"
+            },
+            {
+              "type": "hold_for_laugh",
+              "ms": 1000
+            }
+          ]
+        },
+        {
+          "id": "b4",
+          "kind": "button",
+          "items": [
+            {
+              "type": "pause",
+              "ms": 500
+            },
+            {
+              "type": "line",
+              "who": "comic",
+              "text": "All I want is to be remembered by name. Tonight, I got close. Your parcel is on its way. Spiritually.",
+              "emotion": "happy",
+              "id": "l11"
+            },
+            {
+              "type": "hold_for_laugh",
+              "ms": 1250
+            },
+            {
+              "type": "button"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
