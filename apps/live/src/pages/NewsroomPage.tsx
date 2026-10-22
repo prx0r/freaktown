@@ -165,9 +165,12 @@ export function NewsroomPage() {
 
       {view.lowerThird && (
         paper ? (
-          <div data-testid="lower-third" style={{ position: 'absolute', left: '5%', bottom: tick?.enabled && view.ticker.length ? 'calc(clamp(26px, 4.2vh, 38px) + 4%)' : '7%', zIndex: 10, maxWidth: 'min(80%, 640px)', opacity: ltOpacity, transform: `translateY(${(1 - ltOpacity) * 8}px)`, background: P.paper, color: P.ink, borderLeft: `6px solid ${P.accent}`, padding: 'clamp(6px, 1.2vh, 12px) clamp(12px, 1.8vw, 22px)', boxShadow: '0 6px 24px rgba(0,0,0,0.35)' }}>
-            <div style={{ fontWeight: 600, fontSize: 'clamp(15px, 2.1vw, 26px)', lineHeight: 1.15 }}>{view.lowerThird.name}</div>
-            {view.lowerThird.title && <div style={{ fontStyle: 'italic', fontSize: 'clamp(12px, 1.5vw, 18px)', opacity: 0.8, marginTop: 2 }}>{view.lowerThird.title}</div>}
+          <div data-testid="lower-third" style={{ position: 'absolute', left: '5%', bottom: tick?.enabled && view.ticker.length ? 'calc(clamp(26px, 4.2vh, 38px) + 4.5%)' : '7%', zIndex: 10, maxWidth: 'min(72%, 560px)', opacity: ltOpacity, transform: `translateY(${(1 - ltOpacity) * 10}px)`, display: 'flex', alignItems: 'stretch', boxShadow: '0 10px 30px rgba(0,0,0,0.45)' }}>
+            <div style={{ width: 'clamp(4px, 0.45vw, 7px)', background: P.accent, flex: '0 0 auto' }} />
+            <div style={{ background: P.paper, color: P.ink, padding: 'clamp(7px, 1.3vh, 13px) clamp(14px, 2vw, 26px) clamp(8px, 1.45vh, 15px)' }}>
+              {view.lowerThird.title && <div data-testid="lower-third-title" style={{ fontSize: 'clamp(9px, 1.0vw, 13px)', letterSpacing: '0.24em', textTransform: 'uppercase', fontWeight: 700, color: '#8a5d17', marginBottom: 'clamp(2px, 0.5vh, 5px)', fontFamily: serif }}>{view.lowerThird.title}</div>}
+              <div style={{ fontWeight: 700, fontSize: 'clamp(16px, 2.25vw, 30px)', lineHeight: 1.08, letterSpacing: '0.005em', fontFamily: serif }}>{view.lowerThird.name}</div>
+            </div>
           </div>
         ) : (
           <div data-testid="lower-third" style={{ position: 'absolute', left: '5%', bottom: '15%', color: '#fff', zIndex: 10, maxWidth: '80%', opacity: ltOpacity, fontFamily: serif }}>

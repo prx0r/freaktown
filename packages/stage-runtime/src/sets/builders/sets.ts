@@ -84,7 +84,7 @@ const newsStudio: SetBuilder = (def, ctx) => {
   // chairs + papers + laptop
   placeAtSeats(def, () => chair(std(0x1a1a1f, 0.5, 0.2)), group, 0.05);
   for (const s of def.seats) {
-    const paper = box(0.21, 0.004, 0.29, std(0xffffff, 0.9), s.position[0] - 0.1, 0.81, -0.05); paper.rotation.y = 0.1; group.add(paper);
+    const paper = box(0.21, 0.004, 0.29, std(0xffffff, 0.9), s.position[0] - 0.1, 0.81, -0.05); paper.rotation.y = 0.1; paper.userData.seatId = s.id; group.add(paper);
   }
   const laptop = box(0.34, 0.02, 0.24, std(0x9aa3ad, 0.3, 0.8), 0, 0.82, -0.02); group.add(laptop);
   // studio cameras (props) + light grid

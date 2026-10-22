@@ -20,7 +20,7 @@ import type { SetDefinition, SeatAnchor } from './types';
 import { SET_REGISTRY, SetRegistry, findSeat } from './registry';
 import { resolveCameraCue, seatForward, seatHead, seatSide, type CameraShot } from './camera';
 import { ActiveSpeakerDirector } from './autoDirector';
-import { estimateLineMs, textMouth } from './textMouth';
+import { estimateLineMs, textMouth, wordsMouth } from './textMouth';
 import { SET_BUILDERS } from './builders/sets';
 import type { BuiltSet, WallPainter } from './builders/common';
 import { PokerProps } from './poker/PokerProps';
@@ -60,7 +60,7 @@ interface SeatActor {
   holder: THREE.Group;
   driver: AvatarDriver;
   performer: Performer;
-  speaking: { text: string; start: number; dur: number; audio?: HTMLAudioElement } | null;
+  speaking: { text: string; start: number; dur: number; audio?: HTMLAudioElement; words?: Array<{ word: string; start_ms: number; end_ms: number }> } | null;
   mouth: number;
   folded: boolean;
   face: FaceChannel;
@@ -317,6 +317,16 @@ export class SetStage {
       const pi = def.seats.indexOf(seat);
       this.pokerView.names[pi] = m.name;
     }));
+    this.refreshSeatProps();
+  }
+
+  /** hideEmptySeats sets: show a seat's chair/papers only when someone is cast in that seat. */
+  private refreshSeatProps(): void {
+    if (!this.def?.hideEmptySeats || !this.built) return;
+    this.built.group.traverse((o) => {
+      const id = o.userData?.seatId as string | undefined;
+      if (id) o.visible = this.actors.has(id);
+    });
   }
 
   actorAtIndex(i: number): SeatActor | undefined {
@@ -337,10 +347,12 @@ export class SetStage {
     let audio: HTMLAudioElement | undefined;
     if (line.audio_url) { audio = new Audio(this.resolve(line.audio_url)); void audio.play().catch(() => {}); }
     const now = this.nowMs();
-    actor.speaking = { text: line.text, start: now, dur, audio };
+    actor.speaking = { text: line.text, start: now, dur, audio, words: line.words?.length ? line.words : undefined };
     this.lines++;
     const emo = line.emotion ? emotionToFaceAction(line.emotion) : null;
-    if (emo) actor.performer.trigger(emo, 0.9, dur, now);
+    // a 'warm'/'calm' read is a light smile with open eyes (many VRM 'happy' presets close the eyes at full weight)
+    const emoI = line.emotion && /^(warm|calm|soft|gentle)$/i.test(line.emotion) ? 0.3 : 0.9;
+    if (emo) actor.performer.trigger(emo, emoI, dur, now);
     actor.performer.trigger(line.cue ?? (this.lines % 2 ? 'gesture.open' : emo ? 'gesture.open' : 'face.smile'), 0.8, Math.min(dur, 2200), now);
     if (this.lines % 3 === 0) actor.performer.trigger('gesture.point', 0.6, 1200, now + 300);
     let actedCamera = false;
@@ -510,7 +522,8 @@ export class SetStage {
     }
     if (this.move) {
       const u = Math.max(0, Math.min(1, (now - this.move.start) / this.move.dur));
-      const e = this.move.ease === 'linear' ? u : 0.5 - 0.5 * Math.cos(Math.PI * u);
+      // smootherstep: zero velocity AND zero acceleration at both ends (no visible 'kick' into or out of a move)
+      const e = this.move.ease === 'linear' ? u : u * u * u * (u * (u * 6 - 15) + 10);
       const f = this.move.from;
       const L = (a: number, b: number) => a + (b - a) * e;
       pos = [L(f.position[0], pos[0]), L(f.position[1], pos[1]), L(f.position[2], pos[2])];
@@ -634,7 +647,7 @@ export class SetStage {
       if (a.speaking) {
         const t = now - a.speaking.start;
         if (t > a.speaking.dur) a.speaking = null;
-        else { const s = textMouth(a.speaking.text, a.speaking.dur, t); open = s.open; vis = s.visemes; speaker = a; }
+        else { const s = a.speaking.words ? wordsMouth(a.speaking.words, t) : textMouth(a.speaking.text, a.speaking.dur, t); open = s.open; vis = s.visemes; speaker = a; }
       }
       a.mouth = open > a.mouth ? open : a.mouth + (open - a.mouth) * Math.min(1, dt * 18);
       const frame = a.performer.update(now, now, dt, a.mouth);

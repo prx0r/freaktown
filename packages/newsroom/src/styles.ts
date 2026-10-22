@@ -76,7 +76,7 @@ export const GOODNIGHT: ShowStyle = {
   cadence: {
     lmin_ms: 7000, lmax_ms: 16000, wpm: 105,
     line_gap_ms: 900, story_gap_ms: 1600, tail_hold_ms: 500,
-    move_ms: 2400, creep: 0.07,
+    move_ms: 3000, creep: 0.06,
     open_wide_ms: 4500, open_push_ms: 5200, close_pull_ms: 7000,
     jingle_open_ms: 5000, jingle_sting_ms: 3500, jingle_close_ms: 5000,
     establish_every: 5, reaction_chance: 0.25, recent_window: 3,

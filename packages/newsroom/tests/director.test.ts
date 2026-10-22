@@ -145,7 +145,7 @@ describe('cadence profiles', () => {
     const g = compile(goodnight as RundownV1), n = compile(brisk as RundownV1);
     const mean = (c: CompiledShow) => c.shots.reduce((a, s) => a + (s.end_ms - s.start_ms), 0) / c.shots.length;
     expect(mean(g)).toBeGreaterThan(mean(n) * 1.6);
-    expect(g.cadence).toEqual({ lmin_ms: 7000, lmax_ms: 16000, move_ms: 2400 });
+    expect(g.cadence).toEqual({ lmin_ms: 7000, lmax_ms: 16000, move_ms: 3000 });
     expect(n.cadence.lmin_ms).toBe(2500);
     expect(n.cadence.lmax_ms).toBe(6000);
     expect(g.shots.some((s) => s.creep)).toBe(true);

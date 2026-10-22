@@ -127,7 +127,8 @@ export function compile(rundown: RundownV1, timings: TimingsInput = {}, opts: Co
         seat: l.seat, text: l.text, duration_ms: l.end_ms - l.start_ms, line_id: l.id,
         emotion: l.emotion, words: l.relWords,
       });
-      at(l.start_ms, 'face.expression', { seat: l.seat, emotion: l.emotion ?? style.anchorEmotion, intensity: 0.45, duration_ms: l.end_ms - l.start_ms });
+      const emo = l.emotion ?? style.anchorEmotion;
+      at(l.start_ms, 'face.expression', { seat: l.seat, emotion: emo, intensity: /^(warm|calm|soft|gentle)$/i.test(emo ?? '') ? 0.3 : 0.45, duration_ms: l.end_ms - l.start_ms });
       if (l.kind === 'anchor' && !anchorIntroduced) {
         anchorIntroduced = true;
         at(l.start_ms + 1200, 'overlay.lower_third', { name: l.name, title: style.brand, show: true });
