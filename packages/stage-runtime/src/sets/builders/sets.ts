@@ -160,10 +160,15 @@ const podcast: SetBuilder = (def, ctx) => {
   const metal = std(0x1b1b1b, 0.35, 0.8);
   for (const s of def.seats) {
     const toward = (k: number): THREE.Vector3 => new THREE.Vector3(s.position[0] * k, 0, s.position[2] * k);
-    const clamp = toward(0.8 / 1.2 * 0.92); // table edge in front of the seat
-    const mount = cyl(0.025, 0.025, 0.45, metal, clamp.x, 0.98, clamp.z, 8); group.add(mount);
-    const [mx, my, mz] = seatLocal(s, [-0.2, -0.16, 0.26]); // off to the side so close-ups stay clear
-    const elbow = new THREE.Vector3(clamp.x * 0.85 + mx * 0.15, 1.38, clamp.z * 0.85 + mz * 0.15);
+    // Clamp on the table edge OFF TO THE PERFORMER'S SIDE (seat-local x -0.5, on
+    // the 0.75 m rim), boom elbow kept wide and below eye line, capsule reaching
+    // in under the mouth: the seat single / close cameras see a clear face.
+    const [cx, , cz] = seatLocal(s, [-0.5, 0, 0.64], s.position);
+    const clamp = new THREE.Vector3(cx, 0, cz);
+    const mount = cyl(0.025, 0.025, 0.4, metal, clamp.x, 0.95, clamp.z, 8); group.add(mount);
+    const [mx, my, mz] = seatLocal(s, [-0.17, -0.2, 0.27]); // below and beside the mouth
+    const [ex, , ez] = seatLocal(s, [-0.5, 0, 0.42], s.position);
+    const elbow = new THREE.Vector3(ex, 1.16, ez);
     const arm = (a: THREE.Vector3, b: THREE.Vector3) => {
       const len = a.distanceTo(b);
       const m = cyl(0.012, 0.012, len, metal, 0, 0, 0, 6);
@@ -171,7 +176,7 @@ const podcast: SetBuilder = (def, ctx) => {
       m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
       group.add(m);
     };
-    const top = new THREE.Vector3(clamp.x, 1.2, clamp.z);
+    const top = new THREE.Vector3(clamp.x, 1.15, clamp.z);
     const mic = new THREE.Vector3(mx, my, mz);
     arm(top, elbow); arm(elbow, mic);
     const capsule = new THREE.Mesh(new THREE.CapsuleGeometry(0.035, 0.11, 4, 10), std(0x2a2a2e, 0.3, 0.6));

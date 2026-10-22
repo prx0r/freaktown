@@ -183,29 +183,65 @@ function RoomView({ id }: { id: string }) {
   }, [id]);
 
   return (
-    <div data-testid="room-view" style={{ position: 'relative', width: '100vw', height: '100dvh', overflow: 'hidden', background: '#07060a', color: '#f3f1ec', fontFamily: "Inter, 'Helvetica Neue', Arial, sans-serif" }}>
-      <div ref={ref} style={{ position: 'absolute', inset: 0 }} />
+    <div data-testid="room-view" className="rv" style={{ position: 'relative', width: '100vw', height: '100dvh', overflow: 'hidden', background: '#07060a', color: '#f3f1ec', fontFamily: "Inter, 'Helvetica Neue', Arial, sans-serif" }}>
+      <style>{ROOM_CSS}</style>
+      <div ref={ref} className="rv-stage" />
       <div style={{ position: 'absolute', top: 10, left: 14, right: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 5, gap: 8, flexWrap: 'wrap' }}>
         <Link to={`/rooms${q.toString() ? `?${q}` : ''}`} style={{ color: '#ff2fa8', textDecoration: 'none', fontSize: 13, letterSpacing: 2 }}>← ROOMS</Link>
         <span data-testid="room-mode" style={{ fontSize: 11.5, color: mode === 'server' ? '#7BDFF2' : '#ffd28a' }}>● LIVE · {id} · {mode === 'server' ? 'rooms server' : mode === 'local' ? 'running in this tab' : '…'}</span>
       </div>
-      {line && <div data-testid="room-caption" style={{ position: 'absolute', left: '50%', bottom: 110, transform: 'translateX(-50%)', maxWidth: 'min(92%, 900px)', textAlign: 'center', fontSize: 'clamp(14px,2vw,21px)', background: '#0009', padding: '6px 14px', borderRadius: 6, zIndex: 6 }}><b style={{ color: '#F5C86B' }}>{line.who}:</b> {line.text}</div>}
-      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '10px 14px 14px', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', zIndex: 6, background: 'linear-gradient(#0000,#000c 35%)' }}>
-        {seats.map((s) => <span key={s.seat} data-testid={`room-seat-${s.seat}`} style={{ fontSize: 12, padding: '4px 9px', borderRadius: 12, background: s.kind === 'human' ? '#1d3b44' : s.kind === 'resident' ? '#2a2836' : 'transparent', border: s.kind === 'empty' ? '1px dashed #555' : '1px solid transparent' }}>{s.name ?? 'open seat'}{s.kind === 'resident' ? ' · resident' : s.kind === 'human' ? ' · human' : ''}</span>)}
-        <span style={{ flex: 1 }} />
+      {line && <div data-testid="room-caption" className="rv-caption"><b style={{ color: '#F5C86B' }}>{line.who}:</b> {line.text}</div>}
+      <div className="rv-bar">
+        <div className="rv-seats">
+          {seats.map((s) => <span key={s.seat} data-testid={`room-seat-${s.seat}`} className={`rv-chip ${s.kind}`}>{s.name ?? 'open seat'}{s.kind === 'resident' ? <em>resident</em> : s.kind === 'human' ? <em>human</em> : ''}</span>)}
+        </div>
+        <div className="rv-actions">
         {!me ? (
           <>
-            <input data-testid="room-name" value={name} onChange={(e) => setName(e.target.value)} style={{ width: 110, background: '#14131c', color: '#fff', border: '1px solid #333', borderRadius: 6, padding: '7px 8px' }} />
+            <input data-testid="room-name" aria-label="your name" value={name} onChange={(e) => setName(e.target.value)} style={{ width: 110, minWidth: 0, flex: '0 1 110px', background: '#14131c', color: '#fff', border: '1px solid #333', borderRadius: 6, padding: '7px 8px' }} />
             <button data-testid="room-join" onClick={() => void api.current?.join()} style={{ background: '#ff2fa8', color: '#fff', border: 0, borderRadius: 8, padding: '8px 14px', fontWeight: 700 }}>{id === 'tnts' ? 'Join next game' : 'Take a seat'}</button>
           </>
         ) : (
           <>
-            <span data-testid="room-me" style={{ fontSize: 13 }}>{me.waiting ? 'queued for the next game (only your smile score is sent)' : `you are in ${me.seat}`}</span>
+            <span data-testid="room-me" className="rv-me">{me.waiting ? 'queued for the next game (only your smile score is sent)' : `you are in ${me.seat}`}</span>
             <button data-testid="room-leave" onClick={() => void api.current?.leave()} style={{ background: 'transparent', color: '#fff', border: '1px solid #555', borderRadius: 8, padding: '8px 14px' }}>Leave</button>
           </>
         )}
+        </div>
       </div>
-      {note && <div data-testid="room-note" style={{ position: 'absolute', top: 40, left: '50%', transform: 'translateX(-50%)', background: '#14131cee', padding: '5px 12px', borderRadius: 14, fontSize: 12.5, zIndex: 7 }}>{note}</div>}
+      {note && <div data-testid="room-note" className="rv-note">{note}</div>}
     </div>
   );
 }
+
+const ROOM_CSS = `
+.rv-stage{position:absolute;inset:0}
+.rv-caption{position:absolute;left:50%;bottom:110px;transform:translateX(-50%);max-width:min(92%,900px);text-align:center;font-size:clamp(14px,2vw,21px);background:#0009;padding:6px 14px;border-radius:6px;z-index:6}
+.rv-bar{position:absolute;left:0;right:0;bottom:0;padding:10px 14px 14px;display:flex;gap:8px;align-items:center;z-index:6;background:linear-gradient(#0000,#000c 35%)}
+.rv-seats{display:flex;gap:8px;flex-wrap:wrap;flex:1;min-width:0}
+.rv-actions{display:flex;gap:8px;align-items:center;flex:none}
+.rv-chip{font-size:12px;padding:4px 9px;border-radius:12px;border:1px solid transparent;white-space:nowrap}
+.rv-chip.resident{background:#2a2836}
+.rv-chip.human{background:#1d3b44}
+.rv-chip.empty{border:1px dashed #555;color:#999}
+.rv-chip em{font-style:normal;color:#9a98a8}
+.rv-chip em::before{content:' · '}
+.rv-me{font-size:13px}
+.rv-note{position:absolute;top:40px;left:50%;transform:translateX(-50%);background:#14131cee;padding:5px 12px;border-radius:14px;font-size:12.5px;z-index:7;max-width:92vw;text-align:center}
+@media (max-width:760px){
+  /* phone: stage on top, a solid panel below holds the caption, seats and the join controls */
+  .rv{display:flex;flex-direction:column}
+  .rv-stage{position:relative;inset:auto;flex:1 1 auto;min-height:0}
+  .rv-caption{position:static;transform:none;max-width:none;margin:0;border-radius:0;background:#14131c;font-size:15px;padding:10px 14px;border-top:1px solid #2a2836}
+  .rv-bar{position:static;flex:none;flex-direction:column;align-items:stretch;background:#07060a;padding:10px 12px 16px;gap:10px}
+  .rv-seats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+  .rv-chip{font-size:12.5px;padding:6px 10px;white-space:normal;overflow-wrap:anywhere;border-radius:8px}
+  .rv-chip em{display:block;font-size:10.5px}
+  .rv-chip em::before{content:none}
+  .rv-actions{justify-content:stretch}
+  .rv-actions input{flex:1 1 auto !important;width:auto !important}
+  .rv-actions button{flex:none}
+  .rv-me{flex:1}
+  .rv-note{top:36px}
+}
+`;

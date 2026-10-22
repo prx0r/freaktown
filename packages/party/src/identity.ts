@@ -38,7 +38,7 @@ export interface PartyLook {
   avatar_url: string;
   palette: string[];
   /** Procedural GLB recipe (P3), when the identity built its own body. */
-  body?: { head: 'sphere' | 'box' | 'lantern' | 'blob'; height: number; eyes: number; antenna: boolean; seed: number };
+  body?: { head: 'sphere' | 'box' | 'lantern' | 'blob' | 'dome'; height: number; eyes: number; antenna: boolean; seed: number };
 }
 
 export interface PartyIdentity {
@@ -139,6 +139,9 @@ export interface IdentityBrief {
   catchphrase?: string;
   voice?: Partial<PartyVoice>;
   head?: NonNullable<PartyLook['body']>['head'];
+  /** 1-3 eyes (default 2). */
+  eyes?: number;
+  antenna?: boolean;
   palette?: string[];
 }
 
@@ -166,7 +169,7 @@ export function createIdentity(brief: IdentityBrief): PartyIdentity {
     look: {
       avatar_url: `identities/${id}.glb`,
       palette: brief.palette ?? pick(rng, PALETTES),
-      body: { head: brief.head ?? pick(rng, ['sphere', 'box', 'lantern', 'blob'] as const), height: round3(1.55 + rng() * 0.3), eyes: 2, antenna: rng() > 0.5, seed: hashString(seed) },
+      body: { head: brief.head ?? pick(rng, ['sphere', 'box', 'lantern', 'blob'] as const), height: round3(1.55 + rng() * 0.3), eyes: Math.max(1, Math.min(3, Math.round(brief.eyes ?? 2))), antenna: (() => { const r = rng() > 0.5; return brief.antenna ?? r; })(), seed: hashString(seed) },
     },
     taste: randomTaste(rng, writes),
   };

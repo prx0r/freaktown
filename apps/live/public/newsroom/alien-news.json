@@ -1,0 +1,248 @@
+{
+ "schema": "funnier.newsroom.rundown/v1",
+ "id": "alien-news-ep1",
+ "title": "Alien News",
+ "show_style": "default-news",
+ "brand": "Alien News",
+ "cast": {
+  "anchors": [
+   {
+    "chair": "zorvex",
+    "name": "Zorvex Quillam",
+    "seat": "anchor1",
+    "character_id": "agent.zorvex-quillam",
+    "avatar_url": "identities/agent.zorvex-quillam.glb"
+   },
+   {
+    "chair": "mib",
+    "name": "Mib Trellune",
+    "seat": "anchor2",
+    "character_id": "agent.mib-trellune",
+    "avatar_url": "identities/agent.mib-trellune.glb"
+   }
+  ]
+ },
+ "segments": [
+  {
+   "id": "open",
+   "title": "Open",
+   "kind": "open",
+   "stories": [
+    {
+     "id": "open-story",
+     "title": "Open",
+     "pieces": [
+      {
+       "type": "wall",
+       "layout": "title",
+       "headline": "Alien News",
+       "kicker": "Live from high orbit"
+      },
+      {
+       "type": "ticker",
+       "items": [
+        "Earth: still spinning",
+        "Moon: unimpressed",
+        "Probe: missing",
+        "Translation desk: on strike"
+       ]
+      },
+      {
+       "type": "jingle",
+       "kind": "open"
+      },
+      {
+       "type": "anchor_read",
+       "id": "open-1",
+       "chair": "zorvex",
+       "text": "Pipgourkvo gloub xoushfnou kre'xosh vro-gloushkree vi vroutirk thee kribvrep, vree'voup.",
+       "emotion": "neutral",
+       "subtitle": "Good evening, galaxy. I am Zorvex Quillam."
+      },
+      {
+       "type": "anchor_read",
+       "id": "open-2",
+       "chair": "mib",
+       "text": "Te-vrute taitlumthua boushqaith, thuaztou tu she tlai saith-pun!",
+       "emotion": "happy",
+       "subtitle": "And I am Mib. Tonight: Earth, still doing that."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "leader",
+   "title": "Top story",
+   "kind": "section",
+   "stories": [
+    {
+     "id": "leader-story",
+     "title": "Top story",
+     "source": {
+      "name": "FUNNIER original illustration",
+      "license": "original"
+     },
+     "pieces": [
+      {
+       "type": "wall",
+       "layout": "headline",
+       "headline": "Earth man at podium very sure about everything",
+       "kicker": "Top story",
+       "image_url": "/alien-news/politician-card.svg",
+       "image_license": "original",
+       "credit": "Original illustration"
+      },
+      {
+       "type": "anchor_read",
+       "id": "leader-1",
+       "chair": "zorvex",
+       "text": "Fnegoushgle vreexe vrerkvish, fnerk-krou thithou gosh fni'vreesh'pe tipee'xi vob gle fne.",
+       "subtitle": "Our top story: an Earth leader spoke for ninety minutes today."
+      },
+      {
+       "type": "anchor_read",
+       "id": "leader-2",
+       "chair": "zorvex",
+       "text": "Tourkfnepoup vevrou xixeegee vo fno kreeppou'gou gosh xeshthe'krob xoubfnep, vo.",
+       "subtitle": "Translators confirm the volume was the message."
+      },
+      {
+       "type": "anchor_read",
+       "id": "leader-3",
+       "chair": "mib",
+       "text": "Teshu bush buth taimraitlai thua puzquamvroum, the vruathrouz skrushbain suantlu!",
+       "emotion": "surprised",
+       "subtitle": "He promised a better tomorrow and a much louder today."
+      },
+      {
+       "type": "anchor_read",
+       "id": "leader-4",
+       "chair": "mib",
+       "text": "Soutumqaish qaiz tuaskrouzbouz routhpouthte, qeqouzqu shumqua baivruth quan shaimbevruan thethua.",
+       "subtitle": "Our probe asked a follow-up question. The probe is being rebooted."
+      },
+      {
+       "type": "anchor_read",
+       "id": "leader-5",
+       "chair": "zorvex",
+       "text": "Thish vrerkthish fnorkfnib, pishfnee xee gee-xe.",
+       "subtitle": "[translation: he pointed at the sky a lot]"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "numbers",
+   "title": "The numbers",
+   "kind": "section",
+   "stories": [
+    {
+     "id": "numbers-story",
+     "title": "The numbers",
+     "pieces": [
+      {
+       "type": "wall",
+       "layout": "numbers",
+       "headline": "times a day an Earthling checks the small glowing rectangle",
+       "kicker": "The numbers",
+       "figure": "144"
+      },
+      {
+       "type": "anchor_read",
+       "id": "numbers-1",
+       "chair": "mib",
+       "text": "Senshouz-qe bai-puatlai vrounsem qua'skre baishu pua qoumsun, saimqu puz tou.",
+       "subtitle": "Earthlings check a small glowing rectangle one hundred and forty-four times a day."
+      },
+      {
+       "type": "anchor_read",
+       "id": "numbers-2",
+       "chair": "zorvex",
+       "text": "Theebtheegleep fnekree gee, geegloushtee ti'fnoup xeepkrish xepebgleeb fnovrip.",
+       "subtitle": "The rectangle has never once checked on them."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "weather",
+   "title": "Weather",
+   "kind": "section",
+   "stories": [
+    {
+     "id": "weather-story",
+     "title": "Weather",
+     "pieces": [
+      {
+       "type": "wall",
+       "layout": "headline",
+       "headline": "Earth weather: hot, then complaining, then hot again",
+       "kicker": "Weather"
+      },
+      {
+       "type": "anchor_read",
+       "id": "weather-1",
+       "chair": "mib",
+       "text": "Roumqush skruanruan reth buan touth ruaruabuz, ruzsemse buanbum!",
+       "subtitle": "Earth weather: hot, then complaining."
+      },
+      {
+       "type": "anchor_read",
+       "id": "weather-2",
+       "chair": "zorvex",
+       "text": "Krou thibvree glepeepi fnouvreeptirk glirk, tib'vrovrirk.",
+       "subtitle": "Then hot again. Bring a small fan and a large opinion."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "close",
+   "title": "Close",
+   "kind": "close",
+   "stories": [
+    {
+     "id": "close-story",
+     "title": "Close",
+     "pieces": [
+      {
+       "type": "wall",
+       "layout": "close",
+       "headline": "Please return our probe",
+       "kicker": "Alien News"
+      },
+      {
+       "type": "anchor_read",
+       "id": "close-1",
+       "chair": "zorvex",
+       "text": "Glob xee gloush fnee'theb, voute'veesh toush'kreefnib tou voush.",
+       "subtitle": "That is the news. Kravash."
+      },
+      {
+       "type": "anchor_read",
+       "id": "close-2",
+       "chair": "mib",
+       "text": "Bou-tuamshu baiskruan shoun, suash qou puthqai!",
+       "emotion": "happy",
+       "subtitle": "Shoo-mak! And please return our probe."
+      },
+      {
+       "type": "jingle",
+       "kind": "close"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "meta": {
+  "generator": "packages/party/src/alien.ts",
+  "language": "invented (seeded phonology per anchor)",
+  "subtitles": true,
+  "caricature": "original SVG, generic label, no real likeness"
+ }
+}

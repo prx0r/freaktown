@@ -51,7 +51,9 @@ const ORDER: Record<string, number> = {
 
 export function compile(rundown: RundownV1, timings: TimingsInput = {}, opts: CompileOptions = {}): CompiledShow {
   assertRundown(rundown);
-  const style = typeof opts.style === 'object' ? opts.style : getShowStyle(opts.style ?? rundown.show_style);
+  const base = typeof opts.style === 'object' ? opts.style : getShowStyle(opts.style ?? rundown.show_style);
+  const B = rundown.brand?.trim();
+  const style: ShowStyle = B ? { ...base, brand: B, wall: { ...base.wall, brandLine: B.toUpperCase() }, overlay: { ...base.overlay, ticker: { ...base.overlay.ticker, label: B.toUpperCase() }, ...(base.overlay.bug ? { bug: B } : {}) } } : base;
   const C = style.cadence;
   const setId = rundown.set ?? style.set;
   const prog = layoutProgram(rundown, style, timings);
@@ -125,7 +127,7 @@ export function compile(rundown: RundownV1, timings: TimingsInput = {}, opts: Co
     if (l.seat) {
       at(l.start_ms, 'dialogue.line', {
         seat: l.seat, text: l.text, duration_ms: l.end_ms - l.start_ms, line_id: l.id,
-        emotion: l.emotion, words: l.relWords,
+        emotion: l.emotion, words: l.relWords, ...(l.subtitle ? { subtitle: l.subtitle } : {}),
       });
       at(l.start_ms, 'face.expression', { seat: l.seat, emotion: l.emotion ?? style.anchorEmotion, intensity: 0.45, duration_ms: l.end_ms - l.start_ms });
       if (l.kind === 'anchor' && !anchorIntroduced) {

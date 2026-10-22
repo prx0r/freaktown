@@ -10,3 +10,4 @@ export * from './game';
 export * from './rooms';
 export * from './glb';
 export * from './minute';
+export * from './alien';

@@ -87,6 +87,24 @@ function cachedImage(url: string): HTMLImageElement | null {
   return null;
 }
 
+/** Load wall images up front so a capture render shows them from their first frame. */
+export function preloadWallImages(urls: string[], timeoutMs = 8000): Promise<void> {
+  const one = (url: string) => new Promise<void>((resolve) => {
+    if (typeof Image === 'undefined') return resolve();
+    const got = images.get(url);
+    if (got instanceof HTMLImageElement || got === 'failed') return resolve();
+    const im = new Image();
+    im.crossOrigin = 'anonymous';
+    const done = (v: HTMLImageElement | 'failed') => { images.set(url, v); resolve(); };
+    im.onload = () => done(im);
+    im.onerror = () => done('failed');
+    setTimeout(() => { if (!(images.get(url) instanceof HTMLImageElement)) resolve(); }, timeoutMs);
+    images.set(url, 'loading');
+    im.src = url;
+  });
+  return Promise.all([...new Set(urls)].map(one)).then(() => undefined);
+}
+
 // ── paper-sunrise (goodnight) ──────────────────────────────────────────
 
 function paperSunrise(ctx: Ctx, card: WallCardInput, th: SetThemePayloadV1 | null, t: number) {
@@ -238,11 +256,22 @@ function broadcast(ctx: Ctx, card: WallCardInput, th: SetThemePayloadV1 | null, 
     const lab = fitText(ctx, card.text, (px) => `bold ${px}px ${sans}`, maxW, 2, 40, 24);
     ctx.font = `bold ${lab.px}px ${sans}`; let y = 170 + f.px; for (const l of lab.lines) { ctx.fillText(l, 52, y); y += lab.px * 1.2; }
   } else {
-    const f = fitText(ctx, card.text, (px) => `bold ${px}px ${sans}`, maxW, layout === 'country' ? 1 : 3, layout === 'country' ? 110 : 64, 30);
+    // headline with a licensed / original image: text on the left, framed card on the right
+    const img = layout === 'headline' && card.image_url ? cachedImage(card.image_url) : null;
+    const textW = img ? W * 0.56 : maxW;
+    const f = fitText(ctx, card.text, (px) => `bold ${px}px ${sans}`, textW, layout === 'country' ? 1 : 3, layout === 'country' ? 110 : 64, 30);
     ctx.fillStyle = '#fff'; ctx.font = `bold ${f.px}px ${sans}`;
     let y = 150 + f.px;
     for (const l of f.lines) { ctx.fillText(l, 52, y); y += f.px * 1.2; }
-    if (card.body) { const b = fitText(ctx, card.body, (px) => `${px}px ${sans}`, maxW, 2, 32, 20); ctx.font = `${b.px}px ${sans}`; ctx.fillStyle = 'rgba(255,255,255,0.85)'; for (const l of b.lines) { ctx.fillText(l, 52, y); y += b.px * 1.25; } }
+    if (card.body) { const b = fitText(ctx, card.body, (px) => `${px}px ${sans}`, textW, 2, 32, 20); ctx.font = `${b.px}px ${sans}`; ctx.fillStyle = 'rgba(255,255,255,0.85)'; for (const l of b.lines) { ctx.fillText(l, 52, y); y += b.px * 1.25; } }
+    if (img) {
+      const bh = H - 150, bw = Math.min(W * 0.34, bh * (img.width / img.height)), bx = W - bw - 48, by = 64;
+      ctx.fillStyle = '#fff'; ctx.fillRect(bx - 8, by - 8, bw + 16, bh + 16);
+      ctx.save(); ctx.beginPath(); ctx.rect(bx, by, bw, bh); ctx.clip();
+      const sc = Math.max(bw / img.width, bh / img.height);
+      ctx.drawImage(img, bx + (bw - img.width * sc) / 2, by + (bh - img.height * sc) / 2, img.width * sc, img.height * sc);
+      ctx.restore();
+    }
   }
   ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.font = `bold 26px ${sans}`;
   ctx.fillText(fitOne(ctx, [(th?.brand ?? 'FUNNIER NEWS').toUpperCase(), card.credit ? `· ${card.credit}` : ''].join(' '), maxW), 52, H - 40);

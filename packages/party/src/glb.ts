@@ -113,6 +113,7 @@ export function buildIdentityMeshes(idn: PartyIdentity): MeshSpec[] {
   const wobble = 0.04 + rng() * 0.05;
   const head = body.head === 'box' ? box([0, hy, 0], [hr, hr * 1.05, hr * 0.9])
     : body.head === 'lantern' ? (() => { const p = ellipsoid([0, hy, 0], [hr * 0.95, hr * 1.15, hr * 0.95], 16, 12, (q, n) => [q[0] * (1 + 0.12 * Math.cos(n[1] * 6)), q[1], q[2] * (1 + 0.12 * Math.cos(n[1] * 6))]); append(p, box([0, hy + hr * 1.25, 0], [hr * 0.5, hr * 0.1, hr * 0.5])); append(p, box([0, hy - hr * 1.2, 0], [hr * 0.55, hr * 0.08, hr * 0.55])); return p; })()
+      : body.head === 'dome' ? ellipsoid([0, hy, 0], [hr * 1.05, hr * 1.2, hr], 18, 14, (q, n) => { const up = Math.max(0, n[1]); const k = 1 + 0.35 * up * up - 0.12 * Math.max(0, -n[1]); return [q[0] * k, q[1], q[2] * k * (1 + wobble * Math.sin(n[0] * 4))]; })
       : body.head === 'blob' ? ellipsoid([0, hy, 0], [hr * 1.1, hr, hr], 16, 12, (q, n) => { const k = 1 + wobble * Math.sin(n[0] * 5 + n[1] * 3); return [q[0] * k, q[1] * k, q[2] * k]; })
         : ellipsoid([0, hy, 0], [hr, hr * 1.05, hr]);
   const zf = (body.head === 'box' ? hr * 0.9 : hr * 0.97) + 0.004 * s;
@@ -120,10 +121,12 @@ export function buildIdentityMeshes(idn: PartyIdentity): MeshSpec[] {
   // face: mouth (8×3 verts) + two eyes (5×3 each)
   const face = empty();
   const mouth = plate(0, hy - hr * 0.42, zf * 0.98, hr * 0.9, hr * 0.16, 8, 3);
-  const eyeL = plate(-hr * 0.38, hy + hr * 0.22, zf * 0.99, hr * 0.32, hr * 0.26, 5, 3);
-  const eyeR = plate(hr * 0.38, hy + hr * 0.22, zf * 0.99, hr * 0.32, hr * 0.26, 5, 3);
+  // eyes: 2 (default) = left + right; 3 adds a centre eye above; 1 = one big centre eye
+  const nEyes = Math.max(1, Math.min(3, body.eyes ?? 2));
+  const eyeSpecs: Array<[number, number, number, number]> = nEyes === 1 ? [[0, hy + hr * 0.22, hr * 0.5, hr * 0.38]]
+    : [[-hr * 0.38, hy + hr * 0.22, hr * 0.32, hr * 0.26], [hr * 0.38, hy + hr * 0.22, hr * 0.32, hr * 0.26], ...(nEyes === 3 ? [[0, hy + hr * 0.62, hr * 0.26, hr * 0.22] as [number, number, number, number]] : [])];
   append(face, mouth); const mouthN = mouth.pos.length / 3;
-  append(face, eyeL); append(face, eyeR);
+  for (const [ex, ey, ew, eh] of eyeSpecs) append(face, plate(ex, ey, zf * 0.99, ew, eh, 5, 3));
   const nv = face.pos.length / 3;
   const zero = () => new Array(nv * 3).fill(0);
   const jaw = zero(), smL = zero(), smR = zero(), blL = zero(), blR = zero();
@@ -137,10 +140,10 @@ export function buildIdentityMeshes(idn: PartyIdentity): MeshSpec[] {
     if (u > 0) { smR[v * 3 + 1] = hr * 0.16 * corner; smR[v * 3] = hr * 0.05 * corner; }
   }
   const eyeBase = (which: number) => mouthN + which * 15;
-  for (const [which, arr] of [[0, blL], [1, blR]] as Array<[number, number[]]>) {
-    const cy = hy + hr * 0.22;
+  eyeSpecs.forEach(([, cy], which) => {
+    const arr = which === 1 ? blR : blL; // the centre eye blinks with the left
     for (let k = 0; k < 15; k++) { const v = eyeBase(which) + k; arr[v * 3 + 1] = (cy - face.pos[v * 3 + 1]) * 0.92; }
-  }
+  });
   const meshes: MeshSpec[] = [
     { name: 'body', color: cBody, part: torso },
     { name: 'legs', color: cTrim, part: legs },
@@ -149,8 +152,9 @@ export function buildIdentityMeshes(idn: PartyIdentity): MeshSpec[] {
   ];
   if (body.antenna) {
     const a = empty();
-    append(a, cylinder(0, 0, hy + hr, hy + hr + 0.16 * s, 0.012 * s, 8));
-    append(a, ellipsoid([0, hy + hr + 0.18 * s, 0], [0.03 * s, 0.03 * s, 0.03 * s], 10, 8));
+    const top = hy + hr * (body.head === 'dome' ? 1.2 : 1);
+    append(a, cylinder(0, 0, top, top + 0.16 * s, 0.012 * s, 8));
+    append(a, ellipsoid([0, top + 0.18 * s, 0], [0.03 * s, 0.03 * s, 0.03 * s], 10, 8));
     meshes.push({ name: 'antenna', color: cAccent, part: a });
   }
   return meshes;

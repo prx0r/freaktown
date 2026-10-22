@@ -21,7 +21,7 @@ export function MinutePage() {
 
   const draft = () => { setM(draftMinute(premise, idn)); setPreview(null); setStatus('Drafted by the agent. Edit anything.'); };
   const edit = (id: string, patch: Partial<MinuteLine>) => setM((x) => (x ? { ...x, lines: x.lines.map((l) => (l.id === id ? { ...l, ...patch } : l)) } : x));
-  const suggest = () => { setM((x) => (x ? { ...x, lines: suggestDelivery(x.lines, idn) } : x)); setStatus('Delivery re-suggested by the agent.'); };
+  const suggest = () => { setM((x) => (x ? { ...x, lines: suggestDelivery(x.lines, idn) } : x)); setStatus('Delivery re-suggested by the agent (your emphasis kept).'); };
   const sub = () => (m ? submitMinute(m, idn.look.avatar_url) : null);
   const doPreview = () => {
     const s = sub();
@@ -69,7 +69,7 @@ export function MinutePage() {
                     <select value={l.delivery} onChange={(e) => edit(l.id, { delivery: e.target.value as LineDelivery })} style={{ ...inp, padding: '2px 4px', fontSize: 11.5 }}>{DELIVERIES.map((d) => <option key={d}>{d}</option>)}</select>
                     pause <input type="number" step={100} value={l.pause_ms} onChange={(e) => edit(l.id, { pause_ms: Number(e.target.value) })} style={{ ...inp, width: 64, padding: '2px 4px' }} />
                     hold <input type="number" step={100} value={l.hold_ms} onChange={(e) => edit(l.id, { hold_ms: Number(e.target.value) })} style={{ ...inp, width: 64, padding: '2px 4px' }} />
-                    emphasis <input value={l.emphasis.join(' ')} onChange={(e) => edit(l.id, { emphasis: e.target.value.split(/\s+/).filter(Boolean) })} style={{ ...inp, width: 110, padding: '2px 4px' }} />
+                    emphasis <input value={l.emphasis.join(' ')} onChange={(e) => edit(l.id, { emphasis: e.target.value.split(/\s+/).filter(Boolean), emphasis_user: true })} style={{ ...inp, width: 110, padding: '2px 4px' }} />
                   </div>
                 </div>
               </div>

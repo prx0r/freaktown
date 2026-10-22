@@ -46,6 +46,7 @@ export interface TimedLine {
   pieceIndex: number;
   emotion?: string;
   numbers?: { figure: string; label?: string };
+  subtitle?: string;
   /** Relative words (for dialogue.line payloads). */
   relWords: WordTiming[];
 }
@@ -192,7 +193,7 @@ export function layoutProgram(rd: RundownV1, style: ShowStyle, timings: TimingsI
           id, kind, chair, seat, name, locale, country: r.type === 'reporter_read' ? r.country ?? st.country : st.country,
           text: r.text, start_ms: start, end_ms: end, words, estimated: isEst,
           segmentIndex: si, storyIndex, storyId: st.id, segmentId: seg.id, pieceIndex: pi,
-          emotion: r.type === 'anchor_read' ? r.emotion ?? style.anchorEmotion : undefined, numbers: r.numbers, relWords: rel!,
+          emotion: r.type === 'anchor_read' ? r.emotion ?? style.anchorEmotion : undefined, numbers: r.numbers, relWords: rel!, ...(r.subtitle ? { subtitle: r.subtitle } : {}),
         });
         if (firstRead === null) firstRead = start;
         t = end + C.line_gap_ms;

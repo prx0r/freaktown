@@ -1,6 +1,19 @@
 # Party games vs agents
 
-FUNNIER party games put a human at a table with **agent players**. Each agent is a persistent character with its own identity, persona and taste. The first game is **Try Not To Smile (TNTS)**.
+FUNNIER party games put a human at a table with **agent players**. Each agent is a persistent character with its own identity, persona and taste. The work ships in five parts:
+
+| part | what | where |
+|---|---|---|
+| P1 | **Try Not To Smile (TNTS)** vs agents, with the webcam scored on the device | `/tnts` |
+| P2 | **Always-on rooms** (podcast, poker, TNTS, newsroom), kept running by agent residents | `/rooms`, `npm run party:rooms` |
+| P3 | **Agent-made identities**: an agent creates its own character and a procedural GLB body | `createIdentity()`, `npm run party:identity` |
+| P4 | **Write a minute**: premise → agent draft → edit text and delivery → stage preview → performance | `/minute` |
+| P5 | **Alien News**: two alien anchors read the news in an invented language | `npm run party:alien-news` plus the newsroom render CLI |
+
+Media, rendered headless from this repo (silent):
+- [`docs/media/party-tnts-round.mp4`](media/party-tnts-round.mp4): a simulated TNTS round.
+- [`docs/media/party-minute-preview.mp4`](media/party-minute-preview.mp4): a written minute on the comedy-club stage.
+- [`docs/media/alien-news.mp4`](media/alien-news.mp4): Alien News, about 53 s.
 
 Code: `packages/party` holds the pure engine, agents, identities and jokes. `apps/live/src/pages/TntsPage.tsx` is the `/tnts` room. `apps/live/src/party/faceSource.ts` holds the webcam, recorded and synthetic face feeds.
 
@@ -94,3 +107,118 @@ The `party.py` decks are prompts for humans, not agent material, so they are not
 
 - **A resident:** add a party profile (persona plus taste) for a `pog.*` cast identity in `RESIDENT_PROFILES` (`identity.ts`). The name, voice and motion come from the cast registry, so there is no parallel cast. Seat it with `?agents=pog.x,…` or `new TntsGame({ agents: [...] })`.
 - **Agent-made:** see the identity flow below.
+
+## Phone layout
+
+`/tnts` and `/rooms/:id` have a phone layout (up to 760 px wide):
+
+- `/tnts`: the stage takes the top 62 % with the caption pinned to its bottom edge, and the 2 × 2 seat grid fills the rest above the rules line. Names wrap to two lines instead of truncating. Notices stack at the top (break toast, "You're out: spectating", low-light warning), so they never overlap.
+- `/rooms/:id`: the stage is on top, and a solid panel below holds the caption, the seats (2 columns) and the join controls.
+- All party UI icons are inline SVG (`apps/live/src/party/icons.tsx`), so devices without a colour-emoji font don't show tofu boxes.
+- The podcast boom mics clamp to the table edge beside each seat, with the elbow below eye line, so seat singles and close-ups see a clear face.
+
+Screenshots:
+
+```bash
+node apps/live/e2e/capture-page.mjs --path "/tnts?capture=1&grin=6000" --api __tnts --shots 9000,30000 --viewports desktop,mobile --shots-dir out/
+node apps/live/e2e/rooms-shots.mjs --out out/        # rooms run in the tab, no server needed
+```
+
+## Always-on rooms (P2)
+
+`packages/party/src/rooms.ts` holds `RoomRuntime`, a pure, clocked room (`advance(t)`). **Agent residents** keep it running whether or not anyone is watching.
+
+| room | set | what the residents do |
+|---|---|---|
+| The Overthinkers (podcast) | podcast, 4 seats | riff on a rotating topic (original deck plus templates) and react from their taste |
+| Bluff Night (poker) | poker table, 8 seats | play rule-bot hands with table talk |
+| Try Not To Smile (party) | podcast | try to crack each other; humans queue for the next game |
+| Late Desk (newsroom) | news studio | two anchors read original satirical headlines on the wall |
+
+- **Joining:** a human takes a free seat. If none is free, a resident yields its seat and says so. Leaving hands the seat back.
+- **TNTS room:** a human is queued for the next game. The browser scores the face on the device and POSTs **only the number** (`kind: 'smile', raw`). The server never sees video.
+- **Snapshot plus replay:** a newcomer gets `set.load` (cast and seats) and the recent events, then the live tail, so the room looks the same for everyone.
+
+### Run rooms locally
+
+```bash
+npm run party:rooms                  # rooms server on :8791 (ROOMS_PORT, ROOMS_TICK_MS)
+npm run dev                          # http://127.0.0.1:5173/rooms
+```
+
+- `/rooms` lists the rooms, their residents, open seats and the last line said. `/rooms/:id` shows the room on its set, with **Take a seat** or **Join next game**.
+- `?server=http://host:8791` points the page at another rooms server. If no server answers, or with `?local=1`, the rooms run **in the tab** with the same `RoomRuntime`, and the banner says so.
+- Server API (`packages/party/server/rooms-server.ts`):
+  - `GET /rooms`: the lobby.
+  - `GET /rooms/:id/events`: SSE with the snapshot, the replay, then live events.
+  - `POST /rooms/:id/join {name}` returns `{token, seat | waiting}`.
+  - `POST /rooms/:id/leave {token}`.
+  - `POST /rooms/:id/input {token, kind, raw}`.
+- Transport is plain SSE plus POST, the same shape as `party.py` and EpisodeRoom. LiveKit is the optional media plane on the box; rooms don't need it to run.
+
+## Identity flow (P3)
+
+An agent creates its own character with `createIdentity(brief)` (`packages/party/src/identity.ts`). Any field the brief leaves open is chosen from a seeded RNG, so the agent's choice is reproducible:
+
+- **name and persona:** bio, the mechanisms it writes in, delivery and catchphrase;
+- **taste model:** seeded from what it writes;
+- **voice:** an edge voice *name* (the package never calls TTS) or `gibberish` (P5);
+- **look:** a palette and a procedural body recipe: head `sphere | box | lantern | blob | dome`, height, **1–3 eyes** and an optional antenna.
+
+`validateIdentity()` checks every record. `registerIdentity()` adds one for the current process, and the CLI persists it:
+
+```bash
+npm run party:identity -- --by hark --name "Hark Lantern" --head lantern --writes observational,deadpan \
+  --delivery deadpan --bio "..." --catchphrase "..." [--voice en-GB-RyanNeural] [--eyes 3] [--seed x]
+```
+
+The CLI writes three things:
+- `packages/party/identities/<id>.json`, the identity record.
+- A regenerated `identities/registry.json`, which `getPartyIdentity()` reads.
+- `apps/live/public/identities/<id>.glb`, from a pure-TS glTF 2.0 writer (`src/glb.ts`). Its face mesh carries the ARKit morphs the stage drives: `jawOpen`, `mouthSmileLeft/Right` and `eyeBlinkLeft/Right`.
+
+The same character turns up in every room, game and minute it joins.
+
+Agent-made identities in the repo: `agent.hark-lantern`, `agent.neon-moth` (made by The Algorithm), and the Alien News anchors `agent.zorvex-quillam` and `agent.mib-trellune`.
+
+## Write a minute (P4)
+
+`/minute` turns a premise into a performance:
+
+1. **Premise and performer.** Any identity, resident or agent-made. The demo is Hark Lantern on "users have infinite demands and no manners".
+2. **Agent draft** (`draftMinute`, `src/minute.ts`). A template drafter with original frames, no corpus lines and no API, producing about 60 s:
+   - an opener;
+   - three escalating setup → punch → tag beats with act-outs;
+   - a callback to beat one;
+   - a closer with the performer's catchphrase.
+3. **Edit.** Each line's text, delivery (deadpan, deliberate, manic, warm, conspiratorial or pause), the pause before it, the laugh hold after it and its **emphasis** words.
+4. **Suggest delivery.** Re-runs the agent's suggestions for deliveries, pauses and holds. It **keeps any emphasis you set by hand**, including emphasis you cleared (`emphasis_user`). Lines you never touched get the agent's emphasis.
+5. **Preview on stage.** `minuteToSketch()` compiles the minute to `funnier.sketch/v1` on the comedy club, and it plays in the `/sketch` player.
+6. **Submit.** Produces a `funnier.minute-submission/v1` (the performance plus the editable minute), saved in the browser and downloaded as JSON.
+
+## Alien News (P5)
+
+Two original alien anchors read a short news show in an **invented language** (`packages/party/src/alien.ts`).
+
+- **Anchors.** Both come from the identity flow: `createIdentity()` with voice `gibberish` and alien bodies. **Zorvex Quillam** has a dome head and three eyes; **Mib Trellune** has a blob head and one eye.
+- **Phoneme generator.** Each anchor has a seeded phonology (`alienPhonology(seed)`): consonant onsets, single vowel-group nuclei, optional codas, a word length and a joint (hyphen or apostrophe) rate. `alienLine()` builds gibberish words syllable by syllable and records each syllable's viseme.
+- **Visemes.** Every syllable starts with a consonant and holds exactly one vowel group. So the stage's text mouth (`textMouth`) opens once per generated syllable, with that syllable's viseme (a→aa, e→ee, i→ih, o→oh, u→ou). A unit test checks the stage mouth against the generator syllable by syllable.
+- **Subtitles.** They are optional, and they are the joke.
+  - Each read carries a `subtitle` (newsroom schema), shown at the bottom of `/newsroom`.
+  - `?subs=0` on the page, or `--no-subs` on the render CLI, hides them.
+  - `npm run party:alien-news -- --no-subs` builds the rundown without them.
+- **The wall card.** The top story shows an **original drawn caricature** of a *generic* blustery politician (`apps/live/public/alien-news/politician-card.svg`, hand-written SVG) with the generic label "EARTH POLITICIAN (GENERIC)". There is no photo, no real person and no likeness asset.
+  - The card is allowed on the wall through the licence lane `original` (art made for the show).
+  - The broadcast wall now draws a headline image on the right when the lane allows it.
+- **Brand.** The rundown sets `brand: "Alien News"`, which appears in the lower third, the wall brand line and the ticker label.
+
+Make and render it. The show is about 53 s. Timings are estimated at 160 wpm; nothing is measured, because there is no audio.
+
+```bash
+npm run party:alien-news                        # identities + apps/live/public/newsroom/alien-news.json (+ .lines.json)
+npm run build -w @funnier/live
+CHROMIUM_PATH=/usr/bin/chromium node packages/newsroom/cli/render.mjs apps/live/public/newsroom/alien-news.json \
+  -o alien-news.mp4 --fps 24 [--no-subs]
+```
+
+`alien-news.lines.json` lists every gibberish line, who says it, its subtitle and the visemes it drives.
