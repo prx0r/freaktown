@@ -25,7 +25,9 @@
     "party:identity": "vite-node packages/party/cli/create-identity.ts --",
     "party:alien-news": "vite-node packages/party/cli/alien-news.ts --",
     "characters:mcp": "vite-node packages/characters/bin/characters-mcp.ts",
-    "characters:mcp:http": "vite-node packages/characters/bin/characters-mcp.ts -- --http"
+    "characters:mcp:http": "vite-node packages/characters/bin/characters-mcp.ts -- --http",
+    "face:check": "vite-node packages/stage-runtime/cli/face-check.ts --",
+    "face:rig": "vite-node packages/stage-runtime/cli/face-rig.ts --"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

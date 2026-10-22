@@ -23,6 +23,8 @@ export interface AvatarSpec {
   lite?: boolean;
   /** Deform skinned/morphed meshes on the CPU (no vertex texture fetch). */
   cpuSkinning?: boolean;
+  /** GLB without face channels: 'auto' (default) generates jaw/blink morphs, 'off' drives only what the bytes carry. */
+  faceRig?: 'auto' | 'off';
 }
 
 /** MToon → MeshStandardMaterial (same textures), outline passes hidden. */
@@ -86,7 +88,7 @@ export async function loadAvatar(spec: AvatarSpec): Promise<LoadedAvatar> {
       if (spec.lite) liteMaterials(vrm.scene);
       driver = new VrmAvatar(vrm, spec.name ?? ((vrm.meta as { name?: string; title?: string } | undefined)?.name ?? (vrm.meta as { title?: string } | undefined)?.title ?? 'VRM'));
     } else {
-      driver = new GlbAvatar(gltf.scene, gltf.animations ?? [], spec.name ?? 'GLB');
+      driver = new GlbAvatar(gltf.scene, gltf.animations ?? [], spec.name ?? 'GLB', { faceRig: spec.faceRig });
     }
     normalizeHeight(driver.root, spec.height ?? 1.7);
     if (spec.cpuSkinning) {

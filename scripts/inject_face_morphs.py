@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """inject_face_morphs.py — add jawOpen + blink morph targets to a rigged GLB.
 
+SUPERSEDED by `npm run face:rig -- in.glb out.glb` (packages/stage-runtime/cli/face-rig.ts,
+same generator the stage runs at load). This version translates the whole lower
+face down (the lip line slides instead of parting) and names the blink `blink`.
+Kept for reference; see docs/MESH-FACE-HOOKUP.md.
+
 The stage's GlbAvatar is ONE facial engine for every body: it sniffs
 morphTargetDictionary for names it knows (jawOpen/visemes/blink/emotions)
 and drives them from the audio envelope and face channel. Meshy (and most
