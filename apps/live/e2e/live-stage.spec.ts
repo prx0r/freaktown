@@ -50,7 +50,7 @@ async function openPair(context: BrowserContext, ep: string, stageQuery: string,
 }
 
 async function startSet(control: Page, stage: Page, setId: string) {
-  await expect(control.locator('[data-testid=set-select] option')).toHaveCount(2);
+  await expect(control.locator('[data-testid=set-select] option')).toHaveCount(3);
   await control.getByTestId('set-select').selectOption(setId);
   await control.getByTestId('start').click();
   await stage.bringToFront(); // hidden tabs throttle rAF
