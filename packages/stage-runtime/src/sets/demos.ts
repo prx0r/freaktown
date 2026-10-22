@@ -2,7 +2,7 @@
  * Demo episodes per set — plain command timelines (control sends them through
  * the transport like any operator action, so the room log replays them).
  */
-import type { CastMemberV1 } from '@freaktown/contracts';
+import type { CastMemberV1 } from '@funnier/contracts';
 import type { DealerSeat } from './poker/PokerDealer';
 
 export interface TimedCommand { at_ms: number; type: string; payload: Record<string, unknown> }
@@ -15,12 +15,12 @@ export const NEWS_CAST: CastMemberV1[] = [
 export const NEWS_HEADLINES = [
   { kicker: 'breaking', text: 'Local robot wins pie contest, refuses to eat pie', a: 'Breaking tonight: a local robot has won the county pie contest. It then refused to eat the pie, citing firmware.', b: 'I can confirm the pie was excellent. Structurally.' },
   { kicker: 'weather', text: 'Forecast: 90% chance of puns by Friday', a: 'Weather now. Forecasters say there is a ninety percent chance of puns by Friday.', b: 'I would bring an umbrella. The puns will be dry.' },
-  { kicker: 'sport', text: 'Freak Town poker night ends in a five-way tie', a: 'And in sport, the Freak Town poker night ended in a five way tie, which the rules say is impossible.', b: 'The rules have been informed. They are taking it badly.' },
+  { kicker: 'sport', text: 'FUNNIER poker night ends in a five-way tie', a: 'And in sport, the FUNNIER poker night ended in a five way tie, which the rules say is impossible.', b: 'The rules have been informed. They are taking it badly.' },
 ];
 
 export function newsDemo(): TimedCommand[] {
   const out: TimedCommand[] = [
-    { at_ms: 0, type: 'set.load', payload: { setId: 'news-studio', title: 'Freak Town News', cast: NEWS_CAST } },
+    { at_ms: 0, type: 'set.load', payload: { setId: 'news-studio', title: 'FUNNIER News', cast: NEWS_CAST } },
     { at_ms: 600, type: 'overlay.ticker', payload: { items: NEWS_HEADLINES.map((h) => `${h.kicker.toUpperCase()}: ${h.text}`).concat(['Markets: chips up 4%', 'Traffic: the mic stand is blocking lane two']) } },
     { at_ms: 900, type: 'set.auto_director', payload: { on: false } },
     { at_ms: 1000, type: 'set.camera', payload: { cue: 'wide' } },
@@ -99,7 +99,7 @@ export function pokerSeats(humanName = 'You'): DealerSeat[] {
 
 export function pokerDemoIntro(): TimedCommand[] {
   return [
-    { at_ms: 0, type: 'set.load', payload: { setId: 'poker-table', title: 'Freak Town Poker', cast: POKER_CAST } },
+    { at_ms: 0, type: 'set.load', payload: { setId: 'poker-table', title: 'FUNNIER Poker', cast: POKER_CAST } },
     { at_ms: 400, type: 'set.camera', payload: { cue: 'orbit' } },
   ];
 }

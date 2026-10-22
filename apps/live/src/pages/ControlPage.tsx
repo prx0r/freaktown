@@ -11,8 +11,8 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { EventConsumer, LocalTransport } from '@freaktown/stage-runtime';
-import type { ShowEvent } from '@freaktown/contracts';
+import { EventConsumer, LocalTransport } from '@funnier/stage-runtime';
+import type { ShowEvent } from '@funnier/contracts';
 import { ControlClient } from '../control/controlClient';
 import { SetsPanel } from '../control/SetsPanel';
 import { adminKey, createTransport, loadSetCatalog, setAdminKey, transportMode, type SetEntry } from '../live/transport';
@@ -166,7 +166,7 @@ export function ControlPage() {
     <div style={page} data-testid="control">
       <header style={header}>
         <div>
-          <div style={{ fontSize: 12, letterSpacing: 3, color: '#ff7ac8' }}>FREAK TOWN · CONTROL</div>
+          <div style={{ fontSize: 12, letterSpacing: 3, color: '#ff7ac8' }}>FUNNIER · CONTROL</div>
           <h1 style={{ margin: '2px 0 0', fontSize: 22 }}>Episode <code>{episodeId}</code></h1>
         </div>
         <div style={{ textAlign: 'right', fontSize: 13 }}>

@@ -1,4 +1,4 @@
-# @freaktown/newsroom
+# @funnier/newsroom
 
 Newsroom SDK. It turns a Sofie-style rundown (show → segment → story → piece) into a
 directed news-studio show:

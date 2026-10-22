@@ -5,7 +5,7 @@ beats are the authoring unit. The stage consumes absolute-ms MotionCues
 (plus camera cuts and sfx). This module is the bridge Gap 1 needed.
 
 Timing source, in order:
-  1. Measured offsets (freaktown offsets.json → spans_from_offsets).
+  1. Measured offsets (funnier offsets.json → spans_from_offsets).
   2. Estimation (estimate_spans) — flagged "estimated": True so the
      stage knows karaoke/cues may drift slightly.
 
@@ -34,7 +34,7 @@ EXPRESSION_ACTION = {
     "normal": "face_neutral",
 }
 
-# freaktown camera vocab → killella CameraPreset
+# funnier camera vocab → killella CameraPreset
 CAMERA_MAP = {
     "wide": "WIDE_STAGE",
     "medium": "COMIC_MEDIUM",

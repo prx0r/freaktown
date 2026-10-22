@@ -23,10 +23,11 @@ export const COMEDY_CLUB: SetDefinition = {
   description: 'Brick wall, neon sign, mic stand, seated crowd — the original live stage.',
   environment: { builder: 'comedy-club' },
   seats: [seat('stage', 0, 0, 0, 'performer', 'standing')],
+  marks: [seat('stage-left', -1.25, -0.35, 0.25, 'mark', 'standing'), seat('stage-right', 1.3, -0.2, -0.25, 'mark', 'standing')],
   cameras: {
-    wide: { position: [0, 2.4, 7.8], target: [0, 1.3, 0], fov: 46, label: 'Wide' },
-    medium: { position: [0, 1.48, 2.35], target: [0, 1.33, 0], fov: 30, label: 'Mid' },
-    close: { position: [0.08, 1.58, 1.6], target: [0, 1.52, 0], fov: 26, label: 'Close-up' },
+    wide: { position: [0, 1.85, 8.2], target: [0, 1.2, 0], fov: 44, label: 'Wide' },
+    medium: { position: [0.42, 1.5, 2.4], target: [0, 1.33, 0], fov: 30, label: 'Mid' },
+    close: { position: [0.38, 1.6, 1.62], target: [0, 1.5, 0], fov: 26, label: 'Close-up' },
     side: { position: [-2.6, 1.6, 2.4], target: [0, 1.35, 0], fov: 34, label: 'Side' },
   },
   defaultCamera: 'wide',
@@ -60,6 +61,7 @@ export const NEWS_STUDIO: SetDefinition = {
     seat('anchor1', 0.75, -0.55, 0, 'anchor'),
     seat('anchor2', -0.75, -0.55, 0, 'co-anchor'),
   ],
+  marks: [seat('wall-mark', -1.95, -1.45, 0.45, 'mark', 'standing'), seat('floor-mark', 1.9, 0.5, -0.5, 'mark', 'standing')],
   cameras: {
     wide: { position: [0, 2.1, 6.6], target: [0, 1.35, -0.9], fov: 42, label: 'Wide' },
     'anchor1-single': { seat: 'anchor1', position: [-0.15, 0.12, 2.3], target: [0, -0.1, 0], fov: 30, label: 'Anchor 1' },
@@ -105,6 +107,7 @@ export const PODCAST: SetDefinition = {
     podSeat('seat3', -100, 'cohost'),
     podSeat('seat4', 100, 'guest2'),
   ],
+  marks: [seat('door', 2.4, 0.9, -1.1, 'mark', 'standing')],
   cameras: {
     wide: { position: [0, 2.0, 4.4], target: [0, 1.0, -0.4], fov: 44, label: 'Wide' },
     'two-shot': { position: [0, 1.5, 2.6], target: [0, 1.15, -0.95], fov: 40, label: 'Two-shot' },
@@ -138,6 +141,7 @@ export const POKER_TABLE: SetDefinition = {
   description: 'Oval felt table, 8 seats (any can be a bot or a human from /play), cards, chips, dealer button.',
   environment: { builder: 'poker-table' },
   seats: pokerSeats,
+  marks: [seat('rail', 0.9, 2.55, Math.PI, 'mark', 'standing')],
   cameras: {
     wide: { position: [0, 3.0, 5.4], target: [0, 0.85, 0], fov: 44, label: 'Wide' },
     overhead: { position: [0, 5.6, 0.35], target: [0, 0.78, 0], fov: 46, label: 'Overhead' },

@@ -10,7 +10,7 @@ import math
 import time
 from dataclasses import dataclass, field
 
-logger = logging.getLogger("freak_town.callbacks")
+logger = logging.getLogger("funnier.callbacks")
 
 
 @dataclass

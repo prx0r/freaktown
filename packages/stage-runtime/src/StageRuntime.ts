@@ -1,5 +1,5 @@
 /**
- * StageRuntime — the single renderer for Freak Town.
+ * StageRuntime — the single renderer for FUNNIER.
  *
  * One Three.js scene. One AudioContext. One Transport (the show clock).
  * Data/events in, performance out. No React, no app imports: the host
@@ -16,7 +16,7 @@
  */
 
 import * as THREE from 'three';
-import type { CameraCue, MotionCue, PerformancePlan, WordTiming } from '@freaktown/contracts';
+import type { CameraCue, MotionCue, PerformancePlan, WordTiming } from '@funnier/contracts';
 import { Transport } from './Transport';
 import { AudioBus } from './AudioBus';
 import { CameraDirector, type CameraPresetName } from './CameraDirector';
@@ -123,6 +123,8 @@ export class StageRuntime {
 
   private avatar: AvatarDriver | null = null;
   private avatarFallback: string | null = null;
+  private mouthAnchor: THREE.Object3D | null = null;
+  private restMouth = new THREE.Vector3(0, 1.5, 0.1);
   private performer = new Performer();
   private face = new FaceChannel();
   private mouthTrack: MouthTrack | null = null;
@@ -178,7 +180,7 @@ export class StageRuntime {
     this.renderer.domElement.style.display = 'block';
     config.container.appendChild(this.renderer.domElement);
 
-    this.set = new StageSet(this.scene, { shadows: config.shadows ?? !low, sign: config.sign });
+    this.set = new StageSet(this.scene, { shadows: config.shadows ?? !low, sign: config.sign, lite: low });
     this.gaze.position.set(0, 1.5, 6);
     this.scene.add(this.gaze);
 
@@ -250,6 +252,27 @@ export class StageRuntime {
     if (loaded.fallbackReason) console.warn('[stage]', loaded.fallbackReason);
     this.avatar.setGazeTarget(this.gaze);
     this.scene.add(this.avatar.root);
+    this.fitMicToAvatar();
+  }
+
+  /** Stand-up: the mic goes in front of this body's mouth; the performer works it. */
+  private fitMicToAvatar(): void {
+    const anchor = this.avatar?.mouthAnchor?.() ?? null;
+    this.mouthAnchor = anchor;
+    this.performer.micMode = true;
+    if (!anchor) return;
+    this.avatar!.root.updateMatrixWorld(true);
+    const mouth = anchor.getWorldPosition(new THREE.Vector3());
+    this.restMouth.copy(mouth);
+    this.set.fitMic(mouth);
+  }
+
+  /** Mic ↔ mouth geometry in metres (e2e + framing checks). */
+  micReport(): { mouth: number[]; mic: number[]; distance: number; restMouth: number[]; avatar: string | null } {
+    const mic = this.set.mic.grilleWorld();
+    const mouth = this.mouthAnchor ? this.mouthAnchor.getWorldPosition(new THREE.Vector3()) : this.restMouth.clone();
+    const r = (v: THREE.Vector3) => [v.x, v.y, v.z].map((x) => Math.round(x * 1000) / 1000);
+    return { mouth: r(mouth), mic: r(mic), distance: Math.round(mic.distanceTo(mouth) * 1000) / 1000, restMouth: r(this.restMouth), avatar: this.avatar?.caps.kind ?? null };
   }
 
   async loadAudio(url: string): Promise<void> { await this.transport.loadAudio(url); }
@@ -459,7 +482,7 @@ export class StageRuntime {
     // AU prosody (aus.json): brows/eyes lift under beats; phrase blinks
     // OR with the Performer's own blink timer (speech-synced wins ties).
     const pro = playing && this.prosodyTrack ? this.prosodyTrack.sample(t) : null;
-    if (frame.blink > 0.5 && this.blink <= 0.5) this.blinks++;
+    this.blinks = this.performer.blinkCount; // frame-rate independent (sketch PR)
     // Composed face pipeline: live FaceChannel (sampled frame) + AU prosody
     // brow/eye lift from aus.json — setExpression takes prosody as its 2nd
     // arg (avatar contract), applied after Channel so the lift wins ties.

@@ -10,7 +10,7 @@ import { test, expect, type Page, type ConsoleMessage, type BrowserContext } fro
 import fs from 'node:fs';
 import path from 'node:path';
 
-const SHOTS = path.join(process.env.SHOTS_DIR || '/workspace/work/freaktown-live/shots', 'sets');
+const SHOTS = path.join(process.env.SHOTS_DIR || '/workspace/work/funnier-live/shots', 'sets');
 fs.mkdirSync(SHOTS, { recursive: true });
 const Q = 'quality=low&cpuskin=1';
 

@@ -8,6 +8,7 @@
  */
 
 import * as THREE from 'three';
+import { attachMouthAnchor } from './mouthAnchor';
 import type { AvatarCapabilities, AvatarDriver, Emotions, PoseState, Visemes, VisemeKey } from './types';
 
 type MorphRef = { mesh: THREE.Mesh; index: number };
@@ -171,6 +172,12 @@ export class GlbAvatar implements AvatarDriver {
   }
 
   setGazeTarget(): void { /* head aim comes through setPose().headYaw */ }
+
+  private mouth: THREE.Object3D | null = null;
+  mouthAnchor(): THREE.Object3D | null {
+    if (!this.mouth) this.mouth = attachMouthAnchor(this.root, this.head);
+    return this.mouth;
+  }
 
   setPose(p: PoseState): void {
     this.body.position.y = this.bodyRestY + p.bob + p.breath * 0.004;

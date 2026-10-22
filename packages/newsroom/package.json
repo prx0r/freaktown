@@ -1,5 +1,5 @@
 {
-  "name": "@freaktown/newsroom",
+  "name": "@funnier/newsroom",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,6 +9,6 @@
   "exports": { ".": "./src/index.ts" },
   "bin": { "newsroom-render": "cli/render.mjs" },
   "dependencies": {
-    "@freaktown/contracts": "*"
+    "@funnier/contracts": "*"
   }
 }

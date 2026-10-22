@@ -21,7 +21,7 @@
 import { compileHarnessBeats } from '../face/harnessBeats';
 import type {
   CameraCue, CameraPresetV1, MotionCue, MouthSpan, PerformancePlan, PlanBeat, WordTiming,
-} from '@freaktown/contracts';
+} from '@funnier/contracts';
 // One PhoneticViseme source of truth (MouthTrack); redefining it here made
 // the package index export the same name twice (TS2308).
 import type { PhoneticViseme } from '../performance/MouthTrack';

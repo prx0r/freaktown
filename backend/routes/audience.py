@@ -39,7 +39,7 @@ from backend.models import (
 )
 from backend.routes.stage import broadcast_stage, stage_connections
 
-logger = logging.getLogger("freak_town.legacy")
+logger = logging.getLogger("funnier.legacy")
 
 router = APIRouter()
 

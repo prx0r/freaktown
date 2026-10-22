@@ -76,6 +76,12 @@ export interface SetDefinition {
   description: string;
   environment: EnvironmentDef;
   seats: SeatAnchor[];
+  /**
+   * Extra standing positions characters can walk to (stage.move / sketch move-to).
+   * Not cast seats: nothing sits there until something moves there. Camera cues
+   * ("close:<mark>") and gaze targets resolve marks like seats.
+   */
+  marks?: SeatAnchor[];
   cameras: Record<string, CameraPresetDef>;
   /** Cue used on load and when nobody is talking. */
   defaultCamera: string;

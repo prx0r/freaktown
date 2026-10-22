@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Freak Town Party Mode — a party-game OS extension, not a separate game.
+"""FUNNIER Party Mode — a party-game OS extension, not a separate game.
 
 Topology (Jackbox/Netflix-converged, no new backend):
   BIG SCREEN (/party/<code>/stage) + PHONES (/party/<code>/play) + ONE SERVER.
@@ -2744,9 +2744,9 @@ def play_home():
         for mode, m in MODES.items())
     return ("<!DOCTYPE html><html><head><meta charset=utf-8>"
             "<meta name=viewport content='width=device-width,initial-scale=1'>"
-            "<title>Freak Town Party</title></head><body style='background:#0a0a0f;"
+            "<title>FUNNIER Party</title></head><body style='background:#0a0a0f;"
             "color:#eee;font-family:monospace;text-align:center;padding:32px 16px'>"
-            "<div style='color:#ff2fa8;letter-spacing:2px'>FREAK TOWN PARTY</div>"
+            "<div style='color:#ff2fa8;letter-spacing:2px'>FUNNIER PARTY</div>"
             "<h1>GAME MODES</h1>"
             "<p style='color:#888'>Create a room, share the code, phones join. "
             "Add bots to play solo vs agents.</p>"
@@ -3095,9 +3095,9 @@ def play(code):
 
 JOIN_TEMPLATE = """<!DOCTYPE html><html><head><meta charset=utf-8>
 <meta name=viewport content='width=device-width,initial-scale=1'>
-<title>Join __CODE__ — Freak Town Party</title></head>
+<title>Join __CODE__ — FUNNIER Party</title></head>
 <body style='background:#0a0a0f;color:#eee;font-family:monospace;text-align:center;padding:32px 16px'>
-<div style='color:#ff2fa8;letter-spacing:2px;font-size:12px'>FREAK TOWN PARTY</div>
+<div style='color:#ff2fa8;letter-spacing:2px;font-size:12px'>FUNNIER PARTY</div>
 <h1>Room __CODE__</h1>
 <p style='color:#888'>No account. Pick a name, pick your freak.</p>
 <input id=n placeholder='your name' maxlength=24 style='padding:10px;font-size:16px;width:220px'><br><br>
@@ -3121,14 +3121,14 @@ async function join(){
 
 STAGE_TEMPLATE = """<!DOCTYPE html><html><head><meta charset=utf-8>
 <meta name=viewport content='width=device-width,initial-scale=1'>
-<title>__CODE__ — Freak Town Party Stage</title>
+<title>__CODE__ — FUNNIER Party Stage</title>
 <style>body{background:#0a0a0f;color:#eee;font-family:monospace;text-align:center;margin:0}
 .top{padding:8px;font-size:12px;letter-spacing:3px;color:#ff2fa8}
 #code{font-size:44px;letter-spacing:8px;margin:4px}
 #cv{background:#111;border:1px solid #333;border-radius:12px;touch-action:none}
 #cap{font-size:20px;min-height:30px;margin:8px}
 #scores{color:#888;font-size:13px}</style></head><body>
-<div class=top>FREAK TOWN PARTY</div>
+<div class=top>FUNNIER PARTY</div>
 <div id=code>__CODE__</div>
 <div style='color:#555;font-size:12px'>SCAN TO JOIN · freak.town/join/__CODE__</div>
 <img src='/party/__CODE__/qr.png' style='width:120px;margin:6px' alt='join qr'>
@@ -3279,14 +3279,14 @@ poll();
 
 CONTROLLER_TEMPLATE = """<!DOCTYPE html><html><head><meta charset=utf-8>
 <meta name=viewport content='width=device-width,initial-scale=1,viewport-fit=cover'>
-<title>Controller — Freak Town Party</title>
+<title>Controller — FUNNIER Party</title>
 <style>body{background:#0a0a0f;color:#eee;font-family:monospace;text-align:center;margin:0;padding:16px}
 button{background:#1a1a2e;border:1px solid #333;color:#eee;padding:14px 22px;border-radius:24px;font-size:16px;margin:4px}
 button.big{background:#ff2fa8;border-color:#ff2fa8;color:#fff;width:100%}
 textarea{width:100%;background:#111;border:1px solid #333;color:#eee;border-radius:10px;padding:10px;font-size:16px;min-height:80px}
 #draw{background:#111;border:1px solid #333;border-radius:12px;touch-action:none;width:100%}
 .opt{display:block;width:100%;text-align:left;margin:6px 0}</style></head><body>
-<div style='color:#ff2fa8;font-size:11px;letter-spacing:2px'>FREAK TOWN PARTY · __CODE__</div>
+<div style='color:#ff2fa8;font-size:11px;letter-spacing:2px'>FUNNIER PARTY · __CODE__</div>
 <h2 id=t></h2><div id=sub style='color:#888'></div>
 <div id=body style='max-width:520px;margin:0 auto'></div>
 <div style='margin:12px auto;max-width:520px'>
@@ -3355,7 +3355,7 @@ function titleFor(v){
   if(v.screen==='scores') return 'SCORES';
   if(v.screen==='reveal') return 'REVEAL';
   if(v.screen==='audience') return 'AUDIENCE';
-  return v.mode ? v.mode.toUpperCase() : 'FREAK TOWN';
+  return v.mode ? v.mode.toUpperCase() : 'FUNNIER';
 }
 async function submit(c){
   const areas = Array.from(document.querySelectorAll('textarea'));

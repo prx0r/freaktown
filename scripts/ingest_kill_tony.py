@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Ingest Kill Tony Archive data into Freak Town training format.
+"""Ingest Kill Tony Archive data into FUNNIER training format.
 
 Reads the reprocessed JSON files from kill-tony-archive and produces:
 1. A structured comedy dataset (JSONL)
@@ -47,7 +47,7 @@ def load_all_episodes():
 
 
 def ingest_sets(episodes):
-    """Convert Kill Tony sets into Freak Town training format."""
+    """Convert Kill Tony sets into FUNNIER training format."""
     training_data = []
 
     for ep in episodes:
@@ -56,7 +56,7 @@ def ingest_sets(episodes):
         guests = ep_info.get("guests", [])
 
         for s in ep.get("sets", []):
-            # Map to Freak Town format
+            # Map to FUNNIER format
             record = {
                 "source": "kill_tony_archive",
                 "episode": ep_num,

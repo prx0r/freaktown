@@ -6,7 +6,7 @@ from typing import Optional
 
 from backend.services.tts.base import TTSAdapter, TTSResult, ProviderInfo
 
-logger = logging.getLogger("freak_town.tts.registry")
+logger = logging.getLogger("funnier.tts.registry")
 
 
 # ── Generic comedy tag → provider-specific tag mapping ───────────────

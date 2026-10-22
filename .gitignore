@@ -33,3 +33,12 @@ dist/
 .dev.vars
 apps/live/test-results/
 apps/live/playwright-report/
+
+# snldb raw data (hhllcks/snldb has no LICENSE): never commit raw files or transcripts.
+# Only the aggregate packages/sketch/data/structure-stats.json is committed.
+data/snldb/
+snldb/
+**/snldb/
+!packages/sketch/data/
+packages/sketch/data/*
+!packages/sketch/data/structure-stats.json

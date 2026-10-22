@@ -12,7 +12,7 @@
  *   set_time_ms for the ML event log (delegated to the transport).
  */
 
-import type { ShowEvent, ShowPhase } from '@freaktown/contracts';
+import type { ShowEvent, ShowPhase } from '@funnier/contracts';
 import type { RoomStore } from './ports';
 import type { LiveConnectOptions, LiveSnapshot, LiveTransport } from './live/LiveTransport';
 import { EpisodeRoomTransport } from './live/EpisodeRoomTransport';

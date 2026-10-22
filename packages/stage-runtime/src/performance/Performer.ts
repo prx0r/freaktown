@@ -93,7 +93,16 @@ export class Performer {
   private rand = rng(7);
   private nextBlink = 1800;
   private blinkStart = -1;
+  /** Blinks started so far (frame-rate independent; a 150 ms blink can fall between slow frames). */
+  blinkCount = 0;
   energy = 0.7;
+  /**
+   * Stand-up at a mic: head motion stays small and addressed to the mic/audience while
+   * talking (bigger looks only in silence), a slight lean onto the mic while speaking,
+   * and a small step back off-mic during longer pauses.
+   */
+  micMode = false;
+  private silentMs = 0;
 
   reset(): void {
     this.active = [];
@@ -174,6 +183,8 @@ export class Performer {
           p.armR.raise += 1.25 * k * w; p.armR.bend += 0.6 * w; p.armR.out += 0.4 * w;
           p.armR.wave = Math.sin(t * 0.012) * 0.55 * k * w;
           break;
+        case 'gesture.nod': p.headPitch += 0.11 * k * Math.sin(u * Math.PI * 4) * w; break;
+        case 'gesture.lean': p.spinePitch += 0.12 * k * env(u, 0.15, 0.3); break;
         case 'pose.lean_forward': p.spinePitch += 0.16 * k * env(u, 0.12, 0.25); break;
         case 'pose.lean_back': p.spinePitch -= 0.1 * k * env(u, 0.12, 0.25); break;
         case 'pose.confident': p.spinePitch -= 0.04 * k * w; p.headPitch -= 0.06 * k * w; break;
@@ -197,9 +208,21 @@ export class Performer {
     p.headYaw += this.gazeYaw * 0.7;
     p.headPitch += this.gazePitch * 0.7;
 
+    if (this.micMode) {
+      const talking = Math.min(1, this.talk * 2.5);
+      this.silentMs = mouthOpen > 0.06 ? 0 : this.silentMs + dt * 1000;
+      const yawLim = 0.12 + 0.3 * (1 - talking);
+      p.headYaw = Math.max(-yawLim, Math.min(yawLim, p.headYaw));
+      p.headPitch = Math.max(-0.12, Math.min(0.12 + 0.2 * (1 - talking), p.headPitch));
+      p.swayX *= 0.6;
+      p.spinePitch += 0.035 * talking;                       // into the mic while speaking
+      const off = Math.min(1, Math.max(0, (this.silentMs - 1200) / 600));
+      p.spinePitch -= 0.05 * off * live;                     // eases back off-mic on long pauses
+    }
+
     // blink (own channel, wall clock)
     let blink = 0;
-    if (this.blinkStart < 0 && wallMs >= this.nextBlink) this.blinkStart = wallMs;
+    if (this.blinkStart < 0 && wallMs >= this.nextBlink) { this.blinkStart = wallMs; this.blinkCount++; }
     if (this.blinkStart >= 0) {
       const u = (wallMs - this.blinkStart) / 150;
       if (u >= 1) {

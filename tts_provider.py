@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """TTS Provider — Unified interface for text-to-speech.
 
-Freak Town owns timing. TTS just speaks the chunks.
+FUNNIER owns timing. TTS just speaks the chunks.
 Provider-independent: edge-tts now, Qwen3-TTS later.
 
 The compositor handles:
@@ -275,7 +275,7 @@ class AudioChunk:
 class AudioCompositor:
     """Compose audio from speech chunks with exact timing.
     
-    This is where Freak Town owns timing:
+    This is where FUNNIER owns timing:
     - TTS generates speech chunks
     - Compositor inserts EXACT silence between them
     - Sound effects get mixed in at precise timestamps

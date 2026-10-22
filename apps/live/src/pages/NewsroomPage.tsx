@@ -1,5 +1,5 @@
 /**
- * NewsroomPage — program feed for a compiled newsroom show (@freaktown/newsroom).
+ * NewsroomPage — program feed for a compiled newsroom show (@funnier/newsroom).
  *
  *   /newsroom/:showId?rundown=<url>      fetch a rundown.json, compile in-page, play in realtime
  *   /newsroom/:showId?timeline=<url>     fetch an already-compiled timeline
@@ -15,9 +15,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { SetEventExecutor, SetStage, type EventConsumer, type SetStageTelemetry } from '@freaktown/stage-runtime';
-import { compile, paintWallCard, type CompiledShow, type RundownV1, type TimingsInput } from '@freaktown/newsroom';
-import type { SetThemePayloadV1, ShowEvent } from '@freaktown/contracts';
+import { SetEventExecutor, SetStage, type EventConsumer, type SetStageTelemetry } from '@funnier/stage-runtime';
+import { compile, paintWallCard, type CompiledShow, type RundownV1, type TimingsInput } from '@funnier/newsroom';
+import type { SetThemePayloadV1, ShowEvent } from '@funnier/contracts';
 import { resolveAsset } from '../live/transport';
 
 type LoadInput = CompiledShow | { rundown: RundownV1; timings?: TimingsInput };

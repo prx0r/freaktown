@@ -17,7 +17,7 @@ import httpx
 from backend.services.tts.base import TTSAdapter, TTSResult, ProviderInfo
 from backend.models.draft import WordTiming
 
-logger = logging.getLogger("freak_town.tts.elevenlabs")
+logger = logging.getLogger("funnier.tts.elevenlabs")
 
 COMEDY_TAGS = ["[laughs]", "[sighs]", "[whispers]", "[stammers]", "[drawn out]", "[rushed]"]
 

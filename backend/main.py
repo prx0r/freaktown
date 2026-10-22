@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.config import settings
 
-logger = logging.getLogger("freak_town")
+logger = logging.getLogger("funnier")
 
 # NOTE (migration): this FastAPI app is API-only infrastructure. It must NOT
 # serve product HTML — no SPA root, no Green Room, no creator UI. Product
@@ -37,7 +37,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Freak Town",
+    title="FUNNIER",
     description="A live talent show for artificial personalities",
     version="0.1.0",
     docs_url="/docs",
@@ -72,7 +72,7 @@ app.include_router(intake.router, prefix="/v1", tags=["intake"])
 @app.get("/api")
 async def api_info():
     return {
-        "name": "Freak Town infrastructure API",
+        "name": "FUNNIER infrastructure API",
         "description": "Execution backend: intake, episodes, shows, judges, media metadata",
         "version": "0.1.0",
         "docs": "/docs",
@@ -94,8 +94,8 @@ async def health():
 
 @app.get("/")
 async def root():
-    """API index. Product HTML is Freak Town-owned and served elsewhere."""
-    return {"name": "Freak Town infrastructure API", "docs": "/docs",
+    """API index. Product HTML is FUNNIER-owned and served elsewhere."""
+    return {"name": "FUNNIER infrastructure API", "docs": "/docs",
             "health": "/health", "intake": "/v1/intake/bundle"}
     index = SERVE_DIR / "index.html"
     if index.exists():

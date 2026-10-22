@@ -1,5 +1,5 @@
 /**
- * @freaktown/newsroom — the newsroom SDK.
+ * @funnier/newsroom — the newsroom SDK.
  *   schema    Sofie-style rundown (show → segment → story → piece) + validator
  *   styles    show styles (goodnight, default-news) + cadence profiles
  *   timing    measured words (words.json) or 105-wpm estimates → program clock

@@ -19,7 +19,7 @@ import httpx
 from backend.services.tts.base import TTSAdapter, TTSResult, ProviderInfo
 from backend.models.draft import WordTiming
 
-logger = logging.getLogger("freak_town.tts.minimax")
+logger = logging.getLogger("funnier.tts.minimax")
 
 MINIMAX_VOICES = {
     "Calm_Woman": {"name": "Calm Woman", "gender": "female", "style": "calm"},

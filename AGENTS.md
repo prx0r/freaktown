@@ -1,8 +1,8 @@
-# AGENTS.md — freaktown
+# AGENTS.md — funnier
 
 New agent: read in order: `docs/STATUS.md` (honest vision/done/not-done/theatre/next — start here), then `HANDOVER-2026-10-17.md` (latest: stage day), then `docs/BOUNDARIES.md` (what lives where), then this file. Do not build until you have read all four. `HANDOVER-2026-09-12.md` is STALE — do not treat it as latest.
 
-## What freaktown owns
+## What funnier owns
 
 Product and stage. The live site, studio, party UX, performance contracts,
 the full avatar pipeline (face profiles, VRM, takes, revoice, walkout, record
@@ -17,11 +17,11 @@ through an adapter, never reimplemented. The retired Python game engine in
 
 pogtown = runtime, protocol, rooms API, gift packs, order state machine,
 the five gift tools, media providers, channel reference.
-freaktown = product, studio, avatar pipeline, performance contracts,
+funnier = product, studio, avatar pipeline, performance contracts,
 delivery, Ella, the live site.
 Shared key = the freak pack identity. Server is truth.
 
-Gift packs: pogtown owns the spec and state machine. freaktown generates
+Gift packs: pogtown owns the spec and state machine. funnier generates
 the portrait, video, voice, and walkout. Nothing crosses the boundary
 except bundles and events.
 

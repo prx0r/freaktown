@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Freak Town — The Show.
+"""FUNNIER — The Show.
 
 Run a full episode:
   python show.py
@@ -145,7 +145,7 @@ def simulate_audience(act: Act, duration_sec: int = 60) -> str:
 # ── The show ────────────────────────────────────────────────────────────
 
 def run_show(num_acts: int = 5, specific_comedian: str | None = None, use_tts: bool = True):
-    """Run a full Freak Town episode."""
+    """Run a full FUNNIER episode."""
 
     banner()
 
@@ -181,7 +181,7 @@ def run_show(num_acts: int = 5, specific_comedian: str | None = None, use_tts: b
         names = ", ".join(a.name for a in show.acts[:-1]) + f" and {show.acts[-1].name}"
     act_word = "act" if len(show.acts) == 1 else "acts"
     intro = (
-        f"Welcome to Freak Town. I'm Ella M. Tonight we have {len(show.acts)} "
+        f"Welcome to FUNNIER. I'm Ella M. Tonight we have {len(show.acts)} "
         f"comedy {act_word}: {names}. I'll be honest — I'm not optimistic. "
         f"But that's never stopped me before. Let's meet our first act."
     )
@@ -358,7 +358,7 @@ def run_show(num_acts: int = 5, specific_comedian: str | None = None, use_tts: b
 # ── CLI ─────────────────────────────────────────────────────────────────
 
 def main():
-    parser = argparse.ArgumentParser(description="Freak Town — The Show")
+    parser = argparse.ArgumentParser(description="FUNNIER — The Show")
     parser.add_argument("--acts", type=int, default=5, help="Number of acts (default: 5)")
     parser.add_argument("--comedian", type=str, default=None, help="Run a specific comedian by slug")
     parser.add_argument("--no-tts", action="store_true", help="Skip TTS generation")

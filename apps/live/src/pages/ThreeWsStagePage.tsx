@@ -4,7 +4,7 @@
  * Same show, different renderer than the VRM StagePage:
  * - Avatar: <agent-3d> (idle/clips/gestures/gaze, live say() dialogue)
  * - Set audio: pre-generated recording via <audio> (exact timing owned
- *   by the compositor, same as freaktown's Black Room pattern)
+ *   by the compositor, same as funnier's Black Room pattern)
  * - Captions: manifest word timings
  * - Beat cues: gesture/camera/sfx fired at beat starts derived from words
  * - Live events: EpisodeRoom socket (stage.speak → say, verdict → wave)

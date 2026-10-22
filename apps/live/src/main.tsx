@@ -8,9 +8,10 @@ import { HomePage } from './pages/HomePage';
 import { NotFound } from './pages/NotFound';
 import { PlayPage } from './pages/PlayPage';
 import { NewsroomPage } from './pages/NewsroomPage';
+import { SketchPage } from './pages/SketchPage';
 
 // NOTE (migration): creator routes (/studio /green-room /demo) are
-// deliberately ABSENT. Freak Town Studio is the one creator. This app
+// deliberately ABSENT. FUNNIER Studio is the one creator. This app
 // serves production surfaces only: stage, control, live audience.
 // /stage-ws (ThreeWsStagePage) is parked: its <agent-3d> component was not
 // carried over from killella (see docs/LIVE-STAGE.md "what's left").
@@ -29,6 +30,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/live/:episodeId" element={<LivePage />} />
         <Route path="/play/:episodeId/seat/:seat" element={<PlayPage />} />
         <Route path="/newsroom/:showId" element={<NewsroomPage />} />
+        <Route path="/sketch" element={<SketchPage />} />
+        <Route path="/sketch/:sketchId" element={<SketchPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

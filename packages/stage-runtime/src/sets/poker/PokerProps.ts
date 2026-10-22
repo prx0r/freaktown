@@ -4,7 +4,7 @@
  * camera sees chips slide and cards fly from the dealer.
  */
 import * as THREE from 'three';
-import type { CardV1 } from '@freaktown/contracts';
+import type { CardV1 } from '@funnier/contracts';
 import type { SetDefinition } from '../types';
 import { canvasTexture } from '../builders/common';
 import { POKER_TOP_Y } from '../builders/sets';

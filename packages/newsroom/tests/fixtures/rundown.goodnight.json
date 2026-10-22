@@ -1,5 +1,5 @@
 {
- "schema": "freaktown.newsroom.rundown/v1",
+ "schema": "funnier.newsroom.rundown/v1",
  "id": "fixture-goodnight-01",
  "title": "Fixture Night",
  "show_style": "goodnight",

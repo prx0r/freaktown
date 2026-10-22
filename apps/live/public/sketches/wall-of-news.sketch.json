@@ -1,0 +1,107 @@
+{
+  "schema": "funnier.sketch/v1",
+  "id": "wall-of-news",
+  "title": "Wall of News",
+  "set": "news-studio",
+  "style": "default-news",
+  "premise": "A by-the-book anchor reads whatever the video wall says, no matter how absurd it gets.",
+  "game": "Each new headline on the wall is more absurd; the anchor reads it with total sincerity while his co-anchor unravels.",
+  "credits": "Original fiction written for FUNNIER. All characters are fictional FUNNIER identities.",
+  "cast": [
+    { "role": "anchor", "identity": "pog.doug-deadline", "seat": "anchor1", "name": "Doug Deadline" },
+    { "role": "coanchor", "identity": "pog.tictoria-gossip", "seat": "anchor2", "name": "Tictoria Gossip" },
+    { "role": "algo", "identity": "pog.the-algorithm", "seat": "floor-mark", "name": "The Algorithm" }
+  ],
+  "scenes": [
+    {
+      "id": "studio",
+      "title": "Tonight's top story",
+      "beats": [
+        {
+          "id": "setup",
+          "kind": "setup",
+          "note": "Establish the normal: a warm, boring local story.",
+          "items": [
+            { "type": "headline", "text": "Local bakery wins award", "kicker": "Tonight" },
+            { "type": "line", "who": "anchor", "to": "camera", "text": "Good evening. Tonight's top story: a local bakery has won an award for its sourdough." },
+            { "type": "line", "who": "coanchor", "text": "Lovely. Warm bread, good news. That's what people want.", "emotion": "warm" }
+          ]
+        },
+        {
+          "id": "game",
+          "kind": "game",
+          "note": "The first unusual thing: the wall feeds something absurd and the anchor reads it straight.",
+          "items": [
+            { "type": "headline", "text": "Sourdough starter hires lawyer", "kicker": "Breaking" },
+            { "type": "line", "who": "anchor", "to": "camera", "text": "Breaking now. The sourdough starter has retained a lawyer." },
+            { "type": "look", "who": "coanchor", "at": "prop:wall", "double_take": true },
+            { "type": "line", "who": "coanchor", "text": "The starter. The yeast." },
+            { "type": "line", "who": "anchor", "text": "It is seeking full custody of the bakery.", "emotion": "deadpan" },
+            { "type": "react", "who": "coanchor", "kind": "eye-roll" },
+            { "type": "hold_for_laugh", "ms": 1300 }
+          ]
+        },
+        {
+          "id": "escalate-1",
+          "kind": "escalation",
+          "items": [
+            { "type": "headline", "text": "Yeast wins custody, renames town 'Crumb'", "kicker": "Breaking" },
+            { "type": "line", "who": "anchor", "to": "camera", "text": "In a stunning ruling, the yeast has won custody and renamed the town Crumb.", "emotion": "deadpan" },
+            { "type": "line", "who": "coanchor", "text": "Doug. Where are these coming from?" },
+            { "type": "line", "who": "anchor", "text": "The wall, Tictoria. The wall has never lied to me." },
+            { "type": "gesture", "who": "anchor", "kind": "point", "during": "prev", "at_word": 2 },
+            { "type": "headline", "text": "Wall has never lied, says wall", "kicker": "Developing" },
+            { "type": "react", "who": "coanchor", "kind": "shock" },
+            { "type": "hold_for_laugh", "ms": 1400 }
+          ]
+        },
+        {
+          "id": "escalate-2",
+          "kind": "escalation",
+          "items": [
+            { "type": "headline", "text": "Weather: Tuesday cancelled", "kicker": "Weather" },
+            { "type": "line", "who": "anchor", "to": "camera", "text": "Turning to the weather. Tuesday has been cancelled. Please enjoy a second Monday." },
+            { "type": "react", "who": "coanchor", "kind": "deadpan", "during": "prev", "from_end_ms": 300 },
+            { "type": "look", "who": "coanchor", "at": "camera", "ms": 1500 },
+            { "type": "hold_for_laugh", "ms": 1200 }
+          ]
+        },
+        {
+          "id": "turn",
+          "kind": "turn",
+          "note": "Reveal who is feeding the wall.",
+          "items": [
+            { "type": "move", "who": "algo", "to": "wall-mark", "ms": 1600 },
+            { "type": "line", "who": "algo", "to": "anchor", "text": "Sorry, sorry. I write the headlines. Engagement was down, so I made the bread litigious." },
+            { "type": "look", "who": "anchor", "at": "algo", "double_take": true, "during": "prev", "at_word": 4 },
+            { "type": "line", "who": "coanchor", "text": "You're a robot." },
+            { "type": "line", "who": "algo", "text": "I'm an algorithm. The robot is a costume. It tested well.", "emotion": "smug" },
+            { "type": "react", "who": "anchor", "kind": "smirk" },
+            { "type": "hold_for_laugh", "ms": 1200 }
+          ]
+        },
+        {
+          "id": "punch",
+          "kind": "punch",
+          "items": [
+            { "type": "headline", "text": "Anchor reads headline about himself reading headline", "kicker": "Live" },
+            { "type": "look", "who": "anchor", "at": "prop:wall", "ms": 1100 },
+            { "type": "line", "who": "anchor", "to": "camera", "text": "This just in. I am reading this headline." },
+            { "type": "line", "who": "algo", "text": "Ratings are up eleven percent." },
+            { "type": "react", "who": "coanchor", "kind": "laugh-break" },
+            { "type": "hold_for_laugh", "ms": 1600 }
+          ]
+        },
+        {
+          "id": "button",
+          "kind": "button",
+          "items": [
+            { "type": "button" },
+            { "type": "line", "who": "coanchor", "to": "camera", "text": "That's the news. The bread is fine. We think." },
+            { "type": "blackout", "fade_ms": 900, "delay_ms": 300 }
+          ]
+        }
+      ]
+    }
+  ]
+}

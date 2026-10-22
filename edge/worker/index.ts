@@ -1,5 +1,5 @@
 /**
- * Freak Town — Cloudflare Worker entry point.
+ * FUNNIER — Cloudflare Worker entry point.
  *
  * This is the live nervous system.
  * The Python backend handles offline research/evaluation.

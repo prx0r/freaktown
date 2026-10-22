@@ -1,9 +1,9 @@
-"""Black Room adapter — freaktown artifacts in, killella performances out.
+"""Black Room adapter — funnier artifacts in, killella performances out.
 
-Freaktown (Blue Room / Black Room) is the creator UX: chatbar writer,
+FUNNIER (Blue Room / Black Room) is the creator UX: chatbar writer,
 beat boxes, DAW editing, tempo templates, YOUR SETS library, three.ws
 avatar stage. Killella is the show runtime. This module is the bridge —
-read-only with respect to freaktown (we never edit that repo):
+read-only with respect to funnier (we never edit that repo):
 
   bundle validation  — character.json + delivery.json + set.wav + meta.json
   beats → score      — freaktown.delivery.v1 dicts → DeliveryScore,
@@ -31,7 +31,7 @@ AVATAR_SCHEMA_VERSION = "freaktown.avatar.v1"
 
 BEAT_TYPES = {"setup", "escalation", "misdirect", "punchline", "tag", "callback", "actout", "closer"}
 
-# Free-text species (freaktown character.species) → killella body family.
+# Free-text species (funnier character.species) → killella body family.
 SPECIES_MAP = {
     "human": "human",
     "person": "human",
@@ -63,7 +63,7 @@ SPECIES_MAP = {
 
 
 def species_to_body(species: str) -> str:
-    """Map freaktown species text to a killella BodyArchetype value."""
+    """Map funnier species text to a killella BodyArchetype value."""
     s = (species or "").lower()
     for key, body in SPECIES_MAP.items():
         if key in s:
@@ -72,7 +72,7 @@ def species_to_body(species: str) -> str:
 
 
 def bundle_slug(name: str, text: str) -> str:
-    """Same slug rule as freaktown app.py: name-hash + 6-hex digest."""
+    """Same slug rule as funnier app.py: name-hash + 6-hex digest."""
     base = re.sub(r"[^a-z0-9]+", "-", (name or "freak").lower()).strip("-")[:32] or "freak"
     digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:6]
     return f"{base}-{digest}"
@@ -133,7 +133,7 @@ def validate_bundle(bundle: dict) -> BundleValidation:
 
 
 def bundle_to_score(delivery: dict) -> DeliveryScore:
-    """Freaktown delivery dict → killella DeliveryScore.
+    """FUNNIER delivery dict → killella DeliveryScore.
 
     Raises ValueError on invalid input. Every performance-intent field
     (expression, gesture, camera, sound, stage, pauses) is preserved —
@@ -159,7 +159,7 @@ class BeatSpan:
 
 
 def spans_from_offsets(offsets: list[dict]) -> list[BeatSpan]:
-    """Freaktown /api/compose offsets → beat spans.
+    """FUNNIER /api/compose offsets → beat spans.
 
     Offsets look like [{id, start_ms, speech_ms, pause_ms}].
     """

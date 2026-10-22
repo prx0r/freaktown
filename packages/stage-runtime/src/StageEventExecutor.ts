@@ -18,7 +18,7 @@
  * that performance (replay never duplicates ACKs).
  */
 
-import { CAMERA_NAMES, type CameraPresetV1, type PerformancePlan, type ShowEvent } from '@freaktown/contracts';
+import { CAMERA_NAMES, type CameraPresetV1, type PerformancePlan, type ShowEvent } from '@funnier/contracts';
 import type { StageRuntime } from './StageRuntime';
 import type { EventConsumer } from './EventConsumer';
 import { loadSealedSet } from './plan/setAdapter';

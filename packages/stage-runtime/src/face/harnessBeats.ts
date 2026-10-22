@@ -4,7 +4,7 @@
  * feature/mutuals-acting-party-smiles 008d4f5). Fails closed: text/word mismatch,
  * unsorted timings or out-of-order spans throw — never estimate an acted punchline.
  */
-import type { CameraCue, MotionCue, WordTiming } from '@freaktown/contracts';
+import type { CameraCue, MotionCue, WordTiming } from '@funnier/contracts';
 import { HARNESS_CAMERAS, HARNESS_EMOTIONS, HARNESS_GESTURES } from './vocab';
 
 export interface HarnessBeat { span: string; emotion?: string; register?: string; gesture?: string; camera?: string }

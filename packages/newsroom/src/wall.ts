@@ -11,7 +11,7 @@
  * An image is drawn only when card.image_url is set — compile() sets it only
  * for licence lanes that allow it (verbatim-ok).
  */
-import type { SetThemePayloadV1 } from '@freaktown/contracts';
+import type { SetThemePayloadV1 } from '@funnier/contracts';
 
 export interface WallCardInput {
   text: string;
@@ -245,7 +245,7 @@ function broadcast(ctx: Ctx, card: WallCardInput, th: SetThemePayloadV1 | null, 
     if (card.body) { const b = fitText(ctx, card.body, (px) => `${px}px ${sans}`, maxW, 2, 32, 20); ctx.font = `${b.px}px ${sans}`; ctx.fillStyle = 'rgba(255,255,255,0.85)'; for (const l of b.lines) { ctx.fillText(l, 52, y); y += b.px * 1.25; } }
   }
   ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.font = `bold 26px ${sans}`;
-  ctx.fillText(fitOne(ctx, [(th?.brand ?? 'FREAK NEWS').toUpperCase(), card.credit ? `· ${card.credit}` : ''].join(' '), maxW), 52, H - 40);
+  ctx.fillText(fitOne(ctx, [(th?.brand ?? 'FUNNIER NEWS').toUpperCase(), card.credit ? `· ${card.credit}` : ''].join(' '), maxW), 52, H - 40);
 }
 
 /** The WallPainter: pick the family from the theme (goodnight → paper-sunrise). */

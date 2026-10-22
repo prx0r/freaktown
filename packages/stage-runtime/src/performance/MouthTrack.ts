@@ -9,7 +9,7 @@
  * (mic, realtime TTS) when a plan carries no timings.
  */
 
-import type { MouthSpan, PerformancePlan, WordTiming } from '@freaktown/contracts';
+import type { MouthSpan, PerformancePlan, WordTiming } from '@funnier/contracts';
 import type { VisemeKey, Visemes } from '../avatars/types';
 
 export interface MouthSample {

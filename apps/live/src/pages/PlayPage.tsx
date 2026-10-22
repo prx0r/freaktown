@@ -5,8 +5,8 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { EventConsumer } from '@freaktown/stage-runtime';
-import type { CardV1 } from '@freaktown/contracts';
+import { EventConsumer } from '@funnier/stage-runtime';
+import type { CardV1 } from '@funnier/contracts';
 import { createTransport, transportMode } from '../live/transport';
 import { CardChip } from './SetStagePage';
 
@@ -62,7 +62,7 @@ export function PlayPage() {
 
   return (
     <div style={page} data-testid="play">
-      <div style={{ fontSize: 12, letterSpacing: 3, color: '#7dffa0' }}>FREAK TOWN POKER · SEAT {seat}</div>
+      <div style={{ fontSize: 12, letterSpacing: 3, color: '#7dffa0' }}>FUNNIER POKER · SEAT {seat}</div>
       {!joined ? (
         <div style={{ marginTop: 16 }}>
           <input value={name} onChange={(e) => setName(e.target.value)} style={inp} data-testid="play-name" />
