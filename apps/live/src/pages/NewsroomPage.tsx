@@ -6,6 +6,8 @@
  *   ?capture=1                           deterministic: nothing moves until window.__newsroom.renderAt(ms)
  *   ?t=<ms>                              (capture) render this instant on load (screenshots)
  *   ?quality=low · ?cpuskin=1 · ?debug=1
+ *   ?newsset=<id>                        baked Blender studio (late-night | goodnight | breaking; sets/blender);
+ *                                        the procedural studio stays if it fails to load
  *
  * The stage obeys events only: compiled events go through SetEventExecutor
  * in t_ms order; the themed overlays (lower third, ticker, bug) are drawn
@@ -52,6 +54,7 @@ export function NewsroomPage() {
   const quality = q.get('quality') === 'low' ? 'low' : 'high';
   const cpuSkinning = q.get('cpuskin') === '1';
   const debug = q.get('debug') === '1';
+  const newsSet = q.get('newsset') ?? undefined;
   const ref = useRef<HTMLDivElement>(null);
   const tickerRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<View>({ t: 0, theme: null, lowerThird: null, ticker: [], headline: null });
@@ -59,7 +62,7 @@ export function NewsroomPage() {
 
   useEffect(() => {
     if (!ref.current) return;
-    const stage = new SetStage({ container: ref.current, quality, cpuSkinning, manual: true, wallPainter: paintWallCard, resolveUrl: resolveAsset });
+    const stage = new SetStage({ container: ref.current, quality, cpuSkinning, manual: true, wallPainter: paintWallCard, resolveUrl: resolveAsset, variant: newsSet });
     const executor = new SetEventExecutor(stage, nullConsumer, { onError: (m) => errors.push(m) });
     const errors: string[] = [];
     let timeline: CompiledShow | null = null;
@@ -138,7 +141,7 @@ export function NewsroomPage() {
       stage.dispose();
       if (window.__newsroom === api) delete window.__newsroom;
     };
-  }, [showId, quality, cpuSkinning, capture]);
+  }, [showId, quality, cpuSkinning, capture, newsSet]);
 
   const th = view.theme;
   const P = { paper: '#f6efe2', ink: '#2a2420', accent: '#F5C86B', bg: '#07060a', ...(th?.palette ?? {}) };

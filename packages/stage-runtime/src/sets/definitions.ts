@@ -42,6 +42,9 @@ export const COMEDY_CLUB: SetDefinition = {
 };
 
 // ── 2. news studio ──
+/** Baked Blender newsroom GLBs in apps/live/public/stage-sets/newsroom-<id>.glb. */
+export const NEWSROOM_BLENDER_VARIANTS = ['late-night', 'goodnight', 'breaking'];
+
 export const NEWS_STUDIO: SetDefinition = {
   id: 'news-studio',
   name: 'News studio',
@@ -56,6 +59,8 @@ export const NEWS_STUDIO: SetDefinition = {
       transform: { position: [0, 0, -9], rotation: 0, scale: 1 },
       verified: false,
     },
+    // procedural Blender studios (sets/blender/newsroom_build.py); /newsroom/<id>?newsset=goodnight
+    variants: { url: 'stage-sets/newsroom-{id}.glb', ids: NEWSROOM_BLENDER_VARIANTS },
   },
   seats: [
     seat('anchor1', 0.75, -0.55, 0, 'anchor'),
@@ -64,8 +69,10 @@ export const NEWS_STUDIO: SetDefinition = {
   marks: [seat('wall-mark', -1.95, -1.45, 0.45, 'mark', 'standing'), seat('floor-mark', 1.9, 0.5, -0.5, 'mark', 'standing')],
   cameras: {
     wide: { position: [0, 2.1, 6.6], target: [0, 1.35, -0.9], fov: 42, label: 'Wide', portrait: { position: [-0.6, 1.5, 6.2], target: [-0.6, 0.55, -1.6], fov: 50 } },
-    'anchor1-single': { seat: 'anchor1', position: [-0.15, 0.12, 2.3], target: [0, -0.1, 0], fov: 30, label: 'Anchor 1' },
-    'anchor2-single': { seat: 'anchor2', position: [0.15, 0.12, 2.3], target: [0, -0.1, 0], fov: 30, label: 'Anchor 2' },
+    // anchor close-ups frame from the measured eye line (eyeLineFraming): camera at eye height, aimed
+    // 2.3 * tan(11 deg) / 3 = 0.149 m under the eyes, so they sit on the upper third of a 22 deg frame
+    'anchor1-single': { seat: 'anchor1', position: [-0.15, 0.03, 2.3], target: [0, -0.149, 0], fov: 22, label: 'Anchor 1' },
+    'anchor2-single': { seat: 'anchor2', position: [0.15, 0.03, 2.3], target: [0, -0.149, 0], fov: 22, label: 'Anchor 2' },
     'two-shot': { position: [0, 1.45, 3.7], target: [0, 1.2, -0.6], fov: 32, label: 'Two-shot' },
     screen: { position: [2.7, 1.55, 2.3], target: [-0.7, 1.55, -1.8], fov: 36, label: 'Over-shoulder screen' },
     // newsroom: 3/4 on anchor1 with the whole video wall in frame (headline / numbers cards)
@@ -83,6 +90,7 @@ export const NEWS_STUDIO: SetDefinition = {
   overlays: ['lower_third', 'ticker', 'headline'],
   controlCameras: ['wide', 'anchor1-single', 'anchor2-single', 'two-shot', 'screen'],
   hideEmptySeats: true,
+  eyeLineFraming: true,
 };
 
 // ── 3. podcast ──

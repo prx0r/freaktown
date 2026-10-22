@@ -25,6 +25,11 @@ export interface SeatAnchor {
   pose: SeatPose;
   /** Seat a human may take from /play (poker). */
   open?: boolean;
+  /**
+   * Measured eye height (m) of the body cast in this seat (SetStage fills it on eyeLineFraming sets);
+   * seat-bound shots frame from it instead of the generic HEAD_HEIGHT.
+   */
+  eyeHeight?: number;
 }
 
 export interface CameraPresetDef {
@@ -66,6 +71,12 @@ export interface EnvironmentDef {
     /** Verified framing? Unverified GLBs load only with ?setglb=1. */
     verified?: boolean;
   };
+  /**
+   * Baked Blender variants of this set (sets/blender/newsroom_build.py), opt-in by id
+   * (SetStageConfig.variant, e.g. /newsroom/x?newsset=goodnight). `url` has an {id} placeholder.
+   * The builder's adoptVariant() takes the GLB over; if it fails the procedural set stays.
+   */
+  variants?: { url: string; ids: string[] };
 }
 
 export type OverlayHook = 'lower_third' | 'ticker' | 'headline' | 'on_air' | 'speaker_strap' | 'poker_hud';
@@ -91,6 +102,8 @@ export interface SetDefinition {
   /** Ordered camera buttons for /control. */
   /** Hide seat props (chair, papers) at seats nobody is cast in, e.g. a single-anchor news desk. */
   hideEmptySeats?: boolean;
+  /** Frame seat-bound shots from each cast body's measured eye line (SeatAnchor.eyeHeight), not HEAD_HEIGHT. */
+  eyeLineFraming?: boolean;
   controlCameras: string[];
   /** Max seats a cast may fill (defaults to seats.length). */
   maxCast?: number;

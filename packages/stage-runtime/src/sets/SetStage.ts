@@ -47,6 +47,11 @@ export interface SetStageConfig {
   manual?: boolean;
   /** Draws the video-wall card (newsroom). Sets without a wall ignore it. */
   wallPainter?: WallPainter;
+  /**
+   * Baked Blender variant of the set (environment.variants ids, e.g. 'goodnight' for the newsroom).
+   * loadSet waits for it; if it fails to load the procedural set stays (telemetry envError says why).
+   */
+  variant?: string;
 }
 
 /** An eased camera move / slow creep (set.camera move_ms / creep). */
@@ -70,6 +75,8 @@ interface SeatActor {
   /** Smoothed head aim (rad) so gaze switches turn instead of snapping. */
   aimYaw: number;
   aimPitch: number;
+  /** Measured eye height (m, world) at the seated/standing rest pose, for eyeLineFraming sets. */
+  eyeY?: number;
   /** Walk between marks (stage.move). */
   walk?: { from: SeatAnchor; to: SeatAnchor; start: number; dur: number } | null;
 }
@@ -113,7 +120,7 @@ export interface SetStageTelemetry {
   actingWarnings: string[];
   activeSpeaker: string | null;
   lines: number;
-  environment: 'procedural' | 'procedural+glb';
+  environment: 'procedural' | 'procedural+glb' | `blender:${string}`;
   envError: string | null;
   overlay: OverlayState;
   poker: PokerView | null;
@@ -159,6 +166,7 @@ export class SetStage {
   private disposed = false;
   private loadToken = 0;
   private envGlb: THREE.Object3D | null = null;
+  private variantId: string | null = null;
   private envError: string | null = null;
   private lines = 0;
   private actingWarnings: string[] = [];
@@ -248,7 +256,27 @@ export class SetStage {
     this.cut('wide', 'initial');
     const glb = def.environment.glb;
     if (glb && (glb.verified || this.config.glb)) void this.loadGlb(def, token);
+    if (this.config.variant) await this.loadVariant(def, this.config.variant, token);
     if (cast.length) await this.cast(cast);
+  }
+
+  /** A baked Blender variant (sets/blender): the builder adopts the GLB, else the procedural set stays. */
+  private async loadVariant(def: SetDefinition, id: string, token: number): Promise<void> {
+    const v = def.environment.variants;
+    if (!v || !v.ids.includes(id) || !this.built?.adoptVariant) {
+      this.envError = `set ${def.id} has no Blender variant "${id}"; procedural set`;
+      return;
+    }
+    try {
+      const gltf = await new GLTFLoader().loadAsync(this.resolve(v.url.replace('{id}', id)));
+      if (token !== this.loadToken || this.disposed) return;
+      this.built.adoptVariant(gltf.scene, { shadows: this.config.quality !== 'low' });
+      this.variantId = id;
+      this.refreshSeatProps();
+    } catch (e) {
+      this.envError = `variant ${id} failed (${e instanceof Error ? e.message : String(e)}); procedural set`;
+      console.warn('[set]', this.envError);
+    }
   }
 
   private async loadGlb(def: SetDefinition, token: number): Promise<void> {
@@ -279,6 +307,7 @@ export class SetStage {
     this.built = null;
     if (this.props) { this.scene.remove(this.props.group); this.props = null; }
     if (this.envGlb) { this.scene.remove(this.envGlb); this.envGlb = null; }
+    this.variantId = null;
     this.envError = null;
     this.lines = 0;
   }
@@ -486,7 +515,7 @@ export class SetStage {
     if (!def) return false;
     if (cue === 'auto') { this.auto = true; return true; }
     try {
-      this.shot = resolveCameraCue(def, cue, this.setTimeMs / 1000);
+      this.shot = resolveCameraCue(this.framingDef(def), cue, this.setTimeMs / 1000);
     } catch (e) {
       console.warn('[set]', e instanceof Error ? e.message : e);
       return false;
@@ -500,6 +529,22 @@ export class SetStage {
     this.cuts.push({ cue, at_ms: Math.round(this.setTimeMs), source });
     this.applyShot();
     return true;
+  }
+
+  /**
+   * eyeLineFraming sets: the definition with each cast seat's measured eye height, so seat-bound shots
+   * frame the real eyes (a seated VRM's eyes are ~1.03 m, not the generic 1.3 m head height).
+   */
+  private framingDef(def: SetDefinition): SetDefinition {
+    if (!def.eyeLineFraming) return def;
+    let any = false;
+    const seats = def.seats.map((s) => {
+      const y = this.actors.get(s.id)?.eyeY;
+      if (y === undefined) return s;
+      any = true;
+      return { ...s, eyeHeight: y };
+    });
+    return any ? { ...def, seats } : def;
   }
 
   /** Current camera pose: shot, eased from the previous pose during a move, plus creep. */
@@ -527,7 +572,11 @@ export class SetStage {
       const f = this.move.from;
       const L = (a: number, b: number) => a + (b - a) * e;
       pos = [L(f.position[0], pos[0]), L(f.position[1], pos[1]), L(f.position[2], pos[2])];
-      tgt = [L(f.target[0], tgt[0]), L(f.target[1], tgt[1]), L(f.target[2], tgt[2])];
+      // the look leads the dolly (an operator pans to the new subject first): the target lands at 1/1.6 of the
+      // move, so a pull-out to the wide frames the wall's title early instead of clipping it mid-move
+      const ul = Math.min(1, u * 1.6);
+      const el = this.move.ease === 'linear' ? u : ul * ul * ul * (ul * (ul * 6 - 15) + 10);
+      tgt = [f.target[0] + (tgt[0] - f.target[0]) * el, f.target[1] + (tgt[1] - f.target[1]) * el, f.target[2] + (tgt[2] - f.target[2]) * el];
       fov = L(f.fov, fov);
       if (u >= 1) this.move = null;
     }
@@ -694,6 +743,11 @@ export class SetStage {
       a.lastEmotions = face.emotions;
       FaceChannel.apply(a.driver, face);
       a.driver.update(dt);
+      if (a.eyeY === undefined && this.def?.eyeLineFraming) {
+        // first posed frame: eyes ~5 cm above the mouth anchor (mouthAnchor.ts puts it 5.2 cm under the eye line)
+        const m = a.driver.mouthAnchor?.();
+        if (m) { a.holder.updateMatrixWorld(true); a.eyeY = Math.round((m.getWorldPosition(new THREE.Vector3()).y + 0.052) * 1000) / 1000; }
+      }
     }
     if (speaker) this.lastSpeaker = speaker;
     if (!speaker && this.overlay.speaker && this.actors.size) {
@@ -733,7 +787,7 @@ export class SetStage {
       activeSpeaker: speaking?.seat.id ?? null,
       lines: this.lines,
       actingWarnings: this.actingWarnings.slice(-10),
-      environment: this.envGlb ? 'procedural+glb' : 'procedural',
+      environment: this.variantId ? `blender:${this.variantId}` : this.envGlb ? 'procedural+glb' : 'procedural',
       envError: this.envError,
       overlay: { ...this.overlay },
       poker: this.def?.id === 'poker-table' ? { ...this.pokerView } : null,

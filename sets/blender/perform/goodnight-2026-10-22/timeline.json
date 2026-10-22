@@ -1,0 +1,470 @@
+{
+ "source": "Goodnight News 2026-10-22 timeline (packages/newsroom compile), cut to the clip window",
+ "style": "goodnight",
+ "duration_ms": 10000,
+ "events": [
+  {
+   "t_ms": 0,
+   "type": "set.load",
+   "payload": {
+    "setId": "news-studio",
+    "title": "Goodnight News \u2014 2026-10-22",
+    "cast": [
+     {
+      "seat": "anchor1",
+      "character_id": "goodnight-news.anchor",
+      "name": "The night desk",
+      "avatar_url": "avatars/default-v1.vrm",
+      "kind": "character"
+     }
+    ]
+   }
+  },
+  {
+   "t_ms": 0,
+   "type": "set.theme",
+   "payload": {
+    "style": "goodnight",
+    "palette": {
+     "bg": "#07060a",
+     "paper": "#f6efe2",
+     "ink": "#2a2420",
+     "accent": "#F5C86B",
+     "accent2": "#e9a77a",
+     "muted": "#1a1612",
+     "glow": "#3a2a12"
+    },
+    "fonts": {
+     "display": "Georgia, 'C059', 'Century Schoolbook', 'DejaVu Serif', serif",
+     "body": "Georgia, 'C059', 'Century Schoolbook', 'DejaVu Serif', serif"
+    },
+    "brand": "Goodnight News",
+    "wall": {
+     "family": "paper-sunrise",
+     "brandLine": "GOODNIGHT NEWS"
+    },
+    "lighting": {
+     "ambient": "#6b5a4a",
+     "key": "#ffe6c2",
+     "fill": "#d9c2a6",
+     "rim": "#F5C86B",
+     "background": "#07060a",
+     "exposure": 0.95
+    },
+    "overlay": {
+     "lowerThird": "paper",
+     "ticker": {
+      "enabled": true,
+      "label": "GOODNIGHT NEWS",
+      "speed_px_s": 26
+     },
+     "bug": "Goodnight News"
+    }
+   }
+  },
+  {
+   "t_ms": 0,
+   "type": "overlay.headline",
+   "payload": {
+    "text": "Euclid discovers new comet.",
+    "layout": "headline",
+    "kicker": "ESA",
+    "credit": "ESA"
+   }
+  },
+  {
+   "t_ms": 0,
+   "type": "set.camera",
+   "payload": {
+    "cue": "wall-ots",
+    "source": "auto_director",
+    "creep": 0.06,
+    "creep_ms": 7040
+   }
+  },
+  {
+   "t_ms": 700,
+   "type": "overlay.headline",
+   "payload": {
+    "text": "Euclid discovers new comet.",
+    "layout": "headline",
+    "kicker": "ESA",
+    "credit": "ESA"
+   }
+  },
+  {
+   "t_ms": 700,
+   "type": "face.expression",
+   "payload": {
+    "seat": "anchor1",
+    "emotion": "warm",
+    "intensity": 0.45,
+    "duration_ms": 5940
+   }
+  },
+  {
+   "t_ms": 700,
+   "type": "dialogue.line",
+   "payload": {
+    "seat": "anchor1",
+    "text": "First: Euclid discovers new comet. From the European Space Agency.",
+    "duration_ms": 5940,
+    "line_id": "s1#1",
+    "emotion": "warm",
+    "words": [
+     {
+      "word": "First:",
+      "start_ms": 0,
+      "end_ms": 660
+     },
+     {
+      "word": "Euclid",
+      "start_ms": 960,
+      "end_ms": 1660
+     },
+     {
+      "word": "discovers",
+      "start_ms": 1660,
+      "end_ms": 2220
+     },
+     {
+      "word": "new",
+      "start_ms": 2220,
+      "end_ms": 2760
+     },
+     {
+      "word": "comet.",
+      "start_ms": 2760,
+      "end_ms": 3240
+     },
+     {
+      "word": "From",
+      "start_ms": 3240,
+      "end_ms": 4260
+     },
+     {
+      "word": "the",
+      "start_ms": 4260,
+      "end_ms": 4440
+     },
+     {
+      "word": "European",
+      "start_ms": 4440,
+      "end_ms": 4720
+     },
+     {
+      "word": "Space",
+      "start_ms": 4720,
+      "end_ms": 5300
+     },
+     {
+      "word": "Agency.",
+      "start_ms": 5300,
+      "end_ms": 5940
+     }
+    ]
+   }
+  },
+  {
+   "t_ms": 7040,
+   "type": "set.camera",
+   "payload": {
+    "cue": "anchor1-single",
+    "source": "auto_director",
+    "move_ms": 3000,
+    "ease": "smooth",
+    "creep": 0.06,
+    "creep_ms": 7580
+   }
+  },
+  {
+   "t_ms": 7540,
+   "type": "face.expression",
+   "payload": {
+    "seat": "anchor1",
+    "emotion": "warm",
+    "intensity": 0.45,
+    "duration_ms": 27740
+   }
+  },
+  {
+   "t_ms": 7540,
+   "type": "dialogue.line",
+   "payload": {
+    "seat": "anchor1",
+    "text": "The European Space Agency\u2019s Euclid space telescope has discovered its first previously unknown comet, in images taken between 16 and 24 September 2026. The discovery is impressive for a mission that is designed to take deep, steady images of distant galaxies \u2014 not for following fast-moving Solar System objects like comets.",
+    "duration_ms": 27740,
+    "line_id": "s1#2",
+    "emotion": "warm",
+    "words": [
+     {
+      "word": "The",
+      "start_ms": 0,
+      "end_ms": 180
+     },
+     {
+      "word": "European",
+      "start_ms": 180,
+      "end_ms": 420
+     },
+     {
+      "word": "Space",
+      "start_ms": 420,
+      "end_ms": 920
+     },
+     {
+      "word": "Agency\u2019s",
+      "start_ms": 920,
+      "end_ms": 1880
+     },
+     {
+      "word": "Euclid",
+      "start_ms": 1880,
+      "end_ms": 2440
+     },
+     {
+      "word": "space",
+      "start_ms": 2440,
+      "end_ms": 2660
+     },
+     {
+      "word": "telescope",
+      "start_ms": 2660,
+      "end_ms": 3440
+     },
+     {
+      "word": "has",
+      "start_ms": 3440,
+      "end_ms": 3800
+     },
+     {
+      "word": "discovered",
+      "start_ms": 3800,
+      "end_ms": 4360
+     },
+     {
+      "word": "its",
+      "start_ms": 4360,
+      "end_ms": 4660
+     },
+     {
+      "word": "first",
+      "start_ms": 4660,
+      "end_ms": 5240
+     },
+     {
+      "word": "previously",
+      "start_ms": 5240,
+      "end_ms": 5760
+     },
+     {
+      "word": "unknown",
+      "start_ms": 5760,
+      "end_ms": 6420
+     },
+     {
+      "word": "comet,",
+      "start_ms": 6420,
+      "end_ms": 7080
+     },
+     {
+      "word": "in",
+      "start_ms": 7080,
+      "end_ms": 8000
+     },
+     {
+      "word": "images",
+      "start_ms": 8000,
+      "end_ms": 8380
+     },
+     {
+      "word": "taken",
+      "start_ms": 8380,
+      "end_ms": 8880
+     },
+     {
+      "word": "between",
+      "start_ms": 8880,
+      "end_ms": 9400
+     },
+     {
+      "word": "16",
+      "start_ms": 9400,
+      "end_ms": 9860
+     },
+     {
+      "word": "and",
+      "start_ms": 9860,
+      "end_ms": 10580
+     },
+     {
+      "word": "24",
+      "start_ms": 10580,
+      "end_ms": 10980
+     },
+     {
+      "word": "September",
+      "start_ms": 10980,
+      "end_ms": 12140
+     },
+     {
+      "word": "2026.",
+      "start_ms": 12680,
+      "end_ms": 13560
+     },
+     {
+      "word": "The",
+      "start_ms": 14300,
+      "end_ms": 14800
+     },
+     {
+      "word": "discovery",
+      "start_ms": 14800,
+      "end_ms": 15100
+     },
+     {
+      "word": "is",
+      "start_ms": 15100,
+      "end_ms": 15580
+     },
+     {
+      "word": "impressive",
+      "start_ms": 15580,
+      "end_ms": 15940
+     },
+     {
+      "word": "for",
+      "start_ms": 15940,
+      "end_ms": 16940
+     },
+     {
+      "word": "a",
+      "start_ms": 16940,
+      "end_ms": 17040
+     },
+     {
+      "word": "mission",
+      "start_ms": 17040,
+      "end_ms": 17420
+     },
+     {
+      "word": "that",
+      "start_ms": 17420,
+      "end_ms": 17680
+     },
+     {
+      "word": "is",
+      "start_ms": 17680,
+      "end_ms": 17840
+     },
+     {
+      "word": "designed",
+      "start_ms": 17840,
+      "end_ms": 18340
+     },
+     {
+      "word": "to",
+      "start_ms": 18340,
+      "end_ms": 18640
+     },
+     {
+      "word": "take",
+      "start_ms": 18640,
+      "end_ms": 18880
+     },
+     {
+      "word": "deep,",
+      "start_ms": 18880,
+      "end_ms": 19200
+     },
+     {
+      "word": "steady",
+      "start_ms": 19200,
+      "end_ms": 19860
+     },
+     {
+      "word": "images",
+      "start_ms": 19860,
+      "end_ms": 20480
+     },
+     {
+      "word": "of",
+      "start_ms": 20760,
+      "end_ms": 21260
+     },
+     {
+      "word": "distant",
+      "start_ms": 21260,
+      "end_ms": 21800
+     },
+     {
+      "word": "galaxies",
+      "start_ms": 21800,
+      "end_ms": 22320
+     },
+     {
+      "word": "\u2014",
+      "start_ms": 22320,
+      "end_ms": 23160
+     },
+     {
+      "word": "not",
+      "start_ms": 23160,
+      "end_ms": 23520
+     },
+     {
+      "word": "for",
+      "start_ms": 23520,
+      "end_ms": 23760
+     },
+     {
+      "word": "following",
+      "start_ms": 23760,
+      "end_ms": 24240
+     },
+     {
+      "word": "fast-moving",
+      "start_ms": 24240,
+      "end_ms": 24740
+     },
+     {
+      "word": "Solar",
+      "start_ms": 25180,
+      "end_ms": 25660
+     },
+     {
+      "word": "System",
+      "start_ms": 25660,
+      "end_ms": 26260
+     },
+     {
+      "word": "objects",
+      "start_ms": 26260,
+      "end_ms": 26720
+     },
+     {
+      "word": "like",
+      "start_ms": 26720,
+      "end_ms": 27200
+     },
+     {
+      "word": "comets.",
+      "start_ms": 27200,
+      "end_ms": 27740
+     }
+    ]
+   }
+  },
+  {
+   "t_ms": 8840,
+   "type": "overlay.headline",
+   "payload": {
+    "text": "Euclid discovers new comet.",
+    "layout": "ambient",
+    "kicker": "ESA",
+    "credit": "ESA",
+    "card_layout": "headline"
+   }
+  }
+ ]
+}

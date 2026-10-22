@@ -1,0 +1,125 @@
+{
+ "Room Width": 11.0,
+ "Ceiling Height": 3.4,
+ "Back Wall Y": 3.6,
+ "Glass Wall": false,
+ "Window Wall": true,
+ "Glow Color": [
+  0.9131,
+  0.57758,
+  0.14703,
+  1.0
+ ],
+ "Glow Strength": 2.5,
+ "Desk Wood": 1.0,
+ "Tiles X": 1,
+ "Tiles Y": 1,
+ "Tile Gap": 0.0,
+ "Bezel": 0.08,
+ "Wall Width": 4.6,
+ "Wall Height": 2.3,
+ "Wall Centre Height": 1.95,
+ "Seed": 11,
+ "Floor Color": [
+  0.02315,
+  0.01161,
+  0.007,
+  1.0
+ ],
+ "Floor Gloss": 0.35,
+ "Riser Color": [
+  0.04231,
+  0.02315,
+  0.01298,
+  1.0
+ ],
+ "Side Flats": false,
+ "Back Color": [
+  0.04374,
+  0.02732,
+  0.02315,
+  1.0
+ ],
+ "Slats": 0,
+ "Desk Color": [
+  0.25415,
+  0.10224,
+  0.03689,
+  1.0
+ ],
+ "Desk Top Color": [
+  0.57758,
+  0.32314,
+  0.14413,
+  1.0
+ ],
+ "Desk Gloss": 0.5,
+ "Brand Height": 0.2,
+ "Grid Cans": 0,
+ "Pendants": 0,
+ "Desk Lamp": true,
+ "Side Lamps": true,
+ "Bookshelves": true,
+ "Plants": true,
+ "Chair Color": [
+  0.10224,
+  0.04231,
+  0.04231,
+  1.0
+ ],
+ "Frame Color": [
+  0.02315,
+  0.01298,
+  0.00802,
+  1.0
+ ],
+ "Sky Top": [
+  0.00304,
+  0.00605,
+  0.02956,
+  1.0
+ ],
+ "Sky Horizon": [
+  0.04231,
+  0.02732,
+  0.09759,
+  1.0
+ ],
+ "_look": {
+  "key": 200,
+  "key_color": "#FFE3C0",
+  "fill": 60,
+  "fill_color": "#FFD8B0",
+  "rim": 180,
+  "rim_color": "#FFC890",
+  "desk": 70,
+  "desk_color": "#FFE0B8",
+  "wash": 50,
+  "wash_color": "#FFB070",
+  "ambient": "#120C0A",
+  "ambient_strength": 0.4,
+  "practicals": [
+   [
+    -0.85,
+    0.25,
+    1.36
+   ],
+   [
+    -2.75,
+    1.7,
+    1.25
+   ],
+   [
+    2.75,
+    1.7,
+    1.25
+   ]
+  ],
+  "practical": 18,
+  "practical_color": "#FFB868",
+  "fstop": 2.0,
+  "glow": 0.35,
+  "glow_threshold": 1.2
+ },
+ "Window Offset": 3.2
+}

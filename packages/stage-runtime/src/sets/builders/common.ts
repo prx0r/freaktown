@@ -23,6 +23,11 @@ export interface BuiltSet {
   /** set.theme: recolour the set (lights, cyclorama, desk brand). */
   setTheme?(theme: SetThemePayloadV1): void;
   setOnAir?(on: boolean): void;
+  /**
+   * Take over a baked Blender variant (sets/blender): hide the procedural geometry (lights stay), add the GLB,
+   * and wire its blank slots (e.g. news_wall_screen) to the live canvas textures.
+   */
+  adoptVariant?(root: THREE.Object3D, opts: { shadows: boolean }): void;
   dispose(): void;
 }
 
