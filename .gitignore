@@ -42,3 +42,7 @@ snldb/
 !packages/sketch/data/
 packages/sketch/data/*
 !packages/sketch/data/structure-stats.json
+
+# other sessions' strays (tracked by nothing; brand test scans untracked)
+HANDOVER-2026-09-08.md
+docs/CHARACTERS2-MAP.md
