@@ -1,4 +1,4 @@
-# Freak Town Monorepo Consolidation
+# FUNNIER Monorepo Consolidation
 
 ## Mission
 
@@ -9,7 +9,7 @@ Consolidate:
 
 into **one canonical repository: `prx0r/freaktown`**.
 
-Freak Town remains the product, brand, creator experience and schema authority.
+FUNNIER remains the product, brand, creator experience and schema authority.
 
 Killella is treated as a donor of production infrastructure:
 
@@ -29,16 +29,16 @@ Killella is treated as a donor of production infrastructure:
 * judge infrastructure
 * production tests
 
-Do NOT move Freak Town into Killella.
+Do NOT move FUNNIER into Killella.
 
 Do NOT leave two applications that can independently create/rehearse Freaks.
 
-Do NOT create a nested `killella/` application inside Freak Town.
+Do NOT create a nested `killella/` application inside FUNNIER.
 
 The desired architecture is:
 
 ```text
-FREAK TOWN
+FUNNIER
 │
 ├── CREATE
 ├── REHEARSE
@@ -60,7 +60,7 @@ PRODUCTION INFRASTRUCTURE
 └── StageRuntime
         │
         ▼
-LIVE FREAK TOWN
+LIVE FUNNIER
 ```
 
 ---
@@ -79,7 +79,7 @@ KILLELLA_SOURCE
 
 Tag both before changing anything.
 
-In Freak Town:
+In FUNNIER:
 
 ```bash
 git checkout main
@@ -93,11 +93,11 @@ In Killella:
 ```bash
 git checkout main
 git pull
-git tag frozen-before-freaktown-merge-863cdd3
-git push origin frozen-before-freaktown-merge-863cdd3
+git tag frozen-before-funnier-merge-863cdd3
+git push origin frozen-before-funnier-merge-863cdd3
 ```
 
-Create migration branch in Freak Town:
+Create migration branch in FUNNIER:
 
 ```bash
 git checkout -b merge/killella-infra
@@ -123,17 +123,17 @@ git merge \
   --allow-unrelated-histories \
   -s ours \
   killella/main \
-  -m "chore: attach killella history as Freak Town infrastructure ancestry"
+  -m "chore: attach killella history as FUNNIER infrastructure ancestry"
 ```
 
 This creates a merge commit with:
 
 ```text
-parent 1 = Freak Town
+parent 1 = FUNNIER
 parent 2 = Killella
 ```
 
-while preserving Freak Town's current tree.
+while preserving FUNNIER's current tree.
 
 Do NOT perform a normal unrelated-history merge.
 
@@ -160,11 +160,11 @@ git worktree remove ../killella-source
 This rule is absolute:
 
 ```text
-Freak Town owns product behavior.
-Infrastructure must conform to Freak Town.
+FUNNIER owns product behavior.
+Infrastructure must conform to FUNNIER.
 ```
 
-Product surfaces owned by Freak Town:
+Product surfaces owned by FUNNIER:
 
 ```text
 Studio
@@ -199,7 +199,7 @@ Delete/ignore any Killella routes that attempt to make `/`, `/studio`, or `/gree
 
 There must be one Studio.
 
-It is Freak Town Studio.
+It is FUNNIER Studio.
 
 ---
 
@@ -210,7 +210,7 @@ Do not achieve this in one huge file move.
 This is the target shape:
 
 ```text
-freaktown/
+funnier/
 │
 ├── app.py                         # temporary legacy Flask product shell
 ├── party.py                       # temporary party implementation
@@ -302,7 +302,7 @@ Copy:
 ```text
 killella/backend/
 →
-freaktown/backend/
+funnier/backend/
 ```
 
 but immediately remove creator-product duplication before the first commit.
@@ -316,7 +316,7 @@ backend/services/green_room_compiler.py
 
 Review `dressing_room` carefully.
 
-If it means creator-side character editing already covered by Freak Town:
+If it means creator-side character editing already covered by FUNNIER:
 
 ```text
 DROP
@@ -349,7 +349,7 @@ backend/services/delivery/
 backend/services/direction_parser.py
 backend/services/ella/
 backend/services/events.py
-backend/services/freaktown/
+backend/services/funnier/
 backend/services/judge/
 backend/services/media_store.py
 backend/services/motions/
@@ -389,7 +389,7 @@ They are outside MVP.
 
 Leave them available in the frozen Killella repository.
 
-Do not drag them into Freak Town's dependency graph.
+Do not drag them into FUNNIER's dependency graph.
 
 Likewise do not port miscellaneous experimental files simply because they exist.
 
@@ -416,7 +416,7 @@ killella_backend
 "Killella" UI labels
 ```
 
-Everything becomes Freak Town infrastructure.
+Everything becomes FUNNIER infrastructure.
 
 ---
 
@@ -438,7 +438,7 @@ in one migration.
 
 Keep existing SQL table names initially where required for stability.
 
-At Python/domain level introduce Freak Town vocabulary:
+At Python/domain level introduce FUNNIER vocabulary:
 
 ```text
 Creator
@@ -483,7 +483,7 @@ This is critical because previous regressions came from schema drift.
 There is exactly one schema authority:
 
 ```text
-/freaktown/contracts/
+/funnier/contracts/
 ```
 
 Nothing in:
@@ -508,7 +508,7 @@ freaktown.events.v1
 freaktown.lineage.v1
 ```
 
-Start by moving the existing Freak Town schemas into `contracts/`.
+Start by moving the existing FUNNIER schemas into `contracts/`.
 
 Fix `delivery.v1` before proceeding.
 
@@ -589,7 +589,7 @@ Both Python and TypeScript must load the exact same files.
 Tests must assert that every field survives:
 
 ```text
-Freak Town Studio
+FUNNIER Studio
 → save
 → contract fixture
 → backend intake
@@ -669,7 +669,7 @@ show management
 health
 ```
 
-Product HTML remains Freak Town-owned during migration.
+Product HTML remains FUNNIER-owned during migration.
 
 Target routes:
 
@@ -697,7 +697,7 @@ For at least one migration phase run:
 ```text
 freak.town
 │
-├── /                       existing Freak Town product
+├── /                       existing FUNNIER product
 ├── /studio                 existing Studio
 ├── /f/*                    share/watch/respond
 ├── /@*                     character/performance URLs
@@ -842,7 +842,7 @@ Product code must not directly know whether storage is local or R2.
 
 # 15. Migrate current JSONL state later, not immediately
 
-Current Freak Town has useful simple data:
+Current FUNNIER has useful simple data:
 
 ```text
 funnel.jsonl
@@ -870,7 +870,7 @@ Migration should be replayable and idempotent.
 
 ---
 
-# 16. Party mode stays Freak Town-owned
+# 16. Party mode stays FUNNIER-owned
 
 Current Party mode already has a useful server-authoritative invariant:
 
@@ -929,7 +929,7 @@ killella/apps/web/worker/
 to:
 
 ```text
-freaktown/edge/worker/
+funnier/edge/worker/
 ```
 
 Keep:
@@ -1044,7 +1044,7 @@ React
 Green Room
 ControlPage
 LivePage
-Freak Town Studio UI
+FUNNIER Studio UI
 ```
 
 It accepts data/events.
@@ -1089,7 +1089,7 @@ Current Killella `preload()` requires an avatar URL before loading audio.
 
 This caused the Killella rehearsal bug.
 
-Fix it before Freak Town consumes the package.
+Fix it before FUNNIER consumes the package.
 
 Avatar is OPTIONAL.
 
@@ -1265,7 +1265,7 @@ After extraction, migrate consumers in this order:
 
 ## First
 
-Freak Town rehearsal.
+FUNNIER rehearsal.
 
 ```text
 Studio
@@ -1346,7 +1346,7 @@ Killella currently has browser/Worker contract definitions.
 Change imports to:
 
 ```text
-@freaktown/contracts
+@funnier/contracts
 ```
 
 or generated output under root `contracts/`.
@@ -1476,9 +1476,9 @@ auditing
 
 ---
 
-# 31. Viral lineage comes from Freak Town
+# 31. Viral lineage comes from FUNNIER
 
-Current Freak Town now owns:
+Current FUNNIER now owns:
 
 ```text
 relation
@@ -1522,7 +1522,7 @@ EllaJudge
 EllaDialogue
 ```
 
-Do not replace Freak Town's:
+Do not replace FUNNIER's:
 
 ```text
 ella_bible.md
@@ -1532,12 +1532,12 @@ Ella personality/content
 
 with Killella prompts.
 
-Freak Town owns Ella's character.
+FUNNIER owns Ella's character.
 
 Infrastructure owns execution.
 
 ```text
-Freak Town Ella definition
+FUNNIER Ella definition
           ↓
 Killella-derived Ella runtime
           ↓
@@ -1595,7 +1595,7 @@ Do not make correctness depend on it.
 
 # 35. Dependency cleanup
 
-Freak Town's current `requirements.txt` is no longer honest enough.
+FUNNIER's current `requirements.txt` is no longer honest enough.
 
 Replace dependency management with one real manifest.
 
@@ -1678,7 +1678,7 @@ Pin compatible shared versions.
 
 ---
 
-# 37. Do not rewrite Freak Town Studio to React yet
+# 37. Do not rewrite FUNNIER Studio to React yet
 
 This is specifically forbidden in the consolidation PR.
 
@@ -1833,7 +1833,7 @@ Content hash assets where useful.
 
 ---
 
-# 43. three.ws generation belongs to Freak Town creation infrastructure
+# 43. three.ws generation belongs to FUNNIER creation infrastructure
 
 Implement provider:
 
@@ -2147,7 +2147,7 @@ Only history + migration doc.
 ### Commit 2
 
 ```text
-feat: establish canonical Freak Town contracts and golden fixture
+feat: establish canonical FUNNIER contracts and golden fixture
 ```
 
 No infrastructure.
@@ -2181,7 +2181,7 @@ feat: extract shared StageRuntime package
 ### Commit 7
 
 ```text
-feat: wire Freak Town rehearsal to shared StageRuntime
+feat: wire FUNNIER rehearsal to shared StageRuntime
 ```
 
 ### Commit 8
@@ -2211,7 +2211,7 @@ test: golden Freak create-to-live convergence
 ### Commit 12
 
 ```text
-docs: freeze killella and declare freaktown canonical
+docs: freeze killella and declare funnier canonical
 ```
 
 Every commit must independently build/test.
@@ -2223,7 +2223,7 @@ Every commit must independently build/test.
 At every stage:
 
 ```text
-existing Freak Town user-facing route
+existing FUNNIER user-facing route
 ```
 
 must continue to work until its replacement has passed parity tests.
@@ -2252,9 +2252,9 @@ Delete flags after stabilization.
 Do NOT:
 
 ```text
-move Freak Town into Killella
+move FUNNIER into Killella
 
-rename Freak Town back to Killella anywhere
+rename FUNNIER back to Killella anywhere
 
 copy Killella Green Room
 
@@ -2305,7 +2305,7 @@ docs/migration/KILLELLA_IMPORT.md
 `BOUNDARIES.md` should begin:
 
 ```text
-Freak Town Studio creates performances.
+FUNNIER Studio creates performances.
 
 Contracts describe performances.
 
@@ -2358,7 +2358,7 @@ But no feature gets implemented there again.
 The entire product should reduce to:
 
 ```text
-                    FREAK TOWN
+                    FUNNIER
 
 CREATE / RESPOND / PARTY / HUMAN / AI
                     │
@@ -2411,7 +2411,7 @@ That is the merged system.
 
 # Appendix: dependency honesty
 
-Freak Town's current `requirements.txt` only declares `openai` and `edge-tts`,
+FUNNIER's current `requirements.txt` only declares `openai` and `edge-tts`,
 despite the current app using Flask and the merged system needing
 substantially more infrastructure; Killella's dependency manifest is much
 closer to reality. Fix as part of early consolidation (see §35).
@@ -2421,6 +2421,6 @@ closer to reality. Fix as part of early consolidation (see §35).
 Above everything else, protect this split:
 
 ```text
-Freak Town = product + contracts.
+FUNNIER = product + contracts.
 Imported infrastructure = execution.
 ```

@@ -29,7 +29,7 @@ def configured() -> bool:
 def room_name(event_id: str) -> str:
     safe = "".join(c if c.isalnum() or c in "-_" else "-"
                    for c in str(event_id or "lobby"))[:48].strip("-") or "lobby"
-    return f"freaktown-{safe}"
+    return f"funnier-{safe}"
 
 
 def mint_token(identity: str, room: str, role: str = "human",

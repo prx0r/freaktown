@@ -17,7 +17,7 @@ import json
 import logging
 import os
 
-logger = logging.getLogger("freak_town.scoring")
+logger = logging.getLogger("funnier.scoring")
 
 RUBRIC = """You are a comedy expert evaluating a one-minute standup set.
 

@@ -1,7 +1,7 @@
 """Qwen3-TTS adapter — canonical open-source TTS with voice cloning.
 
 Apache-2.0 licensed. 0.6B params. Voice cloning from seconds of reference audio.
-This is the open-source destination for Freak Town.
+This is the open-source destination for FUNNIER.
 
 Comedy tags: uses text-based prosody markers (SSML-like).
 Voice cloning: reference audio + reference text.
@@ -20,7 +20,7 @@ import struct
 from backend.services.tts.base import TTSAdapter, TTSResult, ProviderInfo
 from backend.models.draft import WordTiming
 
-logger = logging.getLogger("freak_town.tts.qwen3")
+logger = logging.getLogger("funnier.tts.qwen3")
 
 COMEDY_TAGS = [
     "[laugh]", "[sigh]", "[pause]", "[whisper]",

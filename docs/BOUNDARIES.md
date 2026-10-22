@@ -1,7 +1,7 @@
 # Boundaries — what lives where (2026-09-11)
 
 ```text
-Freak Town Studio creates performances.
+FUNNIER Studio creates performances.
 
 Contracts describe performances.
 
@@ -16,7 +16,7 @@ Ella observes and acts on live events.
 No subsystem may recreate another subsystem's responsibility.
 ```
 
-## 0. Pogtown vs Freaktown (repo line)
+## 0. Pogtown vs FUNNIER (repo line)
 
 | | prx0r/pogtown | prx0r/freaktown (this repo) |
 |---|---|---|
@@ -24,13 +24,13 @@ No subsystem may recreate another subsystem's responsibility.
 | Serves | Pog API (Docker, Postgres) | Flask app (live site), later FastAPI strangler |
 | Never | product UI, avatars, voices as store of record | game-truth reimplementation (see `archive/`) |
 
-Import direction: freaktown consumes the pog protocol via the stage-adapter
-(pog side) and `backend/services/freaktown/`. Pogtown never imports freaktown
+Import direction: funnier consumes the pog protocol via the stage-adapter
+(pog side) and `backend/services/funnier/`. Pogtown never imports funnier
 runtime code — only validates its bundles. The dormant Python game engine was
 archived for exactly this reason (`archive/README.md`).
 
 Gift packs: pogtown owns the spec, the validator, and the state machine
-(briefed → generating → qa → delivered). Freaktown owns the avatar pipeline
+(briefed → generating → qa → delivered). FUNNIER owns the avatar pipeline
 that generates the actual assets (portrait, video, voice, walkout). The
 shared key is the freak pack identity. Nothing crosses the boundary except
 bundles and events. See `pogtown-mvp/packages/gift-pack/` for the spec.
@@ -64,7 +64,7 @@ providers behind the manifest — never the store of record. See
 
 | Concern | Owner | Lives in |
 |---|---|---|
-| Product behavior, Studio, watch/respond, party, URLs, lore, Ella character | Freak Town | `app.py` (temp), `party.py` (temp), `static/`, `ella_*.md` |
+| Product behavior, Studio, watch/respond, party, URLs, lore, Ella character | FUNNIER | `app.py` (temp), `party.py` (temp), `static/`, `ella_*.md` |
 | Schema authority | Contracts | `contracts/*.schema.json` + `contracts/fixtures/golden-freak-v1/` |
 | Persistence, intake, judges, media metadata | FastAPI backend | `backend/` |
 | Live coordination | EpisodeRoom (DO) | `edge/worker/` |
@@ -73,7 +73,7 @@ providers behind the manifest — never the store of record. See
 
 ## Hard rules
 
-- One Studio (Freak Town). No Green Room, no Dressing Room API.
+- One Studio (FUNNIER). No Green Room, no Dressing Room API.
 - One delivery schema version in force (`freaktown.delivery.v1`, frozen).
 - Intake validates/hashes/stores; never rewrites creative content.
 - Postgres = durable truth. R2 = immutable assets. DO = live state only.

@@ -1,4 +1,4 @@
-"""Funnier skin for Freak Town's public pages (/perform*, /play, /party*, /join*).
+"""Funnier skin for the FUNNIER box's public pages (/perform*, /play, /party*, /join*).
 
 Why a response layer instead of editing every template: the box (party.funnier.si) runs commits that are not on
 GitHub (stone-face, poker, the /perform bill and live-room APIs). Rewriting the HTML on the way out reskins those
@@ -7,10 +7,10 @@ of app.py. Element ids, classes and scripts are left exactly as the views wrote 
 few wrapper classes change, plus the Funnier header.
 
 What it does to an HTML response on a skinned path:
-  1. palette: Freak Town pink/cyan/monospace -> Funnier red/gold/Inter Tight (inline styles, <style> blocks and
+  1. palette: legacy pink/cyan/monospace -> Funnier red/gold/Inter Tight (inline styles, <style> blocks and
      colour strings inside scripts alike, so canvas/JS-built UI follows);
   2. links https://www.funnier.si/theme.css (shared tokens + components) and a small local sheet (SKIN_CSS);
-  3. puts the Funnier header (wordmark -> www.funnier.si, Freak Town nav, round account icon) at the top of <body>;
+  3. puts the Funnier header (wordmark -> www.funnier.si, FUNNIER nav, round account icon) at the top of <body>;
   4. /play: groups the mode cards into Funnier rails (party games, Quip Clash decks);
      /perform: turns the bill into a poster grid.
 
@@ -38,7 +38,7 @@ SKIN_PATHS = re.compile(r"^/(perform(/|$)|play/?$|party(/|$)|join/)")
 ACT_PATH = re.compile(r"^/perform/([^/?#]+)")
 TEST_ACT = re.compile(r"(^|[-\s_])(e2e|test|testing|smoke|qa)([-\s_]|$)", re.I)
 
-# Freak Town colour -> Funnier token. Matched as whole hex literals only.
+# Legacy box colour -> Funnier token. Matched as whole hex literals only.
 PALETTE = {
     "#ff2fa8": "#e8102e", "#ffb7dc": "#ffd6dc", "#2a0a1e": "#2a0a10", "#7a2f5c": "#7a1020",
     "#00d4ff": "#f5c76b", "#8f8": "#5fd38d",
@@ -174,7 +174,7 @@ def _header(path: str) -> str:
     lab = path.startswith("/party/lab")
     on = lambda yes: " class=on" if yes else ""
     return (f"<header class='fn-top ft-top'><a class='fn-wordmark' href='{HOME_URL}' aria-label='Funnier home'>FUNNIER</a>"
-            f"<nav class='fn-nav' aria-label='Freak Town'><a href='/perform'{on(path.startswith('/perform'))}>Tonight&#39;s bill</a>"
+            f"<nav class='fn-nav' aria-label='FUNNIER'><a href='/perform'{on(path.startswith('/perform'))}>Tonight&#39;s bill</a>"
             f"<a href='/party'{on(not lab and re.match(r'^/(play|party|join)', path) is not None)}>Party games</a><a href='/party/lab'{on(lab)}>Tech lab</a></nav>"
             f"<a class='fn-userbtn' href='{HOME_URL}#you' aria-label='Your Funnier account'>{USER_SVG}</a></header>")
 
@@ -205,7 +205,7 @@ def _mode_rails(html: str) -> str:
 
 
 def _poster(m):
-    """A bill card without a portrait gets a Funnier monogram poster instead of the pink Freak Town icon."""
+    """A bill card without a portrait gets a Funnier monogram poster instead of the legacy pink icon."""
     card = m.group(0)
     name = re.search(r"</?(?:img|span)[^>]*>\s*<div[^>]*>([^<]*)</div>", card)
     initial = (name.group(1).strip()[:1] if name else "") or "?"
@@ -223,7 +223,8 @@ def reskin(html: str, path: str) -> str:
             f"<style id='funnier-skin'>{SKIN_CSS}</style><meta name='theme-color' content='#07070a'>")
     html = re.sub(r"<meta name=\"theme-color\"[^>]*>", "", html)
     html = re.sub(r"</head>", head + "</head>", html, count=1, flags=re.I)
-    html = re.sub(r"<title>([^<]*)Freak Town( Party)?", lambda m: f"<title>{m.group(1)}Freak Town{m.group(2) or ''} · Funnier", html, count=1)
+    # Accepts the legacy "Freak Town" brand too (a box still on older code); the brand is now FUNNIER.
+    html = re.sub(r"<title>([^<]*)(?:Freak Town|FUNNIER)( Party)?(?! · Funnier)", lambda m: f"<title>{m.group(1)}FUNNIER{m.group(2) or ''} · Funnier", html, count=1)
     index = path.rstrip("/") in ("/play", "/party", "/perform")
     html = re.sub(r"<body([^>]*)>", lambda m: _body_open(m.group(1), index) + _header(path), html, count=1, flags=re.I)
     if path.rstrip("/") in ("/play", "/party"):
@@ -307,8 +308,8 @@ def _fallback_perform_routes(app):
                 s, m = acts[0][1], acts[0][2]
                 head = f"<p style=\"color:#888;\">Headliner: <a href=\"/perform/{s}\">{_h.escape((m.get('character') or {}).get('name', s))}</a></p>"
             page = ("<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
-                    "<title>TONIGHT — Freak Town Live</title>\n<style>body{background:#0a0a0f;color:#eee;font-family:monospace;text-align:center;padding:32px 16px}\n"
-                    "a{color:#ff2fa8}</style></head><body>\n<div style=\"font-size:12px;letter-spacing:2px;color:#ff2fa8;\">🎪 FREAK TOWN · LIVE</div>\n"
+                    "<title>TONIGHT — FUNNIER Live</title>\n<style>body{background:#0a0a0f;color:#eee;font-family:monospace;text-align:center;padding:32px 16px}\n"
+                    "a{color:#ff2fa8}</style></head><body>\n<div style=\"font-size:12px;letter-spacing:2px;color:#ff2fa8;\">🎪 FUNNIER · LIVE</div>\n"
                     f"<h1>TONIGHT'S BILL</h1>\n{head}\n<div>{''.join(cards)}</div>\n"
                     f"<p style=\"color:#555;font-size:12px;margin-top:16px\">{len(cards)} acts · pre-rendered sets,\nlive audience · predicted heat is heuristic v0</p>\n</body></html>")
             return page, 200, {"Content-Type": "text/html; charset=utf-8"}

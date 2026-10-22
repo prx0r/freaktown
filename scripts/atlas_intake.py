@@ -29,7 +29,7 @@ WEB_BUDGET = 8 * 1024 * 1024
 
 def load_bytes(src: str) -> bytes:
     if src.startswith(("http://", "https://")):
-        req = urllib.request.Request(src, headers={"User-Agent": "freaktown-intake/1"})
+        req = urllib.request.Request(src, headers={"User-Agent": "funnier-intake/1"})
         with urllib.request.urlopen(req, timeout=120) as r:
             return r.read(60 * 1024 * 1024 + 1)
     return Path(src).read_bytes()

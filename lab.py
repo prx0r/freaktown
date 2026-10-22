@@ -27,7 +27,7 @@ LAB_RIGS = [
 
 LAB_HOME = """<!DOCTYPE html><html><head><meta charset=utf-8>
 <meta name=viewport content='width=device-width,initial-scale=1'>
-<title>Tech Lab — Freak Town Party</title></head>
+<title>Tech Lab — FUNNIER Party</title></head>
 <body style='background:#0a0a0f;color:#eee;font-family:monospace;text-align:center;padding:32px 16px'>
 <div style='color:#ff2fa8;letter-spacing:2px'>TECH LAB</div>
 <h1>TEST THE TECH</h1>
@@ -88,7 +88,7 @@ VOICE_RIG = """<!DOCTYPE html><html><head><meta charset=utf-8>
 <body style='background:#0a0a0f;color:#eee;font-family:monospace;text-align:center;padding:32px 16px'>
 <div style='color:#ff2fa8'>TECH LAB · E2 VOICE</div>
 <h1>SAY IT</h1>
-<textarea id=t rows=3 style='width:min(92vw,480px);font-size:16px;background:#111;color:#eee;border:1px solid #333;border-radius:10px;padding:10px'>Welcome to Freak Town. I am not optimistic.</textarea><br><br>
+<textarea id=t rows=3 style='width:min(92vw,480px);font-size:16px;background:#111;color:#eee;border:1px solid #333;border-radius:10px;padding:10px'>Welcome to FUNNIER. I am not optimistic.</textarea><br><br>
 <button onclick='say()' style='font-size:18px;padding:12px 32px;background:#ff2fa8;border:0;color:#fff;border-radius:24px'>SPEAK</button>
 <p id=m style='color:#888'></p><audio id=a controls style='margin-top:12px'></audio>
 <script>

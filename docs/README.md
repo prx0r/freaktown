@@ -1,4 +1,4 @@
-# docs/ — freaktown docs map
+# docs/ — funnier docs map
 
 Read in order: `BOUNDARIES.md` → `TRIAL_STAGE1_PLAN.md` → `CHARACTER_PACK.md`
 → then the relevant deep-dive below.
@@ -7,7 +7,7 @@ Read in order: `BOUNDARIES.md` → `TRIAL_STAGE1_PLAN.md` → `CHARACTER_PACK.md
 
 | File | What it is |
 |---|---|
-| BOUNDARIES.md | What lives where: pogtown vs freaktown, old vs new, three rooms, hard rules |
+| BOUNDARIES.md | What lives where: pogtown vs funnier, old vs new, three rooms, hard rules |
 | ARCHITECTURE.md | Live system map: Flask strangler, backend, edge, stage-runtime, contracts |
 | AGENT-ONBOARDING.md | Quick-start for coding agents joining the project |
 

@@ -1,4 +1,4 @@
-"""House guests — famous AIs and robots as Freak Town regulars.
+"""House guests — famous AIs and robots as FUNNIER regulars.
 
 Same dict shape as comedians.py. These are recurring characters with
 fixed voices and canonical minutes. Anyone can challenge them.

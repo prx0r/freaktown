@@ -1,4 +1,4 @@
-# HANDOVER — freaktown, 2026-09-11 final (session closed)
+# HANDOVER — funnier, 2026-09-11 final (session closed)
 
 Owner's goal: **avatar flow working** — prompt → custom avatar + minute,
 shareable, dad makes his own. **Status: LIVE.**
@@ -20,7 +20,7 @@ shareable, dad makes his own. **Status: LIVE.**
 
 ## Pushed
 
-- pogtown `main`: CP0 (163ff2f). freaktown `trial/avatar-flow` (branch,
+- pogtown `main`: CP0 (163ff2f). funnier `trial/avatar-flow` (branch,
   main frozen). Nothing else pending push; trees staged-clean.
 
 ## Built this session (all pushed except where noted)
@@ -37,7 +37,7 @@ AGENTS.md + this HANDOVER · pogtown attacker-gate + fetch-upstreams fixes ·
 ## Still needs human (nothing code-side outstanding)
 
 1. **Rotate pasted secrets** (GH PAT + CF/R2 keys went through chat; used
-   env-only, on disk only in 600 files: `freaktown/.env`,
+   env-only, on disk only in 600 files: `funnier/.env`,
    `~/.cloudflared/`).
 2. **Vault grant** for opencode (`set-role ... member --vault oracle/main`)
    → unlocks Kaggle kernel firing + secret reads without chat pastes.

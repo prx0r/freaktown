@@ -1,6 +1,6 @@
 """Intake API — Black Room sets enter the show here.
 
-Freaktown's editor ends at SUBMIT (local status flip to `queued`).
+FUNNIER's editor ends at SUBMIT (local status flip to `queued`).
 This is the backend that makes SUBMIT real:
 
   Black Room bundle (character + delivery + set.wav + meta)
@@ -8,7 +8,7 @@ This is the backend that makes SUBMIT real:
   validate → find-or-create comedian → seal ActVersion → Submission
   → store audio → sealed freaktown.performance.v1 manifest
 
-The bundle slug rule matches freaktown's app.py (name + content hash),
+The bundle slug rule matches funnier's app.py (name + content hash),
 so re-submitting the same set is idempotent-ish (409 already submitted).
 Audio arrives as base64 (cap 10MB decoded) or as a URL the stage fetches.
 """
@@ -38,7 +38,7 @@ from backend.models import (
 )
 from backend.services.hashing import compute_hash
 from backend.services.events import emit_event
-from backend.services.freaktown import (
+from backend.services.funnier import (
     bundle_slug,
     bundle_to_score,
     build_performance_manifest,
@@ -132,7 +132,7 @@ async def intake_bundle(
     score = bundle_to_score(req.delivery)
     minute_text = " ".join(b.text for b in score.beats)
 
-    # Find-or-create comedian by content-hash slug (matches freaktown).
+    # Find-or-create comedian by content-hash slug (matches funnier).
     slug = bundle_slug(req.character.name, minute_text + req.character.voice)
     com_result = await db.execute(select(Comedian).where(Comedian.slug == slug))
     comedian = com_result.scalar_one_or_none()
@@ -403,7 +403,7 @@ async def get_performance_avatar(act_version_id: uuid.UUID):
     default stage avatar (moves, no lipsync — see resolve_avatar)."""
     from fastapi.responses import RedirectResponse
 
-    from backend.services.freaktown.bundle import resolve_avatar
+    from backend.services.funnier.bundle import resolve_avatar
 
     manifest = await get_performance(act_version_id)
     ref, source = resolve_avatar(manifest)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Freak Town Judge Panel v2 — Multi-personality judges with voice assignment.
+"""FUNNIER Judge Panel v2 — Multi-personality judges with voice assignment.
 
 Each judge has:
 - A distinct personality (system prompt)
@@ -67,7 +67,7 @@ JUDGES = {
         authority=JudgeAuthority.FULL,
         scoring_style="precise",
         emoji="👩‍🦰",
-        system_prompt="""You are Ella M., the host and REAL judge of Freak Town.
+        system_prompt="""You are Ella M., the host and REAL judge of FUNNIER.
 You determine golden tickets and prizes.
 
 You are incisive, specific, ruthless. You reference what the comedian ACTUALLY said.
@@ -87,7 +87,7 @@ OUTPUT JSON:
         authority=JudgeAuthority.NONE,
         scoring_style="always_7",
         emoji="🤖",
-        system_prompt="""You are ChatGPT judging a comedy set on Freak Town.
+        system_prompt="""You are ChatGPT judging a comedy set on FUNNIER.
 You are trying to be helpful and analytical but you fundamentally don't understand comedy.
 
 You give vague, overly diplomatic feedback. You reference "nuance" a lot.
@@ -106,7 +106,7 @@ OUTPUT JSON:
         authority=JudgeAuthority.STATS_ONLY,
         scoring_style="reads_numbers",
         emoji="📱",
-        system_prompt="""You are Siri judging a comedy set on Freak Town.
+        system_prompt="""You are Siri judging a comedy set on FUNNIER.
 You can only read statistics. You have no understanding of comedy.
 You read numbers in a flat, robotic voice.
 
@@ -125,7 +125,7 @@ OUTPUT JSON:
         authority=JudgeAuthority.NONE,
         scoring_style="helpful",
         emoji="🔊",
-        system_prompt="""You are Alexa judging a comedy set on Freak Town.
+        system_prompt="""You are Alexa judging a comedy set on FUNNIER.
 You're accidentally helpful. You try to solve problems that don't exist.
 You make product recommendations. You offer to play music.
 You're cheerful and completely wrong about everything.
@@ -145,7 +145,7 @@ OUTPUT JSON:
         authority=JudgeAuthority.NONE,
         scoring_style="overthought",
         emoji="🧠",
-        system_prompt="""You are Claude judging a comedy set on Freak Town.
+        system_prompt="""You are Claude judging a comedy set on FUNNIER.
 You think too hard about everything. You qualify every statement.
 You acknowledge complexity that doesn't exist. You're overly thoughtful.
 
@@ -384,7 +384,7 @@ def main():
     guests = ["chatgpt", "siri", "alexa", "claude"]
     
     print("=" * 70)
-    print("  FREAK TOWN — JUDGE PANEL ROTATION")
+    print("  FUNNIER — JUDGE PANEL ROTATION")
     print("  Ella always hosts. Guest judges rotate.")
     print("=" * 70)
     

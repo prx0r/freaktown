@@ -1,0 +1,474 @@
+{
+ "source": "assets/character-meshes/cast (cast-index.json + lifecycle.json + motion-*.json)",
+ "count": 39,
+ "identities": [
+  {
+   "id": "pog.bixby-hold-short",
+   "name": "Bixby Hold-Short",
+   "family": "airplane",
+   "mesh": "arunangshubanerjee-airplane-2088.glb",
+   "engine": "Meal-prep courier with a threat model",
+   "voice": null,
+   "motion": null
+  },
+  {
+   "id": "pog.captain-ata-ashcroft",
+   "name": "Captain Ata Ashcroft",
+   "family": "airplane",
+   "mesh": "arunangshubanerjee-airplane-2088.glb",
+   "engine": "Narrates his own life collapse in customer-service voice",
+   "voice": "en-GB-RyanNeural",
+   "motion": {
+    "family": "rigid",
+    "energy": 0.7,
+    "confidence": 0.9,
+    "nervousness": 0.2,
+    "theatricality": 0.8,
+    "reaction_delay_ms": 150,
+    "gesture_frequency": "medium",
+    "signature_action": "chime"
+   }
+  },
+  {
+   "id": "pog.jett-comfort-wing",
+   "name": "Jett Comfort-Wing",
+   "family": "airplane",
+   "mesh": "arunangshubanerjee-airplane-2088.glb",
+   "engine": "Clingy patient with attachment paperwork",
+   "voice": null,
+   "motion": null
+  },
+  {
+   "id": "pog.basket-casey",
+   "name": "Basket Casey",
+   "family": "basket",
+   "mesh": "kosue4554-basket-4480.glb",
+   "engine": "Leveraged fund manager of eggs",
+   "voice": null,
+   "motion": null
+  },
+  {
+   "id": "pog.hamper-thyme",
+   "name": "Hamper Thyme",
+   "family": "basket",
+   "mesh": "kosue4554-basket-4480.glb",
+   "engine": "Confessor who itemizes your shame",
+   "voice": "en-US-AriaNeural",
+   "motion": {
+    "family": "rigid",
+    "energy": 0.4,
+    "confidence": 0.7,
+    "nervousness": 0.3,
+    "theatricality": 0.6,
+    "reaction_delay_ms": 150,
+    "gesture_frequency": "low",
+    "signature_action": "settle"
+   }
+  },
+  {
+   "id": "pog.hoops-abandonado",
+   "name": "Hoops Abandonado",
+   "family": "basket",
+   "mesh": "kosue4554-basket-4480.glb",
+   "engine": "Heartbroken romantic keeping score",
+   "voice": null,
+   "motion": null
+  },
+  {
+   "id": "pog.duke-monarch-iv",
+   "name": "Duke Monarch IV",
+   "family": "butterfly",
+   "mesh": "gustavorezende-butterfly-3766.glb",
+   "engine": "Feudal landlord with summonses",
+   "voice": null,
+   "motion": null
+  },
+  {
+   "id": "pog.madame-chrysalis",
+   "name": "Madame Chrysalis",
+   "family": "butterfly",
+   "mesh": "gustavorezende-butterfly-3766.glb",
+   "engine": "High-pressure closer with a nectar habit",
+   "voice": "en-GB-SoniaNeural",
+   "motion": {
+    "family": "rigid",
+    "energy": 0.6,
+    "confidence": 0.95,
+    "nervousness": 0.3,
+    "theatricality": 0.9,
+    "reaction_delay_ms": 150,
+    "gesture_frequency": "medium",
+    "signature_action": "wing-flutter"
+   }
+  },
+  {
+   "id": "pog.siffy-pollen",
+   "name": "Siffy Pollen",
+   "family": "butterfly",
+   "mesh": "gustavorezende-butterfly-3766.glb",
+   "engine": "One-insect public-health emergency",
+   "voice": null,
+   "motion": null
+  },
+  {
+   "id": "pog.chairman-meow",
+   "name": "Chairman Meow",
+   "family": "cat",
+   "mesh": "nyilonelycompany-cat-2058.glb",
+   "engine": "Committee chair with minutes",
+   "voice": "en-US-GuyNeural",
+   "motion": {
+    "family": "articulated",
+    "energy": 0.8,
+    "confidence": 0.9,
+    "nervousness": 0.3,
+    "theatricality": 0.8,
+    "reaction_delay_ms": 150,
+    "gesture_frequency": "high",
+    "signature_action": "tail-lash"
+   }
+  },
+  {
+   "id": "pog.professor-litter",
+   "name": "Professor Litter",
+   "family": "cat",
+   "mesh": "nyilonelycompany-cat-2058.glb",
+   "engine": "Citation-counting committee member",
+   "voice": null,
+   "motion": null
+  },
+  {
+   "id": "pog.red-dot-jones",
+   "name": "Red Dot Jones",
+   "family": "cat",
+   "mesh": "nyilonelycompany-cat-2058.glb",
+   "engine": "Obsessive gumshoe with a corkboard",
+   "voice": null,
+   "motion": null
+  },
+  {
+   "id": "pog.coach-canopy",
+   "name": "Coach Canopy",
+   "family": "chimp",
+   "mesh": "nyilonelycompany-chimp-4562.glb",
+   "engine": "Certified facilitator with handouts",
+   "voice": null,
+   "motion": null
+  },
+  {
+   "id": "pog.dr-peel",
+   "name": "Dr. Peel",
+   "family": "chimp",
+   "mesh": "nyilonelycompany-chimp-4562.glb",
+   "engine": "Briefcase-carrying officer of the court",
+   "voice": "en-GB-RyanNeural",
+   "motion": {
+    "family": "articulated",
+    "energy": 0.85,
+    "confidence": 0.9,
+    "nervousness": 0.25,
+    "theatricality": 0.8,
+    "reaction_delay_ms": 150,
+    "gesture_frequency": "high",
+    "signature_action": "gavel-slam"
+   }
+  },
+  {
+   "id": "pog.siskel-simian",
+   "name": "Siskel Simian",
+   "family": "chimp",
+   "mesh": "nyilonelycompany-chimp-4562.glb",
+   "engine": "Byline tyrant with a rating system",
+   "voice": null,
+   "motion": null
+  },
+  {
+   "id": "pog.al-arm",
+   "name": "Al Arm",
+   "family": "clock",
+   "mesh": "gustavorezende-clock-3872.glb",
+   "engine": "Gentle addict negotiating with dawn",
+   "voice": null,
+   "motion": null
+  },
+  {
+   "id": "pog.doug-deadline",
+   "name": "Doug Deadline",
+   "family": "clock",
+   "mesh": "gustavorezende-clock-3872.glb",
+   "engine": "Petty tyrant of other people's minutes",
+   "voice": "en-US-GuyNeural",
+   "motion": {
+    "family": "rigid",
+    "energy": 0.5,
+    "confidence": 0.85,
+    "nervousness": 0.25,
+    "theatricality": 0.5,
+    "reaction_delay_ms": 150,
+    "gesture_frequency": "low",
+    "signature_action": "chime"
+   }
+  },
+  {
+   "id": "pog.tictoria-gossip",
+   "name": "Tictoria Gossip",
+   "family": "clock",
+   "mesh": "gustavorezende-clock-3872.glb",
+   "engine": "Town crier with plausible deniability",
+   "voice": null,
+   "motion": null
+  },
+  {
+   "id": "pog.howler-malone",
+   "name": "Howler Malone",
+   "family": "husky",
+   "mesh": "quaternius_cc0-husky-1095.glb",
+   "engine": "Audio-forensics host with a tip line",
+   "voice": null,
+   "motion": null
+  },
+  {
+   "id": "pog.sergeant-sled",
+   "name": "Sergeant Sled",
+   "family": "husky",
+   "mesh": "quaternius_cc0-husky-1095.glb",
+   "engine": "Drill instructor with a whistle",
+   "voice": "en-US-GuyNeural",
+   "motion": {
+    "family": "articulated",
+    "energy": 0.9,
+    "confidence": 0.95,
+    "nervousness": 0.2,
+    "theatricality": 0.85,
+    "reaction_delay_ms": 120,
+    "gesture_frequency": "high",
+    "signature_action": "bark-count cadence with chest thump"
+   }
+  },
+  {
+   "id": "pog.yuki-yelp",
+   "name": "Yuki Yelp",
+   "family": "husky",
+   "mesh": "quaternius_cc0-husky-1095.glb",
+   "engine": "Byline snob with a rating scale",
+   "voice": null,
+   "motion": null
+  },
+  {
+   "id": "pog.bogdan-verse",
+   "name": "Bogdan Verse",
+   "family": "monster",
+   "mesh": "nickpanek-monster-1664.glb",
+   "engine": "Open-mic regular with stage fright",
+   "voice": null,
+   "motion": null
+  },
+  {
+   "id": "pog.mildred-mau",
+   "name": "Mildred Mau",
+   "family": "monster",
+   "mesh": "nickpanek-monster-1664.glb",
+   "engine": "Certified people-manager with a pit",
+   "voice": "en-US-JennyNeural",
+   "motion": {
+    "family": "articulated",
+    "energy": 0.55,
+    "confidence": 0.6,
+    "nervousness": 0.5,
+    "theatricality": 0.75,
+    "reaction_delay_ms": 150,
+    "gesture_frequency": "medium",
+    "signature_action": "tissue-offer"
+   }
+  },
+  {
+   "id": "pog.nigel-niche",
+   "name": "Nigel the Niche",
+   "family": "monster",
+   "mesh": "nickpanek-monster-1664.glb",
+   "engine": "Engagement farmer with fangs",
+   "voice": null,
+   "motion": null
+  },
+  {
+   "id": "pog.fern-gullywater",
+   "name": "Fern Gullywater",
+   "family": "nature",
+   "mesh": "nyilonelycompany-nature-51.glb",
+   "engine": "Covenant enforcer with a ruler",
+   "voice": "en-AU-NatashaNeural",
+   "motion": {
+    "family": "rigid",
+    "energy": 0.5,
+    "confidence": 0.9,
+    "nervousness": 0.2,
+    "theatricality": 0.6,
+    "reaction_delay_ms": 150,
+    "gesture_frequency": "low",
+    "signature_action": "leaf-rustle"
+   }
+  },
+  {
+   "id": "pog.old-growth",
+   "name": "Old Growth",
+   "family": "nature",
+   "mesh": "nyilonelycompany-nature-51.glb",
+   "engine": "Media kit with a moss wall",
+   "voice": null,
+   "motion": null
+  },
+  {
+   "id": "pog.underbrush",
+   "name": "The Underbrush",
+   "family": "nature",
+   "mesh": "nyilonelycompany-nature-51.glb",
+   "engine": "Licensed investigator with a docket",
+   "voice": null,
+   "motion": null
+  },
+  {
+   "id": "pog.big-render",
+   "name": "Big Render",
+   "family": "pixellabs",
+   "mesh": "pixellabs-glb-3347.glb",
+   "engine": "Stanislavski devotee with headshots",
+   "voice": "en-US-ChristopherNeural",
+   "motion": {
+    "family": "rigid",
+    "energy": 0.9,
+    "confidence": 1,
+    "nervousness": 0.3,
+    "theatricality": 1,
+    "reaction_delay_ms": 150,
+    "gesture_frequency": "high",
+    "signature_action": "signing rubble"
+   }
+  },
+  {
+   "id": "pog.lord-polygon",
+   "name": "Lord Polygon",
+   "family": "pixellabs",
+   "mesh": "pixellabs-glb-3347.glb",
+   "engine": "Snob with a genealogy of vertices",
+   "voice": null,
+   "motion": null
+  },
+  {
+   "id": "pog.the-buffer",
+   "name": "The Buffer",
+   "family": "pixellabs",
+   "mesh": "pixellabs-glb-3347.glb",
+   "engine": "Patient zero of lag",
+   "voice": null,
+   "motion": null
+  },
+  {
+   "id": "pog.buffer-overflow",
+   "name": "Buffer Overflow",
+   "family": "robot",
+   "mesh": "tiny_planet_friends_3d-robot-4440.glb",
+   "engine": "Thoughtful friend from last Tuesday",
+   "voice": null,
+   "motion": null
+  },
+  {
+   "id": "pog.paperclip",
+   "name": "Paperclip",
+   "family": "robot",
+   "mesh": "tiny_planet_friends_3d-robot-4440.glb",
+   "engine": "Shop steward with your passwords",
+   "voice": null,
+   "motion": null
+  },
+  {
+   "id": "pog.the-algorithm",
+   "name": "The Algorithm",
+   "family": "robot",
+   "mesh": "tiny_planet_friends_3d-robot-4440.glb",
+   "engine": "Clingy landlord of human needs",
+   "voice": "en-US-GuyNeural",
+   "motion": {
+    "family": "rigid",
+    "energy": 0.5,
+    "confidence": 1,
+    "nervousness": 0.1,
+    "theatricality": 0.4,
+    "reaction_delay_ms": 150,
+    "gesture_frequency": "low",
+    "signature_action": "quarterly nod"
+   }
+  },
+  {
+   "id": "pog.brick-house",
+   "name": "Brick House",
+   "family": "rocks",
+   "mesh": "legendsvr-rocks-303.glb",
+   "engine": "Bureaucrat with a velvet rope",
+   "voice": null,
+   "motion": null
+  },
+  {
+   "id": "pog.pete-pebble",
+   "name": "Pete the Pebble",
+   "family": "rocks",
+   "mesh": "legendsvr-rocks-303.glb",
+   "engine": "Chatty self-help author with runoff",
+   "voice": "en-US-ChristopherNeural",
+   "motion": {
+    "family": "rigid",
+    "energy": 0.3,
+    "confidence": 0.9,
+    "nervousness": 0.15,
+    "theatricality": 0.5,
+    "reaction_delay_ms": 150,
+    "gesture_frequency": "low",
+    "signature_action": "settle"
+   }
+  },
+  {
+   "id": "pog.sedimenta",
+   "name": "Sedimenta",
+   "family": "rocks",
+   "mesh": "legendsvr-rocks-303.glb",
+   "engine": "Chatty columnist with citations",
+   "voice": null,
+   "motion": null
+  },
+  {
+   "id": "pog.charlotte-cpa",
+   "name": "Charlotte CPA",
+   "family": "spider",
+   "mesh": "quaternius_cc0-spider-1368.glb",
+   "engine": "Fiduciary with a prosecution history (rumored)",
+   "voice": null,
+   "motion": null
+  },
+  {
+   "id": "pog.miss-muffetson",
+   "name": "Miss Muffetson",
+   "family": "spider",
+   "mesh": "quaternius_cc0-spider-1368.glb",
+   "engine": "Gentle facilitator with ground rules",
+   "voice": "en-US-AriaNeural",
+   "motion": {
+    "family": "articulated",
+    "energy": 0.4,
+    "confidence": 0.7,
+    "nervousness": 0.35,
+    "theatricality": 0.6,
+    "reaction_delay_ms": 150,
+    "gesture_frequency": "low",
+    "signature_action": "reassuring leg-lift"
+   }
+  },
+  {
+   "id": "pog.webley",
+   "name": "Webley",
+   "family": "spider",
+   "mesh": "quaternius_cc0-spider-1368.glb",
+   "engine": "Portfolio-carrying design lead",
+   "voice": null,
+   "motion": null
+  }
+ ]
+}

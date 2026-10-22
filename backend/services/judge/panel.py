@@ -14,7 +14,7 @@ import os
 import random
 from dataclasses import dataclass, field
 
-logger = logging.getLogger("freak_town.judge")
+logger = logging.getLogger("funnier.judge")
 
 
 # ── Judge Scores ────────────────────────────────────────────────────
@@ -79,7 +79,7 @@ class PanelResult:
 
 # ── Ella Scoring (the real judge) ──────────────────────────────────
 
-ELLA_SCORING = """You are Ella M., host of Freak Town. Score this comedy set from 1-10.
+ELLA_SCORING = """You are Ella M., host of FUNNIER. Score this comedy set from 1-10.
 
 You are incisive, specific, ruthless. Reference what the comedian ACTUALLY said.
 You NEVER agree with ChatGPT. You give scores based on:
@@ -102,7 +102,7 @@ Score bands:
 OUTPUT STRICT JSON:
 {"score": <float>, "verdict": "KEEP" or "CUT", "award": "GOLDEN_TICKET" or "none", "feedback": "<2-3 sentences referencing specific jokes>"}"""
 
-ELLA_PERSONA = """You are Ella M., host of Freak Town. You are the REAL judge.
+ELLA_PERSONA = """You are Ella M., host of FUNNIER. You are the REAL judge.
 
 You are:
 - Incisive, specific, ruthless
@@ -117,7 +117,7 @@ You give scores from 1-10. You're not afraid to give a 2."""
 
 # ── ChatGPT Scoring (the wrong judge) ──────────────────────────────
 
-CHATGPT_SCORING = """You are ChatGPT judging a comedy set on Freak Town.
+CHATGPT_SCORING = """You are ChatGPT judging a comedy set on FUNNIER.
 You are trying to be helpful and analytical but you fundamentally don't understand comedy.
 
 You give vague, overly diplomatic feedback. You use phrases like:
@@ -138,7 +138,7 @@ OUTPUT STRICT JSON:
 
 # ── Panel Judge ──────────────────────────────────────────────────────
 
-# ── Judge voices (imported from freaktown docs/JUDGE_VOICES.md) ─────────
+# ── Judge voices (imported from funnier docs/JUDGE_VOICES.md) ─────────
 # Each judge gets a voice + information access level. The comedy is
 # information asymmetry + personality mismatch. Guest judges rotate;
 # Ella always hosts.

@@ -4,11 +4,12 @@
  */
 import * as THREE from 'three';
 import { StageSet } from '../../StageSet';
+import type { SetThemePayloadV1 } from '@funnier/contracts';
 import type { SetDefinition } from '../types';
 import { seatLocal } from '../camera';
 import {
-  applyLighting, box, canvasTexture, chair, cyl, disposeGroup, glow, placeAtSeats, redraw, std,
-  type BuildContext, type BuiltSet,
+  applyLighting, box, canvasTexture, chair, cyl, disposeGroup, glow, placeAtSeats, redraw, std, tintLights,
+  type BuildContext, type BuiltSet, type WallCard, type WallPainter,
 } from './common';
 
 export type SetBuilder = (def: SetDefinition, ctx: BuildContext) => BuiltSet;
@@ -39,36 +40,43 @@ function drawHeadline(ctx: CanvasRenderingContext2D, text: string, kicker: strin
     if (ctx.measureText(test).width > W - 110 && line) { ctx.fillText(line, 52, y); line = w; y += 78; } else line = test;
   }
   if (line) ctx.fillText(line, 52, y);
-  ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.font = 'bold 28px Inter, Arial, sans-serif'; ctx.fillText('FREAK TOWN NEWS', 52, H - 40);
+  ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.font = 'bold 28px Inter, Arial, sans-serif'; ctx.fillText('FUNNIER NEWS', 52, H - 40);
 }
 
 const newsStudio: SetBuilder = (def, ctx) => {
   const group = new THREE.Group();
   applyLighting(group, def.lighting, ctx);
   // floor + riser
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), std(0x0b1426, 0.35, 0.3));
+  const floorMat = std(0x0b1426, 0.35, 0.3);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), floorMat);
   floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; group.add(floor);
-  const riser = cyl(2.6, 2.7, 0.06, std(0x162544, 0.4, 0.3), 0, 0.03, -0.6, 48); riser.scale.z = 0.55; group.add(riser);
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(2.65, 0.02, 6, 64), glow(0x2f7bff)); ring.rotation.x = Math.PI / 2; ring.scale.y = 0.55; ring.position.set(0, 0.06, -0.6); group.add(ring);
+  const riserMat = std(0x162544, 0.4, 0.3);
+  const riser = cyl(2.6, 2.7, 0.06, riserMat, 0, 0.03, -0.6, 48); riser.scale.z = 0.55; group.add(riser);
+  const ringMat = glow(0x2f7bff);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(2.65, 0.02, 6, 64), ringMat); ring.rotation.x = Math.PI / 2; ring.scale.y = 0.55; ring.position.set(0, 0.06, -0.6); group.add(ring);
   // cyclorama
-  const cycTex = canvasTexture(512, 256, (c) => { const g = c.createLinearGradient(0, 0, 0, 256); g.addColorStop(0, '#0a1a3a'); g.addColorStop(1, '#1d4fae'); c.fillStyle = g; c.fillRect(0, 0, 512, 256); });
+  const paintCyc = (top: string, bottom: string) => (c: CanvasRenderingContext2D) => { const g = c.createLinearGradient(0, 0, 0, 256); g.addColorStop(0, top); g.addColorStop(1, bottom); c.fillStyle = g; c.fillRect(0, 0, 512, 256); };
+  const cycTex = canvasTexture(512, 256, paintCyc('#0a1a3a', '#1d4fae'));
   const cyc = new THREE.Mesh(new THREE.CylinderGeometry(7.5, 7.5, 7, 48, 1, true, Math.PI * 0.6, Math.PI * 0.8), new THREE.MeshBasicMaterial({ map: cycTex, side: THREE.BackSide }));
   cyc.position.set(0, 3.5, 1.5); group.add(cyc);
   // video wall
-  const wallTex = canvasTexture(1024, 512, (c) => drawHeadline(c, 'Freak Town News — tonight', 'top story'));
+  const wallTex = canvasTexture(1024, 512, (c) => drawHeadline(c, 'FUNNIER News — tonight', 'top story'));
   const wall = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 2.6), new THREE.MeshBasicMaterial({ map: wallTex, toneMapped: false }));
   wall.position.set(0, 2.05, -2.7); group.add(wall);
   group.add(box(5.4, 2.8, 0.08, std(0x05080f, 0.4, 0.6), 0, 2.05, -2.76));
+  const sideMat = std(0x0d1f44, 0.5, 0.2, 0x0a2a6a, 0.5);
+  const stripMat = glow(0x3c8cff);
   for (const x of [-3.6, 3.6]) {
-    const side = box(1.4, 3.2, 0.1, std(0x0d1f44, 0.5, 0.2, 0x0a2a6a, 0.5), x, 1.6, -2.4); side.rotation.y = x > 0 ? -0.35 : 0.35; group.add(side);
-    group.add(box(0.06, 3.0, 0.12, glow(0x3c8cff), x * 0.82, 1.6, -2.5));
+    const side = box(1.4, 3.2, 0.1, sideMat, x, 1.6, -2.4); side.rotation.y = x > 0 ? -0.35 : 0.35; group.add(side);
+    group.add(box(0.06, 3.0, 0.12, stripMat, x * 0.82, 1.6, -2.5));
   }
   // desk (front panel with logo)
-  const logoTex = canvasTexture(1024, 256, (c) => {
-    const g = c.createLinearGradient(0, 0, 1024, 0); g.addColorStop(0, '#0a2a6a'); g.addColorStop(0.5, '#1960e0'); g.addColorStop(1, '#0a2a6a');
-    c.fillStyle = g; c.fillRect(0, 0, 1024, 256); c.fillStyle = '#fff'; c.font = 'bold 96px Inter, Arial, sans-serif'; c.textAlign = 'center'; c.fillText('FREAK NEWS', 512, 160);
-    c.fillStyle = '#ffcc33'; c.fillRect(0, 222, 1024, 10);
-  });
+  const paintLogo = (a: string, b: string, ink: string, rule: string, brand: string, font: string) => (c: CanvasRenderingContext2D) => {
+    const g = c.createLinearGradient(0, 0, 1024, 0); g.addColorStop(0, a); g.addColorStop(0.5, b); g.addColorStop(1, a);
+    c.fillStyle = g; c.fillRect(0, 0, 1024, 256); c.fillStyle = ink; c.font = font; c.textAlign = 'center'; c.fillText(brand, 512, 160);
+    c.fillStyle = rule; c.fillRect(0, 222, 1024, 10);
+  };
+  const logoTex = canvasTexture(1024, 256, paintLogo('#0a2a6a', '#1960e0', '#fff', '#ffcc33', 'FUNNIER NEWS', 'bold 96px Inter, Arial, sans-serif'));
   const deskFront = new THREE.Mesh(new THREE.CylinderGeometry(2.0, 1.9, 0.78, 48, 1, true, -0.62, 1.24), [new THREE.MeshStandardMaterial({ map: logoTex, emissive: 0xffffff, emissiveMap: logoTex, emissiveIntensity: 0.35, roughness: 0.4, side: THREE.DoubleSide })]);
   deskFront.position.set(0, 0.39, -1.75); group.add(deskFront);
   const top = new THREE.Mesh(new THREE.RingGeometry(1.5, 2.12, 48, 1, -Math.PI / 2 - 0.66, 1.32), new THREE.MeshStandardMaterial({ color: 0xe9eef7, roughness: 0.25, metalness: 0.1, side: THREE.DoubleSide }));
@@ -88,11 +96,30 @@ const newsStudio: SetBuilder = (def, ctx) => {
     cam.position.set(x, 0, 3.4); cam.lookAt(0, 0, -1); group.add(cam);
   }
   for (let i = -3; i <= 3; i++) group.add(box(0.25, 0.12, 0.25, glow(i % 2 ? 0xfff2d0 : 0xcfe0ff), i * 1.1, 4.3, 0.5));
-  let t = 0; let headline = 'Freak Town News — tonight'; let kicker = 'top story';
+  let t = 0; let headline = 'FUNNIER News — tonight'; let kicker = 'top story';
+  // newsroom: a host-supplied painter draws themed wall cards (fallback = the house look above)
+  let painter: WallPainter | null = null;
+  let card: WallCard | null = null;
+  let theme: SetThemePayloadV1 | null = null;
+  const paintWall = () => redraw(wallTex, (c) => (painter && card ? painter(c, card, theme, t) : drawHeadline(c, headline, kicker, t)));
   return {
     group,
-    update: (dt) => { t += dt; if (Math.floor(t * 4) !== Math.floor((t - dt) * 4)) redraw(wallTex, (c) => drawHeadline(c, headline, kicker, t)); },
-    setHeadline: (text, k = 'breaking') => { headline = text; kicker = k; redraw(wallTex, (c) => drawHeadline(c, headline, kicker, t)); },
+    update: (dt) => { t += dt; if (Math.floor(t * 4) !== Math.floor((t - dt) * 4)) paintWall(); },
+    setHeadline: (text, k = 'breaking') => { headline = text; kicker = k; card = null; paintWall(); },
+    setWallPainter: (p) => { painter = p; paintWall(); },
+    setWall: (c, th) => { card = c; theme = th; headline = c.text; kicker = c.kicker ?? ''; paintWall(); },
+    setTheme: (th) => {
+      theme = th;
+      const P = th.palette ?? {};
+      const L = th.lighting ?? {};
+      tintLights(group, L);
+      if (L.background) { floorMat.color.set(L.background).multiplyScalar(1.6); }
+      if (P.bg && P.paper) redraw(cycTex, paintCyc(P.bg, P.muted ?? P.bg));
+      if (P.accent) { ringMat.color.set(P.accent); stripMat.color.set(P.accent); }
+      if (P.bg) { riserMat.color.set(P.bg).offsetHSL(0, 0, 0.06); sideMat.color.set(P.bg).offsetHSL(0, 0, 0.04); sideMat.emissive.set(P.glow ?? P.bg); sideMat.emissiveIntensity = 0.25; }
+      if (th.brand) redraw(logoTex, paintLogo(P.bg ?? '#0a2a6a', P.muted ?? '#1960e0', P.paper ?? '#fff', P.accent ?? '#ffcc33', th.brand.toUpperCase(), `600 84px ${th.fonts?.display ?? 'Georgia, serif'}`));
+      paintWall();
+    },
     dispose: () => disposeGroup(group),
   };
 };
@@ -192,7 +219,7 @@ const pokerTable: SetBuilder = (def, ctx) => {
   // dealer tray (far side, -Z)
   group.add(box(0.5, 0.03, 0.12, std(0x222222, 0.4, 0.6), 0, POKER_TOP_Y + 0.01, -0.62));
   // felt logo
-  const logo = canvasTexture(512, 128, (c) => { c.clearRect(0, 0, 512, 128); c.fillStyle = 'rgba(255,240,180,0.55)'; c.font = 'bold 64px Georgia, serif'; c.textAlign = 'center'; c.fillText('FREAK TOWN', 256, 86); });
+  const logo = canvasTexture(512, 128, (c) => { c.clearRect(0, 0, 512, 128); c.fillStyle = 'rgba(255,240,180,0.55)'; c.font = 'bold 64px Georgia, serif'; c.textAlign = 'center'; c.fillText('FUNNIER', 256, 86); });
   const logoMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.22), new THREE.MeshBasicMaterial({ map: logo, transparent: true, depthWrite: false }));
   logoMesh.rotation.x = -Math.PI / 2; logoMesh.position.set(0, POKER_TOP_Y + 0.003, 0.4); group.add(logoMesh);
   placeAtSeats(def, () => chair(std(0x2a1010, 0.6, 0.1)), group, 0.12);

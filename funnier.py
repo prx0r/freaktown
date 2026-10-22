@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""freaktown — One command. One minute. That's it.
+"""funnier — One command. One minute. That's it.
 
 Usage:
-  python freaktown.py                     # random premise
-  python freaktown.py dogs                # your premise
-  python freaktown.py "being gay and a dog"  # your premise
+  python funnier.py                     # random premise
+  python funnier.py dogs                # your premise
+  python funnier.py "being gay and a dog"  # your premise
 """
 
 import asyncio
@@ -134,7 +134,7 @@ def main():
     else:
         premise = random.choice(PREMISES)
     
-    print(f"\n  🎤 FREAK TOWN")
+    print(f"\n  🎤 FUNNIER")
     print(f"  {premise}\n")
     
     # Generate the minute (LLM or fallback)
@@ -171,7 +171,7 @@ def main():
         all_samples.extend([0] * int(sr * b["p"] / 1000))
     
     # Write final
-    final = AUDIO_DIR / "freaktown_set.wav"
+    final = AUDIO_DIR / "funnier_set.wav"
     with wave.open(str(final), 'wb') as w:
         w.setnchannels(1); w.setsampwidth(2); w.setframerate(sr)
         w.writeframes(struct.pack(f'<{len(all_samples)}h', *all_samples))

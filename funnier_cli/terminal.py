@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Freak Town — The Black Room.
+"""FUNNIER — The Black Room.
 
 The creative director's terminal. 
 You design the character. You set the vibe. The AI writes the minute. You hear it.
@@ -218,7 +218,7 @@ def main():
     
     while True:
         try:
-            prompt = f"{MAGENTA}freaktown>{RESET} "
+            prompt = f"{MAGENTA}funnier>{RESET} "
             user = input(prompt).strip()
             if not user:
                 continue
@@ -262,7 +262,7 @@ def main():
                 
                 print(f"\n{DIM}  Generating minute about: {premise}{RESET}")
                 
-                system = f"""You are a comedy writer for Freak Town. Write a 60-second standup minute.
+                system = f"""You are a comedy writer for FUNNIER. Write a 60-second standup minute.
 
 Character: {char.name or 'Unknown'}
 Species: {char.species or 'Unknown'}
@@ -436,7 +436,7 @@ Write ONLY the set text. No title, no explanation."""
             else:
                 # Try treating as a premise
                 print(f"\n{DIM}  Generating minute about: {user}{RESET}")
-                system = f"""You are a comedy writer for Freak Town. Write a 60-second standup minute.
+                system = f"""You are a comedy writer for FUNNIER. Write a 60-second standup minute.
 
 Premise: {user}
 

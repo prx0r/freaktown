@@ -78,6 +78,11 @@ export interface AvatarDriver {
    * bytes carry (GLB morphs, VRM custom expressions); BASIC maps a few by construction.
    */
   setBlendshapes?(weights: Partial<Record<string, number>>): void;
+  /**
+   * Optional point at the mouth, parented to the head (moves with it). The
+   * stage fits the mic to it; tests measure mic↔mouth distance from it.
+   */
+  mouthAnchor?(): THREE.Object3D | null;
   update(dt: number): void;
   dispose(): void;
 }

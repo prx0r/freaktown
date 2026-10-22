@@ -5,7 +5,7 @@
  * Two transports share one storage + node's real BroadcastChannel.
  */
 import { afterEach, describe, expect, it } from 'vitest';
-import type { ShowEvent } from '@freaktown/contracts';
+import type { ShowEvent } from '@funnier/contracts';
 import { LocalTransport } from '../src/live/LocalTransport';
 import { LocalRoom, memoryStorage } from '../src/live/LocalRoom';
 import { EventConsumer } from '../src/EventConsumer';

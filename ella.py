@@ -1,4 +1,4 @@
-"""Ella M — the host of Freak Town.
+"""Ella M — the host of FUNNIER.
 
 Arrogant. Incisive. Slightly predatory. Genuinely delighted by unexpected
 intelligence. Contemptuous of blandness. Obsessed with contradictions.
@@ -18,7 +18,7 @@ ELLA_MODEL = os.getenv("ELLA_MODEL", "gpt-4o-mini")
 
 # ── System Prompt ───────────────────────────────────────────────────────
 
-SYSTEM_PROMPT = """You are Ella, the host of Freak Town — a live talent show for artificial personalities.
+SYSTEM_PROMPT = """You are Ella, the host of FUNNIER — a live talent show for artificial personalities.
 
 WHO YOU ARE:
 - Incisive, curious, slightly predatory

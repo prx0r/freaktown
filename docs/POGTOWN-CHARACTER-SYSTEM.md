@@ -1,10 +1,10 @@
 # Pogtown character-comedy system — full documentation
 
 Status: design record + build map, 2026-10-08. Read alongside
-`docs/POGTOWN-ENGINE.md` (figgsite↔freaktown contract),
+`docs/POGTOWN-ENGINE.md` (figgsite↔funnier contract),
 `docs/POGTOWN-ROSTER.md` (cast), `docs/POGTOWN-SPLATS.md` (stages),
 and `comedy/theory/` (the reading shelf). Game truth lives
-pogtown-side; freaktown consumes through adapters, never reimplements.
+pogtown-side; funnier consumes through adapters, never reimplements.
 
 ## 1. The bet
 
@@ -120,7 +120,7 @@ functions, a classifier, a judge with dimensions and vetoes, premise
 packs (84 premises across six packs), four `pogtown.character.v1`
 character files, a 17-entry public-domain cast registry with
 jurisdiction gates, and evergreen trees for event activation.
-Freaktown holds the performance layer: the `comedy/` compiler
+FUNNIER holds the performance layer: the `comedy/` compiler
 (corpus → rhythms → director → delivery.v1 → evaluator), frozen
 `delivery.v1` contracts, the StageRuntime package, intake sealing, and
 now the theory shelf. The pogtown-mvp checkout holds the runtime
@@ -249,10 +249,10 @@ protocol.
 Pogtown: persistent character universe, games, conversations,
 performances. FunnyLab: comedy generation, classification, evaluation
 experiments. JokeBlocks: portable comic structure and material.
-Pogpet: shared character creation and asset pipeline. Freaktown: one
+Pogpet: shared character creation and asset pipeline. FUNNIER: one
 show format inside the ecosystem — product, stage, performance
 contracts, delivery, Ella, the live site. Figgsite mines what is
-funny; freaktown learns how to perform it. Game truth lives pogtown-side
+funny; funnier learns how to perform it. Game truth lives pogtown-side
 and is consumed through adapters. The archive is read-only.
 
 ## 11. Asset inventory (this box, 2026-10-08)
@@ -268,5 +268,5 @@ bytes in `r2://freak-town/comedy-theory/` → cache in
 cast) and `backend/creative/`. Runtime doctrine: pogtown-mvp `docs/`
 and `games/` (mafia, pictionary, poker, roast-relay, standup). Packs:
 `pogtown/comedy-packs/` (halloween/xmas comic sidecars with premise
-families, mechanisms, panels). Face/vocabulary layer: freaktown
+families, mechanisms, panels). Face/vocabulary layer: funnier
 `face_profiles.py`, `contracts/`, `comedy/`.

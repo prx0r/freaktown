@@ -1,0 +1,104 @@
+{
+  "schema": "funnier.sketch/v1",
+  "id": "the-tell",
+  "title": "The Tell",
+  "set": "poker-table",
+  "premise": "Three sharks try to read the one player at the table with a perfect poker face.",
+  "game": "The Buffer's 'poker face' is lag: every reaction arrives a beat too late, so the others keep reading tells that are really replies to old news.",
+  "credits": "Original fiction written for FUNNIER. All characters are fictional FUNNIER identities.",
+  "cast": [
+    { "role": "chair", "identity": "pog.chairman-meow", "seat": "seat1" },
+    { "role": "sarge", "identity": "pog.sergeant-sled", "seat": "seat3" },
+    { "role": "madame", "identity": "pog.madame-chrysalis", "seat": "seat5" },
+    { "role": "buffer", "identity": "pog.the-buffer", "seat": "seat7" }
+  ],
+  "timing": { "idle_glance_chance": 0.15 },
+  "scenes": [
+    {
+      "id": "table",
+      "title": "Hand one",
+      "beats": [
+        {
+          "id": "setup",
+          "kind": "setup",
+          "note": "Everyone at the table, everyone suspicious of the quiet one.",
+          "items": [
+            { "type": "prop", "event": "poker.hand_start", "payload": { "hand_id": "h1", "button": 1, "small_blind": 5, "big_blind": 10, "seats": [{ "seat": 1, "stack": 500 }, { "seat": 3, "stack": 500 }, { "seat": 5, "stack": 500 }, { "seat": 7, "stack": 500 }] } },
+            { "type": "prop", "event": "poker.deal", "payload": { "hand_id": "h1", "seat": 1, "cards": [{ "rank": "9", "suit": "clubs" }, { "rank": "9", "suit": "hearts" }] } },
+            { "type": "prop", "event": "poker.deal", "payload": { "hand_id": "h1", "seat": 3, "cards": [{ "rank": "K", "suit": "spades" }, { "rank": "Q", "suit": "spades" }] } },
+            { "type": "prop", "event": "poker.deal", "payload": { "hand_id": "h1", "seat": 5, "cards": [{ "rank": "A", "suit": "diamonds" }, { "rank": "7", "suit": "diamonds" }] } },
+            { "type": "prop", "event": "poker.deal", "payload": { "hand_id": "h1", "seat": 7, "cards": [{ "rank": "2", "suit": "clubs" }, { "rank": "7", "suit": "hearts" }] } },
+            { "type": "line", "who": "chair", "to": "camera", "text": "Minutes of this hand. Present: myself, the Sergeant, Madame, and the Buffer." },
+            { "type": "line", "who": "sarge", "to": "buffer", "text": "The Buffer. Never blinks. Never flinches. I do not trust it." },
+            { "type": "look", "who": "madame", "at": "buffer", "ms": 1600 }
+          ]
+        },
+        {
+          "id": "game",
+          "kind": "game",
+          "note": "The first read: total stillness.",
+          "items": [
+            { "type": "line", "who": "madame", "text": "Everyone has a tell, darling. Watch his eyes when I raise." },
+            { "type": "prop", "event": "poker.board", "payload": { "hand_id": "h1", "street": "flop", "cards": [{ "rank": "7", "suit": "clubs" }, { "rank": "2", "suit": "diamonds" }, { "rank": "K", "suit": "hearts" }] } },
+            { "type": "line", "who": "madame", "to": "buffer", "text": "I raise." },
+            { "type": "look", "who": "chair", "at": "buffer", "ms": 2400 },
+            { "type": "look", "who": "sarge", "at": "buffer", "ms": 2400 },
+            { "type": "react", "who": "buffer", "kind": "deadpan", "ms": 2200 },
+            { "type": "pause", "ms": 1600 },
+            { "type": "line", "who": "sarge", "text": "Nothing. Not a twitch." },
+            { "type": "line", "who": "chair", "text": "Let the minutes show: no twitch.", "emotion": "smug" },
+            { "type": "hold_for_laugh", "ms": 1100 }
+          ]
+        },
+        {
+          "id": "escalate",
+          "kind": "escalation",
+          "items": [
+            { "type": "line", "who": "sarge", "to": "buffer", "text": "Fine. I am all in. Read that, you statue." },
+            { "type": "gesture", "who": "sarge", "kind": "point", "during": "prev", "at_word": 4 },
+            { "type": "pause", "ms": 900 },
+            { "type": "react", "who": "buffer", "kind": "shock" },
+            { "type": "line", "who": "buffer", "to": "sarge", "text": "Wait. Who does not trust me?" },
+            { "type": "look", "who": "sarge", "at": "buffer", "double_take": true },
+            { "type": "hold_for_laugh", "ms": 1300 }
+          ]
+        },
+        {
+          "id": "turn",
+          "kind": "turn",
+          "note": "The table works out the game.",
+          "items": [
+            { "type": "line", "who": "chair", "text": "Oh no. He is not stone-faced. He is behind." },
+            { "type": "line", "who": "madame", "to": "chair", "text": "How far behind?" },
+            { "type": "line", "who": "buffer", "to": "madame", "text": "Hello! Lovely to meet you all. Is it my turn?", "emotion": "happy" },
+            { "type": "react", "who": "madame", "kind": "eye-roll" },
+            { "type": "hold_for_laugh", "ms": 1300 }
+          ]
+        },
+        {
+          "id": "punch",
+          "kind": "punch",
+          "items": [
+            { "type": "line", "who": "sarge", "text": "You have been winning all night by accident?" },
+            { "type": "pause", "ms": 700 },
+            { "type": "line", "who": "buffer", "text": "I call." },
+            { "type": "prop", "event": "poker.showdown", "payload": { "hand_id": "h1", "winners": [{ "seat": 7, "amount": 1500, "ranking": "two pair", "cards": [{ "rank": "2", "suit": "clubs" }, { "rank": "7", "suit": "hearts" }] }], "hole": [{ "seat": 3, "cards": [{ "rank": "K", "suit": "spades" }, { "rank": "Q", "suit": "spades" }] }, { "seat": 7, "cards": [{ "rank": "2", "suit": "clubs" }, { "rank": "7", "suit": "hearts" }] }] } },
+            { "type": "react", "who": "sarge", "kind": "shock" },
+            { "type": "react", "who": "madame", "kind": "laugh-break" },
+            { "type": "react", "who": "chair", "kind": "smirk" },
+            { "type": "hold_for_laugh", "ms": 1600 }
+          ]
+        },
+        {
+          "id": "button",
+          "kind": "button",
+          "items": [
+            { "type": "button" },
+            { "type": "line", "who": "buffer", "to": "camera", "text": "Sorry. What are we playing?" },
+            { "type": "blackout", "fade_ms": 900, "delay_ms": 400 }
+          ]
+        }
+      ]
+    }
+  ]
+}

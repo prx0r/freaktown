@@ -11,7 +11,7 @@
 import { Table } from 'poker-ts';
 import type {
   CardV1, PokerActionV1, PokerStreetV1, PokerTurnPayloadV1,
-} from '@freaktown/contracts';
+} from '@funnier/contracts';
 
 export interface DealerEvent { type: string; payload: Record<string, unknown> }
 export interface DealerSeat { seat: number; name: string; stack: number; kind: 'bot' | 'human'; style?: BotStyle }

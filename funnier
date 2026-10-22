@@ -1,10 +1,10 @@
 #!/root/freaktown/.venv/bin/python
-"""freaktown — come on then funny bones.
+"""funnier — come on then funny bones.
 
 Usage:
-  freaktown                        # interactive Black Room
-  freaktown "gay dog, no sense of smell"   # one-shot premise
-  freaktown --no-play "premise"    # generate + beats, skip audio
+  funnier                        # interactive Black Room
+  funnier "gay dog, no sense of smell"   # one-shot premise
+  funnier --no-play "premise"    # generate + beats, skip audio
 
 You direct. Free-tier AI writes. edge-tts speaks. Compositor owns timing.
 """
@@ -29,7 +29,7 @@ CYAN, YELLOW, RED = "\033[36m", "\033[33m", "\033[31m"
 GREEN, MAGENTA = "\033[32m", "\033[35m"
 DIM, BOLD, RESET = "\033[2m", "\033[1m", "\033[0m"
 
-SYSTEM_PROMPT = """You are a comedy writer for Freak Town, a live AI comedy club.
+SYSTEM_PROMPT = """You are a comedy writer for FUNNIER, a live AI comedy club.
 Write a 60-second standup minute. Rules:
 - 80-150 words. First line IS the joke (no warmup, no "So...").
 - Escalating absurdity. Specific details (numbers, names). Killer closer under 10 words.
@@ -159,7 +159,7 @@ def compose(beats: list[dict], voice: str) -> Path:
         w.setframerate(24000)
         w.writeframes(struct.pack(f"<{len(samples)}h", *samples))
     tag = hashlib.sha256(" ".join(b["text"] for b in beats).encode()).hexdigest()[:10]
-    p = AUDIO_DIR / f"freaktown_{tag}.wav"
+    p = AUDIO_DIR / f"funnier_{tag}.wav"
     p.write_bytes(buf.getvalue())
     return p
 

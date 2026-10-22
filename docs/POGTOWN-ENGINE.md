@@ -1,6 +1,6 @@
-# Pogtown engine — figgsite ↔ freaktown contract
+# Pogtown engine — figgsite ↔ funnier contract
 
-Two repos, one system. Figgsite mines what's funny; freaktown performs it.
+Two repos, one system. Figgsite mines what's funny; funnier performs it.
 
 ## Figgsite owns (upstream)
 
@@ -13,7 +13,7 @@ Two repos, one system. Figgsite mines what's funny; freaktown performs it.
 Docs: `figgsite/docs/comedy-os.md` (inventory), `joke-blocks.md` (ontology),
 `theory-bank.md`, `comedy-graph.md` (full spec, verbatim), `meme-engine.md`.
 
-## Freaktown owns (downstream)
+## FUNNIER owns (downstream)
 
 - `comedy/` compiler: corpus → rhythms → director → delivery.v1 → evaluator.
 - Characters as `freaks/<slug>/` packs (`docs/CHARACTER_PACK.md`).
@@ -22,7 +22,7 @@ Docs: `figgsite/docs/comedy-os.md` (inventory), `joke-blocks.md` (ontology),
 
 ## The joints
 
-| Figgsite | Freaktown | Rule |
+| Figgsite | FUNNIER | Rule |
 |---|---|---|
 | premise (theories + oppositions) | `director.py` input | premise carries everything needed to cast + time it |
 | theory support scores | `evaluator.py` mechanism stats | same question, material vs delivery layer |

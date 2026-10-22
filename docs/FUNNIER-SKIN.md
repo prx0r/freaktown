@@ -1,7 +1,7 @@
-# Funnier skin for Freak Town (/perform, /party)
+# Funnier skin for FUNNIER (/perform, /party)
 
-Branch `funnier-skin`. Freak Town's public pages under www.funnier.si now look like Funnier: dark, red accents,
-Anton + Inter Tight, the Funnier header (wordmark linking to https://www.funnier.si/, Freak Town nav, round
+Branch `funnier-skin`. FUNNIER's public pages under www.funnier.si now look like Funnier: dark, red accents,
+Anton + Inter Tight, the Funnier header (wordmark linking to https://www.funnier.si/, FUNNIER nav, round
 account icon). It also adds a privacy gate on the public bill.
 
 ## What changed
@@ -21,7 +21,7 @@ couldn't touch the box-only pages at all. `funnier_skin` rewrites the HTML on th
 whatever the box serves and merges with a 3-line change to `app.py`.
 
 What the layer does to an HTML response:
-1. Palette: Freak Town pink `#ff2fa8` → Funnier red `#e8102e`, cyan `#00d4ff` → gold `#f5c76b`, the greys/blacks
+1. Palette: FUNNIER pink `#ff2fa8` → Funnier red `#e8102e`, cyan `#00d4ff` → gold `#f5c76b`, the greys/blacks
    → Funnier panel/line tokens, `font-family:monospace` → Inter Tight. This applies to inline styles, `<style>` blocks
    and colour strings in scripts, so canvas/JS-built UI follows.
 2. Links `https://www.funnier.si/theme.css` (shared Funnier tokens + `fn-*` components) plus a small local sheet.
@@ -123,7 +123,7 @@ git merge origin/funnier-skin   # only app.py's last lines + new files; conflict
 python3 test_funnier_skin.py && python3 test_party.py
 python3 funnier_skin.py status
 python3 funnier_skin.py list <the slugs you want on the bill>   # see the list above
-systemctl restart freaktown
+systemctl restart funnier
 git push origin HEAD:main       # optional: finally publish the box's commits + the skin to GitHub
 ```
 

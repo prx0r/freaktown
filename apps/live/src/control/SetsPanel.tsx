@@ -9,8 +9,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   EventConsumer, PokerShow, POKER_HUMAN_SEAT, SET_REGISTRY, newsDemo, podcastDemo, pokerDemoIntro, pokerSeats,
   NEWS_CAST, PODCAST_CAST, POKER_CAST, type TimedCommand,
-} from '@freaktown/stage-runtime';
-import type { CastMemberV1, PokerActionV1 } from '@freaktown/contracts';
+} from '@funnier/stage-runtime';
+import type { CastMemberV1, PokerActionV1 } from '@funnier/contracts';
 import { createTransport, type TransportMode } from '../live/transport';
 
 const FACE_EMOTIONS = ['smile', 'smug', 'deadpan', 'surprised', 'annoyed', 'sad'];

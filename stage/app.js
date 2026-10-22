@@ -32,7 +32,7 @@
 
   // ----- Theme system -------------------------------------------------
   const savedTheme = localStorage.getItem('freak-town-theme');
-  const bootTheme = window.FREAK_TOWN_DEFAULT_THEME || savedTheme || 'bubble-pop';
+  const bootTheme = window.FUNNIER_DEFAULT_THEME || savedTheme || 'bubble-pop';
   document.documentElement.dataset.theme = bootTheme;
   themeSelect.value = bootTheme;
 

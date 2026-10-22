@@ -7,10 +7,10 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Freak Town">
+<meta name="apple-mobile-web-app-title" content="FUNNIER">
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<title>Freak Town — Black Room</title>
+<title>FUNNIER — Black Room</title>
 <script type="module" src="https://three.ws/agent-3d/1.5.2/agent-3d.js" crossorigin="anonymous"></script>
 <script type="importmap">
 {"imports": {
@@ -80,7 +80,7 @@ input[type=range] { flex: 1; accent-color: #ff00aa; cursor: pointer; }
 <body>
 
 <div class="header">
-  <div class="title">FREAK TOWN · BLACK ROOM</div>
+  <div class="title">FUNNIER · BLACK ROOM</div>
   <div style="font-size: 11px; color: #555;" id="charLine">no character yet</div>
 </div>
 
@@ -420,10 +420,10 @@ async function shareClip() {
   const url = new URL(audio.src, location.origin).href;
   try {
     const Share = window.Capacitor?.Plugins?.Share;
-    if (Share) { await Share.share({title: 'My Freak Town set', url}); return; }
+    if (Share) { await Share.share({title: 'My FUNNIER set', url}); return; }
   } catch (e) {}
   try {
-    if (navigator.share) { await navigator.share({title: 'My Freak Town set', url}); return; }
+    if (navigator.share) { await navigator.share({title: 'My FUNNIER set', url}); return; }
   } catch (e) { if (e?.name === 'AbortError') return; }
   try {
     await navigator.clipboard.writeText(url);

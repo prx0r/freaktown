@@ -571,7 +571,7 @@ export class EpisodeRoom extends DurableObject {
     this.lastReactionAt.set(attachment.sessionId, now);
 
     const setTimeMs = Number(data.set_time_ms ?? 0) || 0;
-    const source = typeof data.source === 'string' ? data.source : 'freaktown_web';
+    const source = typeof data.source === 'string' ? data.source : 'funnier_web';
 
     // 1. Persist the raw event first.
     this.episodeState.seq += 1;

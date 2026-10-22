@@ -9,7 +9,7 @@ Canonical 20-character roster: 10 primary (Popeye, Flip, Felix, Pooh, Holmes, Be
 Pogtown Puppet Theatre v1: stop-motion-inspired digital puppets, tactile materials, controlled palette, shared rig and expression pack, pose-driven animation, theatrical staging. Plus the Christmas Special (10 concepts) and the personalised-card bridge to OddHobb. This is the brand language — every mesh and scene bows to it.
 
 ## 3. `docs/POGTOWN-ENGINE.md` — the contract
-How the two repos divide the work: figgsite mines comedy (JokeBlocks, theories, judges, ledger), freaktown performs it (director, stage, voices, audience). Joints table, actor-id namespace, roster pointer.
+How the two repos divide the work: figgsite mines comedy (JokeBlocks, theories, judges, ledger), funnier performs it (director, stage, voices, audience). Joints table, actor-id namespace, roster pointer.
 
 ## Read next
 - `CAST.md` — existing stage cast (predates the PD policy; migrate, don't purge).

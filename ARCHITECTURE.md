@@ -1,4 +1,4 @@
-# Freak Town Architecture Spec
+# FUNNIER Architecture Spec
 
 > Canonical reference for build decisions. Truth as of Checkpoint 1:
 > what prod actually runs, not what was planned. Aspirations live in
@@ -52,7 +52,7 @@ freaks/
     meta.json           # status, hashes, timestamps (tool-written)
 ```
 
-Drop folder into Freak Town. Character performs.
+Drop folder into FUNNIER. Character performs.
 Full contract: docs/CHARACTER_PACK.md. Validate: scripts/validate_pack.py.
 
 ## One Audio Timeline (core abstraction)
@@ -120,10 +120,10 @@ Band sound bank: 20-50 pre-generated drum hits, riffs, rimshots, stings.
 ```text
 Docker Compose
 
-freaktown-web       Three.js / TS
-freaktown-api       FastAPI
-freaktown-db        SQLite volume
-freaktown-assets    GLB / WAV / MP3 / JSON
+funnier-web       Three.js / TS
+funnier-api       FastAPI
+funnier-db        SQLite volume
+funnier-assets    GLB / WAV / MP3 / JSON
 
 optional:
 qwen-tts            GPU worker
@@ -159,7 +159,7 @@ Available: (laughs), (chuckle), (breath), (groans), (sighs), (snorts), (humming)
 ```text
 8GB VPS (orchestrate, don't generate)
    │
-   ├── Freak Town web/API/database
+   ├── FUNNIER web/API/database
    ├── cached MP3/WAV
    └── TTS router
           ├── MiniMax      ← default now
