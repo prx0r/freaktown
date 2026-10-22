@@ -10,6 +10,7 @@ import { PlayPage } from './pages/PlayPage';
 import { NewsroomPage } from './pages/NewsroomPage';
 import { SketchPage } from './pages/SketchPage';
 import { TntsPage } from './pages/TntsPage';
+import { WatchPage } from './pages/WatchPage';
 import { RoomsPage } from './pages/RoomsPage';
 import { MinutePage } from './pages/MinutePage';
 
@@ -32,6 +33,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/control" element={<ControlPage />} />
         <Route path="/live/:episodeId" element={<LivePage />} />
         <Route path="/play/:episodeId/seat/:seat" element={<PlayPage />} />
+        <Route path="/watch" element={<WatchPage />} />
+        <Route path="/watch/:setId" element={<WatchPage />} />
         <Route path="/newsroom/:showId" element={<NewsroomPage />} />
         <Route path="/sketch" element={<SketchPage />} />
         <Route path="/sketch/:sketchId" element={<SketchPage />} />

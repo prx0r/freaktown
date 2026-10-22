@@ -60,6 +60,21 @@ export function ControlPage() {
 
   useEffect(() => { void loadSetCatalog().then((s) => { setSets(s); setSetId((cur) => cur || s[0]?.id || ''); }).catch((e) => setNotice(String(e))); }, []);
 
+  // ?auto=<setId> — one-click watch links (see /watch/:setId): once the
+  // sets are loaded AND the room link is up, start that show without a click.
+  const autoSet = search.get('auto');
+  const autoRan = useRef(false);
+  useEffect(() => {
+    if (!autoSet || autoRan.current || !connected || !sets.length) return;
+    if (show !== 'idle') return;
+    if (!sets.some((s) => s.id === autoSet)) { setNotice(`unknown set: ${autoSet}`); return; }
+    autoRan.current = true;
+    setSetId(autoSet);
+    const timer = window.setTimeout(() => { void startShow(autoSet); }, 400);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSet, connected, sets, show]);
+
   // READ view of the room (same transport the commands go through).
   useEffect(() => {
     const consumer = new EventConsumer({ transport });
@@ -95,21 +110,22 @@ export function ControlPage() {
     readyWaiters.current.set(pid, () => { window.clearTimeout(t); resolve(true); });
   });
 
-  const startShow = () => run('start', async () => {
-    if (!current) throw new Error('pick a set');
-    const pid = `${current.id}-${Date.now().toString(36)}`;
+  const startShow = (setIdArg?: string) => run('start', async () => {
+    const entry = (setIdArg ? sets.find((s) => s.id === setIdArg) : undefined) ?? current;
+    if (!entry) throw new Error('pick a set');
+    const pid = `${entry.id}-${Date.now().toString(36)}`;
     setPerfId(pid);
     perfIdRef.current = pid;
     setShow('loading');
-    await client.startShow(current.title);
+    await client.startShow(entry.title);
     const ready = waitReady(pid, 45000);
     await client.preloadPerformance({
       performance_id: pid,
-      set_url: current.set_url,
-      audio_url: current.audio_url,
-      avatar_url: avatarOverride || current.avatar_url,
-      character_name: current.character_name,
-      title: current.premise,
+      set_url: entry.set_url,
+      audio_url: entry.audio_url,
+      avatar_url: avatarOverride || entry.avatar_url,
+      character_name: entry.character_name,
+      title: entry.premise,
       episode_id: episodeId,
     });
     setShow('waiting_stage');
@@ -201,7 +217,7 @@ export function ControlPage() {
       <section style={card}>
         <h2 style={h2}>Show <span style={pill('#333')} data-testid="show-state">{show}</span></h2>
         <div style={row}>
-          <button style={btn('#ff2fa0')} onClick={startShow} disabled={!!busy || show === 'loading' || show === 'waiting_stage'} data-testid="start">▶ Start show</button>
+          <button style={btn('#ff2fa0')} onClick={() => void startShow()} disabled={!!busy || show === 'loading' || show === 'waiting_stage'} data-testid="start">▶ Start show</button>
           {show === 'waiting_stage' && <button style={btn('#c78a00')} onClick={() => run('go', () => go())}>Go anyway</button>}
           <button style={btn('#444')} onClick={pause} disabled={show !== 'live'} data-testid="pause">❚❚ Pause</button>
           <button style={btn('#444')} onClick={resume} disabled={show !== 'paused'} data-testid="resume">▶ Resume</button>
