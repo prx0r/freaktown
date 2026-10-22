@@ -20,7 +20,7 @@ What gets keyed, per frame, with the same maths as the web stage (packages/stage
                attack instant / release 18/s like SetStage.renderFrame, the vowel picks the viseme
                (aa ih ou ee oh); shapes found through the face:rig alias table (PR #10 meshBinding: jawOpen, ARKit,
                VRoid Fcl_MTH_*, Oculus viseme_*), else a jaw/head bone fallback
-    blinks     eyeBlinkLeft/Right (or Fcl_EYE_Close_L/R): seeded 2.6-5.4 s cadence, 150 ms, both eyes
+    blinks     eyeBlinkLeft/Right (or Fcl_EYE_Close_L/R): seeded 1.8-5.0 s cadence, 150 ms sine (Performer)
     affect     face.expression emotion x intensity -> the happy/relaxed/sad/... channel, eased in and out
     head       neck 0.4 / head 0.6 of a small speech nod + slow sway, turned toward the camera (speakers address it)
     camera     set.camera cues -> the set's camera marks (wide / anchor close / wall 3/4 / medium), move_ms eased with
@@ -245,7 +245,7 @@ def bake(sc, tl, clip, cams, arm, binding, fps, seed=7):
     blinks, t = [], rng.uniform(0.6, 2.0) * 1000
     while t < dur:
         blinks.append(t)
-        t += rng.uniform(2600, 5400)
+        t += 1800 + rng.random() * 3200          # Performer: next blink 1.8-5.0 s after the last
 
     # base pose of the head bones (seated pose already applied), so each frame starts from it
     neck = NB._pb(arm, "J_Bip_C_Neck", "neck", "Neck") if arm else None
@@ -327,11 +327,11 @@ def bake(sc, tl, clip, cams, arm, binding, fps, seed=7):
         mouth = open_ if open_ > mouth else mouth + (open_ - mouth) * min(1.0, dt * 18)
         if vis:
             last_vis = vis
-        # -- blink: 150 ms triangle
+        # -- blink: sin over 150 ms (Performer.update); at 25 fps at least one frame lands above 0.9
         bl = 0.0
         for b in blinks:
             if b <= t < b + 150:
-                bl = 1.0 - abs((t - b) / 75.0 - 1.0)
+                bl = math.sin(math.pi * (t - b) / 150.0)
         # -- affect
         aff = {}
         for e in exprs:
