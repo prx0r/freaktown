@@ -53,27 +53,40 @@ const FACE_MAP: Record<string, Partial<Emotions>> = {
 
 ### GLB (three.ws / Meshy / character-meshes)
 
-Add morph-name aliases where the sniffer looks (`src/avatars/GlbAvatar.ts`).
-Only names that exist in the bytes are ever driven:
+**Checklist for prepping a new mesh: [`docs/MESH-FACE-HOOKUP.md`](MESH-FACE-HOOKUP.md).**
+Run `npm run face:check -- <file.glb>` before casting a mesh; it prints exactly
+what the stage will drive.
+
+Morph and bone names are matched in ONE place, `src/face/meshBinding.ts`
+(`MESH_FACE_ALIASES`), shared by `GlbAvatar` and `face:check`. Matching ignores
+case, separators and exporter prefixes (`blendShape1.`, `Key 1|`, `vrc.`), so
+ARKit, Oculus/VRChat, VRoid `Fcl_*`, CC4 `Mouth_Open`/`Eye_Blink_L` all bind.
+Add a vendor's name to the alias list and every mesh using it hooks in:
 
 ```ts
-const VISEME_NAMES: Record<VisemeKey, string[]> = {
-  aa: ['viseme_aa', 'v_aa', 'aa', 'A', 'mouth_a', 'Fcl_MTH_A', /* add */ 'MTH_A'],
+export const MESH_FACE_ALIASES = {
+  open: n('jawOpen', 'mouthOpen', 'Mouth_Open', /* add a vendor's name */ 'Mouth_Open_01'),
+  visemes: { aa: n('viseme_aa', 'v_aa', 'Fcl_MTH_A', /* add */ 'MTH_A'), /* … */ },
+  blinkLeft: n('eyeBlinkLeft', 'Eye_Blink_L', /* … */),
   // …
 };
-const OPEN_NAMES = ['jawOpen', 'mouthOpen', /* add a vendor's name */ 'Mouth_Open_01'];
-const EMOTION_NAMES = { happy: ['mouthSmileLeft', 'mouthSmileRight', 'happy'], /* … */ };
 ```
 
-Bones are found by regex (`/head$|head_|:head/i`, `/spine2|spine1|spine|chest/i`,
-`/jaw/i`). A static mesh (no bones) gets whole-body puppet motion. If the GLB ships
-an `idle` clip it plays on an `AnimationMixer` under the procedural layer.
+Mouth order: visemes (≥2) → `jawOpen`/`mouthOpen` morph → jaw bone → none.
+If a rigged GLB has **no** face channels but a Head bone, the stage generates
+procedural `jawOpen`, `eyeBlinkLeft/Right`, `browInnerUp`, `browDownLeft/Right`,
+`mouthSmileLeft/Right` at load (`src/face/proceduralRig.ts`, opt out with
+`faceRig: 'off'`) and logs a `[face]` warning; `npm run face:rig` bakes the
+same shapes into the file. A mesh with nothing at all logs
+`[face] … NO mouth channel`. The mouth channel owns `jawOpen`/visemes/blink:
+emotion and prosody writes never touch them. One-key rest-pose clips (Meshy
+exports) are not played; a real `idle` clip plays under the procedural layer.
 
 To know what a mesh really has before casting it:
 
-```ts
-const { driver } = await loadAvatar({ url: '/meshes/quaternius_cc0-husky-1095.glb' });
-console.log(driver.caps); // { kind:'glb', mouthMode:'none'|'morph'|…, morphNames:[…] }
+```bash
+npm run face:check -- static/avatars/buddha.glb      # human report, exit 0 = mouth+blink OK
+npm run face:check -- some.glb --json                # machine report
 ```
 
 ### BASIC

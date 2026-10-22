@@ -59,6 +59,10 @@ export interface AvatarCapabilities {
   hasExpressions: boolean;
   hasSkeleton: boolean;
   morphNames: string[];
+  /** GLB only: where the face channels came from ('bytes' = the file, 'procedural' = generated at load, 'none'). */
+  faceRig?: 'bytes' | 'procedural' | 'none';
+  /** GLB only: what the face binding could not find (face/meshBinding.ts). */
+  faceWarnings?: string[];
 }
 
 export interface AvatarDriver {

@@ -38,7 +38,7 @@
    "set_url": "sets/buddha-ultimate-deadpan",
    "audio_url": "sets/buddha-ultimate-deadpan/set.mp3",
    "avatar_url": "avatars/buddha.glb",
-   "avatar_note": "Meshy rigged GLB (A-pose, 24 joints, smart-topology); mouth none — stillness is the bit",
+   "avatar_note": "Meshy rigged GLB (A-pose, 24 joints, smart-topology) + face:rig shapes (jawOpen, eyeBlinkLeft/Right, browInnerUp, browDownLeft/Right, mouthSmileLeft/Right); mouthMode morph — see docs/MESH-FACE-HOOKUP.md",
    "beats": 37,
    "duration_ms": 87587,
    "source": "characters3 delivery_engine (Fish s2.1-pro-free)"
