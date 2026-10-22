@@ -250,8 +250,12 @@ def beam_material():
     lw = nt.nodes.new("ShaderNodeLayerWeight"); lw.inputs["Blend"].default_value = 0.45
     inv = nt.nodes.new("ShaderNodeMath"); inv.operation = "SUBTRACT"; inv.inputs[0].default_value = 1.0
     nt.links.new(lw.outputs["Facing"], inv.inputs[1])
-    fade = nt.nodes.new("ShaderNodeMapRange"); fade.inputs["To Min"].default_value = 1.0
-    fade.inputs["To Max"].default_value = 0.25
+    # fade to nothing well before the floor end: the cone runs through the raised deck, and a lit lower end read
+    # as a grey haze "dome" round the spot pool; smoothstep so there is no visible cut-off ring
+    fade = nt.nodes.new("ShaderNodeMapRange"); fade.interpolation_type = "SMOOTHSTEP"
+    fade.inputs["From Max"].default_value = 0.8
+    fade.inputs["To Min"].default_value = 1.0
+    fade.inputs["To Max"].default_value = 0.0
     nt.links.new(a.outputs["Factor"], fade.inputs["Value"])
     mul = nt.nodes.new("ShaderNodeMath"); mul.operation = "MULTIPLY"
     nt.links.new(inv.outputs[0], mul.inputs[0]); nt.links.new(fade.outputs[0], mul.inputs[1])
@@ -1370,6 +1374,7 @@ def main():
     ap.add_argument("--frames", type=int, default=240)
     ap.add_argument("--tt-width", type=int, default=1280)
     ap.add_argument("--tt-samples", type=int, default=24)
+    ap.add_argument("--chunk", default="0/1", help="K/N: render the K-th of N frame ranges of the camera move")
     ap.add_argument("--dump", default="", help="write the graph dump JSON here")
     a = ap.parse_args(_ARGV)
 
@@ -1411,9 +1416,12 @@ def main():
             print("RENDERED", sc.render.filepath)
         inspect.set_modifier_inputs(mod, {"Show Beam": True})
     if a.turntable:
+        # a slow push-in that sweeps across the house: keyframed once, rendered as an animation with persistent
+        # data (one BVH build); --chunk K/N renders the K-th of N equal frame ranges (CI renders them in parallel)
         td = pathlib.Path(a.turntable).resolve()
         td.mkdir(parents=True, exist_ok=True)
         render_setup(sc, a.tt_width, round(a.tt_width * 9 / 16 / 2) * 2, a.tt_samples)
+        sc.render.use_persistent_data = True
         cam = cams["wide"]
         cam.constraints.clear()
         H = value(mod, "Ceiling Height")
@@ -1425,14 +1433,21 @@ def main():
             e = 0.5 - 0.5 * math.cos(math.pi * u)                         # ease in/out
             ang = math.radians(-38 + 76 * e)                              # sweep across the house
             r = 6.4 - 2.6 * e                                             # and push in
-            loc = Vector((r * math.sin(ang), max(back + 0.6, -r * math.cos(ang)), min(H - 0.4, 2.1 - 0.5 * e)))
+            loc = Vector((r * math.sin(ang), max(back + 0.6, -r * math.cos(ang)), min(H - 0.6, 2.1 - 0.5 * e)))
             tgt = Vector((0.0, 0.0, 1.15 + 0.15 * e))
             cam.location = loc
             cam.rotation_euler = (tgt - loc).to_track_quat("-Z", "Y").to_euler()
-            sc.camera = cam
-            sc.render.filepath = str(td / f"tt_{f:04d}.png")
-            bpy.ops.render.render(write_still=True, scene=sc.name)
-        print("TURNTABLE", td, n)
+            cam.keyframe_insert("location", frame=f + 1)
+            cam.keyframe_insert("rotation_euler", frame=f + 1)
+        k, nch = (int(x) for x in a.chunk.split("/"))
+        per = math.ceil(n / nch)
+        sc.frame_start, sc.frame_end = 1 + k * per, min(n, (k + 1) * per)
+        sc.camera = cam
+        sc.render.filepath = str(td / "tt_")
+        if bpy.context.window:
+            bpy.context.window.scene = sc
+        bpy.ops.render.render(animation=True, scene=sc.name)
+        print("TURNTABLE", td, sc.frame_start, sc.frame_end)
     if a.glb:
         p = pathlib.Path(a.glb).resolve()
         p.parent.mkdir(parents=True, exist_ok=True)

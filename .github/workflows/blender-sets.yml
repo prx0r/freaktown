@@ -1,7 +1,8 @@
 name: blender sets
 
 # Builds the procedural comedy-club set (sets/blender/club_build.py) in Blender 5.2.2 on x86 Linux:
-# library checks, Cycles stills, baked GLBs and a camera-move clip, uploaded as artifacts.
+# library checks, Cycles stills, baked GLBs and a ~10 s camera-move clip (4 parallel frame chunks + an encode job),
+# uploaded as artifacts.
 # Blender has no official linux-arm64 build, so the heavy lifting happens here (docs/BLENDER-SETS.md).
 on:
   push:
@@ -74,25 +75,45 @@ jobs:
             out/*.graph.json
 
   turntable:
-    name: camera move (${{ inputs.turntable || 'dive' }})
+    name: camera move ${{ matrix.chunk }}/4
     runs-on: ubuntu-24.04
-    timeout-minutes: 240
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        chunk: [0, 1, 2, 3]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/cache@v4
         with: { path: ~/blender, key: "blender-${{ env.BLENDER_VERSION }}-linux-x64" }
       - run: bash sets/blender/ci_setup.sh
-      - name: Render the camera move and encode it
+      - name: Render a quarter of the camera move
         run: |
-          P=${{ inputs.turntable || 'dive' }}
           mkdir -p out
           "$BLENDER" -b --factory-startup --python sets/blender/club_build.py -- --skill "$V2B_SKILL" \
-            --preset $P --turntable out/tt --frames ${{ inputs.frames || '240' }} --tt-width 1280 --tt-samples 20 \
-            2>&1 | grep -E "PRESET|LINT|TURNTABLE|Error" || true
-          ffmpeg -y -loglevel error -framerate 24 -i out/tt/tt_%04d.png -c:v libx264 -pix_fmt yuv420p -crf 20 \
-            -movflags +faststart out/club_${P}_camera_move.mp4
-          ls -la out
+            --preset ${{ inputs.turntable || 'dive' }} --turntable out/tt --frames ${{ inputs.frames || '240' }} \
+            --chunk ${{ matrix.chunk }}/4 --tt-width 1280 --tt-samples 16 2>&1 | grep -E "PRESET|LINT|TURNTABLE|Error" || true
+          ls out/tt | wc -l; test "$(ls out/tt | wc -l)" -gt 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tt-frames-${{ matrix.chunk }}
+          path: out/tt/*.png
+
+  encode:
+    name: encode camera move
+    needs: turntable
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { pattern: tt-frames-*, merge-multiple: true, path: tt }
+      - run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg >/dev/null
+          ls tt | head -3; ls tt | wc -l
+          ffmpeg -y -loglevel error -framerate 24 -start_number 1 -i tt/tt_%04d.png -c:v libx264 -pix_fmt yuv420p \
+            -crf 20 -movflags +faststart club_${{ inputs.turntable || 'dive' }}_camera_move.mp4
+          ls -la *.mp4
       - uses: actions/upload-artifact@v4
         with:
           name: club-camera-move
-          path: out/*.mp4
+          path: '*.mp4'
