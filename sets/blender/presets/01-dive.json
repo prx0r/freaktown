@@ -1,0 +1,41 @@
+{
+ "Room Width": 10.0,
+ "Room Depth": 11.0,
+ "Ceiling Height": 3.8,
+ "Riser Height": 0.3,
+ "Theatre Rows": false,
+ "Crowd": 0.6,
+ "Clutter": 1.0,
+ "Paint Cover": 0.15,
+ "Side Curtain Width": 1.6,
+ "Neon Color": [
+  1.0,
+  0.02843,
+  0.35153,
+  1.0
+ ],
+ "Seed": 3,
+ "Brick Color": [
+  0.19462,
+  0.04374,
+  0.02315,
+  1.0
+ ],
+ "Curtain Color": [
+  0.11193,
+  0.00335,
+  0.00802,
+  1.0
+ ],
+ "Stage Width": 6.0,
+ "Stage Depth": 3.4,
+ "_look": {
+  "key": 900,
+  "rim": 160,
+  "neon": 60,
+  "house": 90,
+  "haze": 0.45,
+  "haze_color": "#2A2230",
+  "ambient": "#120C18"
+ }
+}

@@ -68,6 +68,23 @@ export interface EnvironmentDef {
   };
 }
 
+/**
+ * Optional pre-built environment that REPLACES the procedural decor (walls, deck, curtains, crowd) while
+ * keeping the set's lights, camera presets and fitted props. Opt-in per page (e.g. ?clubset=dive); the
+ * procedural builder stays the default and the fallback if the GLB fails to load.
+ */
+export interface SetVariantDef {
+  id: string;
+  label: string;
+  url: string;
+  license: string;
+  source: string;
+  /** glTF node names to hide (parts the runtime draws itself, e.g. the fitted mic, the light cone). */
+  hideNodes?: string[];
+  /** glTF node whose bounding-box centre the set's sign text moves onto. */
+  signNode?: string;
+}
+
 export type OverlayHook = 'lower_third' | 'ticker' | 'headline' | 'on_air' | 'speaker_strap' | 'poker_hud';
 
 export interface SetDefinition {
@@ -90,6 +107,8 @@ export interface SetDefinition {
   overlays: OverlayHook[];
   /** Ordered camera buttons for /control. */
   controlCameras: string[];
+  /** Optional GLB environments (see SetVariantDef); none of them is loaded unless asked for. */
+  variants?: SetVariantDef[];
   /** Max seats a cast may fill (defaults to seats.length). */
   maxCast?: number;
 }

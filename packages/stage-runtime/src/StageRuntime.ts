@@ -22,6 +22,7 @@ import { AudioBus } from './AudioBus';
 import { CameraDirector, type CameraPresetName } from './CameraDirector';
 import { EventConsumer } from './EventConsumer';
 import { StageSet } from './StageSet';
+import { COMEDY_CLUB } from './sets/definitions';
 import { SfxSynth } from './SfxSynth';
 import { NULL_CLOCK_SINK, type ClockSink, type RoomStore } from './ports';
 import type { LiveTransport } from './live/LiveTransport';
@@ -72,6 +73,10 @@ export interface StageConfig {
   quality?: 'high' | 'low';
   /** CPU skinning/morphs for GPUs without vertex texture fetch (CI/SwiftShader). */
   cpuSkinning?: boolean;
+  /** Optional comedy-club environment variant id (COMEDY_CLUB.variants, e.g. 'dive'); procedural if unset. */
+  setVariant?: string;
+  /** Resolve asset URLs (variant GLBs). */
+  resolveUrl?: (u: string) => string;
 }
 
 export interface CutRecord {
@@ -157,6 +162,8 @@ export class StageRuntime {
   private lastCutSource: CutRecord['source'] = 'initial';
 
   status: RuntimeStatus = 'EMPTY';
+  /** Resolves once an optional set variant (config.setVariant) has loaded or failed. */
+  variantReady: Promise<void> = Promise.resolve();
 
   constructor(config: StageConfig) {
     this.config = config;
@@ -181,6 +188,11 @@ export class StageRuntime {
     config.container.appendChild(this.renderer.domElement);
 
     this.set = new StageSet(this.scene, { shadows: config.shadows ?? !low, sign: config.sign, lite: low });
+    if (config.setVariant) {
+      const v = COMEDY_CLUB.variants?.find((x) => x.id === config.setVariant);
+      if (v) this.variantReady = this.set.loadVariant(v, config.resolveUrl);
+      else this.set.variantStatus = `error:${config.setVariant}: unknown club set variant`;
+    }
     this.gaze.position.set(0, 1.5, 6);
     this.scene.add(this.gaze);
 
@@ -539,6 +551,9 @@ export class StageRuntime {
 
   private currentWordCb?: (index: number, word: string) => void;
   setWordCallback(cb: (index: number, word: string) => void): void { this.currentWordCb = cb; }
+
+  /** Which comedy-club environment is showing ('procedural', a variant id, 'loading:…' or 'error:…'). */
+  setVariantStatus(): string { return this.set.variantStatus; }
 
   telemetry(): StageTelemetry {
     const w = this.wordIndex >= 0 ? this.wordTimings[this.wordIndex] : undefined;
