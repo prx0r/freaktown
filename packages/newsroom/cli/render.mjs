@@ -150,7 +150,7 @@ try {
       : args.tone ? ['-f', 'lavfi', '-i', 'sine=frequency=196:sample_rate=48000,volume=0.02']
       : ['-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo'];
     const ff = spawnSync('ffmpeg', ['-y', '-loglevel', 'error', '-framerate', String(fps), '-i', path.join(framesDir, 'f_%06d.jpg'), ...audioIn,
-      '-map', '0:v', '-map', '1:a', '-t', String(n / fps), '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '20', '-preset', 'veryfast', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', out], { stdio: 'inherit' });
+      '-map', '0:v', '-map', '1:a', '-t', String(n / fps), '-vf', 'scale=out_color_matrix=bt709:out_range=tv:flags=accurate_rnd+full_chroma_int,format=yuv420p', '-c:v', 'libx264', '-color_range', 'tv', '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-crf', '20', '-preset', 'veryfast', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', out], { stdio: 'inherit' });
     if (ff.status !== 0) throw new Error('ffmpeg failed');
     const tl = await page.evaluate(() => window.__newsroom.timeline());
     fs.writeFileSync(out.replace(/\.mp4$/, '') + '.json', JSON.stringify({
