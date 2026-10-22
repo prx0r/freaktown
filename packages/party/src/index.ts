@@ -7,3 +7,4 @@ export * from './taste';
 export * from './identity';
 export * from './agents';
 export * from './game';
+export * from './rooms';

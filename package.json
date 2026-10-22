@@ -20,7 +20,7 @@
     "sketch:render": "node packages/sketch/cli/render.mjs",
     "sketch:stats": "python3 packages/sketch/scripts/snl_structure_stats.py",
     "sketch:identities": "node packages/sketch/scripts/build-identities.mjs",
-    "party:rooms": "node packages/party/server/rooms-server.mjs",
+    "party:rooms": "vite-node packages/party/server/rooms-server.ts",
     "party:identity": "node packages/party/cli/create-identity.mjs"
   },
   "devDependencies": {
