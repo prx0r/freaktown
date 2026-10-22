@@ -1,8 +1,12 @@
 /**
- * proceduralRig — synthesise jawOpen, eyeBlinkLeft/Right, browInnerUp,
- * browDownLeft/Right and mouthSmileLeft/Right morph deltas for a
- * skinned mesh that has a Head bone but no face channels (Meshy, Tripo,
- * Hunyuan, Rodin… body rigs ship with ZERO face shapes).
+ * proceduralRig — synthesise the morph deltas the stage's FaceChannel can
+ * actually drive for a skinned mesh that has a Head bone but no face
+ * channels (Meshy, Tripo, Hunyuan, Rodin… body rigs ship with ZERO face
+ * shapes). Covered: jawOpen, eyeBlinkLeft/Right, browInnerUp,
+ * browDownLeft/Right, mouthSmileLeft/Right, plus the expression set the
+ * Emotions channels need — mouthFrownLeft/Right (sad), cheekSquintLeft/Right
+ * (happy), eyeSquintLeft/Right + noseSneerLeft/Right + mouthPressLeft/
+ * Right (angry), browOuterUpLeft/Right + eyeWideLeft/Right (surprised).
  *
  * Pure (no three.js): typed arrays in, POSITION-space deltas out. Used by
  *   - GlbAvatar at load time (runtime fallback, with a console warning), and
@@ -198,6 +202,126 @@ export function proceduralFaceRig(inp: RigInput): RigResult {
   };
   const smL = smile(+1), smR = smile(-1);
 
+  // ── mouthFrownLeft/Right (sad, AU15): each mouth corner down and slightly in
+  const frown = (side: number) => {
+    const out = new Float32Array(n * 3);
+    const cs = sMid + side * 0.17 * w, r = 0.13 * w;
+    let moved = 0;
+    for (let j = 0; j < head.length; j++) {
+      if (fu[j] < fMid) continue;
+      const ds = (su[j] - cs) / r, du = (uu[j] - mouth) / (0.8 * r);
+      const r2 = ds * ds + du * du;
+      if (r2 >= 1) continue;
+      const wt = (1 - r2) * (1 - r2) * smooth(fMid, fMid + 0.3 * d, fu[j]);
+      const i = head[j];
+      for (let a = 0; a < 3; a++) out[i * 3 + a] = (-U[a] * 0.035 * h - S[a] * side * 0.008 * w) * wt;
+      moved++;
+    }
+    return { deltas: out, moved };
+  };
+  const fnL = frown(+1), fnR = frown(-1);
+
+  // ── cheekSquintLeft/Right (happy, AU6): cheek lifts toward the lower lid
+  const cheek = (side: number) => {
+    const out = new Float32Array(n * 3);
+    const cs = sMid + side * t.eyeSpread * w, r = 0.16 * w, cu = eyes - 0.9 * (0.14 * h);
+    let moved = 0;
+    for (let j = 0; j < head.length; j++) {
+      if (fu[j] < fMid) continue;
+      const ds = (su[j] - cs) / r, du = (uu[j] - cu) / r;
+      const r2 = ds * ds + du * du;
+      if (r2 >= 1) continue;
+      const wt = (1 - r2) * (1 - r2) * smooth(fMid, fMid + 0.3 * d, fu[j]);
+      const i = head[j];
+      for (let a = 0; a < 3; a++) out[i * 3 + a] = (U[a] * 0.03 * h + F[a] * 0.005 * d) * wt;
+      moved++;
+    }
+    return { deltas: out, moved };
+  };
+  const chL = cheek(+1), chR = cheek(-1);
+
+  // ── eyeSquint (angry, AU7) / eyeWide (surprised, AU5): upper-lid tighten / open
+  const lidDir = (side: number, sign: number, mag: number) => {
+    const out = new Float32Array(n * 3);
+    const cs = sMid + side * t.eyeSpread * w, rx = 0.17 * w, ry = 0.14 * h;
+    let moved = 0;
+    for (let j = 0; j < head.length; j++) {
+      if (fu[j] < fMid) continue;
+      const ds = (su[j] - cs) / rx, du = (uu[j] - eyes) / ry;
+      const r2 = ds * ds + du * du;
+      if (r2 >= 1) continue;
+      const upper = Math.max(0, Math.min(1, du + 0.2));
+      const wt = Math.min(1, 1.6 * (1 - r2)) * upper * smooth(fMid, fMid + 0.3 * d, fu[j]);
+      if (wt <= 1e-3) continue;
+      const dU = sign * mag * h * wt;
+      const i = head[j];
+      for (let a = 0; a < 3; a++) out[i * 3 + a] = U[a] * dU;
+      moved++;
+    }
+    return { deltas: out, moved };
+  };
+  const sqL = lidDir(+1, -1, 0.025), sqR = lidDir(-1, -1, 0.025);
+  const wdL = lidDir(+1, +1, 0.03), wdR = lidDir(-1, +1, 0.03);
+
+  // ── noseSneerLeft/Right (angry, AU9): nose sides lift and wrinkle out
+  const sneer = (side: number) => {
+    const out = new Float32Array(n * 3);
+    const cs = sMid + side * 0.11 * w, r = 0.10 * w, cu = nose + 0.06 * (0.14 * h);
+    let moved = 0;
+    for (let j = 0; j < head.length; j++) {
+      if (fu[j] < fMid) continue;
+      const ds = (su[j] - cs) / r, du = (uu[j] - cu) / r;
+      const r2 = ds * ds + du * du;
+      if (r2 >= 1) continue;
+      const wt = (1 - r2) * (1 - r2) * smooth(fMid, fMid + 0.3 * d, fu[j]);
+      const i = head[j];
+      for (let a = 0; a < 3; a++) out[i * 3 + a] = (U[a] * 0.03 * h + S[a] * side * 0.008 * w) * wt;
+      moved++;
+    }
+    return { deltas: out, moved };
+  };
+  const snL = sneer(+1), snR = sneer(-1);
+
+  // ── mouthPressLeft/Right (angry, AU23): lips flatten — upper down, lower up
+  const press = (side: number) => {
+    const out = new Float32Array(n * 3);
+    const cs = sMid + side * 0.10 * w, rs = 0.10 * w, ru = 0.06 * w;
+    let moved = 0;
+    for (let j = 0; j < head.length; j++) {
+      if (fu[j] < fMid) continue;
+      const ds = (su[j] - cs) / rs, du = (uu[j] - mouth) / ru;
+      const r2 = ds * ds + du * du;
+      if (r2 >= 1) continue;
+      const wt = (1 - r2) * (1 - r2) * smooth(fMid, fMid + 0.3 * d, fu[j]);
+      const dU = -0.018 * h * Math.max(-1, Math.min(1, du * 2)) * wt;
+      const i = head[j];
+      for (let a = 0; a < 3; a++) out[i * 3 + a] = U[a] * dU;
+      moved++;
+    }
+    return { deltas: out, moved };
+  };
+  const prL = press(+1), prR = press(-1);
+
+  // ── browOuterUpLeft/Right (surprised, AU2): outer brow band lifts
+  const browOut = (side: number) => {
+    const out = new Float32Array(n * 3);
+    const cs = sMid + side * (t.eyeSpread + 0.13) * w, rs = 0.14 * w;
+    let moved = 0;
+    const b0o = eyes + 0.75 * (0.14 * h), b1o = eyes + 2.6 * (0.14 * h);
+    for (let j = 0; j < head.length; j++) {
+      if (fu[j] < fMid || uu[j] < b0o - 0.4 * (0.14 * h) || uu[j] > b1o + 0.8 * (0.14 * h)) continue;
+      const band = uu[j] <= (b0o + b1o) / 2 ? smooth(b0o - 0.4 * (0.14 * h), (b0o + b1o) / 2, uu[j]) : 1 - smooth((b0o + b1o) / 2, b1o + 0.8 * (0.14 * h), uu[j]);
+      const ds = (su[j] - cs) / rs;
+      const wt = band * Math.exp(-ds * ds) * smooth(fMid, fMid + 0.3 * d, fu[j]);
+      if (wt <= 1e-3) continue;
+      const i = head[j];
+      for (let a = 0; a < 3; a++) out[i * 3 + a] = U[a] * 0.05 * h * wt;
+      moved++;
+    }
+    return { deltas: out, moved };
+  };
+  const boL = browOut(+1), boR = browOut(-1);
+
   if (movedJaw < 30) warnings.push(`jaw region tiny (${movedJaw} verts) — landmarks may be off; tune mouthFrac`);
   if (left.moved < 10 || right.moved < 10) warnings.push('eye regions tiny — tune eyeFrac/eyeSpread');
   return {
@@ -210,6 +334,20 @@ export function proceduralFaceRig(inp: RigInput): RigResult {
       { name: 'browDownRight', deltas: browDR, moved: movedBrow },
       { name: 'mouthSmileLeft', deltas: smL.deltas, moved: smL.moved },
       { name: 'mouthSmileRight', deltas: smR.deltas, moved: smR.moved },
+      { name: 'mouthFrownLeft', deltas: fnL.deltas, moved: fnL.moved },
+      { name: 'mouthFrownRight', deltas: fnR.deltas, moved: fnR.moved },
+      { name: 'cheekSquintLeft', deltas: chL.deltas, moved: chL.moved },
+      { name: 'cheekSquintRight', deltas: chR.deltas, moved: chR.moved },
+      { name: 'eyeSquintLeft', deltas: sqL.deltas, moved: sqL.moved },
+      { name: 'eyeSquintRight', deltas: sqR.deltas, moved: sqR.moved },
+      { name: 'eyeWideLeft', deltas: wdL.deltas, moved: wdL.moved },
+      { name: 'eyeWideRight', deltas: wdR.deltas, moved: wdR.moved },
+      { name: 'noseSneerLeft', deltas: snL.deltas, moved: snL.moved },
+      { name: 'noseSneerRight', deltas: snR.deltas, moved: snR.moved },
+      { name: 'mouthPressLeft', deltas: prL.deltas, moved: prL.moved },
+      { name: 'mouthPressRight', deltas: prR.deltas, moved: prR.moved },
+      { name: 'browOuterUpLeft', deltas: boL.deltas, moved: boL.moved },
+      { name: 'browOuterUpRight', deltas: boR.deltas, moved: boR.moved },
     ],
     landmarks: { chin, nose, mouth, eyes, headHeight: h, headWidth: w, headVerts: head.length },
     warnings,
