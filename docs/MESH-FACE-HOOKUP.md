@@ -11,6 +11,10 @@ npm run face:check -- static/avatars/<name>.glb
 It runs the same binding the stage runs (`packages/stage-runtime/src/face/meshBinding.ts`),
 so what it prints is what the stage drives.
 
+Reference result: [`docs/media/buddha-face-mesh-binding.mp4`](media/buddha-face-mesh-binding.mp4)
+(13 s, Buddha on the stand-up set, `COMIC_CLOSE`. The Meshy rig plus `face:rig` shapes:
+the mouth follows the words, blinks, and the brows knit on the "annoyed" beat).
+
 ---
 
 ## How the engine picks a face (30 seconds)
