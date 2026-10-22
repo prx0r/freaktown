@@ -333,7 +333,8 @@ def screen_material(name, image_path=None, tint=(0.05, 0.06, 0.09, 1.0), strengt
     uv.uv_map = "UVMap"
     if image_path and pathlib.Path(image_path).exists():
         tx = nt.nodes.new("ShaderNodeTexImage")
-        tx.image = bpy.data.images.load(str(image_path))
+        # absolute: a CWD-relative path is remapped to "/sets/..." when the .blend is saved (cards rendered missing-pink)
+        tx.image = bpy.data.images.load(str(pathlib.Path(image_path).resolve()))
         tx.extension = "EXTEND"
         nt.links.new(uv.outputs["UV"], tx.inputs["Vector"])
         nt.links.new(tx.outputs["Color"], em.inputs["Color"])

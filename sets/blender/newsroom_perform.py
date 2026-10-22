@@ -161,7 +161,7 @@ def mark_pose(cam):
 
 # ---- the bake ---------------------------------------------------------------------------------------------------------
 def load_clip(d):
-    d = pathlib.Path(d)
+    d = pathlib.Path(d).resolve()  # absolute, so card/brand image paths survive save_as_mainfile
     tl = json.loads((d / "timeline.json").read_text())
     clip = json.loads((d / "clip.json").read_text()) if (d / "clip.json").exists() else {"from_ms": 0}
     cards = json.loads((d / "cards.json").read_text()) if (d / "cards.json").exists() else []
