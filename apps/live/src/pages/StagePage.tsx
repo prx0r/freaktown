@@ -148,7 +148,10 @@ export function ClubStagePage() {
     <div
       data-testid="stage"
       style={{ width: '100vw', height: '100dvh', position: 'relative', overflow: 'hidden', background: '#000' }}
-      onPointerDown={() => { if (audioLocked) void unlockAudio(); }}
+      // ALWAYS unlock on pointer-down: audioLocked lags by an 800ms timer,
+      // so a click inside that window used to be silently eaten and the
+      // clock stayed suspended (nothing moves). resume() is idempotent.
+      onPointerDown={() => { void unlockAudio(); }}
     >
       <div ref={containerRef} style={{ position: 'absolute', inset: 0 }} />
 

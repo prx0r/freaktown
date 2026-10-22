@@ -24,8 +24,15 @@ export function WatchPage() {
   // gesture because they share this origin/user activation).
   useEffect(() => {
     const unlock = () => {
+      // Stage exposes window.__stage.runtime — unlockAudio() resumes its
+      // WebAudio context (idempotent). Same-origin iframes, so this is legal.
       for (const f of document.querySelectorAll('iframe')) {
-        try { (f.contentWindow as Window & { __audioUnlock?: () => void })?.__audioUnlock?.(); } catch { /* cross-frame best effort */ }
+        try {
+          const w = f.contentWindow as unknown as {
+            __stage?: { runtime?: { unlockAudio?: () => Promise<void> } };
+          };
+          void w.__stage?.runtime?.unlockAudio?.();
+        } catch { /* frame not ready — its own pointer-down handler covers it */ }
       }
       if (note.current) note.current.style.display = 'none';
     };
