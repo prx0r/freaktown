@@ -366,7 +366,12 @@ export class StageSet {
           m.receiveShadow = true;
           m.castShadow = !/club_(floor|wall|house|beam)/.test(m.name);
           const mats = Array.isArray(m.material) ? m.material : [m.material];
-          for (const mat of mats) if ((mat as THREE.MeshStandardMaterial).map) (mat as THREE.MeshStandardMaterial).map!.anisotropy = 4;
+          for (const mat of mats) {
+            if ((mat as THREE.MeshStandardMaterial).map) (mat as THREE.MeshStandardMaterial).map!.anisotropy = 4;
+            // the house walls face in: cull their backs so a shallow room (basement) never walls off a camera
+            // that sits behind its rear wall, like WIDE_STAGE at z 8.2
+            if (/^club_house/.test(m.name)) mat.side = THREE.FrontSide;
+          }
         }
       });
       if (this.variantRoot) this.group.remove(this.variantRoot);

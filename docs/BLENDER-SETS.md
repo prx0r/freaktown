@@ -130,7 +130,9 @@ the crowd, or the segment counts in the person/seat groups.
 On the stand-up page the variants are opt-in: `/stage/<episode>?clubset=dive` (`late-night-tv`,
 `basement-open-mic`, `theatre`). The runtime (`StageSet.loadVariant`) hides the procedural room (deck, wall,
 curtains, stool, crowd), keeps the three.js lights, beam, haze and the mic fitted to the performer's mouth, hides
-the GLB's own `club_mic` and `club_beam`, and moves the neon text onto the GLB's sign board. If the GLB fails to
+the GLB's own `club_mic` and `club_beam`, and moves the neon text onto the GLB's sign board. The GLB's house walls
+(`club_house`, facing in) render front-side only, so a shallow room such as the basement never walls off the
+WIDE_STAGE camera, which sits behind its rear wall. If the GLB fails to
 load, the procedural room comes back. `runtime.setVariantStatus()` reports which one is showing.
 `apps/live/e2e/club-variant-shots.mjs` takes desktop and mobile screenshots of each variant with the performer.
 
