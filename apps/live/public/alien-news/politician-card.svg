@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="720" viewBox="0 0 600 720">
+  <!-- ORIGINAL drawn caricature for Alien News: a generic blustery politician.
+       Not based on any real person, photo or likeness. Drawn for FUNNIER, 2026. -->
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="38%" r="70%">
+      <stop offset="0" stop-color="#ffe9a8"/><stop offset="0.55" stop-color="#ffb347"/><stop offset="1" stop-color="#d9472b"/>
+    </radialGradient>
+    <radialGradient id="skin" cx="45%" cy="40%" r="65%">
+      <stop offset="0" stop-color="#ffd2b0"/><stop offset="0.7" stop-color="#f29b7f"/><stop offset="1" stop-color="#d8665a"/>
+    </radialGradient>
+    <radialGradient id="cheek" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ff4d4d" stop-opacity="0.75"/><stop offset="1" stop-color="#ff4d4d" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="600" height="720" fill="url(#bg)"/>
+  <!-- sunburst -->
+  <g opacity="0.22" fill="#fff">
+    <path d="M300 260 L120 0 L200 0Z"/><path d="M300 260 L330 0 L410 0Z"/><path d="M300 260 L540 0 L600 40Z"/>
+    <path d="M300 260 L600 210 L600 290Z"/><path d="M300 260 L0 120 L0 200Z"/><path d="M300 260 L0 330 L0 400Z"/>
+  </g>
+  <!-- flag bunting (made-up flag) -->
+  <path d="M0 40 Q150 90 300 40 Q450 -10 600 40" fill="none" stroke="#1b2a5e" stroke-width="6"/>
+  <g>
+    <path d="M40 52 l30 4 -12 32z" fill="#1b2a5e"/><path d="M110 70 l30 2 -14 32z" fill="#fff"/><path d="M180 76 l30 0 -15 32z" fill="#c8102e"/>
+    <path d="M390 32 l30 -2 -14 32z" fill="#1b2a5e"/><path d="M460 24 l30 -3 -12 32z" fill="#fff"/><path d="M530 30 l30 2 -14 32z" fill="#c8102e"/>
+  </g>
+  <!-- steam from the ears -->
+  <g fill="#ffffff" opacity="0.9">
+    <circle cx="70" cy="300" r="20"/><circle cx="44" cy="268" r="15"/><circle cx="30" cy="236" r="10"/>
+    <circle cx="560" cy="420" r="16"/><circle cx="580" cy="390" r="11"/>
+  </g>
+  <!-- tiny body, dark suit -->
+  <path d="M190 470 Q300 430 410 470 L450 640 L150 640Z" fill="#23263a"/>
+  <path d="M270 455 L300 520 L330 455Z" fill="#f4f1ea"/>
+  <!-- enormous tie -->
+  <path d="M288 470 L312 470 L330 600 L300 632 L270 600Z" fill="#c8102e"/>
+  <g stroke="#ffd166" stroke-width="7"><path d="M282 520 L322 500"/><path d="M276 560 L326 540"/><path d="M274 598 L328 580"/></g>
+  <!-- head: huge, round, bald, very red -->
+  <ellipse cx="300" cy="275" rx="200" ry="190" fill="url(#skin)" stroke="#8a3b2e" stroke-width="5"/>
+  <!-- shine on the bald dome -->
+  <ellipse cx="250" cy="140" rx="60" ry="22" fill="#fff" opacity="0.45" transform="rotate(-12 250 140)"/>
+  <!-- grey side tufts (fluffy) -->
+  <g fill="#e2e2e8" stroke="#a3a3ae" stroke-width="3">
+    <circle cx="112" cy="300" r="24"/><circle cx="104" cy="268" r="20"/><circle cx="122" cy="238" r="16"/>
+    <circle cx="488" cy="300" r="24"/><circle cx="496" cy="268" r="20"/><circle cx="478" cy="238" r="16"/>
+  </g>
+  <!-- furious eyebrows -->
+  <path d="M175 205 L270 232" stroke="#55555f" stroke-width="18" stroke-linecap="round"/>
+  <path d="M425 205 L330 232" stroke="#55555f" stroke-width="18" stroke-linecap="round"/>
+  <!-- squeezed eyes -->
+  <ellipse cx="228" cy="258" rx="26" ry="17" fill="#fff" stroke="#2a1a14" stroke-width="4"/>
+  <ellipse cx="372" cy="258" rx="26" ry="17" fill="#fff" stroke="#2a1a14" stroke-width="4"/>
+  <circle cx="236" cy="262" r="8" fill="#2a1a14"/><circle cx="364" cy="262" r="8" fill="#2a1a14"/>
+  <!-- glaring lids -->
+  <path d="M198 248 L258 263" stroke="#2a1a14" stroke-width="7" stroke-linecap="round"/><path d="M402 248 L342 263" stroke="#2a1a14" stroke-width="7" stroke-linecap="round"/>
+  <!-- puffed cheeks -->
+  <circle cx="175" cy="320" r="58" fill="url(#cheek)"/><circle cx="425" cy="320" r="58" fill="url(#cheek)"/>
+  <!-- bulb nose -->
+  <ellipse cx="300" cy="300" rx="34" ry="28" fill="#ef7c6c" stroke="#8a3b2e" stroke-width="4"/>
+  <ellipse cx="290" cy="290" rx="9" ry="6" fill="#fff" opacity="0.6"/>
+  <!-- giant shouting mouth -->
+  <path d="M215 355 Q300 335 385 355 Q370 455 300 460 Q230 455 215 355Z" fill="#5a1220" stroke="#8a3b2e" stroke-width="5"/>
+  <path d="M232 360 Q300 346 368 360 L362 378 Q300 366 238 378Z" fill="#fff"/>
+  <ellipse cx="300" cy="430" rx="40" ry="18" fill="#e0566b"/>
+  <!-- pointing arm (finger wagging at the sky) -->
+  <path d="M420 500 Q520 470 540 330" fill="none" stroke="#23263a" stroke-width="40" stroke-linecap="round"/>
+  <circle cx="542" cy="318" r="26" fill="url(#skin)" stroke="#8a3b2e" stroke-width="3"/>
+  <rect x="533" y="246" width="18" height="64" rx="9" fill="url(#skin)" stroke="#8a3b2e" stroke-width="3" transform="rotate(8 542 300)"/>
+  <g stroke="#23263a" stroke-width="4" stroke-linecap="round"><path d="M566 250 l14 -10"/><path d="M572 272 l18 -2"/><path d="M516 248 l-12 -12"/></g>
+  <!-- spit flecks + exclamation bubble -->
+  <g fill="#bfe7ff"><circle cx="400" cy="400" r="6"/><circle cx="420" cy="420" r="4"/><circle cx="196" cy="404" r="5"/></g>
+  <g transform="translate(70 380) rotate(-8)">
+    <path d="M0 0 h110 v66 h-60 l-22 22 l2 -22 h-30z" fill="#fff" stroke="#23263a" stroke-width="5"/>
+    <text x="55" y="50" font-family="Impact, 'Arial Black', 'DejaVu Sans', sans-serif" font-weight="900" font-size="46" fill="#c8102e" text-anchor="middle">!!!</text>
+  </g>
+  <!-- podium with a made-up seal -->
+  <path d="M120 600 L480 600 L455 720 L145 720Z" fill="#6b4226" stroke="#3e2414" stroke-width="5"/>
+  <circle cx="300" cy="650" r="34" fill="#ffd166" stroke="#3e2414" stroke-width="4"/>
+  <path d="M300 626 l7 16 h17 l-14 10 5 17 -15 -10 -15 10 5 -17 -14 -10 h17z" fill="#c8102e"/>
+  <!-- microphones -->
+  <g stroke="#222" stroke-width="5"><path d="M250 600 L270 545"/><path d="M350 600 L330 545"/></g>
+  <circle cx="270" cy="540" r="10" fill="#333"/><circle cx="330" cy="540" r="10" fill="#333"/>
+  <!-- generic label -->
+  <rect x="0" y="676" width="600" height="44" fill="#0b1433"/>
+  <text x="300" y="707" font-family="Inter, Arial, 'DejaVu Sans', sans-serif" font-weight="800" font-size="24" letter-spacing="3" fill="#ffd166" text-anchor="middle">EARTH POLITICIAN (GENERIC)</text>
+</svg>

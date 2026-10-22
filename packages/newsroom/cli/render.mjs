@@ -14,6 +14,7 @@
  *        [--audio master.wav]   mux this audio (else silent; --tone = quiet placeholder tone)
  *        [--size 1280x720] [--fps 25] [--from ms] [--to ms] [--quality low|high]
  *        [--shots 30000,52000 --viewports desktop,mobile --shots-dir dir]   screenshots only
+ *        [--no-subs]            hide subtitles (reads that carry a `subtitle`)
  *        [--build]              rebuild apps/live first (default: build only if dist is missing)
  *        [--keep-frames]
  * Env: CHROMIUM_PATH (system Chromium; linux-arm64 has no Playwright-managed one).
@@ -90,7 +91,7 @@ async function openStage(vw, vh, mobile = false) {
   const ctx = await browser.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: 1, isMobile: mobile, hasTouch: mobile });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => console.error('[pageerror]', e.message));
-  await page.goto(`${base}/newsroom/render?capture=1&quality=${quality}&cpuskin=1`);
+  await page.goto(`${base}/newsroom/render?capture=1&quality=${quality}&cpuskin=1${args['no-subs'] ? '&subs=0' : ''}`);
   await page.waitForFunction(() => !!window.__newsroom, null, { timeout: 60000 });
   const info = await page.evaluate((x) => window.__newsroom.load(x), { rundown, timings });
   return { ctx, page, info };

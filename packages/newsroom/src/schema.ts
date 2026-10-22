@@ -22,7 +22,7 @@ export const RUNDOWN_SCHEMA = 'funnier.newsroom.rundown/v1' as const;
 /** One measured word, relative to the start of its line (face layer format). */
 export interface WordTiming { word: string; start_ms: number; end_ms: number }
 
-export type LicenseLane = 'verbatim-ok' | 'fact-rewrite' | 'unknown' | (string & {});
+export type LicenseLane = 'verbatim-ok' | 'original' | 'fact-rewrite' | 'unknown' | (string & {});
 
 export interface SourceRef { name: string; url?: string; license?: LicenseLane }
 
@@ -64,6 +64,8 @@ export interface AnchorReadPiece extends PieceBase {
   /** Measured words for this line (relative ms). Overrides estimates. */
   words?: WordTiming[];
   emotion?: string;
+  /** Optional on-screen subtitle (e.g. a translation of a gibberish line). Shown unless the viewer turns subtitles off. */
+  subtitle?: string;
   /** Marks a line that carries the story's figure (fires the numbers graphic). */
   numbers?: { figure: string; label?: string };
 }
@@ -77,6 +79,7 @@ export interface ReporterReadPiece extends PieceBase {
   country?: string;
   text: string;
   words?: WordTiming[];
+  subtitle?: string;
   numbers?: { figure: string; label?: string };
 }
 
@@ -130,6 +133,8 @@ export interface RundownV1 {
   show_style: string;
   /** Set id; defaults to the style's set (news-studio). */
   set?: string;
+  /** Show brand override ("Alien News"): lower-third title, wall brand line, ticker label. */
+  brand?: string;
   date?: string;
   cast: CastV1;
   segments: SegmentV1[];
@@ -254,9 +259,10 @@ export function assertRundown(x: unknown): asserts x is RundownV1 {
 
 /**
  * Licence-lane gate for wall images. Only `verbatim-ok` sources (public-domain
- * / open re-use: NASA, ESA, UN, OGL…) may show their image; © news
+ * / open re-use: NASA, ESA, UN, OGL…) and `original` art made for the show
+ * (drawn in-house, no real photo or likeness) may show their image; © news
  * (`fact-rewrite`) and unknown lanes get the procedural card only.
  */
 export function imageAllowed(lane: LicenseLane | undefined): boolean {
-  return lane === 'verbatim-ok';
+  return lane === 'verbatim-ok' || lane === 'original';
 }

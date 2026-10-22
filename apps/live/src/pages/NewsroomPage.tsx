@@ -16,7 +16,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { SetEventExecutor, SetStage, type EventConsumer, type SetStageTelemetry } from '@funnier/stage-runtime';
-import { compile, paintWallCard, type CompiledShow, type RundownV1, type TimingsInput } from '@funnier/newsroom';
+import { compile, paintWallCard, preloadWallImages, type CompiledShow, type RundownV1, type TimingsInput } from '@funnier/newsroom';
 import type { SetThemePayloadV1, ShowEvent } from '@funnier/contracts';
 import { resolveAsset } from '../live/transport';
 
@@ -41,6 +41,8 @@ interface View {
   lowerThird: { name: string; title?: string; at: number } | null;
   ticker: string[];
   headline: { text: string; layout: string; kicker?: string } | null;
+  /** Subtitle of the line being spoken (when the rundown gives one). */
+  subtitle: { text: string; who: string } | null;
 }
 
 const nullConsumer = { onEvent: () => () => {} } as unknown as EventConsumer;
@@ -54,7 +56,8 @@ export function NewsroomPage() {
   const debug = q.get('debug') === '1';
   const ref = useRef<HTMLDivElement>(null);
   const tickerRef = useRef<HTMLDivElement>(null);
-  const [view, setView] = useState<View>({ t: 0, theme: null, lowerThird: null, ticker: [], headline: null });
+  const [view, setView] = useState<View>({ t: 0, theme: null, lowerThird: null, ticker: [], headline: null, subtitle: null });
+  const subs = q.get('subs') !== '0';
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
@@ -79,8 +82,21 @@ export function NewsroomPage() {
         lowerThird: o.lowerThird ? { ...o.lowerThird, at: ltAt } : null,
         ticker: o.ticker,
         headline: o.headline ? { text: o.headline.text, layout: String(o.headline.layout ?? 'headline'), kicker: o.headline.kicker } : null,
+        subtitle: subtitleAt(t),
       };
       flushSync(() => setView(v));
+    };
+
+    const seatName = new Map<string, string>();
+    const subtitleAt = (t: number): View['subtitle'] => {
+      if (!timeline) return null;
+      for (let i = timeline.events.length - 1; i >= 0; i--) {
+        const e = timeline.events[i];
+        if (e.type !== 'dialogue.line' || e.t_ms > t) continue;
+        if (t > e.t_ms + Number(e.payload.duration_ms ?? 0) + 250) return null;
+        return e.payload.subtitle ? { text: String(e.payload.subtitle), who: seatName.get(String(e.payload.seat)) ?? '' } : null;
+      }
+      return null;
     };
 
     const renderAt = async (ms: number): Promise<void> => {
@@ -102,6 +118,9 @@ export function NewsroomPage() {
     const load = async (x: LoadInput) => {
       timeline = 'events' in x ? x : compile(x.rundown, x.timings ?? {});
       cursor = 0; lastT = -1;
+      seatName.clear();
+      for (const e of timeline.events) if (e.type === 'set.load' || e.type === 'set.cast') for (const c of (e.payload.cast as Array<{ seat: string; name?: string }> | undefined) ?? []) if (c.name) seatName.set(c.seat, c.name);
+      await preloadWallImages(timeline.events.filter((e) => e.type === 'overlay.headline' && e.payload.image_url).map((e) => String(e.payload.image_url)));
       await renderAt(0);
       api.ready = true;
       return { duration_ms: timeline.duration_ms, estimated: timeline.estimated, shots: timeline.shots.length, warnings: timeline.warnings, timing_source: timeline.timing_source };
@@ -175,6 +194,12 @@ export function NewsroomPage() {
             {view.lowerThird.title && <div style={{ background: 'rgba(8,20,48,0.92)', padding: '6px 14px', fontSize: 'clamp(12px, 1.6vw, 18px)' }}>{view.lowerThird.title}</div>}
           </div>
         )
+      )}
+
+      {subs && view.subtitle && (
+        <div data-testid="subtitle" style={{ position: 'absolute', left: '50%', bottom: tick?.enabled && view.ticker.length ? 'calc(clamp(26px, 4.2vh, 38px) + 3.5%)' : '5%', transform: 'translateX(-50%)', zIndex: 11, maxWidth: 'min(88%, 980px)', textAlign: 'center', background: 'rgba(0,0,0,0.72)', color: '#fff7c2', padding: '6px 14px', borderRadius: 4, fontFamily: "Inter, Arial, 'DejaVu Sans', sans-serif", fontSize: 'clamp(14px, 2.1vw, 26px)', lineHeight: 1.3, textShadow: '0 2px 4px #000' }}>
+          {view.subtitle.text}
+        </div>
       )}
 
       {tick?.enabled && view.ticker.length > 0 && (
