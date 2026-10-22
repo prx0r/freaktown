@@ -8,3 +8,4 @@ export * from './identity';
 export * from './agents';
 export * from './game';
 export * from './rooms';
+export * from './glb';
