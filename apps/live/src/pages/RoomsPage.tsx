@@ -29,7 +29,12 @@ function localRooms(): Map<string, RoomRuntime> {
 }
 void LOCAL_TIMER;
 
-const serverOf = (q: URLSearchParams) => q.get('server') ?? `http://${window.location.hostname || '127.0.0.1'}:8791`;
+const serverOf = (q: URLSearchParams) => q.get('server')
+  // deployed HTTPS page has no rooms server behind it: empty -> relative
+  // fetch -> SPA 200 -> json fail -> local rooms fallback (no mixed content)
+  ?? ((typeof location !== 'undefined' && location.protocol === 'https:')
+    ? ''
+    : `http://${window.location.hostname || '127.0.0.1'}:8791`);
 const nullConsumer = { onEvent: () => () => {} } as unknown as EventConsumer;
 
 export function RoomsPage() {
