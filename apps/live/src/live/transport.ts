@@ -5,7 +5,7 @@
  * Override the default with VITE_LIVE_TRANSPORT=room at build time.
  */
 
-import { EpisodeRoomTransport, LocalTransport, type LiveTransport } from '@freaktown/stage-runtime';
+import { EpisodeRoomTransport, LocalTransport, type LiveTransport } from '@funnier/stage-runtime';
 
 export type TransportMode = 'local' | 'room';
 

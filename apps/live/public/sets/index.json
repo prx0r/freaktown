@@ -1,9 +1,9 @@
 {
- "schema": "freaktown.live.sets.v1",
+ "schema": "funnier.live.sets.v1",
  "sets": [
   {
    "id": "captain-ata-ashcroft",
-   "title": "Captain Ata Ashcroft \u2014 Divorce as a captain's announcement",
+   "title": "Captain Ata Ashcroft — Divorce as a captain's announcement",
    "character_name": "Captain Ata Ashcroft",
    "character_id": "pog.captain-ata-ashcroft",
    "premise": "Divorce proceedings as a captain's announcement.",
@@ -17,7 +17,7 @@
   },
   {
    "id": "the-algorithm",
-   "title": "The Algorithm \u2014 The Optimization",
+   "title": "The Algorithm — The Optimization",
    "character_name": "The Algorithm",
    "character_id": "pog.the-algorithm",
    "premise": "The Optimization (flagship bit).",
@@ -28,6 +28,20 @@
    "beats": 6,
    "duration_ms": 63216,
    "source": "scripts/build_set.py --character pog.the-algorithm (edge-TTS, $0)"
+  },
+  {
+   "id": "buddha-ultimate-deadpan",
+   "title": "Buddha — Did You Do the Dishes?",
+   "character_name": "Buddha",
+   "character_id": "pog.buddha-ultimate-deadpan",
+   "premise": "The awakened one doing classic standup.",
+   "set_url": "sets/buddha-ultimate-deadpan",
+   "audio_url": "sets/buddha-ultimate-deadpan/set.mp3",
+   "avatar_url": "basic",
+   "avatar_note": "BASIC procedural body (humanoid)",
+   "beats": 37,
+   "duration_ms": 87587,
+   "source": "characters3 delivery_engine (Fish s2.1-pro-free)"
   }
  ]
 }

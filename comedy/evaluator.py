@@ -1,7 +1,7 @@
 """Evaluator: predicted audience response from grammar + rhythm + profile.
 
 Deterministic first (heuristics derived from the Ella rubric's structural
-insights), then learn() from real Freaktown reaction events — laugh latency,
+insights), then learn() from real FUNNIER reaction events — laugh latency,
 magnitude, audience fatigue — so predictions become empirical. No neural net
 needed initially; a gradient-boosted ranker slots in behind the same API.
 """

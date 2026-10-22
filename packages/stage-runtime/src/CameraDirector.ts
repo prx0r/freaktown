@@ -10,7 +10,7 @@
 
 import * as THREE from 'three';
 
-import { CAMERA_NAMES, type CameraPresetV1 } from '@freaktown/contracts';
+import { CAMERA_NAMES, type CameraPresetV1 } from '@funnier/contracts';
 
 // ── Camera Presets ────────────────────────────────────────────────
 
@@ -24,20 +24,24 @@ export interface CameraPreset {
 }
 
 export const CAMERA_PRESETS: Record<CameraPresetName, CameraPreset> = {
+  // From the back of the house, low enough that the front rows' heads and
+  // shoulders sit as silhouettes across the bottom of frame.
   WIDE_STAGE: {
-    position: [0, 2.4, 7.8],
-    target: [0, 1.3, 0],
-    fov: 46,
+    position: [0, 1.85, 8.2],
+    target: [0, 1.2, 0],
+    fov: 44,
   },
   // Framed for a performer normalized to 1.7 m at the origin (StageRuntime).
+  // Slightly off-axis (house-right) so the mic in front of the mouth reads
+  // as "working the mic" without covering the lips.
   COMIC_MEDIUM: {
-    position: [0, 1.48, 2.35],
+    position: [0.42, 1.5, 2.4],
     target: [0, 1.33, 0],
     fov: 30,
   },
   COMIC_CLOSE: {
-    position: [0.08, 1.58, 1.6],
-    target: [0, 1.52, 0],
+    position: [0.38, 1.6, 1.62],
+    target: [0, 1.5, 0],
     fov: 28,
   },
   // Club angle from house-left, so the mic stand (stage-right) never

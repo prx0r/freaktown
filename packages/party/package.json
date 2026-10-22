@@ -1,0 +1,18 @@
+{
+  "name": "@funnier/party",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Party games vs agents: Try-Not-To-Smile rules engine, calibration + fairness, agent players with persistent identities and taste models, original joke sources (LLM hook, off by default), always-on rooms, agent-made identities (procedural GLB), write-a-minute, Alien News gibberish.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@funnier/contracts": "*",
+    "@funnier/sketch": "*",
+    "@funnier/stage-runtime": "*",
+    "@funnier/newsroom": "*"
+  }
+}

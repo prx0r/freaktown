@@ -1,4 +1,4 @@
-# Freak Town iOS shell (Capacitor 8)
+# FUNNIER iOS shell (Capacitor 8)
 
 Live-URL mode: the app loads `https://freaktown.egoic.ai`, so the web
 build is always current. No Swift, no React Native, no fork.

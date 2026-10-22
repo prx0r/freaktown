@@ -1,0 +1,46 @@
+{
+  "id": "greenroom",
+  "name": "Green Room",
+  "size": "S",
+  "room": {"w": 9, "d": 7, "h": 3.2},
+  "stage": {"w": 3.5, "d": 2.5, "top_y": 0.4, "front_z": 0, "back_z": -2.5},
+  "marks": [
+    {"id": "mic", "pos": [0, 0.4, -1.2], "facing": "+Z"},
+    {"id": "wing-l", "pos": [-1.2, 0.4, -2.0], "facing": "+Z"},
+    {"id": "wing-r", "pos": [1.2, 0.4, -2.0], "facing": "+Z"}
+  ],
+  "props": [
+    {"id": "mic-stand", "anchor": [0, 0.4, -1.2], "pack": "base", "variant": "brass-worn"},
+    {"id": "stool-tall", "anchor": [-1.2, 0.4, -2.0], "pack": "base"},
+    {"id": "stool-tall", "anchor": [1.2, 0.4, -2.0], "pack": "base"},
+    {"id": "table-cocktail", "anchor": [-2.5, 0, 2.0], "pack": "base"},
+    {"id": "table-cocktail", "anchor": [2.5, 0, 2.0], "pack": "base"},
+    {"id": "bulb-cage", "anchor": [0, 3.1, 1.5], "pack": "base"},
+    {"id": "exit-sign", "anchor": [-4.2, 2.0, 3.2], "pack": "base"}
+  ],
+  "light_rig": {
+    "house": {"temp_k": 3000, "level": 0.45, "pos": [0, 3.1, 2.0]},
+    "spot": {"temp_k": 3800, "level": 1.0, "pos": [0, 3.0, 3.5]},
+    "washes": [
+      {"temp_k": 3000, "level": 0.4, "pos": [-2.5, 2.8, 0.5]},
+      {"temp_k": 3000, "level": 0.4, "pos": [2.5, 2.8, 0.5]}
+    ],
+    "practicals": ["mirror bulbs", "EXIT green"]
+  },
+  "cameras": [
+    {"id": "wide", "pos": [0, 2.2, 5.5], "fov": 46},
+    {"id": "medium", "pos": [0, 1.7, 3.5], "fov": 34},
+    {"id": "close", "pos": [0, 1.6, 2.2], "fov": 28}
+  ],
+  "crowd": {
+    "capacity": 20,
+    "zones": [
+      {"id": "couch", "tier": "face", "count": 12},
+      {"id": "door", "tier": "pip", "count": 8}
+    ]
+  },
+  "budgets": {"glb_mb": 30, "parses": 3},
+  "glb": {"sha256": "pending-atlas-job"},
+  "acoustics": {"rt60": 0.6, "warmth": 0.7, "bed_db": -17},
+  "physics": {"decay": 0.84, "laugh_gain": 0.19, "resist_start": 0.3}
+}

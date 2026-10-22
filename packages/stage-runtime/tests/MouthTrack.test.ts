@@ -39,3 +39,24 @@ describe('Performer', () => {
     expect(p.update(600, 600, 0.016, 0).pose.armR.raise).toBeGreaterThan(rest + 0.5);
   });
 });
+
+describe('MouthTrack phonetics', () => {
+  const words = [{ word: 'hello', start_ms: 100, end_ms: 500, index: 0 }];
+  const phon = [
+    { viseme: 'I', time: 100, end: 200 },
+    { viseme: 'E', time: 200, end: 300 },
+    { viseme: 'nn', time: 300, end: 400 },
+    { viseme: 'O', time: 400, end: 500 },
+  ];
+  const track = new MouthTrack(words, [], phon);
+  it('prefers real phonetics over vowel groups', () => {
+    expect(track.hasPhonetics).toBe(true);
+    // 'hello' vowel groups would give ee then oh; phonetics say I at 150
+    expect(track.sample(150).visemes.ih).toBeGreaterThan(0);
+    expect(track.sample(250).visemes.ee).toBeGreaterThan(0);
+  });
+  it('maps Oculus IDs onto the 5-key mouth', () => {
+    // nn -> aa fallback with jaw shape
+    expect(track.sample(350).visemes.aa).toBeGreaterThan(0);
+  });
+});

@@ -1,0 +1,46 @@
+{
+  "id": "lobby",
+  "name": "Lobby",
+  "size": "M",
+  "room": {"w": 14, "d": 10, "h": 4.5},
+  "stage": {"w": 4, "d": 2.5, "top_y": 0.4, "front_z": 0, "back_z": -2.5},
+  "marks": [
+    {"id": "mic", "pos": [0, 0.4, -1.0], "facing": "+Z"},
+    {"id": "arch-north", "pos": [0, 0, 4.5], "facing": "-Z"},
+    {"id": "arch-east", "pos": [6.5, 0, 0], "facing": "-X"},
+    {"id": "arch-west", "pos": [-6.5, 0, 0], "facing": "+X"}
+  ],
+  "props": [
+    {"id": "mic-stand", "anchor": [0, 0.4, -1.0], "pack": "base", "variant": "brass-worn"},
+    {"id": "chalk-sigil", "anchor": [0, 2.4, -4.9], "pack": "base"},
+    {"id": "table-cocktail", "anchor": [-3, 0, 2.5], "pack": "base"},
+    {"id": "table-cocktail", "anchor": [3, 0, 2.5], "pack": "base"},
+    {"id": "bulb-cage", "anchor": [0, 4.4, 1.0], "pack": "base"},
+    {"id": "exit-sign", "anchor": [-6.5, 2.2, 4.5], "pack": "base"},
+    {"id": "bar-counter", "anchor": [5.0, 0, 3.5], "pack": "base"}
+  ],
+  "light_rig": {
+    "house": {"temp_k": 3000, "level": 0.5, "pos": [0, 4.4, 2.0]},
+    "spot": {"temp_k": 3800, "level": 0.8, "pos": [0, 4.2, 3.0]},
+    "washes": [
+      {"temp_k": 3200, "level": 0.4, "pos": [-4, 4.2, 0.0]},
+      {"temp_k": 3200, "level": 0.4, "pos": [4, 4.2, 0.0]}
+    ],
+    "practicals": ["bar amber blur", "EXIT green", "archway spills"]
+  },
+  "cameras": [
+    {"id": "wide", "pos": [0, 2.6, 8.0], "fov": 46},
+    {"id": "medium", "pos": [0, 1.9, 4.5], "fov": 34}
+  ],
+  "crowd": {
+    "capacity": 60,
+    "zones": [
+      {"id": "floor", "tier": "face", "count": 20},
+      {"id": "edges", "tier": "pip", "count": 40}
+    ]
+  },
+  "budgets": {"glb_mb": 80, "parses": 5},
+  "glb": {"sha256": "pending-atlas-job"},
+  "acoustics": {"rt60": 1.2, "warmth": 0.6, "bed_db": -17},
+  "physics": {"decay": 0.87, "laugh_gain": 0.14, "resist_start": 0.45}
+}

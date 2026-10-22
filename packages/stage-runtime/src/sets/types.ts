@@ -37,6 +37,11 @@ export interface CameraPresetDef {
   label?: string;
   /** Slow orbit around `target` (rad/s). */
   orbit?: number;
+  /**
+   * Portrait framing (aspect < 1, phones): replaces position/target and uses `fov`
+   * as the vertical FOV as-is (no automatic widening). Additive (newsroom).
+   */
+  portrait?: { position: Vec3; target: Vec3; fov: number };
 }
 
 export interface LightingRig {
@@ -71,6 +76,12 @@ export interface SetDefinition {
   description: string;
   environment: EnvironmentDef;
   seats: SeatAnchor[];
+  /**
+   * Extra standing positions characters can walk to (stage.move / sketch move-to).
+   * Not cast seats: nothing sits there until something moves there. Camera cues
+   * ("close:<mark>") and gaze targets resolve marks like seats.
+   */
+  marks?: SeatAnchor[];
   cameras: Record<string, CameraPresetDef>;
   /** Cue used on load and when nobody is talking. */
   defaultCamera: string;

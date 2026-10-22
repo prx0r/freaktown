@@ -1,0 +1,280 @@
+{
+ "character_id": "buddha-ultimate-deadpan",
+ "mesh": "",
+ "premise": "The awakened one doing classic standup and sighing at 2,500 years of commentary",
+ "delivery": {
+  "profile": {
+   "energy": 0.4,
+   "pace": 0.82,
+   "style": "norm_macdonald"
+  },
+  "beats": [
+   {
+    "id": "b1",
+    "performance": {
+     "expression": "deadpan",
+     "look": "left"
+    }
+   },
+   {
+    "id": "b2",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold"
+    }
+   },
+   {
+    "id": "b3",
+    "performance": {
+     "expression": "annoyed",
+     "look": "left"
+    }
+   },
+   {
+    "id": "b4",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold"
+    }
+   },
+   {
+    "id": "b5",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold"
+    }
+   },
+   {
+    "id": "b6",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold"
+    }
+   },
+   {
+    "id": "b7",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "shrug",
+     "look": "left"
+    }
+   },
+   {
+    "id": "b8",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "shrug",
+     "look": "left"
+    }
+   },
+   {
+    "id": "b9",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold"
+    }
+   },
+   {
+    "id": "b10",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold"
+    }
+   },
+   {
+    "id": "b11",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold"
+    }
+   },
+   {
+    "id": "b12",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold"
+    }
+   },
+   {
+    "id": "b13",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold"
+    }
+   },
+   {
+    "id": "b14",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold"
+    }
+   },
+   {
+    "id": "b15",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold"
+    }
+   },
+   {
+    "id": "b16",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold"
+    }
+   },
+   {
+    "id": "b17",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold"
+    }
+   },
+   {
+    "id": "b18",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold"
+    }
+   },
+   {
+    "id": "b19",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold"
+    }
+   },
+   {
+    "id": "b20",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold"
+    }
+   },
+   {
+    "id": "b21",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold"
+    }
+   },
+   {
+    "id": "b22",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold"
+    }
+   },
+   {
+    "id": "b23",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold"
+    }
+   },
+   {
+    "id": "b24",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold"
+    }
+   },
+   {
+    "id": "b25",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold"
+    }
+   },
+   {
+    "id": "b26",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold"
+    }
+   },
+   {
+    "id": "b27",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold"
+    }
+   },
+   {
+    "id": "b28",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold"
+    }
+   },
+   {
+    "id": "b29",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold"
+    }
+   },
+   {
+    "id": "b30",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold"
+    }
+   },
+   {
+    "id": "b31",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "shrug",
+     "look": "left"
+    }
+   },
+   {
+    "id": "b32",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold"
+    }
+   },
+   {
+    "id": "b33",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold"
+    }
+   },
+   {
+    "id": "b34",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold"
+    }
+   },
+   {
+    "id": "b35",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold"
+    }
+   },
+   {
+    "id": "b36",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold"
+    }
+   },
+   {
+    "id": "b37",
+    "performance": {
+     "expression": "deadpan",
+     "gesture": "hold"
+    }
+   }
+  ]
+ },
+ "built_from": {
+  "delivery_engine": "buddha_p0.wav",
+  "seal": "6729a64207b7d377"
+ }
+}

@@ -9,3 +9,4 @@ export * from './SetStage';
 export * from './SetEventExecutor';
 export * from './poker/PokerDealer';
 export * from './poker/PokerShow';
+export type { WallCard, WallPainter } from './builders/common';

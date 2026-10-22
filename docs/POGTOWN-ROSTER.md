@@ -120,7 +120,7 @@ Critical: do not bake voice personality entirely into the audio. The CharacterGr
 
 Identity + provenance (original source, version restrictions, ownership) → performance GLB (rig, expressions, actions) → voice package (TTS, timing, emotional presets) → CharacterGraph (beliefs, desires, blind spots, memories) → JokeBlock adapter (comic operators, scoring, callbacks) → PogActor runtime (performs, reacts, debates, remembers, publishes clips).
 
-The runtime refers to the same `actor_id` (`pog.*` namespace) whether the character is in a stand-up show, reacting to news, playing Mafia, being interviewed, or merchandised. See `docs/POGTOWN-ENGINE.md` for the figgsite↔freaktown contract. Freak-native character layout: `docs/CHARACTER_PACK.md` (`freaks/<slug>/`).
+The runtime refers to the same `actor_id` (`pog.*` namespace) whether the character is in a stand-up show, reacting to news, playing Mafia, being interviewed, or merchandised. See `docs/POGTOWN-ENGINE.md` for the figgsite↔funnier contract. Freak-native character layout: `docs/CHARACTER_PACK.md` (`freaks/<slug>/`).
 
 ## 5. Asset acquisition priorities
 

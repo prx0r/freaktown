@@ -1,5 +1,5 @@
 [Unit]
-Description=Freak Town product server
+Description=FUNNIER product server
 After=network.target
 
 [Service]

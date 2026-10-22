@@ -4,7 +4,7 @@
  * a quip (dialogue.line), a human seat acts by `poker.intent` from /play.
  * A human who doesn't act within `humanTimeoutMs` auto-checks (or folds).
  */
-import type { PokerActionV1 } from '@freaktown/contracts';
+import type { PokerActionV1 } from '@funnier/contracts';
 import { PokerDealer, botDecision, holeStrength, quip, type DealerEvent, type DealerSeat } from './PokerDealer';
 
 export type Send = (type: string, payload: Record<string, unknown>) => Promise<unknown> | void;

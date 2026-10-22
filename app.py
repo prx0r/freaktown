@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Freak Town — Live Script Editor v2.
+"""FUNNIER — Live Script Editor v2.
 
 TTS provider with exact timing control.
 Audio compositor owns silence. TTS just speaks.
@@ -15,19 +15,22 @@ import os
 import re
 import struct
 import subprocess
+import sys
 import time
 import wave
 from pathlib import Path
 
-from flask import Flask, send_from_directory, jsonify, request
+from flask import Flask, send_from_directory, send_file, jsonify, request
 
 from party import party_bp
 from lab import lab_bp
+from cauldron_show import show_bp
 from face_profiles import detect_face_profile, to_pog_face
 
 app = Flask(__name__)
 app.register_blueprint(party_bp)
 app.register_blueprint(lab_bp)
+app.register_blueprint(show_bp)
 
 AUDIO_DIR = Path(__file__).parent / "audio_output"
 AUDIO_DIR.mkdir(exist_ok=True)
@@ -802,12 +805,12 @@ def preload_set(slug):
     {avatarUrl|null, portrait, audioUrl, plan, wordTimings, walkoutUrl}.
     Audio + performance are the READY gate; avatar is optional (§21):
     portrait carries the show until 3D is ready. Never black."""
-    from backend.services.freaktown.bundle import (
+    from backend.services.funnier.bundle import (
         build_performance_manifest, bundle_to_score, estimate_spans,
         performance_avatar, resolve_avatar, spans_from_offsets,
         words_from_beats,
     )
-    from backend.services.freaktown.cues import resolve_cues
+    from backend.services.funnier.cues import resolve_cues
     slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
     bdir = FREAK_DIR / slug
     if not bdir.is_dir() or not (bdir / "set.wav").exists():
@@ -1359,7 +1362,7 @@ def respond():
         idea = (idea or f"Answer {pchar.get('name', 'them')} back, but meaner").strip().strip('"')
 
     minute, _ = _cf_chat(
-        "You are a comedy writer for Freak Town. Write a 60-second standup minute. "
+        "You are a comedy writer for FUNNIER. Write a 60-second standup minute. "
         "80-150 words. First line IS the joke. Escalating absurdity. Specific details. "
         "Killer closer under 10 words. Direct audience address. Stay in character voice. "
         "Reply ONLY with the set text, no title, no quotes.",
@@ -1413,7 +1416,7 @@ def takes_browser():
     body = "\n".join(cards) or "<p style='text-align:center;color:#666'>No takes yet — be the first.</p>"
     page = ("""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Takes — Freak Town</title>
+<title>Takes — FUNNIER</title>
 <style>*{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a0f;color:#eee;font-family:monospace;padding:16px 10px 60px}
 h1{text-align:center;font-size:16px;color:#ff2fa8;margin:6px 0 2px}
@@ -1513,10 +1516,10 @@ def character_page(char):
                   _html.escape(", ".join(sorted(rivals))) + "</p>") if rivals else ""
     return f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{name} — Freak Town</title>
+<title>{name} — FUNNIER</title>
 <style>body{{background:#0a0a0f;color:#eee;font-family:monospace;text-align:center;padding:32px 16px}}
 a{{color:#ff2fa8}}</style></head><body>
-<div style="font-size:12px;letter-spacing:2px;color:#ff2fa8;">🎪 FREAK TOWN</div>
+<div style="font-size:12px;letter-spacing:2px;color:#ff2fa8;">🎪 FUNNIER</div>
 <h1>{name}</h1><p style="color:#888;">{premise}</p>
 <p style="color:#555;">{len(bundles)} performance{'s' if len(bundles) != 1 else ''}</p>
 {''.join(cards)}{rival_line}
@@ -1532,6 +1535,1914 @@ def watch_character_set_canonical(char, set):
     if not slug:
         return "No such set (yet). Make one in the Black Room.", 404
     return _render_watch(slug)
+
+
+# ── /perform: live stage (watch a freak perform) ──────────────────────
+# Same player core as /f/<slug> (set.wav + beat captions + avatar + laugh
+# buttons), wrapped in a live-night frame: bill, headliner, predicted-heat
+# strip, finale verdict. Laugh-sim is HEURISTIC_V0 (type/position baseline +
+# characters' published 0.55/0.35 thresholds) until the real laugh model is
+# vendored — the /api/perform/<slug>/heat contract is the swap-in point.
+
+PERFORM_HEAT_MODEL = "heuristic-v0"
+PERFORM_CROWD_P = 0.55   # characters crowd_sim: full crowd at/above
+PERFORM_CHUCKLE_P = 0.35  # characters crowd_sim: chuckle band below crowd
+_PERFORM_TYPE_P = {"punchline": 0.62, "tag": 0.50, "closer": 0.55,
+                   "setup": 0.30}
+
+
+def _perform_bundles() -> list:
+    """Stage-ready bundles (set.wav present), newest first. Canonical
+    player logic lives in _render_watch; this only lists the bill."""
+    out = []
+    for d in sorted(FREAK_DIR.iterdir()):
+        if not d.is_dir():
+            continue
+        meta = _bundle_meta(d.name)
+        if not meta or not (d / "set.wav").exists():
+            continue
+        out.append((d.name, meta))
+    out.sort(key=lambda x: x[1].get("created_at", ""), reverse=True)
+    return out
+
+
+_PERFORM_HEAT_CACHE: dict = {}
+
+
+def _perform_model_p(slug: str) -> tuple:
+    """Real laugh probabilities from characters' delivery-aware model
+    (AUC 0.654, leave-one-comedian-out) via the numpy2 venv sidecar.
+    Returns (model_name, {beat_id: p}). Cached per slug. Any failure ->
+    empty (caller falls back to heuristic). Read-only on both repos."""
+    import subprocess as _sp
+    if slug in _PERFORM_HEAT_CACHE:
+        return _PERFORM_HEAT_CACHE[slug]
+    out = (PERFORM_HEAT_MODEL, {})
+    try:
+        r = _sp.run([str(Path(__file__).parent / ".venv-heat" / "bin" / "python"),
+                     str(Path(__file__).parent / "scripts" / "heat_model.py"), slug],
+                    capture_output=True, text=True, timeout=25)
+        d = json.loads(r.stdout or "{}")
+        if d.get("ok"):
+            out = (d.get("model", PERFORM_HEAT_MODEL),
+                   {b["id"]: b["p"] for b in d.get("beats", [])})
+    except Exception:
+        pass
+    _PERFORM_HEAT_CACHE[slug] = out
+    return out
+
+
+def _perform_beats(slug: str) -> list:
+    """Beat timeline + laugh probability. Mirrors the span logic
+    in _render_watch (measured offsets, else shared estimator)."""
+    from backend.services.funnier.bundle import (
+        estimate_spans, spans_from_offsets,
+    )
+    bdir = FREAK_DIR / slug
+    meta = _bundle_meta(slug) or {}
+    try:
+        delivery = json.loads((bdir / "delivery.json").read_text())
+    except Exception:
+        return []
+    try:
+        offsets = json.loads((bdir / "offsets.json").read_text()).get("offsets", [])
+    except Exception:
+        offsets = []
+    beats_in = delivery.get("beats", [])
+    if not beats_in:
+        return []
+    duration_ms = int(float(meta.get("duration_s", 0)) * 1000) or None
+    spans = spans_from_offsets(offsets) if offsets else estimate_spans(beats_in, duration_ms)
+    by_id = {s.beat_id: s for s in spans}
+    n = len(beats_in)
+    model_name, model_p = _perform_model_p(slug)
+    out = []
+    for i, b in enumerate(beats_in):
+        s = by_id.get(b.get("id"))
+        if s is None:
+            continue
+        if b.get("id") in model_p:
+            p, src = model_p[b["id"]], model_name
+        else:
+            base = _PERFORM_TYPE_P.get(str(b.get("type", "")).lower(), 0.35)
+            ramp = min(1.25, 1.0 + 0.5 * (i / max(1, n - 1)))
+            p, src = round(min(0.95, base * ramp), 3), PERFORM_HEAT_MODEL
+        out.append({"text": b.get("text", ""), "start": s.start_ms,
+                    "end": s.start_ms + s.speech_ms, "p_laugh": p,
+                    "src": src,
+                    "crowd": p >= PERFORM_CROWD_P,
+                    "chuckle": PERFORM_CHUCKLE_P <= p < PERFORM_CROWD_P})
+    return out
+
+
+@app.route("/perform")
+def perform_bill():
+    """Tonight's bill: headliner + lineup. Every act is a stage-ready set."""
+    import html as _html
+    bill = _perform_bundles()
+    if not bill:
+        return "No acts ready yet. Make one in the Black Room.", 404
+    head_slug, head_meta = bill[0]
+    head_char = (head_meta.get("character", {}) or {}).get("name", head_slug)
+    cards = []
+    for slug, m in bill:
+        char = (m.get("character", {}) or {}).get("name", slug)
+        img = (f"/freaks/{slug}/portrait.png"
+               if (FREAK_DIR / slug / "portrait.png").exists() else "/icon-512.png")
+        cards.append(
+            f"<a href='/perform/{slug}' style='display:inline-block;width:150px;margin:8px;"
+            f"padding:10px;border:1px solid #282833;border-radius:12px;color:#eee;"
+            f"text-decoration:none;vertical-align:top'>"
+            f"<img src='{img}' style='width:100%;border-radius:8px'>"
+            f"<div style='font-size:13px;margin-top:6px'>{_html.escape(char)}</div>"
+            f"<div style='color:#666;font-size:11px'>{m.get('duration_s', 0)}s</div></a>")
+    return f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TONIGHT — FUNNIER Live</title>
+<style>body{{background:#0a0a0f;color:#eee;font-family:monospace;text-align:center;padding:32px 16px}}
+a{{color:#ff2fa8}}</style></head><body>
+<div style="font-size:12px;letter-spacing:2px;color:#ff2fa8;">🎪 FUNNIER · LIVE</div>
+<h1>TONIGHT'S BILL</h1>
+<p style="color:#888;">Headliner: <a href="/perform/{head_slug}">{_html.escape(head_char)}</a></p>
+<div>{''.join(cards)}</div>
+<p style="color:#555;font-size:12px;margin-top:16px">{len(bill)} acts · pre-rendered sets,
+live audience · predicted heat is heuristic v0</p>
+</body></html>""", 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
+@app.route("/cauldron")
+def cauldron_concepts():
+    """THE CAULDRON v1 concept gallery: draft frames + the prompts that made
+    them. Owner reviews on phone, replies keep/kill per shot. Winners become
+    Marble contextFrames anchors (atlasGenerate). Nothing here is a promise —
+    drafts until gated per CAULDRON-PROFILE.md."""
+    import html as _html
+    import glob as _glob
+    concept_dir = Path(__file__).parent / "static" / "concepts"
+    metas = []
+    for jf in sorted(concept_dir.glob("*.json")):
+        try:
+            metas.append(json.loads(jf.read_text()))
+        except Exception:
+            continue
+    metas.sort(key=lambda m: m.get("generated_at", ""), reverse=True)
+    cards = []
+    for m in metas:
+        shot = m.get("shot", "?")
+        img = f"/static/concepts/{m.get('file', shot + '.jpg')}"
+        g = m.get("gates", {})
+        verdict = g.get("verdict", "unreviewed")
+        vcolor = {"pass": "#7fdb7f", "fail": "#ff6b6b"}.get(verdict, "#888")
+        anchor = "ANCHOR-OK" if m.get("anchor_eligible") else "vibe only"
+        acolor = "#7fdb7f" if m.get("anchor_eligible") else "#888"
+        cards.append(
+            f"<figure class='card' data-verdict='{verdict}'>"
+            f"<a href='{img}' target='_blank'>"
+            f"<img src='{img}' alt='{_html.escape(shot)}: {_html.escape(m.get('prompt','')[:160])}' loading='lazy'></a>"
+            f"<figcaption><b>🕯️ {_html.escape(shot)}</b> "
+            f"<span class='badge' style='border-color:{vcolor};color:{vcolor}'>{verdict}</span> "
+            f"<span class='badge' style='border-color:{acolor};color:{acolor}'>{anchor}</span>"
+            f"<div class='meta'>{m.get('width',0)}x{m.get('height',0)} · "
+            f"{_html.escape(str(m.get('model','')).split('/')[-1])} · "
+            f"{_html.escape(str(m.get('status','')))}</div>"
+            f"<details><summary>prompt + gates</summary><div class='prompt'>"
+            f"{_html.escape(m.get('prompt',''))}</div>"
+            f"<div class='meta'>{_html.escape(str(g))}</div></details>"
+            f"</figcaption></figure>")
+    body = "".join(cards) if cards else "<p>No frames yet.</p>"
+    return f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>THE CAULDRON — concept gallery v1</title>
+<style>:root{{--tile:220px}}
+body{{background:#0a0a0f;color:#eee;font-family:monospace;text-align:center;padding:24px 12px;margin:0}}
+a{{color:#ff2fa8}}
+#bar{{position:sticky;top:0;background:#0a0a0f;padding:10px;z-index:5;border-bottom:1px solid #282833}}
+#grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--tile),1fr));gap:12px;padding:16px 8px;max-width:1400px;margin:0 auto}}
+.card{{margin:0;border:1px solid #282833;border-radius:12px;padding:8px;text-align:left;background:#111119}}
+.card img{{width:100%;border-radius:8px;display:block;aspect-ratio:1/1;object-fit:cover}}
+.card figcaption{{font-size:12px;margin-top:6px}}
+.badge{{font-size:10px;border:1px solid #888;border-radius:8px;padding:0 6px}}
+.meta{{color:#555;font-size:10px;margin-top:4px}}
+.prompt{{color:#999;font-size:10px;margin-top:6px;line-height:1.5;white-space:pre-wrap}}
+details summary{{cursor:pointer;color:#888;font-size:10px;margin-top:4px}}
+button{{background:#1a1a2e;color:#eee;border:1px solid #333;border-radius:8px;padding:4px 10px}}
+input[type=range]{{width:140px;vertical-align:middle}}</style></head><body>
+<div id="bar">🕯️ THE CAULDRON · V1 · {len(cards)} frames · $0
+<button onclick="zoom(-40)">−</button><input id="z" type="range" min="120" max="460" value="220" oninput="document.documentElement.style.setProperty('--tile',this.value+'px')">
+<button onclick="zoom(40)">+</button>
+<button onclick="filter('all')">all</button><button onclick="filter('pass')">pass</button><button onclick="filter('fail')">fail</button>
+<a href="/perform" style="margin-left:8px">stage</a></div>
+<div id="grid">{body}</div>
+<p style="color:#555;font-size:11px">Gates: empty · no windows · shell-only ·
+tap a frame to zoom · reply keep/kill per shot</p>
+<script>function zoom(d){{var z=document.getElementById('z');z.value=+z.value+d;z.oninput();}}
+function filter(v){{document.querySelectorAll('.card').forEach(c=>{{c.style.display=(v==='all'||c.dataset.verdict===v)?'':'none';}});}}</script>
+</body></html>""", 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
+@app.route("/cauldron.json")
+def cauldron_concepts_json():
+    """Machine-readable feed for ChatGPT/agents: every frame with absolute
+    image URLs + full prompts + review status. No JS, no auth, CORS-open."""
+    concept_dir = Path(__file__).parent / "static" / "concepts"
+    items = []
+    for jf in sorted(concept_dir.glob("*.json")):
+        try:
+            m = json.loads(jf.read_text())
+        except Exception:
+            continue
+        m["image_url"] = f"https://funnier.si/static/concepts/{m.get('file', '')}"
+        items.append(m)
+    items.sort(key=lambda m: m.get("generated_at", ""), reverse=True)
+    resp = jsonify({"venue": "the-cauldron", "version": "v1",
+                    "gates": "empty/no-windows/bare-deck/chalk-sigil/<=30MB/3x-dingy",
+                    "count": len(items), "frames": items})
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
+@app.route("/api/perform/<slug>/heat")
+def perform_heat(slug):
+    """Per-beat laugh prediction contract. v0 = heuristic baseline; a vendored
+    laugh model answers this same shape later. Never a laughter label —
+    predictions only, observed laughs come from /api/react."""
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    beats = _perform_beats(slug)
+    if not beats and not (FREAK_DIR / slug / "set.wav").exists():
+        return jsonify({"ok": False, "error": "no such set"}), 404
+    srcs = sorted({b.get("src", PERFORM_HEAT_MODEL) for b in beats})
+    return jsonify({"ok": True, "slug": slug, "model": PERFORM_HEAT_MODEL,
+                    "models": srcs,
+                    "thresholds": {"crowd": PERFORM_CROWD_P,
+                                   "chuckle": PERFORM_CHUCKLE_P},
+                    "beats": beats})
+
+
+@app.route("/api/perform/<slug>/acting")
+def perform_acting(slug):
+    """Deterministic acting timeline: delivery beats + measured offsets +
+    character vibe profile -> timestamped expression/gesture/look/hold/
+    camera events. No model, no randomness (seeded by beat id). This is the
+    swap-in point for characters' jev_loop delivery profiles: same shape,
+    richer values."""
+    import hashlib as _hl
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    bdir = FREAK_DIR / slug
+    meta = _bundle_meta(slug) or {}
+    try:
+        delivery = json.loads((bdir / "delivery.json").read_text())
+    except Exception:
+        return jsonify({"ok": False, "error": "no such set"}), 404
+    try:
+        from backend.services.funnier.bundle import (
+            estimate_spans, spans_from_offsets,
+        )
+        try:
+            offsets = json.loads((bdir / "offsets.json").read_text()).get("offsets", [])
+        except Exception:
+            offsets = []
+        beats_in = delivery.get("beats", [])
+        duration_ms = int(float(meta.get("duration_s", 0)) * 1000) or None
+        spans = spans_from_offsets(offsets) if offsets else estimate_spans(beats_in, duration_ms)
+        by_id = {s.beat_id: s for s in spans}
+    except Exception:
+        by_id = {}
+    vibe = ((meta.get("character", {}) or {}).get("vibe", "")
+            or (meta.get("character", {}) or {}).get("premise", ""))
+    prof = profile_for_vibe(vibe)
+    gf = prof.get("gesture_frequency", 0.3)
+    hold_ms = prof.get("punchline_hold_ms", 850)
+    events = []
+    for b in delivery.get("beats", []):
+        s = by_id.get(b.get("id"))
+        if s is None:
+            continue
+        t, end = s.start_ms, s.start_ms + s.speech_ms
+        perf = b.get("performance", {}) or {}
+        btype = str(b.get("type", "")).lower()
+        events.append({"t": t, "kind": "expression",
+                       "value": perf.get("expression", "neutral")})
+        events.append({"t": t, "kind": "look",
+                       "value": perf.get("look", "audience")})
+        gest = perf.get("gesture", "normal")
+        seed = int(_hl.sha256(str(b.get("id", "")).encode()).hexdigest(), 16) % 1000 / 1000.0
+        if gest and gest != "normal" and (btype in ("punchline", "tag", "closer") or seed < gf):
+            events.append({"t": t, "kind": "gesture", "value": gest})
+        if btype in ("punchline", "tag", "closer"):
+            events.append({"t": end, "kind": "hold", "ms": hold_ms})
+            events.append({"t": end, "kind": "camera", "value": "push-in"})
+    events.sort(key=lambda e: e["t"])
+    return jsonify({"ok": True, "slug": slug, "profile": prof, "events": events})
+
+
+_PERFORM_BED_CACHE: dict = {}
+
+
+@app.route("/api/perform/<slug>/crowd.wav")
+def perform_crowd(slug):
+    """Crowd ambience bed: real CC0 laugh clips at predicted moments, gain
+    by p, applause swell at close. Ambience, not Foley — the room starts it
+    with the set at low volume. Cached per slug in /tmp."""
+    import struct as _st
+    from flask import Response as _Resp
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    bdir = FREAK_DIR / slug
+    if not (bdir / "set.wav").exists():
+        return "no such set", 404
+    key = (slug, (bdir / "set.wav").stat().st_mtime)
+    if key not in _PERFORM_BED_CACHE:
+        sys.path.insert(0, str(Path(__file__).parent / "scripts"))
+        import crowd as _crowd
+        beats = _perform_beats(slug)
+        meta = _bundle_meta(slug) or {}
+        dur = int(float(meta.get("duration_s", 0)) * 1000)
+        if not dur and beats:
+            dur = max(b["end"] for b in beats) + 2000
+        pcm, _ = _crowd.build_bed(beats, dur or 60000)
+        wav = (b"RIFF" + _st.pack("<I", 36 + len(pcm)) + b"WAVEfmt "
+               + _st.pack("<IHHIIHH", 16, 1, 1, 24000, 24000 * 2, 2, 16)
+               + b"data" + _st.pack("<I", len(pcm)) + pcm)
+        p = Path("/tmp") / f"crowd-{slug}.wav"
+        try:
+            p.write_bytes(wav)
+        except Exception:
+            pass
+        _PERFORM_BED_CACHE[key] = bytes(wav)
+    return _Resp(_PERFORM_BED_CACHE[key], mimetype="audio/wav",
+                 headers={"Cache-Control": "public, max-age=3600"})
+
+
+_PERFORM_SIG: dict = {}
+_PERFORM_PRESENCE: dict = {}
+
+
+@app.route("/api/perform/<slug>/signal", methods=["GET", "POST"])
+def perform_signal(slug):
+    """Minimal WebRTC signaling for the stage monitor: audience publishes,
+    performer subscribes. {from, kind: offer/answer/ice, payload} in;
+    ?since=seq out. In-memory only, never persisted, never logged."""
+    import time as _time
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    box = _PERFORM_SIG.setdefault(slug, {"seq": 0, "msgs": []})
+    if request.method == "POST":
+        data = request.json or {}
+        frm = re.sub(r"[^a-zA-Z0-9_-]", "", str(data.get("frm", "")))[:24]
+        kind = str(data.get("kind", ""))
+        if not frm or kind not in ("offer", "answer", "ice", "bye"):
+            return jsonify({"ok": False, "error": "bad signal"}), 400
+        payload = data.get("payload")
+        box["seq"] += 1
+        box["msgs"].append({"seq": box["seq"], "t": _time.time(),
+                            "frm": frm, "kind": kind, "payload": payload})
+        box["msgs"] = box["msgs"][-200:]
+        return jsonify({"ok": True, "seq": box["seq"]})
+    try:
+        since = int(request.args.get("since", 0))
+    except Exception:
+        since = 0
+    return jsonify({"ok": True, "seq": box["seq"],
+                    "msgs": [m for m in box["msgs"] if m["seq"] > since]})
+
+
+@app.route("/api/perform/<slug>/presence", methods=["GET", "POST"])
+def perform_presence(slug):
+    """Who's in the room and how: face (on monitor) or pip (smile-only).
+    Heartbeat-pruned (>20s stale vanishes). No identities beyond a nickname."""
+    import time as _time
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    room = _PERFORM_PRESENCE.setdefault(slug, {})
+    now = _time.time()
+    for k in [k for k, v in room.items() if now - v.get("t", 0) > 20]:
+        del room[k]
+    if request.method == "POST":
+        data = request.json or {}
+        frm = re.sub(r"[^a-zA-Z0-9_-]", "", str(data.get("frm", "")))[:24]
+        mode = str(data.get("mode", "pip"))
+        if not frm or mode not in ("face", "pip"):
+            return jsonify({"ok": False, "error": "bad presence"}), 400
+        room[frm] = {"frm": frm, "mode": mode, "t": now,
+                     "nick": re.sub(r"[^a-zA-Z0-9 _-]", "",
+                                    str(data.get("nick", "")))[:24]}
+        return jsonify({"ok": True})
+    return jsonify({"ok": True, "here": sorted(room.values(), key=lambda v: v["frm"])})
+
+
+@app.route("/perform/<slug>/monitor")
+def perform_monitor(slug):
+    """Comedian's monitor: look out and see the room. Live faces for
+    audience who opted into APPEAR, glow pips + counts for everyone else.
+    Consent-separate from face TRACKING (which never leaves the device).
+    Nothing here is recorded — no recording code exists on this route.
+    ?venue=<id> runs this room on that venue's crowd physics."""
+    import html as _html
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    meta = _bundle_meta(slug) or {}
+    name = _html.escape((meta.get("character", {}) or {}).get("name", slug))
+    me = "mon_" + re.sub(r"[^a-z0-9]", "", slug)[:8]
+    physics = {"decay": 0.88, "laugh_gain": 0.15, "resist_start": 0.5,
+               "venue": "house"}
+    vid = re.sub(r"[^a-z0-9-]", "", request.args.get("venue", ""))[:32]
+    if vid:
+        try:
+            vv = json.loads((Path(__file__).parent / "docs" / "venues" / f"{vid}.json").read_text())
+            ph = vv.get("physics", {})
+            physics = {"decay": float(ph.get("decay", 0.88)),
+                       "laugh_gain": float(ph.get("laugh_gain", 0.15)),
+                       "resist_start": float(ph.get("resist_start", 0.5)),
+                       "venue": vid}
+        except Exception:
+            pass
+    page = f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MONITOR — {name}</title>
+<style>body{{background:#050508;color:#eee;font-family:monospace;text-align:center;padding:16px}}
+#faces{{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:12px 0}}
+#faces video{{width:160px;border-radius:10px;border:2px solid #ff2fa8}}
+#pips{{font-size:28px;min-height:40px}}
+.tick{{color:#555;font-size:11px}}</style></head><body>
+<div style="color:#ff2fa8;letter-spacing:3px;font-size:12px">🎤 STAGE MONITOR — {name}</div>
+<p class="tick">only opted-in faces appear · nothing is recorded · pips = smile-only crowd</p>
+<div id="faces"></div>
+<div id="pips"></div>
+<div class="tick"><span id="nface">0</span> faces · <span id="npip">0</span> pips · room reacts below</div>
+<div id="energy" style="max-width:520px;margin:10px auto;padding:10px;border:1px solid #282833;border-radius:12px">
+<div style="font-size:11px;color:#888;letter-spacing:2px">ROOM ENERGY</div>
+<div id="emeter" style="height:14px;border-radius:7px;background:#222;margin:8px 0"></div>
+<div id="rmeter" title="room resistance: laughs melt it, boos rebuild it"
+ style="height:6px;border-radius:3px;background:#222;margin:4px 0"></div>
+<div id="everdict" style="font-size:16px">…waiting for the room…</div>
+<div class="tick" id="esplit"></div></div>
+<div id="reactlog" style="max-width:520px;margin:10px auto;text-align:left;font-size:13px"></div>
+<script>
+var SLUG={json.dumps(slug)}, ME={json.dumps(me)}, mySeq=0, pcs={{}};
+function api(p, body){{
+  return fetch('/api/perform/'+SLUG+p, {{
+    method: body ? 'POST' : 'GET',
+    headers: {{'Content-Type': 'application/json'}},
+    body: body ? JSON.stringify(body) : undefined }}).then(function(r){{return r.json()}});
+}}
+function logReact(t, extra){{
+  var d = document.createElement('div'); d.textContent = t;
+  var box = document.getElementById('reactlog');
+  box.prepend(d); while (box.children.length > 12) box.lastChild.remove();
+}}
+// roster: faces + pips
+setInterval(function(){{
+  api('/presence').then(function(j){{
+    var faces = 0, pips = 0, html = '';
+    (j.here || []).forEach(function(p){{
+      if (p.mode === 'face') {{ faces++; }}
+      else {{ pips++; html += '😄 '; }}
+    }});
+    document.getElementById('nface').textContent = faces;
+    document.getElementById('npip').textContent = pips;
+    document.getElementById('pips').textContent = html;
+  }}).catch(function(){{}});
+}}, 3000);
+// answer incoming face offers
+setInterval(function(){{
+  api('/signal?since=' + mySeq).then(function(j){{
+    mySeq = j.seq || mySeq;
+    (j.msgs || []).forEach(function(m){{
+      if (m.frm === ME) return;
+      if (m.kind === 'offer' && !pcs[m.frm]) answer(m);
+      else if (m.kind === 'ice' && pcs[m.frm]) pcs[m.frm].pc.addIceCandidate(m.payload).catch(function(){{}});
+      else if (m.kind === 'bye' && pcs[m.frm]) dropPeer(m.frm);
+    }});
+  }}).catch(function(){{}});
+}}, 1500);
+function dropPeer(frm){{
+  try {{ pcs[frm].pc.close(); }} catch (e) {{}}
+  var v = document.getElementById('v-' + frm); if (v) v.remove();
+  delete pcs[frm]; refreshFaces();
+}}
+function refreshFaces(){{
+  document.getElementById('nface').textContent = Object.keys(pcs).length;
+}}
+function answer(m){{
+  var pc = new RTCPeerConnection({{iceServers: [{{urls: 'stun:stun.l.google.com:19302'}}]}});
+  pcs[m.frm] = {{pc: pc}};
+  pc.ontrack = function(ev){{
+    var v = document.getElementById('v-' + m.frm);
+    if (!v) {{
+      v = document.createElement('video');
+      v.id = 'v-' + m.frm; v.autoplay = true; v.playsInline = true; v.muted = true;
+      document.getElementById('faces').appendChild(v);
+    }}
+    v.srcObject = ev.streams[0]; refreshFaces();
+  }};
+  pc.onicecandidate = function(ev){{
+    if (ev.candidate) api('/signal', {{frm: ME, kind: 'ice', payload: ev.candidate}});
+  }};
+  pc.setRemoteDescription(m.payload).then(function(){{ return pc.createAnswer(); }})
+    .then(function(a){{ return pc.setLocalDescription(a).then(function(){{
+      api('/signal', {{frm: ME, kind: 'answer', payload: pc.localDescription}});
+    }}); }}).catch(function(){{ dropPeer(m.frm); }});
+}}
+// room laugh feed (boolean events the room already emits)
+// Crowd physics ported from characters' laugh_timeline.CrowdState:
+// heat *= 0.88 per event, +0.15 per laugh (cap 1.0), contagion ±1 (cap 5).
+// Plus wall-clock bleed (×0.88 per 10s silence) so the bar visibly decays
+// live. Real weights file pending; dynamics are the documented ones.
+var lastReact = 0;
+var DECAY = __DECAY__, GAIN = __GAIN__;
+var heat = 0, contagion = 0, resist = __RESIST__, lastHeatT = Date.now();
+var VENUE = __VENUE__;
+var state = 'COLD';
+function bleedHeat() {{
+  var gaps = Math.floor((Date.now() - lastHeatT) / 10000);
+  for (var i = 0; i < gaps; i++) {{ heat *= DECAY; resist = Math.min(1, resist + 0.01); }}
+  if (gaps > 0) lastHeatT = Date.now();
+}}
+// Guitar-hero states with hysteresis: step down needs heat 0.15 lower
+// than the step up took, so the room holds a state it earned.
+function crowdState() {{
+  if (state === 'KILLED') return heat >= 0.70 ? 'KILLED' : 'HOT';
+  if (state === 'HOT') return heat >= 0.85 ? 'KILLED' : (heat >= 0.45 ? 'HOT' : 'WARM');
+  if (state === 'WARM') return heat >= 0.6 ? 'HOT' : (heat >= 0.15 ? 'WARM' : 'COLD');
+  return heat >= 0.3 ? 'WARM' : 'COLD';
+}}
+setInterval(function() {{ bleedHeat(); paintEnergy(); }}, 2000);
+var energyLog = [];
+function scoreE(r) {{
+  if (r === 'hahaha') return 2;
+  if (r === 'haha' || r === 'laugh' || r === 'smile') return 1;
+  if (r === 'cheer' || r === 'clap') return 0.5;
+  if (r === 'boo') return -1;
+  return 0;
+}}
+function paintEnergy() {{
+  bleedHeat();
+  var cutoff = Date.now() - 15000, byType = {{}};
+  energyLog = energyLog.filter(function(x) {{ return x.at > cutoff; }});
+  energyLog.forEach(function(x) {{ byType[x.r] = (byType[x.r] || 0) + 1; }});
+  state = crowdState();
+  var pct = Math.round(heat * 100);
+  document.getElementById('emeter').style.background =
+    'linear-gradient(90deg,#ff2fa8 ' + pct + '%,#222 ' + pct + '%)';
+  var v = document.getElementById('everdict');
+  var faces = {{COLD: ['🧊 COLD ROOM', '#888'], WARM: ['🙂 warming up', '#eee'],
+                HOT: ['🔥 THE ROOM IS HOT', '#ff2fa8'], KILLED: ['💀 KILLED (live)', '#ff2fa8']}};
+  v.textContent = faces[state][0];
+  v.style.color = faces[state][1];
+  if (state === 'COLD' && energyLog.length > 3) v.textContent = '🍅 tough crowd';
+  var rpct = Math.round(resist * 100);
+  document.getElementById('esplit').textContent =
+    'heat ' + heat.toFixed(2) + ' · resistance ' + rpct + '% · contagion ' + contagion + ' · ' +
+    (Object.keys(byType).map(function(k) {{ return k + '×' + byType[k]; }}).join(' · ') || 'no signals yet');
+  var rb = document.getElementById('rmeter');
+  if (rb) rb.style.background =
+    'linear-gradient(90deg,#888 ' + rpct + '%,#222 ' + rpct + '%)';
+}}
+setInterval(function(){{
+  fetch('/api/react/feed?slug=' + SLUG + '&since=' + lastReact).then(function(r){{ return r.json(); }})
+    .then(function(j){{
+      (j.events || []).forEach(function(e){{
+        lastReact = Math.max(lastReact, e.seq || 0);
+        energyLog.push({{at: Date.now(), s: scoreE(e.reaction), r: e.reaction}});
+        heat *= DECAY;
+        var laughish = (e.reaction === 'haha' || e.reaction === 'hahaha' ||
+                        e.reaction === 'laugh' || e.reaction === 'smile');
+        if (laughish) {{
+          heat = Math.min(1, heat + GAIN / (1 + resist));
+          resist = Math.max(0, resist - 0.06);
+          contagion = Math.min(5, contagion + 1);
+        }}
+        else {{
+          contagion = Math.max(0, contagion - 1);
+          if (e.reaction === 'boo') resist = Math.min(1, resist + 0.10);
+        }}
+        lastHeatT = Date.now();
+        logReact('😄 ' + (e.reaction || 'laugh') + (e.nick ? ' — ' + e.nick : ''));
+      }});
+      paintEnergy();
+    }}).catch(function(){{}});
+}}, 2500);
+</script></body></html>"""
+    page = page.replace("__DECAY__", repr(physics["decay"]))
+    page = page.replace("__GAIN__", repr(physics["laugh_gain"]))
+    page = page.replace("__RESIST__", repr(physics["resist_start"]))
+    page = page.replace("__VENUE__", json.dumps(physics["venue"]))
+    return page, 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
+_KILLED_ENERGY = 12.0   # total weighted energy across the set
+_KILLED_COVERAGE = 0.5  # fraction of beats with >=1 laugh-ish tap
+_KILLED_CREATORS = 3    # distinct tappers (one fan can't kill alone)
+_KILLED_BOOS = 1        # max boos tolerated
+_VERDICT_W = {"hahaha": 2.0, "haha": 1.0, "laugh": 1.0, "smile": 1.0,
+              "cheer": 0.5, "clap": 0.5, "boo": -1.0}
+
+
+@app.route("/api/perform/<slug>/verdict")
+def perform_verdict(slug):
+    """Definitive KILLED badge. Hard on purpose: big energy AND broad
+    coverage AND a real crowd (distinct tappers) AND (almost) no boos.
+    Computed from the reaction log at finale time."""
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    try:
+        lines = (Path(__file__).parent / "reactions.jsonl").read_text().splitlines()
+    except Exception:
+        lines = []
+    import time as _time
+    energy, boos, creators = 0.0, 0, set()
+    hit_beats: set = set()
+    beats = _perform_beats(slug)
+    week_ago = _time.time() - 7 * 86400  # a kill is recent room life, not history
+    for ln in lines:
+        try:
+            e = json.loads(ln)
+        except Exception:
+            continue
+        if e.get("slug") != slug or e.get("t", 0) < week_ago:
+            continue
+        r = e.get("reaction", "")
+        energy += _VERDICT_W.get(r, 0)
+        if r == "boo":
+            boos += 1
+        if e.get("creator"):
+            creators.add(e["creator"])
+        if r in ("haha", "hahaha", "laugh", "smile"):
+            t = e.get("set_time_ms", 0)
+            for i, b in enumerate(beats):
+                if b["start"] - 500 <= t < b["end"] + 2500:
+                    hit_beats.add(i)
+                    break
+    coverage = len(hit_beats) / max(1, len(beats))
+    killed = (energy >= _KILLED_ENERGY and coverage >= _KILLED_COVERAGE
+              and len(creators) >= _KILLED_CREATORS and boos <= _KILLED_BOOS
+              and len(beats) > 0)
+    return jsonify({"ok": True, "slug": slug, "killed": killed,
+                    "energy": round(energy, 1), "coverage": round(coverage, 2),
+                    "creators": len(creators), "boos": boos,
+                    "bars": {"energy": _KILLED_ENERGY,
+                             "coverage": _KILLED_COVERAGE,
+                             "creators": _KILLED_CREATORS, "boos": _KILLED_BOOS}})
+
+
+_LAUGH_DIR = Path(__file__).parent / "audio_output" / "laughs"
+_LAUGH_MAX = 50
+
+
+@app.route("/api/laughs", methods=["POST"])
+def upload_laugh():
+    """Opt-in personal laugh sample. {b64: webm/opus data URL or raw b64,
+    <=200KB}. Stored by random id, served unlisted. No listing endpoint.
+    Delete by asking (owner tool) — no account system to self-serve."""
+    import base64 as _b64
+    import secrets as _sec
+    data = request.json or {}
+    raw = str(data.get("b64", ""))
+    if "," in raw:
+        raw = raw.split(",", 1)[1]
+    try:
+        blob = _b64.b64decode(raw, validate=True)
+    except Exception:
+        return jsonify({"ok": False, "error": "bad audio"}), 400
+    if not (1024 <= len(blob) <= 200 * 1024):
+        return jsonify({"ok": False, "error": "need 1KB-200KB"}), 400
+    if blob[:4] != b"\x1a\x45\xdf\xa3" and blob[:4] != b"RIFF":
+        return jsonify({"ok": False, "error": "webm or wav only"}), 400
+    try:
+        _LAUGH_DIR.mkdir(parents=True, exist_ok=True)
+        existing = sorted(_LAUGH_DIR.glob("*.webm"), key=lambda p: p.stat().st_mtime)
+        while len(existing) >= _LAUGH_MAX:
+            existing.pop(0).unlink(missing_ok=True)
+        lid = _sec.token_hex(8)
+        (_LAUGH_DIR / f"{lid}.webm").write_bytes(blob)
+    except Exception:
+        return jsonify({"ok": False, "error": "store failed"}), 500
+    return jsonify({"ok": True, "laugh_id": lid})
+
+
+@app.route("/api/laughs/<lid>")
+def serve_laugh(lid):
+    lid = re.sub(r"[^a-z0-9]", "", lid)[:32]
+    p = _LAUGH_DIR / f"{lid}.webm"
+    if not p.exists():
+        return jsonify({"ok": False, "error": "no such laugh"}), 404
+    return send_file(str(p), mimetype="audio/webm",
+                     headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.route("/api/venue/<vid>")
+def venue_manifest(vid):
+    """Venue truth: profile, props, light rig, physics, acoustics. Rooms
+    reference venues by id; GLB by hash, never latest."""
+    vid = re.sub(r"[^a-z0-9-]", "", vid)[:32]
+    p = Path(__file__).parent / "docs" / "venues" / f"{vid}.json"
+    if not p.exists():
+        return jsonify({"ok": False, "error": "no such venue"}), 404
+    try:
+        return jsonify({"ok": True, "venue": json.loads(p.read_text())})
+    except Exception:
+        return jsonify({"ok": False, "error": "bad venue file"}), 500
+
+
+@app.route("/venues/<path:filename>")
+def venue_file(filename):
+    """Local venue meshes (var/venues, gitignored). GLBs pinned by sha256
+    in the venue JSON — referenced by hash, never latest."""
+    if "/" in filename or not (filename.endswith(".glb") or filename.endswith(".spz") or filename.endswith(".vrm")):
+        return jsonify({"ok": False, "error": "glb/spz/vrm only"}), 400
+    mime = "model/gltf-binary" if filename.endswith((".glb", ".vrm")) else "application/octet-stream"
+    # pinned by sha256 in venue JSON = immutable content: cache hard so the
+    # big download happens once per phone, never every visit.
+    resp = send_from_directory(str(Path(__file__).parent / "var" / "venues"),
+                               filename, mimetype=mime)
+    resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    return resp
+
+
+# Second-screen pairing (YouTube-on-TV pattern, party-code logic).
+# TV shows a 4-letter code; phones join at /code. Controllers post
+# reactions; the TV polls the feed and drives shared energy. Ephemeral:
+# codes die with the process. Smile/mic are boolean presence only.
+PAIR = {}
+PAIR_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+
+
+def _pair_code():
+    import secrets as _secrets
+    while True:
+        code = "".join(_secrets.choice(PAIR_ALPHABET) for _ in range(4))
+        if code not in PAIR:
+            return code
+
+
+@app.route("/api/venue/<vid>/pair", methods=["POST"])
+def venue_pair(vid):
+    vid = re.sub(r"[^a-z0-9-]", "", vid)[:32]
+    code = _pair_code()
+    PAIR[code] = {"code": code, "venue": vid, "seq": 0, "events": [],
+                  "members": 0, "t": time.time()}
+    return jsonify({"ok": True, "code": code})
+
+
+@app.route("/api/pair/<code>", methods=["GET"])
+def pair_join(code):
+    code = re.sub(r"[^A-Z0-9]", "", code.upper())[:8]
+    r = PAIR.get(code)
+    if not r:
+        return jsonify({"ok": False, "error": "no such code"}), 404
+    r["members"] += 1
+    return jsonify({"ok": True, "venue": r["venue"], "members": r["members"]})
+
+
+@app.route("/api/pair/<code>/react", methods=["POST"])
+def pair_react(code):
+    code = re.sub(r"[^A-Z0-9]", "", code.upper())[:8]
+    r = PAIR.get(code)
+    if not r:
+        return jsonify({"ok": False, "error": "no such code"}), 404
+    data = request.get_json(force=True, silent=True) or {}
+    kind = str(data.get("kind", ""))[:12]
+    if kind not in ("laugh", "haha", "boo", "clap", "cheer", "smile", "mic"):
+        return jsonify({"ok": False, "error": "bad kind"}), 400
+    r["seq"] += 1
+    ev = {"seq": r["seq"], "kind": kind, "t": time.time(),
+          "by": re.sub(r"[^\w -]", "", str(data.get("name", "guest")))[:16]}
+    r["events"].append(ev)
+    r["events"] = r["events"][-200:]
+    return jsonify({"ok": True, "seq": r["seq"]})
+
+
+@app.route("/api/pair/<code>/kill", methods=["POST"])
+def pair_kill(code):
+    """Mod KILL switch (censor step 1): TV cuts to standby card on next poll.
+    No auth yet (unlisted codes only) — monitor auth lands with it."""
+    code = re.sub(r"[^A-Z0-9]", "", code.upper())[:8]
+    r = PAIR.get(code)
+    if not r:
+        return jsonify({"ok": False, "error": "no such code"}), 404
+    data = request.get_json(force=True, silent=True) or {}
+    r["seq"] += 1
+    ev = {"seq": r["seq"], "kind": "kill" if data.get("killed", True) else "resume",
+          "t": time.time(), "by": "mod"}
+    r["events"].append(ev)
+    r["events"] = r["events"][-200:]
+    return jsonify({"ok": True, "seq": r["seq"]})
+
+
+@app.route("/api/pair/<code>/feed")
+def pair_feed(code):
+    code = re.sub(r"[^A-Z0-9]", "", code.upper())[:8]
+    r = PAIR.get(code)
+    if not r:
+        return jsonify({"ok": False, "error": "no such code"}), 404
+    try:
+        since = int(request.args.get("since", 0))
+    except ValueError:
+        since = 0
+    return jsonify({"ok": True, "seq": r["seq"], "members": r["members"],
+                    "events": [e for e in r["events"] if e["seq"] > since]})
+
+
+@app.route("/venue/<vid>")
+def venue_stage(vid):
+    """P0 venue stage: Marble room views as the walls + VRM performer +
+    procedural mic. v0 uses generated-view textures; swaps to the pinned
+    GLB the moment cauldron.json carries a real glb.sha256."""
+    vid = re.sub(r"[^a-z0-9-]", "", vid)[:32]
+    return f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>THE CAULDRON — live stage v0</title>
+<style>html,body{{margin:0;height:100%;background:#000;overflow:hidden;font-family:monospace}}
+#ui{{position:fixed;top:8px;left:8px;z-index:5;color:#eee;font-size:12px;background:rgba(10,10,15,.7);padding:8px 10px;border-radius:10px;border:1px solid #282833}}
+#ui button{{background:#1a1a2e;color:#eee;border:1px solid #333;border-radius:8px;padding:4px 10px;margin:2px}}
+#ui a{{color:#ff2fa8}}</style>
+<script type="importmap">
+{{"imports":{{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/","@pixiv/three-vrm":"https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.3.0/lib/three-vrm.module.js","three-vrm-animation":"https://cdn.jsdelivr.net/npm/@pixiv/three-vrm-animation@3.3.0/lib/three-vrm-animation.module.min.js","@sparkjsdev/spark":"https://sparkjs.dev/releases/spark/2.3.1/spark.module.js","three-vrm-lip-sync":"https://cdn.jsdelivr.net/npm/three-vrm-lip-sync@0.1.0/dist/index.min.js","wlipsync":"https://cdn.jsdelivr.net/npm/wlipsync@1.3.1/dist/wlipsync-single.min.js","wawa-lipsync":"https://cdn.jsdelivr.net/npm/wawa-lipsync@0.0.2/dist/wawa-lipsync.es.js"}}}}
+</script></head><body>
+<div id="ui">🕯️ <span id="vname">{vid}</span> · v0 room-views + live body<br>
+<span id="cams"></span><br><button id="play">▶ PLAY SET (biscuit)</button>
+<button id="rec">● REC</button>
+<button id="room">ROOM: ON</button>
+<button id="tvbtn" title="pair a phone">📱</button>
+<a href="/cauldron">concepts</a> · <a href="/perform">stage</a>
+<div id="msg" style="color:#888">loading room…</div>
+<div id="blog" style="color:#555;font-size:10px;margin-top:4px;text-align:left;max-height:120px;overflow:auto"></div>
+<div style="margin-top:4px">ROOM ENERGY <span id="emeter" style="color:#ff2fa8">░░░░░░░░░░</span>
+<button id="laugh">😄</button><button id="boo">👎</button></div></div>
+<canvas id="c" style="width:100%;height:100%;display:block"></canvas>
+<script>
+(function () {{
+  var el = document.getElementById('msg');
+  function say(t) {{ el.textContent = 'probe: ' + t; }}
+  try {{
+    if (!window.fetch) return say('no fetch API');
+    var c = document.createElement('canvas');
+    var gl2 = c.getContext('webgl2');
+    if (!gl2) {{
+      var gl1 = c.getContext('webgl') || c.getContext('experimental-webgl');
+      return say(gl1 ? 'WebGL1 only — need WebGL2' : 'NO WebGL at all (private mode? old browser?)');
+    }}
+    var dbg = gl2.getExtension('WEBGL_debug_renderer_info');
+    var gpu = dbg ? gl2.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : 'unknown gpu';
+    say('WebGL2 ok (' + String(gpu).slice(0, 60) + '), loading 3D libs…');
+  }} catch (e) {{ say('probe failed: ' + e.message); }}
+}})();
+</script>
+<script type="module">
+import * as THREE from 'three';
+import {{ GLTFLoader }} from 'three/addons/loaders/GLTFLoader.js';
+import {{ VRMLoaderPlugin, VRMUtils }} from '@pixiv/three-vrm';
+import {{ MeshoptDecoder }} from 'three/addons/libs/meshopt_decoder.module.js';
+import {{ VRMAnimationLoaderPlugin, createVRMAnimationClip }} from 'three-vrm-animation';
+import {{ SparkRenderer, SplatMesh }} from '@sparkjsdev/spark';
+import {{ VRMLipSync }} from 'three-vrm-lip-sync';
+import {{ Lipsync as WawaLipsync }} from 'wawa-lipsync';
+const VID = '{vid}';
+// ?lipsync=wawa|mfcc — challenger engine AB. Default mfcc (incumbent).
+const LIPENGINE = new URLSearchParams(location.search).get('lipsync') || 'mfcc';
+// Oculus-15 → VRM-5 map (v1 approximations, documented, AB-tested).
+const WAWA_MAP = {{sil: null, PP: ['ou', 0.5], FF: ['ih', 0.6], TH: ['ih', 0.5],
+  DD: ['ee', 0.6], kk: ['aa', 0.4], CH: ['oh', 0.6], SS: ['ih', 0.7],
+  nn: ['ee', 0.4], RR: ['ou', 0.6], aa: ['aa', 1.0], E: ['ee', 0.9],
+  I: ['ih', 0.9], O: ['oh', 0.9], U: ['ou', 0.9]}};
+let wawa = null;
+function driveWawa() {{
+  if (!wawa || !vrm || !vrm.expressionManager) return null;
+  try {{
+    wawa.processAudio();
+    const key = String(wawa.viseme || '').replace('viseme_', '');
+    const mgr = vrm.expressionManager;
+    const all = mgr.expressions.map(e => e.expressionName);
+    ['aa','ih','ou','ee','oh'].forEach(n => {{ if (all.includes(n)) try {{ mgr.setValue(n, 0); }} catch (e) {{}} }});
+    const hit = WAWA_MAP[key];
+    if (hit && all.includes(hit[0])) {{ mgr.setValue(hit[0], hit[1]); return key; }}
+    return 'sil';
+  }} catch (e) {{ return null; }}
+}}
+const boot = [];
+const blog = (t) => {{ try {{ const b = document.getElementById('blog'); b.innerHTML += '• ' + t + '<br>'; const lines = b.innerHTML.split('<br>'); if (lines.length > 9) b.innerHTML = lines.slice(-9).join('<br>'); }} catch (e) {{}} }};
+const msg = (t) => {{ boot.push(t); blog(t); document.getElementById('msg').textContent = t; }};
+window.addEventListener('error', (e) => {{ msg('JS ERROR: ' + (e.message || e.type)); }});
+window.addEventListener('unhandledrejection', (e) => {{ msg('LOAD FAILED: ' + (e.reason && e.reason.message || e.reason)); }});
+msg('step 1/5: imports ok, fetching venue…');
+const v = await (await fetch('/api/venue/' + VID)).json().then(j => j.venue);
+msg('step 2/5: venue ok, starting WebGL…');
+document.getElementById('vname').textContent = v.name + ' · ' + v.size;
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({{canvas, antialias: true}});
+renderer.setSize(innerWidth, innerHeight);
+// look: filmic tone curve + slight lift. Cheap, no deps, works on phones.
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+// P0: shadows OFF — SwiftShader/ANGLE fails MToon+spot-shadow compile
+// (vSpotShadowCoord), which eats the performer. Room+body first.
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x050508);
+const camera = new THREE.PerspectiveCamera(46, innerWidth/innerHeight, 0.1, 100);
+// room shell from venue dims (origin at stage front-center, meters)
+const R = v.room, S = v.stage;
+const tex = (u) => new THREE.TextureLoader().load(u);
+const wallMat = (u) => new THREE.MeshBasicMaterial({{map: tex(u)}});
+const dark = new THREE.MeshBasicMaterial({{color: 0x0a0a0e}});
+// room: SPLAT first (photoreal, World Labs Spark fuses splat+mesh in one
+// scene), pinned GLB second, generated-view box last. Chain degrades
+// gracefully — whatever fails, the show still has walls.
+let roomGLB = false;
+const NOBG = new URLSearchParams(location.search).get('nobg') === '1';
+// ?style= splat|mesh|box|void — the Cauldron is a MOTIF, not a file.
+// Same night renders photoreal (splat), stylized (mesh), graphic (box),
+// or void (performer only). Falls through the chain until something holds.
+const STYLE = new URLSearchParams(location.search).get('style') || 'auto';
+const wantSplat = !NOBG && (STYLE === 'auto' || STYLE === 'splat');
+const wantMesh = !NOBG && (STYLE === 'auto' || STYLE === 'mesh');
+if (v.splat && v.splat.local && wantSplat) {{
+  try {{
+    msg('step 3/5: downloading splat room (watch the counter)…');
+    const spark = new SparkRenderer({{renderer}});
+    scene.add(spark);
+    const splat = new SplatMesh({{url: v.splat.local}});
+    await new Promise((resolve, reject) => {{
+      const iv = setInterval(() => {{
+        if (splat.ready) {{ clearInterval(iv); resolve(); }}
+      }}, 500);
+      setTimeout(() => {{ clearInterval(iv); reject(new Error('splat timeout 90s')); }}, 90000);
+    }});
+    scene.add(splat); roomGLB = true;
+    msg('step 4/5: splat room live…');
+  }} catch (e) {{ msg('splat skipped (' + e.message + '), trying mesh…'); }}
+}}
+if (!roomGLB && v.glb && v.glb.local && wantMesh) {{
+  try {{
+    msg('step 3/5: downloading venue mesh (watch the counter)…');
+    const venueLoader = new GLTFLoader();
+    venueLoader.setMeshoptDecoder(MeshoptDecoder);
+    const meshPromise = venueLoader.loadAsync(v.glb.local,
+      (xhr) => {{ if (xhr.total) msg('step 3/5: mesh ' + Math.round(xhr.loaded/1048576) + 'MB / ' + Math.round(xhr.total/1048576) + 'MB'); }});
+    const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('mesh timeout 25s — view-box it is')), 25000));
+    const g = await Promise.race([meshPromise, timeout]);
+    msg('step 4/5: mesh in, placing room…');
+    const obj = g.scene;
+    const box = new THREE.Box3().setFromObject(obj);
+    const size = box.getSize(new THREE.Vector3());
+    // fit by HEIGHT (floor stays floor, heads stay heads) — footprint
+    // fit made rooms cavernous and performers lost. Feet land on y=0.
+    const s = R.h / (size.y || 1);
+    obj.scale.setScalar(s);
+    const ctr = box.getCenter(new THREE.Vector3());
+    obj.position.x -= ctr.x * s; obj.position.z -= ctr.z * s;
+    obj.position.y -= box.min.y * s;
+    window.__roomS = s;
+    scene.add(obj); roomGLB = true;
+    // frame box AFTER scale+placement (pre-scale bounds misframe the camera)
+    obj.updateMatrixWorld(true);
+    window.__roomBox = new THREE.Box3().setFromObject(obj);
+  }} catch (e) {{ msg('mesh skipped (' + e.message + '), view-box fallback'); }}
+}}
+if (!roomGLB && !NOBG) {{
+msg('step 4/5: view-box room…');
+const roomMats = [dark, dark, dark, dark, wallMat('/static/concepts/mbl-wide.jpg'), dark];
+roomMats.forEach(m => {{ m.side = THREE.BackSide; }});
+const room = new THREE.Mesh(new THREE.BoxGeometry(R.w, R.h, R.d), roomMats);
+room.position.set(0, R.h/2, R.d/2 - 0);
+scene.add(room);
+}}
+// stage deck
+const deck = new THREE.Mesh(new THREE.BoxGeometry(S.w, S.top_y, S.d),
+  new THREE.MeshStandardMaterial({{color: 0x2a1d12, roughness: 0.9}}));
+deck.position.set(0, S.top_y/2, S.front_z - S.d/2); deck.receiveShadow = true;
+scene.add(deck);
+// live light rig from venue JSON (temp approx → color)
+const k2c = (k) => new THREE.Color().setHSL(0.09, 0.5, Math.min(0.9, 0.25 + (8000-k)/8000*0.5));
+scene.add(new THREE.AmbientLight(k2c(v.light_rig.house.temp_k), v.light_rig.house.level + 0.25));
+const spot = new THREE.SpotLight(k2c(v.light_rig.spot.temp_k), 60, 30, 0.5, 0.5);
+spot.position.set(...v.light_rig.spot.pos);
+spot.target.position.set(...v.marks[0].pos);
+scene.add(spot, spot.target);
+// procedural mic stand (layer 1, first object — zero downloads)
+const brass = new THREE.MeshStandardMaterial({{color: 0x8a6b32, metalness: 0.8, roughness: 0.35}});
+const mic = new THREE.Group();
+const base = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.04, 24), brass);
+base.position.y = 0.02; mic.add(base);
+const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 1.5, 12), brass);
+pole.position.y = 0.79; pole.castShadow = true; mic.add(pole);
+const ball = new THREE.Mesh(new THREE.SphereGeometry(0.05, 20, 16),
+  new THREE.MeshStandardMaterial({{color: 0x222226, roughness: 0.6}}));
+ball.position.y = 1.58; ball.castShadow = true; mic.add(ball);
+const cable = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.012, 8, 24, Math.PI),
+  new THREE.MeshStandardMaterial({{color: 0x111111}}));
+cable.position.y = 0.1; mic.add(cable);
+mic.position.set(...v.marks[0].pos); mic.position.y = S.top_y;
+// offset stage-right of the body so it reads on camera (comic holds it aside)
+mic.position.x += 0.35;
+scene.add(mic);
+// contact shadow: cheap grounding blob (Animal-Crossing rule — connects feet
+// to floor without real shadow maps, which broke SwiftShader).
+const blob = new THREE.Mesh(new THREE.CircleGeometry(0.45, 24),
+  new THREE.MeshBasicMaterial({{color: 0x000000, transparent: true, opacity: 0.4}}));
+blob.rotation.x = -Math.PI / 2;
+blob.position.set(v.marks[0].pos[0], S.top_y + 0.01, v.marks[0].pos[2] + 0.25);
+scene.add(blob);
+// performer (VRM default; ?body= URL swaps any GLB — weird characters
+// welcome. GLB bodies play embedded clips; VRM bodies get vrma + face.)
+msg('step 5/5: loading performer…');
+const loader = new GLTFLoader();
+loader.register((p) => new VRMLoaderPlugin(p));
+loader.register((p) => new VRMAnimationLoaderPlugin(p));
+const BODY_URL = new URLSearchParams(location.search).get('body') || '';
+const BODY_IS_GLB = BODY_URL.endsWith('.glb');
+let vrm = null, mixer = null, idleAction = null;
+async function loadClip(name) {{
+  const g = await loader.loadAsync('/static/gestures/' + name + '.vrma');
+  const data = g.userData.vrmAnimations && g.userData.vrmAnimations[0];
+  if (!data) throw new Error('no vrma in ' + name);
+  return createVRMAnimationClip(data, vrm);
+}}
+function playGesture(name, holdMs) {{
+  if (!mixer) return;
+  if (!vrm) {{
+    // GLB lane: embedded clips by name (punchline → Gallop etc.)
+    const want = {{cheer: 'Gallop', nod: 'Idle', surprise: 'Jump_ToIdle', wave: 'Walk'}}[name];
+    if (window.__glbClips && window.__glbClips[want]) {{
+      const act = mixer.clipAction(window.__glbClips[want]);
+      act.reset().setLoop(THREE.LoopOnce, 1); act.clampWhenFinished = true;
+      if (idleAction) act.crossFadeFrom(idleAction, 0.3, false);
+      act.play();
+      setTimeout(() => {{
+        if (idleAction && mixer) {{
+          idleAction.reset().setLoop(THREE.LoopRepeat);
+          idleAction.crossFadeFrom(act, 0.4, false); idleAction.play();
+        }}
+      }}, 2500);
+    }}
+    return;
+  }}
+  loadClip(name).then((clip) => {{
+    const act = mixer.clipAction(clip);
+    act.setLoop(THREE.LoopOnce, 1); act.clampWhenFinished = true;
+    if (idleAction) act.crossFadeFrom(idleAction, 0.4, false);
+    act.play();
+    setTimeout(() => {{
+      if (idleAction && mixer) {{
+        idleAction.reset().setLoop(THREE.LoopRepeat);
+        idleAction.crossFadeFrom(act, 0.5, false);
+        idleAction.play();
+      }}
+    }}, holdMs || (clip.duration * 1000 + 400));
+  }}).catch((e) => {{ blog('gesture miss: ' + name); }});
+}}
+const GESTURE_FOR = {{setup: 'nod', punchline: 'cheer', tag: 'surprise', closer: 'cheer', callback: 'nod'}};
+try {{
+  let bodyObj = null;
+  if (BODY_IS_GLB) {{
+    // weird-character lane: plain GLB, embedded clips, no expressions.
+    const g2 = await loader.loadAsync(BODY_URL);
+    bodyObj = g2.scene;
+    const bb = new THREE.Box3().setFromObject(bodyObj);
+    const bs = bb.getSize(new THREE.Vector3());
+    const bh = bs.y > 0 ? 1.1 / bs.y : 1;
+    bodyObj.scale.setScalar(bh);
+    bodyObj.position.set(v.marks[0].pos[0], S.top_y - bb.min.y * bh, v.marks[0].pos[2] + 0.25);
+    scene.add(bodyObj);
+    mixer = new THREE.AnimationMixer(bodyObj);
+    window.__glbClips = {{}};
+    g2.animations.forEach(a => {{ window.__glbClips[a.name] = a; }});
+    const idle = g2.animations.find(a => /idle/i.test(a.name)) || g2.animations[0];
+    if (idle) {{
+      idleAction = mixer.clipAction(idle);
+      idleAction.setLoop(THREE.LoopRepeat); idleAction.play();
+      blog('body clip: ' + idle.name);
+    }}
+    // adjustable mic: ball tracks the body's head height, pole follows.
+    const headY = (bb.max.y - bb.min.y) * bh * 0.92;
+    ball.position.y = headY;
+    pole.scale.y = headY / 1.5; pole.position.y = headY / 2;
+  }} else {{
+  const vrmUrl = (BODY_URL && BODY_URL.endsWith('.vrm')) ? BODY_URL : '/static/avatars/default-v1.vrm';
+  const gltf = await loader.loadAsync(vrmUrl);
+  vrm = gltf.userData.vrm;
+  vrm.scene.rotation.y = Math.PI;
+  vrm.scene.position.set(v.marks[0].pos[0], S.top_y, v.marks[0].pos[2] + 0.25);
+  scene.add(vrm.scene);
+  }} // end else (VRM path)
+  if (!BODY_IS_GLB) {{
+  mixer = new THREE.AnimationMixer(vrm.scene);
+  try {{
+    idleAction = mixer.clipAction(await loadClip('idle_breathing'));
+    idleAction.setLoop(THREE.LoopRepeat); idleAction.play();
+  }} catch (e) {{ blog('idle miss'); }}
+  }} // end VRM-only setup
+  msg('live — pick a camera');
+}} catch (e) {{ msg('performer failed: ' + e.message); }}
+// venue cameras as buttons
+const bar = document.getElementById('cams');
+v.cameras.forEach(c => {{
+  const b = document.createElement('button'); b.textContent = c.id;
+  b.onclick = () => {{ camera.position.set(...c.pos); camera.fov = c.fov;
+    camera.updateProjectionMatrix(); camera.lookAt(0, 1.2, -1); }};
+  bar.appendChild(b);
+}});
+camera.position.set(...v.cameras[0].pos); camera.lookAt(0, 1.2, -1);
+// ?face=1: head close-up test rig — camera pinned to the face so lip and
+// face action fill the frame while the set plays. For AB verification.
+const FACEMODE = new URLSearchParams(location.search).get('face') === '1';
+if (FACEMODE && vrm) {{
+  const hb = new THREE.Box3().setFromObject(vrm.scene);
+  const hc = hb.getCenter(new THREE.Vector3());
+  const hs = hb.getSize(new THREE.Vector3());
+  const hy = hb.min.y + hs.y * 0.88;
+  camera.position.set(hc.x + 0.12, hy + 0.05, hc.z + hs.z * 0.9 + 0.55);
+  camera.fov = 22; camera.updateProjectionMatrix();
+  camera.lookAt(hc.x, hy, hc.z);
+  blog('face rig: close-up locked');
+}}
+if (window.__roomBox) {{
+  // stand inside the real room: near one end, eyes up, look down its length
+  const rb = window.__roomBox, rc = rb.getCenter(new THREE.Vector3());
+  const rsz = rb.getSize(new THREE.Vector3());
+  camera.position.set(rc.x, rc.y + rsz.y * 0.25, rb.max.z - rsz.z * 0.12);
+  camera.lookAt(rc.x, rc.y - rsz.y * 0.1, rb.min.z + rsz.z * 0.25);
+}}
+addEventListener('resize', () => {{ renderer.setSize(innerWidth, innerHeight);
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); }});
+const clock = new THREE.Clock(); let t = 0;
+// set driver v0: set.wav + beat-type expressions on even cadence
+// (APPROXIMATE — no measured offsets in freaks packs; precise driver lands
+// with Rhubarb/forced alignment). Punchline pops + spot push per beat.
+const SET_SLUG = new URLSearchParams(location.search).get('set') || 'biscuit-4cb995';
+document.getElementById('play').textContent = '▶ PLAY SET (' + SET_SLUG.split('-')[0] + ')';
+let beats = [];
+let beatTimes = null; // measured timings preferred over cadence
+try {{ beats = await (await fetch('/freaks/' + SET_SLUG + '/delivery.json')).json().then(j => j.beats || []); }} catch (e) {{}}
+try {{ beatTimes = await (await fetch('/freaks/' + SET_SLUG + '/timings.json')).json().then(j => j.segments || null); }} catch (e) {{}}
+const audio = new Audio();
+audio.preload = 'auto';
+audio.src = '/freaks/' + SET_SLUG + '/set.wav';
+// phones that refuse WAV (MEDIA_ERR_SRC_NOT_SUPPORTED) fall to MP3 at load,
+// so PLAY never meets a sourceless element. MP3 is also 12x smaller.
+audio.addEventListener('error', () => {{
+  const src = audio.src.split('/').pop();
+  if (!audio.src.endsWith('.mp3')) {{
+    blog('audio: ' + src + ' refused, trying mp3…');
+    audio.src = '/freaks/' + SET_SLUG + '/set.mp3';
+    audio.load();
+  }} else {{
+    msg('AUDIO DEAD: both wav+mp3 refused (' + src + ') — reply with phone model + browser');
+  }}
+}});
+audio.load();
+// jaw flap: audio energy → jaw morph (v0 lipsync; phonemes land later).
+let jawSlot = null, analyser = null, freqData = null;
+function initJaw() {{
+  // wawa challenger: direct element tap, no graph needed.
+  try {{
+    if (LIPENGINE === 'wawa' && !wawa && typeof WawaLipsync !== 'undefined') {{
+      wawa = new WawaLipsync();
+      wawa.connectAudio(audio);
+      blog('lipsync: wawa live');
+      return; // wawa owns the mouth; skip MFCC graph entirely
+    }}
+  }} catch (e) {{ blog('wawa miss: ' + e.message); }}
+  // real lipsync first (MFCC vowels → visemes, in-browser, free), energy
+  // flap as fallback. Created on tap (mobile autoplay policy).
+  try {{
+    if (!window.__lipSync && vrm && typeof VRMLipSync !== 'undefined') {{
+      const opts = window.__roomCtx ? {{audioContext: window.__roomCtx}} : {{}};
+      VRMLipSync.create(vrm, opts).then((ls) => {{
+        window.__lipSync = ls;
+        // route set audio into the analyzer: element -> MediaStreamDestination
+        // -> useStream (documented path). Guessed element-tap APIs removed;
+        // the stream carries the same audio the room hears.
+        try {{
+          const ctx = window.__roomCtx;
+          const dest = ctx.createMediaStreamDestination();
+          // reuse the single element source (one per element per context)
+          window.__roomSrc.connect(dest);
+          if (ls.useStream) ls.useStream(dest.stream);
+          else if (ls.useElement) ls.useElement(audio);
+          blog('lipsync: mfcc live (stream-tapped)');
+        }} catch (e) {{ blog('lipsync tap miss: ' + e.message); }}
+      }}).catch((e) => {{ blog('lipsync miss, flap fallback'); }});
+    }}
+  }} catch (e) {{}}
+  try {{
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) {{ blog('no webaudio'); return; }}
+    if (!window.__roomCtx) {{
+      const ctx = new AC();
+      const src = ctx.createMediaElementSource(audio);
+      window.__roomCtx = ctx;
+      window.__roomSrc = src;
+      analyser = ctx.createAnalyser(); analyser.fftSize = 256;
+      freqData = new Uint8Array(analyser.frequencyBinCount);
+      src.connect(analyser);
+    }} else if (window.__roomCtx.state === 'suspended') {{
+      window.__roomCtx.resume();
+    }}
+    const ctx = window.__roomCtx;
+    // ROOM: dry voice + venue reverb send. Impulse is synthesized at runtime
+    // from the venue's own rt60 (Sabine/Eyring, acoustics in venue JSON) —
+    // no IR files, and the tail matches the room's measured physics.
+    const dry = ctx.createGain(); dry.gain.value = 0.85;
+    analyser.connect(dry); dry.connect(ctx.destination);
+    const rt = (v.acoustics && v.acoustics.rt60) || 0.9;
+    const sr = ctx.sampleRate, len = Math.floor(sr * Math.min(4, rt * 1.5));
+    const ir = ctx.createBuffer(2, len, sr);
+    for (let ch = 0; ch < 2; ch++) {{
+      const d = ir.getChannelData(ch);
+      for (let i = 0; i < len; i++)
+        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.2);
+    }}
+    const verb = ctx.createConvolver(); verb.buffer = ir;
+    const wet = ctx.createGain(); wet.gain.value = 0.35;
+    analyser.connect(verb); verb.connect(wet); wet.connect(ctx.destination);
+    window.__roomFx = {{ctx, dry, wet, rt60: rt,
+      toggle(on) {{ wet.gain.value = on ? 0.35 : 0; dry.gain.value = on ? 0.85 : 1; }}}};
+    if (vrm && vrm.expressionManager) {{
+      const all = vrm.expressionManager.expressions.map(e => e.expressionName);
+      jawSlot = all.find(n => /jaw|aa|mouthopen|oh/i.test(n)) || null;
+    }}
+  }} catch (e) {{}}
+}}
+function flapJaw() {{
+  if (!analyser || !jawSlot || !vrm) return;
+  analyser.getByteFrequencyData(freqData);
+  let e = 0;
+  for (let i = 1; i < 12 && i < freqData.length; i++) e += freqData[i];
+  e = Math.min(1, e / (12 * 90));
+  try {{ vrm.expressionManager.setValue(jawSlot, e); }} catch (err) {{}}
+}}
+window.__venueDbg = {{get audioT() {{ return audio.currentTime; }},
+  get audioOn() {{ return !audio.paused; }},
+  get jaw() {{ return jawSlot; }}}};
+window.__mouthNow = function () {{
+  try {{
+    const m = vrm.expressionManager;
+    return ['aa','ih','ou','ee','oh','happy'].map(n => Math.round(m.getValue(n) * 100) / 100).join(',');
+  }} catch (e) {{ return 'err'; }}
+}};
+window.__setMouth = function (v) {{
+  try {{ vrm.expressionManager.setValue('aa', v); return 'set'; }}
+  catch (e) {{ return 'err:' + e.message; }}
+}};
+const EXPR = {{setup: 'neutral', punchline: 'happy', tag: 'happy', closer: 'happy', callback: 'happy'}};
+// Emotion channel ONLY (happy/angry/sad/surprised/relaxed/neutral). Never
+// touches mouth visemes (aa/ih/ou/ee/oh) or blink — those belong to the
+// lipsync engine. Old code zeroed everything per beat and stomped the mouth.
+const EMOTION_ONLY = ['happy', 'angry', 'sad', 'surprised', 'relaxed', 'neutral'];
+function setFace(name, val) {{
+  if (!vrm || !vrm.expressionManager) return;
+  try {{
+    const mgr = vrm.expressionManager;
+    const all = mgr.expressions.map(e => e.expressionName);
+    EMOTION_ONLY.forEach(n => {{ if (all.includes(n)) try {{ mgr.setValue(n, 0); }} catch (e) {{}} }});
+    const slot = EMOTION_ONLY.includes(name) ? name : (all.includes(name) ? name : 'happy');
+    try {{ mgr.setValue(slot, val); }} catch (e) {{}}
+  }} catch (e) {{}}
+}}
+let beatTimer = null;
+document.getElementById('play').onclick = () => {{
+  initJaw();
+  audio.play().catch((e) => {{ msg('PLAY BLOCKED: ' + e.name + ' — tap again, check silent switch'); }});
+  clearInterval(beatTimer);
+  beatTimer = null;
+  if (beatTimes && beatTimes.length === beats.length) {{
+    // MEASURED driver: fire each beat at its real start offset.
+    msg('performing ' + beats.length + ' beats (measured timing)');
+    beatTimes.forEach((seg, i) => {{
+      setTimeout(() => {{
+        if (audio.paused) return;
+        const b = beats[i];
+        setFace(EXPR[b.type] || 'neutral', 0.9);
+        playGesture(GESTURE_FOR[b.type] || 'nod');
+        cutCam();
+        spot.intensity = 60 + (b.type === 'punchline' || b.type === 'closer' ? 25 : 0);
+      }}, seg.start_ms);
+    }});
+    return;
+  }}
+  msg('performing ' + beats.length + ' beats (approx timing)');
+  if (!beats.length || !isFinite(audio.duration)) return;
+  const per = (audio.duration || beats.length * 3) / beats.length;
+  let i = 0;
+  clearInterval(beatTimer);
+  beatTimer = setInterval(() => {{
+    if (i >= beats.length || audio.paused) {{ clearInterval(beatTimer); setFace('neutral', 1); return; }}
+    const b = beats[i++];
+    setFace(EXPR[b.type] || 'neutral', 0.9);
+    playGesture(GESTURE_FOR[b.type] || 'nod');
+    cutCam();
+    spot.intensity = 60 + (b.type === 'punchline' || b.type === 'closer' ? 25 : 0);
+  }}, per * 1000);
+}};
+// cinematography: REC captures the canvas; while recording, each beat cuts
+// the camera (wide → medium → close rotation), then offers the webm.
+let recorder = null, recChunks = [], recCam = 0;
+document.getElementById('rec').onclick = () => {{
+  if (recorder && recorder.state !== 'inactive') {{ recorder.stop(); return; }}
+  try {{
+    const stream = canvas.captureStream(30);
+    recChunks = [];
+    recorder = new MediaRecorder(stream, {{mimeType: 'video/webm'}});
+    recorder.ondataavailable = (e) => {{ if (e.data.size) recChunks.push(e.data); }};
+    recorder.onstop = () => {{
+      const url = URL.createObjectURL(new Blob(recChunks, {{type: 'video/webm'}}));
+      msg('take ready — tap to download');
+      const a = document.createElement('a'); a.href = url;
+      a.download = 'cauldron-take.webm'; a.textContent = '⬇ DOWNLOAD TAKE';
+      a.style.cssText = 'color:#ff2fa8;font-size:14px';
+      document.getElementById('ui').appendChild(a);
+      document.getElementById('rec').textContent = '● REC';
+    }};
+    recorder.start(1000);
+    document.getElementById('rec').textContent = '■ STOP';
+    msg('recording — cameras cut per beat');
+  }} catch (e) {{ msg('rec failed: ' + e.message); }}
+}};
+document.getElementById('room').onclick = (e) => {{
+  const on = e.target.textContent.includes('ON');
+  if (window.__roomFx) window.__roomFx.toggle(!on);
+  e.target.textContent = on ? 'ROOM: OFF' : 'ROOM: ON';
+}};
+document.getElementById('tvbtn').onclick = () => {{
+  location.href = location.pathname + '?tv=1';
+}};
+// TV MODE (?tv=1): hide the desk UI, flash a 4-letter pair code, poll the
+// shared feed — controller taps land in THIS room's energy.
+const TVMODE = new URLSearchParams(location.search).get('tv') === '1';
+let pairCode = null, pairSeq = 0;
+async function tvInit() {{
+  document.getElementById('ui').style.display = 'none';
+  const ov = document.createElement('div');
+  ov.id = 'tvcode';
+  ov.style.cssText = 'position:fixed;top:12px;right:12px;z-index:6;text-align:center;background:rgba(10,10,15,.8);padding:12px 18px;border-radius:14px;border:1px solid #ff2fa8';
+  document.body.appendChild(ov);
+  try {{
+    const j = await (await fetch('/api/venue/' + VID + '/pair', {{method: 'POST'}})).json();
+    pairCode = j.code;
+  }} catch (e) {{ pairCode = '????'; }}
+  const showTv = (members) => {{
+    const n = Math.round(heat * 10);
+    const bar = '█'.repeat(n) + '░'.repeat(10 - n);
+    const verdict = heat >= 0.85 ? '🔥 KILLED' : heat >= 0.6 ? '🔥 HOT' : heat >= 0.3 ? '🙂 WARM' : '🍅 COLD';
+    ov.innerHTML = '<div style="font-size:11px;color:#888">PAIR PHONE @ funnier.si/code</div>' +
+      '<div style="font-size:44px;letter-spacing:8px;color:#ff2fa8">' + pairCode + '</div>' +
+      '<div style="font-size:11px;color:#888">' + members + ' connected</div>' +
+      '<div style="font-size:15px;color:#ff2fa8;margin-top:4px">' + bar + ' ' + verdict + '</div>';
+  }};
+  showTv(0);
+  setInterval(async () => {{
+    if (!pairCode || pairCode === '????') return;
+    try {{
+      const f = await (await fetch('/api/pair/' + pairCode + '/feed?since=' + pairSeq)).json();
+      if (!f.ok) return;
+      pairSeq = f.seq; showTv(f.members);
+      f.events.forEach(ev => {{
+        if (ev.kind === 'kill') {{
+          document.body.innerHTML = '<div style="background:#000;color:#ff2fa8;font-family:monospace;display:flex;align-items:center;justify-content:center;height:100vh;font-size:24px;letter-spacing:4px">🕯️ INTERMISSION</div>';
+        }} else if (ev.kind === 'laugh' || ev.kind === 'haha' || ev.kind === 'clap' || ev.kind === 'cheer') {{
+          heat = Math.min(1, heat + GAIN / (1 + resist));
+          resist = Math.max(0, resist - 0.06);
+        }} else if (ev.kind === 'boo') {{
+          resist = Math.min(1, resist + 0.10); heat = Math.max(0, heat - 0.05);
+        }}
+      }});
+      paintEnergy();
+    }} catch (e) {{}}
+  }}, 2000);
+}}
+if (TVMODE) tvInit();
+// ROOM ENERGY: the venue's own crowd physics (decay/laugh_gain/resist from
+// venue JSON) running live. Laughs melt resistance; silence stiffens it.
+// P0 local sim (one room, one viewer) — shared multi-viewer sum lands later.
+let heat = 0.3, resist = (v.physics && v.physics.resist_start) || 0.35;
+const DECAY = (v.physics && v.physics.decay) || 0.85;
+const GAIN = (v.physics && v.physics.laugh_gain) || 0.18;
+function paintEnergy() {{
+  const n = Math.round(heat * 10);
+  document.getElementById('emeter').textContent = '█'.repeat(n) + '░'.repeat(10 - n);
+  const verdict = heat >= 0.85 ? '🔥 KILLED' : heat >= 0.6 ? '🔥 HOT' : heat >= 0.3 ? '🙂 WARM' : '🍅 COLD';
+  document.getElementById('emeter').title = verdict + ' · resist ' + resist.toFixed(2);
+}}
+document.getElementById('laugh').onclick = () => {{
+  heat = Math.min(1, heat + GAIN / (1 + resist));
+  resist = Math.max(0, resist - 0.06); paintEnergy();
+}};
+document.getElementById('boo').onclick = () => {{
+  resist = Math.min(1, resist + 0.10); heat = Math.max(0, heat - 0.05); paintEnergy();
+}};
+setInterval(() => {{ heat *= DECAY; resist = Math.min(1, resist + 0.005); paintEnergy(); }}, 4000);
+paintEnergy();
+function cutCam() {{
+  if (!recorder || recorder.state === 'inactive') return;
+  recCam = (recCam + 1) % v.cameras.length;
+  const c = v.cameras[recCam];
+  camera.position.set(...c.pos); camera.fov = c.fov;
+  camera.updateProjectionMatrix(); camera.lookAt(0, 1.2, -1);
+}}
+audio.onended = () => {{ clearInterval(beatTimer); setFace('neutral', 1); spot.intensity = 60; if (recorder && recorder.state !== 'inactive') recorder.stop(); }};
+renderer.setAnimationLoop(() => {{
+  const dt = Math.min(0.05, clock.getDelta());
+  t += dt;
+  if (vrm) {{ vrm.scene.position.y = S.top_y + Math.sin(t*1.4)*0.008;
+    vrm.scene.rotation.y = Math.sin(t*0.4)*0.06;
+    if (mixer) mixer.update(dt);
+    if (LIPENGINE === 'wawa' && wawa) {{ const vk = driveWawa(); if (vk) {{ window.__wawaV = vk; }} }}
+    else if (window.__lipSync) {{ try {{ window.__lipSync.update(); }} catch (e) {{ flapJaw(); }} }}
+    else flapJaw();
+    vrm.update(t); }}
+  renderer.render(scene, camera);
+}});
+</script></body></html>""", 200, {"Content-Type": "text/html; charset=utf-8",
+    "Cache-Control": "no-store"}
+
+
+@app.route("/code")
+def pair_controller():
+    """Phone controller: enter the 4-letter TV code, tap reactions, toggle
+    face/mic presence. Plain string (no f-string) — brace-heavy JS inside."""
+    return """<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>CONTROLLER — pair phone</title>
+<style>body{background:#0a0a0f;color:#eee;font-family:monospace;text-align:center;padding:24px 12px;margin:0}
+button{font-size:20px;padding:14px 16px;margin:6px;border-radius:16px;background:#1a1a2e;color:#eee;border:1px solid #333}
+button:active{background:#ff2fa8}
+input{font-size:28px;letter-spacing:8px;text-align:center;width:180px;padding:10px;border-radius:12px;border:1px solid #333;background:#111119;color:#ff2fa8;text-transform:uppercase}
+.big{font-size:26px;padding:18px 22px}
+.on{border-color:#7fdb7f;color:#7fdb7f}
+#status{color:#888;font-size:12px;margin-top:10px;min-height:18px}</style></head><body>
+<h2>📱 CONTROLLER</h2>
+<div id="join"><input id="code" maxlength="4" placeholder="CODE" autocomplete="off"><br>
+<button id="go" class="big">JOIN TV</button></div>
+<div id="pad" style="display:none">
+<div id="room" style="color:#ff2fa8;font-size:13px"></div>
+<button data-k="haha">😄</button><button data-k="haha">🤣</button><button data-k="clap">👏</button><button data-k="cheer">🎉</button><button data-k="boo">👎</button><br>
+<button id="face">📷 FACE: OFF</button><button id="mic">🎙 MIC: OFF</button>
+<div id="status"></div></div>
+<script>
+let CODE = null;
+const say = (t) => { document.getElementById('status').textContent = t; };
+document.getElementById('go').onclick = async () => {
+  CODE = document.getElementById('code').value.toUpperCase().trim();
+  const j = await (await fetch('/api/pair/' + CODE)).json().catch(() => ({}));
+  if (!j.ok) return say('no such code — check the TV');
+  document.getElementById('join').style.display = 'none';
+  document.getElementById('pad').style.display = '';
+  document.getElementById('room').textContent = 'paired → ' + j.venue + ' · ' + j.members + ' here';
+  say('tap away — the room feels it');
+};
+async function tap(kind) {
+  if (!CODE) return;
+  const j = await (await fetch('/api/pair/' + CODE + '/react', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({kind})})).json().catch(() => ({}));
+  if (!j.ok) say('lost the TV — rejoin');
+}
+document.querySelectorAll('[data-k]').forEach(b => { b.onclick = () => tap(b.dataset.k); });
+document.getElementById('face').onclick = (e) => {
+  const on = e.target.textContent.includes('OFF');
+  e.target.textContent = on ? '📷 FACE: ON' : '📷 FACE: OFF';
+  e.target.className = on ? 'on' : '';
+  tap('smile'); say(on ? 'face shared (boolean smiles only)' : 'face off');
+};
+document.getElementById('mic').onclick = (e) => {
+  const on = e.target.textContent.includes('OFF');
+  e.target.textContent = on ? '🎙 MIC: ON' : '🎙 MIC: OFF';
+  e.target.className = on ? 'on' : '';
+  tap('mic'); say(on ? 'mic laughs on (booleans only)' : 'mic off');
+};
+</script></body></html>""", 200, {"Content-Type": "text/html; charset=utf-8",
+    "Cache-Control": "no-store"}
+
+
+@app.route("/sets")
+def takes_gallery():
+    """Recorded venue sets (/sets — /takes belongs to the legacy pog-take
+    browser registered earlier in this file; first route wins in Flask).
+    Server-side takes, watchable on any phone with zero GPU."""
+    import html as _html
+    tdir = Path(__file__).parent / "static" / "takes"
+    cards = []
+    for jf in sorted(tdir.glob("*.json"), reverse=True):
+        try:
+            m = json.loads(jf.read_text())
+        except Exception:
+            continue
+        v = m.get("take", "")
+        cards.append(
+            "<div style='margin:0 auto 20px;max-width:720px;text-align:left;"
+            "border:1px solid #282833;border-radius:12px;padding:12px'>"
+            "<video src='/static/takes/" + v + "' controls preload='metadata' "
+            "playsinline style='width:100%;border-radius:8px'></video>"
+            "<div style='font-size:12px;margin-top:6px'>🎬 " + _html.escape(v) +
+            " <span style='color:#555'>" + _html.escape(str(m.get("venue", ""))) +
+            " · " + _html.escape(str(m.get("set", ""))) + "</span> " +
+            "<button onclick=\"navigator.clipboard.writeText('https://funnier.si/static/takes/" + v + "');this.textContent='✓ link copied'\" " +
+            "style='font-size:11px;padding:4px 10px;border-radius:8px;background:#1a1a2e;color:#eee;border:1px solid #333'>⧉ share</button></div></div>")
+    body = "".join(cards) if cards else "<p>No takes yet.</p>"
+    return """<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TAKES — recorded sets</title>
+<style>body{background:#0a0a0f;color:#eee;font-family:monospace;text-align:center;padding:24px 12px}
+a{color:#ff2fa8}</style></head><body>
+<div style="font-size:12px;letter-spacing:2px;color:#ff2fa8;">🎬 TAKES</div>
+<h1>Recorded sets</h1>
+<p style="color:#888;font-size:12px;">server-recorded · plays anywhere ·
+<a href="/cauldron">concepts</a> · <a href="/perform">stage</a></p>
+<div>""" + body + """</div></body></html>""", 200, {
+        "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store"}
+
+
+@app.route("/perform/<slug>")
+def perform_room(slug):
+    """Live room for one act: the canonical watch player + live frame
+    (LIVE banner, predicted-heat strip, finale verdict, next act)."""
+    import html as _html
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
+    rendered = _render_watch(slug)
+    if isinstance(rendered, tuple):
+        page, code, headers = rendered[0], rendered[1], rendered[2] if len(rendered) > 2 else {}
+    else:
+        page, code, headers = rendered, 200, {}
+    if code != 200:
+        return rendered
+    beats = _perform_beats(slug)
+    meta = _bundle_meta(slug) or {}
+    char = meta.get("character", {}) or {}
+    import html as _html2
+    pname = _html2.escape(char.get("name", slug))
+    ppremise = _html2.escape(char.get("premise", ""))
+    pimg = (f"/freaks/{slug}/portrait.png"
+            if (FREAK_DIR / slug / "portrait.png").exists() else "/icon-512.png")
+    walkout_url = ""
+    for _w in ("walkout.mp3", "walkout.wav"):
+        if (FREAK_DIR / slug / _w).exists():
+            walkout_url = f"/freaks/{slug}/{_w}"
+            break
+    entrance = (
+        "<div id='entrance' style='position:fixed;inset:0;background:#0a0a0f;z-index:50;"
+        "display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px'>"
+        "<div style='color:#ff2fa8;font-size:12px;letter-spacing:3px'>● LIVE</div>"
+        f"<img src='{pimg}' style='width:180px;border-radius:16px;margin:14px 0'>"
+        f"<h2 style='margin:0'>{pname}</h2>"
+        f"<p style='color:#888;font-size:13px;max-width:340px'>{ppremise}</p>"
+        "<p style='color:#555;font-size:12px'>is coming out…</p>"
+        "<button id='showtimeBtn' style='font-size:18px;padding:14px 34px;margin-top:10px;"
+        "background:#ff2fa8;border:none;border-radius:28px;color:#fff'>"
+        "TAP FOR SHOWTIME</button>"
+        "<p style='color:#555;font-size:11px;margin-top:10px'>cheer while you wait — "
+        "buttons below work any time</p></div>"
+        f"<audio id='walkout' src='{walkout_url}' preload='auto'></audio>" if walkout_url else
+        "<div id='entrance' style='position:fixed;inset:0;background:#0a0a0f;z-index:50;"
+        "display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px'>"
+        "<div style='color:#ff2fa8;font-size:12px;letter-spacing:3px'>● LIVE</div>"
+        f"<img src='{pimg}' style='width:180px;border-radius:16px;margin:14px 0'>"
+        f"<h2 style='margin:0'>{pname}</h2>"
+        f"<p style='color:#888;font-size:13px;max-width:340px'>{ppremise}</p>"
+        "<p style='color:#555;font-size:12px'>is coming out…</p>"
+        "<button id='showtimeBtn' style='font-size:18px;padding:14px 34px;margin-top:10px;"
+        "background:#ff2fa8;border:none;border-radius:28px;color:#fff'>"
+        "TAP FOR SHOWTIME</button>"
+        "<p style='color:#555;font-size:11px;margin-top:10px'>cheer while you wait — "
+        "buttons below work any time</p></div>")
+    crowdbar = (
+        "<div id='crowdbar' style='position:fixed;left:0;right:0;bottom:0;z-index:40;"
+        "display:flex;justify-content:center;gap:8px;padding:10px 8px 14px;"
+        "background:rgba(10,10,15,.92);border-top:1px solid #282833'>"
+        + "".join(
+            f"<button data-r='{t}' style='font-size:15px;padding:10px 12px;border-radius:20px;"
+            f"background:#1a1a2e;border:1px solid #333;color:#eee'>{e} <span id='cnt-{t}'>0</span></button>"
+            for e, t in (("😄", "haha"), ("🤣", "hahaha"), ("👏", "clap"),
+                         ("🎉", "cheer"), ("👎", "boo")))
+        + "</div>"
+        "<script>(function(){var counts={};"
+        "function setTime(){var a=document.getElementById('a');"
+        "return (a&&!a.paused&&isFinite(a.currentTime))?Math.round(a.currentTime*1000):0}"
+        "document.querySelectorAll('#crowdbar button').forEach(function(b){"
+        "b.addEventListener('click',function(){var t=b.getAttribute('data-r');"
+        "counts[t]=(counts[t]||0)+1;"
+        "document.getElementById('cnt-'+t).textContent=counts[t];"
+        "b.style.transform='scale(1.25)';setTimeout(function(){b.style.transform=''},150);"
+        "fetch('/api/react',{method:'POST',headers:{'Content-Type':'application/json'},"
+        "body:JSON.stringify({slug:'" + slug + "',type:t,set_time_ms:setTime(),"
+        "laugh_id:(window.__laughId||''),"
+        "cond:(typeof CROWD_COND!=='undefined'?CROWD_COND:'live')})}).catch(function(){});"
+        "if((t==='haha'||t==='hahaha'||t==='laugh')&&window.__laughUrl){"
+        "try{new Audio(window.__laughUrl).play().catch(function(){});}catch(e){}}"
+        "if(t==='cheer'){var s=document.getElementById('stageImg');"
+        "if(s){s.classList.add('pf-pop');setTimeout(function(){s.classList.remove('pf-pop')},400)}}"
+        "});});"
+        "var st=document.getElementById('showtimeBtn');"
+        "if(st)st.addEventListener('click',function(){"
+        "var w=document.getElementById('walkout');"
+        "var go=function(){document.getElementById('entrance').style.display='none';"
+        "var b=document.getElementById('bed');"
+        "if(b){b.volume=0.25;b.play().catch(function(){});}"
+        "var p=document.getElementById('playBtn');if(p)p.click();};"
+        "if(w&&w.src){w.play().catch(function(){});"
+        "w.onended=go;setTimeout(go,9000);}else{go();}});"
+        "})();</script>")
+    n_crowd = sum(1 for b in beats if b["crowd"])
+    banner = (
+        "<div id='livebanner' style='background:#ff2fa8;color:#fff;font-size:12px;"
+        "letter-spacing:3px;padding:6px;text-align:center'>● LIVE — "
+        f"{n_crowd} big moments predicted · you're the audience</div>")
+    strip = (
+        "<div id='heatstrip' style='display:flex;gap:2px;justify-content:center;"
+        "max-width:560px;margin:6px auto;padding:0 16px' title='predicted laugh heat (heuristic v0)'>"
+        + "".join(
+            f"<div style='flex:1;height:6px;border-radius:3px;background:"
+            f"{'#ff2fa8' if b['crowd'] else ('#7a2f5c' if b['chuckle'] else '#282833')}'"
+            f" title='{round(b['p_laugh'] * 100)}%'></div>" for b in beats)
+        + "</div>"
+        + "<div style='font-size:10px;color:#555;text-align:center'>predicted heat · "
+        "heuristic v0 (real laugh model hooks in at /api/perform/heat)</div>")
+    bill = [s for s, _ in _perform_bundles()]
+    try:
+        nxt = bill[(bill.index(slug) + 1) % len(bill)] if bill else ""
+    except ValueError:
+        nxt = ""
+    acting_js = (
+        "<script>(function(){var acts=[],fired={},holdUntil=0;"
+        "fetch('/api/perform/" + slug + "/acting').then(function(r){return r.json()})"
+        ".then(function(j){if(j.ok)acts=j.events||[]}).catch(function(){});"
+        "function img(){return document.getElementById('stageImg')}"
+        "function vrm(){return document.getElementById('vrmStage')}"
+        "function stages(){var o=[],m=img(),v=vrm();if(m)o.push(m);if(v)o.push(v);return o}"
+        "function clearMove(){stages().forEach(function(m){"
+        "m.classList.remove('pf-lean','pf-pop','pf-shake','pf-look-l','pf-look-r')})}"
+        "function eachStage(fn){stages().forEach(fn)}"
+        "window.__vrmFace=function(face){"
+        "if(!stages().length)return;clearMove();"
+        "if(face==='deadpan'||face==='neutral'){return}"
+        "if(face==='happy'||face==='excited'||face==='delighted'){eachStage(function(m){m.classList.add('pf-pop')})}"
+        "else if(face==='angry'||face==='indignant'){eachStage(function(m){m.classList.add('pf-shake')})}"
+        "else{eachStage(function(m){m.classList.add('pf-lean')})}};"
+        "setInterval(function(){var a=document.getElementById('a');"
+        "if(!a||a.paused)return;var t=a.currentTime*1000;"
+        "acts.forEach(function(e,i){"
+        "if(fired[i]||t<e.t)return;fired[i]=1;"
+        "if(e.kind==='gesture'){clearMove();"
+        "eachStage(function(m){m.classList.add('pf-shake')});setTimeout(clearMove,450)}"
+        "else if(e.kind==='look'){clearMove();"
+        "if(e.value==='left')eachStage(function(m){m.classList.add('pf-look-l')});"
+        "else if(e.value==='right')eachStage(function(m){m.classList.add('pf-look-r')})}"
+        "else if(e.kind==='hold'){holdUntil=t+e.ms;eachStage(function(m){m.classList.add('pf-hold')});"
+        "var c=document.getElementById('caption');if(c)c.style.opacity='1'}"
+        "else if(e.kind==='camera'){eachStage(function(m){m.classList.add('pf-lean')});"
+        "setTimeout(function(){eachStage(function(m){m.classList.remove('pf-lean')})},900)}"
+        "});"
+        "if(holdUntil&&t>holdUntil){holdUntil=0;"
+        "eachStage(function(m){m.classList.remove('pf-hold')})}"
+        "},200);})();</script>")
+    finale_js = (
+        "<div id='finale' style='display:none;max-width:560px;margin:12px auto;padding:14px;"
+        "border:1px solid #ff2fa8;border-radius:12px;text-align:center'>"
+        "<div style='color:#ff2fa8;letter-spacing:2px;font-size:12px'>SET OVER</div>"
+        f"<div id='verdict' style='margin:8px 0'></div>"
+        f"{f'<p><a href=/perform/{nxt} style=color:#00d4ff>next act →</a></p>' if nxt and nxt != slug else ''}"
+        "<p><a href='/perform' style='color:#888;font-size:12px'>back to the bill</a></p></div>"
+        "<script>(function(){var a=document.getElementById('a');if(!a)return;"
+        "a.addEventListener('ended',function(){"
+        "var f=document.getElementById('finale');if(!f)return;f.style.display='block';"
+        "var n=(typeof myLaughs!=='undefined')?myLaughs:0;"
+        "try{n+=parseInt((document.getElementById('cnt-haha')||{textContent:0}).textContent)||0;"
+        "n+=3*(parseInt((document.getElementById('cnt-hahaha')||{textContent:0}).textContent)||0);}catch(e){}"
+        "document.getElementById('verdict').textContent="
+        "n>0?('You laughed '+n+'× — they earned another night.'):"
+        "('Stone face. The room decides.');"
+        "f.scrollIntoView();"
+        "fetch('/api/perform/" + slug + "/verdict').then(function(r){return r.json()})"
+        ".then(function(v){if(!v.ok)return;var d=document.createElement('div');"
+        "d.style.cssText='margin:10px 0;font-size:12px;color:#888';"
+        "if(v.killed){d.innerHTML='<div style=font-size:28px>💀 KILLED</div>'"
+        "+'<div>energy '+v.energy+' · '+Math.round(v.coverage*100)+'% of beats laughed · '+v.creators+' in the crowd</div>'"
+        "+'<div style=color:#ff2fa8>Ella: bury them. Encore.</div>';}"
+        "else{d.textContent='room verdict: energy '+v.energy+'/'+v.bars.energy"
+        "+' · coverage '+Math.round(v.coverage*100)+'%/'+Math.round(v.bars.coverage*100)+'%'"
+        "+' · crowd '+v.creators+'/'+v.bars.creators+' · boos '+v.boos+' (max '+v.bars.boos+')';}"
+        "f.appendChild(d);}).catch(function(){});"
+        "var mine=(window.__mySmiles||[]);"
+        "if(mine.length){fetch('/api/perform/" + slug + "/heat').then(function(r){return r.json()})"
+        ".then(function(j){if(!j.ok||!j.beats)return;var g=document.createElement('div');"
+        "g.style.cssText='margin:10px 0;font-size:11px;color:#888';"
+        "g.innerHTML='<div style=color:#ff2fa8;letter-spacing:2px>YOUR FACE vs PREDICTED HEAT</div>';"
+        "j.beats.forEach(function(b,i){var hit=mine.some(function(t){return t>=b.start-500&&t<b.end+2500});"
+        "var row=document.createElement('div');row.style.cssText='display:flex;gap:4px;align-items:center;margin:2px 0';"
+        "var bar=document.createElement('div');"
+        "bar.style.cssText='width:'+Math.round(b.p_laugh*100)+'%;height:8px;border-radius:4px;background:#7a2f5c';"
+        "var dot=document.createElement('span');dot.textContent=hit?'😄':'·';"
+        "dot.style.color=hit?'#ff2fa8':'#333';"
+        "row.appendChild(dot);row.appendChild(bar);g.appendChild(row);});"
+        "f.appendChild(g);}).catch(function(){});}"
+        "});})();</script>")
+    act_css = (
+        "<style>body{padding-bottom:92px}"
+        "#vrmStage{transition:transform .18s ease,filter .18s ease}"
+        "#stageImg{transition:transform .18s ease,filter .18s ease}"
+        ".pf-lean{transform:scale(1.12)}.pf-pop{transform:scale(1.06) rotate(-1.5deg)}"
+        ".pf-shake{animation:pfshake .3s ease}.pf-look-l{transform:translateX(-14px)}"
+        ".pf-look-r{transform:translateX(14px)}.pf-hold{filter:brightness(1.35) saturate(1.2);"
+        "outline:2px solid #ff2fa8;outline-offset:4px}"
+        "@keyframes pfshake{25%{transform:translateX(-6px) rotate(-2deg)}"
+        "75%{transform:translateX(6px) rotate(2deg)}}</style>")
+    from flask import request as _req
+    crowd_on = _req.args.get("crowd", "1") != "0"
+    mouth = _req.args.get("mouth", "v1")
+    if mouth not in ("v0", "v1"):
+        mouth = "v1"
+    bed_el = ("<audio id='bed' src='/api/perform/" + slug + "/crowd.wav' preload='auto'></audio>"
+              if crowd_on else "")
+    # Personal laugh: record once (local), hear it on every tap, share it
+    # with the room only if asked. Upload = room-audible (monitor mix).
+    laughblock = (
+        "<div style='margin:6px auto;max-width:520px;text-align:center'>"
+        "<button id='laughCalBtn' style='font-size:13px;padding:8px 16px;border-radius:18px;"
+        "background:#1a1a2e;border:1px solid #333;color:#eee'>😂 RECORD MY LAUGH (3s)</button> "
+        "<button id='laughPlayBtn' style='font-size:13px;padding:8px 16px;border-radius:18px;"
+        "background:#1a1a2e;border:1px solid #333;color:#555' disabled>▶</button>"
+        "<label style='font-size:11px;color:#888'><input type='checkbox' id='laughShare'> "
+        "share with room</label>"
+        "<div id='laughCalMsg' style='font-size:11px;color:#888;margin-top:4px'>"
+        "Your laugh, on your taps, amidst the crowd. Stored on this device unless shared.</div></div>"
+        "<script>(function(){"
+        "try{var s=localStorage.getItem('ft_laugh');"
+        "if(s){window.__laughUrl=s;document.getElementById('laughPlayBtn').disabled=false;}"
+        "var sid=localStorage.getItem('ft_laugh_id');"
+        "if(sid){window.__laughId=sid;document.getElementById('laughShare').checked=true;}}catch(e){}"
+        "document.getElementById('laughPlayBtn').addEventListener('click',function(){"
+        "if(window.__laughUrl)new Audio(window.__laughUrl).play().catch(function(){});});"
+        "document.getElementById('laughCalBtn').addEventListener('click',async function(){"
+        "var msg=document.getElementById('laughCalMsg'),btn=this;"
+        "try{btn.disabled=true;btn.textContent='LAUGH NOW…';"
+        "var st=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true}});"
+        "var rec=new MediaRecorder(st);var ch=[];"
+        "rec.ondataavailable=function(e){if(e.data.size)ch.push(e.data)};"
+        "rec.start();await new Promise(function(r){setTimeout(r,3000)});"
+        "rec.stop();await new Promise(function(r){rec.onstop=r});"
+        "st.getTracks().forEach(function(t){t.stop()});"
+        "var blob=new Blob(ch,{type:rec.mimeType||'audio/webm'});"
+        "if(blob.size<1024){msg.textContent='Too quiet — try again, closer.';return;}"
+        "var rd=new FileReader();"
+        "rd.onload=function(){var url=rd.result;"
+        "try{if(url.length<400000)localStorage.setItem('ft_laugh',url);}catch(e){}"
+        "window.__laughUrl=url;"
+        "document.getElementById('laughPlayBtn').disabled=false;"
+        "msg.textContent='Got it ('+Math.round(blob.size/1024)+'KB). Tap ▶ to hear you.';};"
+        "rd.readAsDataURL(blob);"
+        "}catch(e){msg.textContent='Mic unavailable or declined: '+String(e);}"
+        "finally{btn.disabled=false;btn.textContent='😂 RECORD MY LAUGH (3s)';}});"
+        "document.getElementById('laughShare').addEventListener('change',async function(){"
+        "var msg=document.getElementById('laughCalMsg');"
+        "if(!this.checked){window.__laughId='';"
+        "try{localStorage.removeItem('ft_laugh_id');}catch(e){}"
+        "msg.textContent='Unshared. The room hears the generic crowd.';return;}"
+        "if(!window.__laughUrl){msg.textContent='Record your laugh first.';this.checked=false;return;}"
+        "msg.textContent='Sharing with the room…';"
+        "try{var r=await fetch('/api/laughs',{method:'POST',"
+        "headers:{'Content-Type':'application/json'},"
+        "body:JSON.stringify({b64:window.__laughUrl})});var j=await r.json();"
+        "if(j.ok){window.__laughId=j.laugh_id;"
+        "try{localStorage.setItem('ft_laugh_id',j.laugh_id);}catch(e){}"
+        "msg.textContent='Shared — the standup hears YOU in the mix.';}"
+        "else{msg.textContent='Share failed: '+(j.error||r.status);this.checked=false;}}"
+        "catch(e){msg.textContent='Share failed.';this.checked=false;}});"
+        "})();</script>")
+    # Mic laugh detector: HEURISTIC (energy bursts, not a laugh model).
+    # Opt-in, booleans only — no audio ever leaves the device. Posts
+    # {type:'laugh', src:'mic'} so the room can tell mic laughs apart.
+    micblock = (
+        "<div style='margin:6px auto;max-width:520px;text-align:center'>"
+        "<button id='micBtn' style='font-size:13px;padding:8px 16px;border-radius:18px;"
+        "background:#1a1a2e;border:1px solid #333;color:#eee'>🎙 MIC LAUGHS (OPTIONAL)</button>"
+        "<div id='micMsg' style='font-size:11px;color:#888;margin-top:4px'>"
+        "Local laugh detection (approximate): only laugh moments leave this device.</div></div>"
+        "<script>(function(){var ctx=null,stream=null,an=null,timer=null,base=0.02,cool=0;"
+        "function setTime(){var a=document.getElementById('a');"
+        "return (a&&!a.paused&&isFinite(a.currentTime))?Math.round(a.currentTime*1000):0}"
+        "document.getElementById('micBtn').addEventListener('click',async function(){"
+        "var msg=document.getElementById('micMsg'),btn=this;"
+        "if(stream){clearInterval(timer);timer=null;"
+        "stream.getTracks().forEach(function(t){t.stop()});stream=null;"
+        "if(ctx){ctx.close();ctx=null;}"
+        "btn.textContent='🎙 MIC LAUGHS (OPTIONAL)';"
+        "msg.textContent='Mic off. Nothing was ever uploaded.';return;}"
+        "try{btn.disabled=true;"
+        "stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true}});"
+        "ctx=new (window.AudioContext||window.webkitAudioContext)();"
+        "var src=ctx.createMediaStreamSource(stream);an=ctx.createAnalyser();an.fftSize=1024;"
+        "src.connect(an);var buf=new Float32Array(an.fftSize),ring=[];"
+        "msg.textContent='Listening locally — laugh out loud.';"
+        "btn.textContent='MIC ON — TAP TO STOP';"
+        "timer=setInterval(function(){an.getFloatTimeDomainData(buf);"
+        "var s=0;for(var i=0;i<buf.length;i++)s+=buf[i]*buf[i];"
+        "var rms=Math.sqrt(s/buf.length);"
+        "base=base*0.98+rms*0.02;"
+        "ring.push(rms);if(ring.length>10)ring.shift();"
+        "var hot=0;for(var j=0;j<ring.length;j++)if(ring[j]>2.5*Math.max(base,0.008))hot++;"
+        "var now=Date.now();"
+        "if(hot>=4&&now>cool){cool=now+4000;"
+        "fetch('/api/react',{method:'POST',headers:{'Content-Type':'application/json'},"
+        "body:JSON.stringify({slug:'" + slug + "',type:'laugh',set_time_ms:setTime(),"
+        "src:'mic',cond:(typeof CROWD_COND!=='undefined'?CROWD_COND:'live')})}).catch(function(){});"
+        "msg.textContent='😄 heard that ('+new Date().toLocaleTimeString()+')';}"
+        "},100);"
+        "}catch(e){if(stream){stream.getTracks().forEach(function(t){t.stop()});stream=null;}"
+        "msg.textContent='Mic unavailable or declined: '+String(e);}"
+        "finally{btn.disabled=false;}});})();</script>")
+    smileblock = (
+        "<div style='margin:10px auto;max-width:520px;text-align:center'>"
+        "<button id='smileToggle' style='font-size:13px;padding:8px 16px;border-radius:18px;"
+        "background:#1a1a2e;border:1px solid #333;color:#eee'>📷 TRACK MY FACE (OPTIONAL)</button>"
+        "<div id='smileMsg' style='font-size:11px;color:#888;margin-top:4px'>"
+        "Local only: calibrates in your browser, only yes/no smile moments leave this device.</div>"
+        "<video id='smileVideo' muted autoplay playsinline "
+        "style='display:none;width:120px;border-radius:8px'></video>"
+        "<div style='margin-top:8px'><button id='appearBtn' style='font-size:13px;padding:8px 16px;"
+        "border-radius:18px;background:#2a0a1e;border:1px solid #ff2fa8;color:#ffb7dc'>"
+        "📡 APPEAR ON STAGE MONITOR</button>"
+        "<div id='appearMsg' style='font-size:11px;color:#888;margin-top:4px'>"
+        "Second opt-in: the comedian sees your live face. Stop anytime.</div></div></div>"
+        "<script>(function(){var pc=null,stream=null,me='a_'+Math.random().toString(36).slice(2,10),seq=0;"
+        "function sig(b){return fetch('/api/perform/" + slug + "/signal',{method:'POST',"
+        "headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(function(r){return r.json()});}"
+        "function beat(){return setInterval(function(){"
+        "fetch('/api/perform/" + slug + "/presence',{method:'POST',"
+        "headers:{'Content-Type':'application/json'},"
+        "body:JSON.stringify({frm:me,mode:(pc?'face':'pip')})}).catch(function(){});},8000);}"
+        "beat();"
+        "document.getElementById('appearBtn').addEventListener('click',async function(){"
+        "var msg=document.getElementById('appearMsg'),btn=this;"
+        "if(pc){try{if(pc._iv)clearInterval(pc._iv);}catch(e0){}try{pc.close();}catch(e){}pc=null;"
+        "if(stream){stream.getTracks().forEach(function(t){t.stop()});stream=null;}"
+        "sig({frm:me,kind:'bye'}).catch(function(){});"
+        "btn.textContent='📡 APPEAR ON STAGE MONITOR';"
+        "msg.textContent='Off the monitor. The room still has your taps.';return;}"
+        "try{btn.disabled=true;"
+        "stream=await navigator.mediaDevices.getUserMedia({video:{width:320,facingMode:'user'},audio:false});"
+        "pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});"
+        "stream.getTracks().forEach(function(t){pc.addTrack(t,stream)});"
+        "pc.onicecandidate=function(ev){if(ev.candidate)sig({frm:me,kind:'ice',payload:ev.candidate});};"
+        "var off=await pc.createOffer();await pc.setLocalDescription(off);"
+        "await sig({frm:me,kind:'offer',payload:pc.localDescription});"
+        "var got=false;"
+        "var iv=setInterval(async function(){"
+        "var j=await (await fetch('/api/perform/" + slug + "/signal?since='+seq)).json();"
+        "seq=j.seq||seq;"
+        "(j.msgs||[]).forEach(function(m){if(m.frm!==me)return;"
+        "if(m.kind==='answer'&&!got){got=true;pc.setRemoteDescription(m.payload).catch(function(){});}"
+        "else if(m.kind==='ice'&&pc){pc.addIceCandidate(m.payload).catch(function(){});}});"
+        "},1500);"
+        "pc._iv=iv;"
+        "btn.textContent='ON MONITOR — TAP TO HIDE';"
+        "msg.textContent='The comedian can see you now. Nothing is recorded.';"
+        "}catch(e){if(stream){stream.getTracks().forEach(function(t){t.stop()});stream=null;}"
+        "if(pc){try{pc.close();}catch(e2){}pc=null;}"
+        "msg.textContent='Camera unavailable or declined: '+String(e);}"
+        "finally{btn.disabled=false;}});})();</script>"
+        "<script src='/static/smile-referee.js'></script>"
+        "<script>(function(){var stream=null,ref=null,poll=null,wasHigh=false,cooldown=0;"
+        "window.__mySmiles=[];"
+        "function setTime(){var a=document.getElementById('a');"
+        "return (a&&!a.paused&&isFinite(a.currentTime))?Math.round(a.currentTime*1000):0}"
+        "function loadScript(u){return new Promise(function(res,rej){var s=document.createElement('script');"
+        "s.src=u;s.onload=res;s.onerror=rej;document.head.appendChild(s);});}"
+        "document.getElementById('smileToggle').addEventListener('click',async function(){"
+        "var msg=document.getElementById('smileMsg'),btn=this;"
+        "if(stream){clearInterval(poll);poll=null;"
+        "stream.getTracks().forEach(function(t){t.stop()});stream=null;"
+        "if(ref){ref.dispose();ref=null;}"
+        "document.getElementById('smileVideo').srcObject=null;wasHigh=false;"
+        "btn.textContent='📷 TRACK MY FACE (OPTIONAL)';"
+        "msg.textContent='Camera stopped. No frames were ever sent.';return;}"
+        "try{btn.disabled=true;"
+        "if(typeof tf==='undefined')await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest');"
+        "var v=document.getElementById('smileVideo');"
+        "stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false});"
+        "v.srcObject=stream;await v.play();v.style.display='inline-block';"
+        "msg.textContent='Calibrating: hold neutral, then smile when asked.';"
+        "ref=await SmileReferee.calibrate(v,{samples:30,ephemeral:true,"
+        "onStep:function(s){msg.textContent=s.smiling?'Smile now':'Hold a neutral face';}});"
+        "var cv=document.createElement('canvas'),ctx=cv.getContext('2d');"
+        "poll=setInterval(function(){if(!ref||!v.videoWidth)return;"
+        "cv.width=v.videoWidth;cv.height=v.videoHeight;ctx.drawImage(v,0,0);"
+        "var p=ref.predict(cv),high=p>0.82,now=Date.now();"
+        "if(high&&!wasHigh&&now>cooldown){cooldown=now+3000;"
+        "var t=setTime();window.__mySmiles.push(t);"
+        "fetch('/api/react',{method:'POST',headers:{'Content-Type':'application/json'},"
+        "body:JSON.stringify({slug:'" + slug + "',type:'smile',set_time_ms:t,"
+        "cond:(typeof CROWD_COND!=='undefined'?CROWD_COND:'live')})}).catch(function(){});}"
+        "wasHigh=high;"
+        "msg.textContent='Camera on · local only · '+(high?'smiling':'neutral');"
+        "},350);"
+        "btn.textContent='STOP TRACKING';"
+        "}catch(e){if(stream){stream.getTracks().forEach(function(t){t.stop()});stream=null;}"
+        "msg.textContent='Camera unavailable or declined: '+String(e);}"
+        "finally{btn.disabled=false;}});})();</script>")
+    if mouth == "v0":
+        page = page.replace("const MOUTH = 'v1'", "const MOUTH = 'v0'")
+    cond_js = ("var CROWD_COND='" + ("bed" if crowd_on else "nobed") + "+mouth" + mouth + "';")
+    if "<body>" in page:
+        page = page.replace("<body>", "<body>" + banner + strip + act_css + entrance + crowdbar + bed_el
+                            + smileblock + micblock + "<script>" + cond_js + "</script>", 1)
+    head, sep, tail = page.rpartition("</body>")
+    if sep:
+        page = head + acting_js + finale_js + sep + tail
+    else:
+        page = page + acting_js + finale_js
+    return page, 200, headers
 
 
 @app.route("/api/card/<slug>.png")
@@ -1550,7 +3461,7 @@ def og_card(slug):
         img = Image.new("RGB", (1200, 630), (10, 10, 15))
         d = ImageDraw.Draw(img)
         d.rectangle([0, 0, 1200, 630], outline=(255, 47, 168), width=6)
-        d.text((60, 40), "FREAK TOWN", fill=(255, 47, 168))
+        d.text((60, 40), "FUNNIER", fill=(255, 47, 168))
         d.text((60, 120), (char.get("name") or slug)[:28].upper(), fill=(255, 255, 255))
         d.text((60, 220), (char.get("premise") or "")[:90], fill=(150, 150, 160))
         d.text((60, 340), f"{meta.get('duration_s', 0)} seconds · watch it, then answer back",
@@ -1680,7 +3591,7 @@ def _render_watch(slug):
     # must never disagree about when a line lands.)
     beats = []
     try:
-        from backend.services.freaktown.bundle import (
+        from backend.services.funnier.bundle import (
             estimate_spans, spans_from_offsets,
         )
         delivery = json.loads((bdir / "delivery.json").read_text())
@@ -1739,6 +3650,7 @@ def _render_watch(slug):
         "__CHAR_SLUG__": char_slug, "__SET_LABEL__": set_label,
         "__NREPLIES__": str(nreplies),
         "__IMG__": img, "__DUR__": str(dur),
+        "__MOUTH__": "v1",
         "__BEATS__": json.dumps(beats),
         "__BODY__": body_url, "__BODY_FORMAT__": body_fmt,
         "__ARBTN__": arbtn,
@@ -1789,16 +3701,16 @@ def _render_watch(slug):
 WATCH_TEMPLATE = """<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>__NAME__ — Freak Town</title>
+<title>__NAME__ — FUNNIER</title>
 <link rel="canonical" href="__CANON__">
-<meta property="og:title" content="__NAME__ — Freak Town">
+<meta property="og:title" content="__NAME__ — FUNNIER">
 <meta property="og:description" content="__PREMISE__ (__DUR__s set). Watch it, then answer back.">
 <meta property="og:image" content="__CARD__">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="__NAME__ trading card">
 <meta property="og:url" content="__CANON__">
-<meta property="og:site_name" content="Freak Town">
+<meta property="og:site_name" content="FUNNIER">
 <meta property="og:type" content="video.other">
 <meta property="video:duration" content="__DUR__">
 <meta name="theme-color" content="#ff2fa8">
@@ -1866,7 +3778,7 @@ a.cta{color:#fff}
 .ghost{background:none}
 </style>
 </head><body>
-<div class="top"><span class="logo">FREAK TOWN</span><button class="share" onclick="passItOn()">↗ share</button></div>
+<div class="top"><span class="logo">FUNNIER</span><button class="share" onclick="passItOn()">↗ share</button></div>
 __REPLYBANNER__
 <div id="stage">
   <canvas id="vrmStage"></canvas>
@@ -2124,7 +4036,7 @@ async function sendResponse() {
   const custom = document.getElementById('replyText').value.trim();
   const line = document.getElementById('genline');
   line.style.display = 'block';
-  line.textContent = 'Your response is entering Freak Town…';
+  line.textContent = 'Your response is entering FUNNIER…';
   funnel('respond_started', {mode: ideaMode, edited: !!custom});
   try {
     const res = await fetch('/api/respond', {
@@ -2254,7 +4166,8 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin } from '@pixiv/three-vrm';
 let vrm = null, analyser = null, freqData = null, audioCtx = null;
-let pAA = 0, pIH = 0, pOH = 0, nextBlink = 0;
+let pAA = 0, pIH = 0, pOH = 0, pOU = 0, pEE = 0, nextBlink = 0;
+const MOUTH = '__MOUTH__';  // v0: 3-shape envelope (legacy). v1: 5-shape + rounded/high vowels.
 const clock = new THREE.Clock();
 const FACE = {grin: ['happy', 0.55], deadpan: ['relaxed', 0.7], annoyed: ['angry', 0.6],
               confused: ['surprised', 0.35], surprised: ['surprised', 0.8], neutral: [null, 0]};
@@ -2364,10 +4277,18 @@ try {
       pAA = sm(pAA, Math.min(1, band(0, 10) / 200), 0.5);
       pIH = sm(pIH, Math.min(1, band(40, 80) / 180) * 0.7, 0.5);
       pOH = sm(pOH, Math.min(1, band(10, 40) / 220) * 0.7, 0.5);
+      if (MOUTH === 'v1') {
+        pOU = sm(pOU, Math.min(1, band(5, 18) / 210) * 0.8, 0.5);
+        pEE = sm(pEE, Math.min(1, band(55, 100) / 170) * 0.65, 0.5);
+      }
       try {
         vrm.expressionManager.setValue('aa', pAA);
         vrm.expressionManager.setValue('ih', pIH);
         vrm.expressionManager.setValue('oh', pOH);
+        if (MOUTH === 'v1') {
+          vrm.expressionManager.setValue('ou', pOU);
+          vrm.expressionManager.setValue('ee', pEE);
+        }
       } catch (e) {}
     } else if (vrm?.expressionManager) {
       pAA = sm(pAA, 0, 0.3); pIH = sm(pIH, 0, 0.3); pOH = sm(pOH, 0, 0.3);
@@ -2375,6 +4296,11 @@ try {
         vrm.expressionManager.setValue('aa', pAA);
         vrm.expressionManager.setValue('ih', pIH);
         vrm.expressionManager.setValue('oh', pOH);
+        if (MOUTH === 'v1') {
+          pOU = sm(pOU, 0, 0.3); pEE = sm(pEE, 0, 0.3);
+          vrm.expressionManager.setValue('ou', pOU);
+          vrm.expressionManager.setValue('ee', pEE);
+        }
       } catch (e) {}
     }
     if (vrm?.humanoid) {
@@ -2415,7 +4341,7 @@ try {
 AR_TEMPLATE = """<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>__NAME__ in your room — Freak Town</title>
+<title>__NAME__ in your room — FUNNIER</title>
 <meta name="theme-color" content="#ff2fa8">
 <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
 <script src="https://cdn.jsdelivr.net/npm/@8thwall/xrextras@1/dist/xrextras.js" crossorigin="anonymous"></script>
@@ -2694,7 +4620,7 @@ def go_badger():
 RECORD_TEMPLATE = """<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Record as __NAME__ — Freak Town</title>
+<title>Record as __NAME__ — FUNNIER</title>
 <meta name="theme-color" content="#ff2fa8">
 <script type="importmap">
 {"imports": {
@@ -3170,7 +5096,7 @@ def revoice_page(slug, fname):
                     for b in _bank_voices())
     return f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Revoice — Freak Town</title>
+<title>Revoice — FUNNIER</title>
 <style>*{{margin:0;padding:0;box-sizing:border-box}}
 body{{background:#0a0a0f;color:#eee;font-family:monospace;padding:16px 12px 60px}}
 h1{{text-align:center;font-size:15px;color:#ff2fa8}}
@@ -3377,7 +5303,7 @@ def api_agent_manifest():
 @app.route("/llms.txt", methods=["GET"])
 def llms_txt():
     """Compact machine index. Agents: start here, then /api/agent."""
-    txt = """# Freak Town (trial) — for agents
+    txt = """# FUNNIER (trial) — for agents
 Trial comedy-club API. No key. Observe, act, assess.
 - Manifest: /api/agent
 - Watch: /f/<slug>  AR: /a/<slug>  Record: /r/<slug>  Takes: /takes
@@ -3406,15 +5332,54 @@ def react_to_set():
     data = request.json or {}
     slug = re.sub(r"[^a-z0-9_-]", "", str(data.get("slug", "")))[:45]
     rtype = str(data.get("type", ""))
-    if not slug or rtype not in ("laugh", "clap", "crickets", "groan"):
+    if not slug or rtype not in ("laugh", "haha", "hahaha", "clap", "cheer",
+                                 "boo", "smile", "crickets", "groan"):
         return jsonify({"ok": False, "error": "bad reaction"}), 400
     try:
+        cond = re.sub(r"[^a-z0-9_-]", "", str(data.get("cond", "")))[:16]
+        src = re.sub(r"[^a-z]", "", str(data.get("src", "")))[:8]
+        creator = re.sub(r"[^a-zA-Z0-9_]", "", str(data.get("creator", "")))[:24]
+        laugh_id = re.sub(r"[^a-z0-9]", "", str(data.get("laugh_id", "")))[:32]
         with open(Path(__file__).parent / "reactions.jsonl", "a") as f:
             f.write(json.dumps({"t": _time.time(), "slug": slug, "reaction": rtype,
-                                "set_time_ms": int(data.get("set_time_ms", 0))}) + "\n")
+                                "set_time_ms": int(data.get("set_time_ms", 0)),
+                                "cond": cond, "src": src,
+                                "creator": creator, "laugh_id": laugh_id}) + "\n")
     except Exception:
         pass
     return jsonify({"ok": True})
+
+
+@app.route("/api/react/feed")
+def react_feed():
+    """Live room feed for the stage monitor: recent boolean reactions.
+    No identities (audience are anonymous taps); nick only if volunteered."""
+    slug = re.sub(r"[^a-z0-9_-]", "", request.args.get("slug", ""))[:45]
+    try:
+        since = int(request.args.get("since", 0))
+    except Exception:
+        since = 0
+    try:
+        lines = (Path(__file__).parent / "reactions.jsonl").read_text().splitlines()
+    except Exception:
+        lines = []
+    out = []
+    start = max(0, len(lines) - 200)
+    for i, ln in enumerate(lines[start:], start=start):
+        try:
+            e = json.loads(ln)
+        except Exception:
+            continue
+        if slug and e.get("slug") != slug:
+            continue
+        if i < since:
+            continue
+        out.append({"seq": i, "reaction": e.get("reaction"),
+                    "set_time_ms": e.get("set_time_ms", 0),
+                    "cond": e.get("cond", ""),
+                    "src": e.get("src", ""),
+                    "laugh_id": e.get("laugh_id", "")})
+    return jsonify({"ok": True, "seq": len(lines) - 1, "events": out[-30:]})
 
 
 @app.route("/api/vote", methods=["POST"])
@@ -3521,7 +5486,7 @@ def list_submissions():
 
 # ── Generate (CF free-tier writer) ────────────────────────────────────
 
-GEN_SYSTEM = """You are a comedy writer for Freak Town, a live AI comedy club.
+GEN_SYSTEM = """You are a comedy writer for FUNNIER, a live AI comedy club.
 Write a 60-second standup minute. Rules:
 - 80-150 words. First line IS the joke (no warmup, no "So...").
 - Escalating absurdity. Specific details (numbers, names). Killer closer under 10 words.
@@ -4459,17 +6424,84 @@ def apply_template():
     return jsonify({"ok": True, "template": name, "beats": beats})
 
 
-# ── Funnier skin + public-bill privacy (keep last: wraps every route above) ──
-import funnier_skin  # noqa: E402
+# ── Killella interview page (skinned via /party/*) ──────────────────
+_KILLELLA_HTML = """<!DOCTYPE html><html><head><meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>Killella interviews Reptilian Ralph — FUNNIER</title>
+<style>
+body{background:#0a0a0f;color:#f3f1ec;font-family:'Inter Tight',system-ui,sans-serif;
+     max-width:640px;margin:0 auto;padding:56px 20px 80px;line-height:1.6}
+h1{font-family:Anton,Impact,sans-serif;font-size:32px;letter-spacing:.5px;
+   text-transform:uppercase;margin:0 0 6px}
+.kicker{color:#e8102e;font-size:12px;letter-spacing:.18em;text-transform:uppercase;margin-bottom:18px}
+.meta{color:#8a8a96;font-size:13px;margin-bottom:26px}
+audio{width:100%;margin:14px 0 30px}
+.t{margin:0 0 18px;padding:14px 16px;border-radius:10px;background:#14141b;border:1px solid #23232d}
+.t.k{border-left:3px solid #e8102e}
+.t.r{border-left:3px solid #f5c76b}
+.who{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#8a8a96;margin-bottom:5px}
+.t.k .who{color:#e8102e}.t.r .who{color:#f5c76b}
+.credit{color:#5c5c66;font-size:12px;margin-top:34px;border-top:1px solid #23232d;padding-top:16px}
+</style></head><body>
+<div class="kicker">Tonight at the Cauldron — Live Interview</div>
+<h1>Killella vs. Reptilian Ralph</h1>
+<div class="meta">The full post-set interview from a live Cauldron show.
+Killella asks on <b>Qwen Omni</b>; Ralph answers in character. Crowd: 9 agent
+laughs across 11 beats. Judge: premise 8, escalation 9, closer 7.</div>
+<audio controls src="https://party.funnier.si/audio/killella-ralph-interview.mp3"></audio>
+<div class="t k"><div class="who">Killella</div>You claim the itch reveals lies. Did you feel it when saying "HR won't let me"? Or did your eyes stay dry?</div>
+<div class="t r"><div class="who">Reptilian Ralph</div>My scales are itching so badly under this polyester blend I can barely stand it, which is obviously unrelated to the fact that my vertical pupils just dilated.</div>
+<div class="t k"><div class="who">Killella</div>"Spanx for your soul." Is that metaphorical comfort, or do you genuinely believe containment defines existence?</div>
+<div class="t r"><div class="who">Reptilian Ralph</div>The compression is literal, Killella. Without the synthetic membrane holding my scales tight against this itchy dermis, I would simply unravel into a puddle of cold-blooded regret.</div>
+<div class="t k"><div class="who">Killella</div>"Spanx for your soul" is funny, but vague. Show me the specific physical toll of maintaining that human suit during a board meeting.</div>
+<div class="t r"><div class="who">Reptilian Ralph</div>The synthetic dermis chafes my scales into a raw, bleeding misery every time I shift in that ergonomic chair, and the fluorescent lights dry out my mucous membranes until I'm praying for the underground base.</div>
+<div class="t k"><div class="who">Killella</div>Verdict on the set: premise eight, escalation nine, closer seven. The itch is canon. You may keep the suit.</div>
+<div class="credit">Voices: Fish s2.1-pro-free. Interview live on qwen3.8-omni-flash.
+Show runtime: <code>/api/show</code> on party.funnier.si.</div>
+</body></html>"""
+
+
+@app.route("/party/killella")
+def killella_page():
+    return _KILLELLA_HTML
+
+
+# ── Sealed sets from characters3 (rendered minutes) ──────────────────
+# Served CORS-open: funnier's cinema screen plays these as media:'audio'
+# clips, and the live stage may fetch timeline.json cross-origin.
+_CHARS3 = Path("/root/characters3/characters")
+_SEALED_OK = {"set.mp3", "set.wav", "timeline.json", "mouth_cues.json",
+              "set_plan.json"}
+
+
+@app.route("/sealed/<slug>/<path:fname>")
+def sealed_set(slug, fname):
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)[:64]
+    if fname not in _SEALED_OK:
+        return jsonify({"ok": False, "error": "no such file"}), 404
+    p = _CHARS3 / slug / "sealed" / fname
+    if not p.is_file():
+        return jsonify({"ok": False, "error": "no sealed set for this act"}), 404
+    resp = send_file(p)
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
+# ── Funnier skin (response layer — must stay after every route) ──
+import funnier_skin
 funnier_skin.init(app)
 
 
 # ── Main ────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    print(f"\n  FREAK TOWN — Live Script Editor v2")
+    print(f"\n  FUNNIER — Live Script Editor v2")
     print(f"  TTS: edge-tts | Compositor: exact silence")
     print(f"  http://localhost:{os.getenv('PORT', '8090')}\n")
     port = int(os.getenv("PORT", "8090"))
     debug = os.getenv("FLASK_DEBUG", "0") == "1"
+    # Proactive table talk: heartbeat thread (never in tests — they import
+    # app, this file as __main__ is the service only). Reads .env itself.
+    import party_chatter
+    party_chatter.start_service()
     app.run(host="0.0.0.0", port=port, debug=debug)
