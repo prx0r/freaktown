@@ -20,7 +20,7 @@ Design rules (killella + party lessons):
   - Fire-and-forget from a daemon thread: never inside the SSE poll, never
     inside game input handling. The room's clock never waits on a model.
 
-Enable: PARTY_CHATTER=1 (in freaktown/.env — the loader below reads it,
+Enable: PARTY_CHATTER=1 (in funnier/.env — the loader below reads it,
 same rule as interpret_joke: repo .env overrides the shell).
 """
 from __future__ import annotations
@@ -177,7 +177,7 @@ _thread: threading.Thread | None = None
 
 
 def _log(msg: str) -> None:
-    print(f"[chatter] {msg}", flush=True)  # journalctl -u freaktown
+    print(f"[chatter] {msg}", flush=True)  # journalctl -u funnier
 
 
 def _loop() -> None:

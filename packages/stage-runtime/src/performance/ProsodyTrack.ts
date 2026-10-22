@@ -4,7 +4,7 @@
  * Mirrors MouthTrack: same clock, same binary-search sampling, opposite
  * channel. MouthTrack drives the mouth from phonemes; this drives brows
  * (accent), eyes (arousal) and blinks (phrase end) from aus.json
- * (backend/services/freaktown/au_track.py). Beats still decide emotion;
+ * (backend/services/funnier/au_track.py). Beats still decide emotion;
  * prosody only lifts where they're quiet.
  */
 

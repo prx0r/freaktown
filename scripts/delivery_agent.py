@@ -18,7 +18,7 @@ Wiring (all $0 lanes):
   ears    → livekit.agents.inference.VAD("silero")  (local)
   persona → character.json (name/deal/facts) as instructions
 
-Server: self-hosted livekit-server (systemd `livekit`), keys in freaktown
+Server: self-hosted livekit-server (systemd `livekit`), keys in funnier
 .env (600, never git). Auto-dispatch: any room created gets this worker.
 
 Run:  /usr/bin/python3 scripts/delivery_agent.py [--character SLUG] [--room NAME]

@@ -1540,7 +1540,7 @@ def watch_character_set_canonical(char, set):
 # ── /perform: live stage (watch a freak perform) ──────────────────────
 # Same player core as /f/<slug> (set.wav + beat captions + avatar + laugh
 # buttons), wrapped in a live-night frame: bill, headliner, predicted-heat
-# strip, finale verdict. Laugh-sim is HEURISTIC_V0 (type/position prior +
+# strip, finale verdict. Laugh-sim is HEURISTIC_V0 (type/position baseline +
 # characters' published 0.55/0.35 thresholds) until the real laugh model is
 # vendored — the /api/perform/<slug>/heat contract is the swap-in point.
 
@@ -1595,7 +1595,7 @@ def _perform_model_p(slug: str) -> tuple:
 def _perform_beats(slug: str) -> list:
     """Beat timeline + laugh probability. Mirrors the span logic
     in _render_watch (measured offsets, else shared estimator)."""
-    from backend.services.freaktown.bundle import (
+    from backend.services.funnier.bundle import (
         estimate_spans, spans_from_offsets,
     )
     bdir = FREAK_DIR / slug
@@ -1658,10 +1658,10 @@ def perform_bill():
             f"<div style='color:#666;font-size:11px'>{m.get('duration_s', 0)}s</div></a>")
     return f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TONIGHT — Freak Town Live</title>
+<title>TONIGHT — FUNNIER Live</title>
 <style>body{{background:#0a0a0f;color:#eee;font-family:monospace;text-align:center;padding:32px 16px}}
 a{{color:#ff2fa8}}</style></head><body>
-<div style="font-size:12px;letter-spacing:2px;color:#ff2fa8;">🎪 FREAK TOWN · LIVE</div>
+<div style="font-size:12px;letter-spacing:2px;color:#ff2fa8;">🎪 FUNNIER · LIVE</div>
 <h1>TONIGHT'S BILL</h1>
 <p style="color:#888;">Headliner: <a href="/perform/{head_slug}">{_html.escape(head_char)}</a></p>
 <div>{''.join(cards)}</div>
@@ -1763,7 +1763,7 @@ def cauldron_concepts_json():
 
 @app.route("/api/perform/<slug>/heat")
 def perform_heat(slug):
-    """Per-beat laugh prediction contract. v0 = heuristic prior; a vendored
+    """Per-beat laugh prediction contract. v0 = heuristic baseline; a vendored
     laugh model answers this same shape later. Never a laughter label —
     predictions only, observed laughs come from /api/react."""
     slug = re.sub(r"[^a-z0-9_-]", "", slug)[:45]
@@ -1794,7 +1794,7 @@ def perform_acting(slug):
     except Exception:
         return jsonify({"ok": False, "error": "no such set"}), 404
     try:
-        from backend.services.freaktown.bundle import (
+        from backend.services.funnier.bundle import (
             estimate_spans, spans_from_offsets,
         )
         try:
@@ -6427,7 +6427,7 @@ def apply_template():
 # ── Killella interview page (skinned via /party/*) ──────────────────
 _KILLELLA_HTML = """<!DOCTYPE html><html><head><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1">
-<title>Killella interviews Reptilian Ralph — Freak Town</title>
+<title>Killella interviews Reptilian Ralph — FUNNIER</title>
 <style>
 body{background:#0a0a0f;color:#f3f1ec;font-family:'Inter Tight',system-ui,sans-serif;
      max-width:640px;margin:0 auto;padding:56px 20px 80px;line-height:1.6}

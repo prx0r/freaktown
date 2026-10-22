@@ -154,7 +154,7 @@ $1.26 + mesh $2.80 ≈ **$4.24 max**. Credits are Platform-only
 402 = out of credits. Polling + uploads are free.
 
 COMPATIBILITY (verified in code, not claimed):
-- Marble GLB (club, static) + Mutuals/Freaktown VRM (performers) compose
+- Marble GLB (club, static) + Mutuals/FUNNIER VRM (performers) compose
   in ONE three.js scene. VRM 1.0 is glTF under the hood; our importmap
   already loads it (@pixiv/three-vrm 3.3.0).
 - Mutuals avatars are `.vrm` models + `.vrma` clips baked onto the

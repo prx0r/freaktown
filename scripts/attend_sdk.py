@@ -2,7 +2,7 @@
 """Attend SDK: agents go to shows. Import it, don't shell out to scripts.
 
     from scripts.attend_sdk import attend
-    report = attend("cathy-prior-f3ac25", persona="skeptic", cond="sdk-demo")
+    report = attend("biscuit-4cb995", persona="skeptic", cond="sdk-demo")
 
 One call: pulls heat, judges every beat with mimo (mechanism x confidence),
 laughs through the delay harness (human-timed, contagion-aware), posts via
@@ -32,18 +32,18 @@ def attend(slug, persona="normal", cond="sdk", base="http://127.0.0.1:8090",
     if not heat.get("ok"):
         return {"ok": False, "error": "no heat"}
     beats = heat["beats"][:max_beats] if max_beats else heat["beats"]
-    prior, room, laughs = [], [], {"haha": 0, "hahaha": 0}
+    earlier, room, laughs = [], [], {"haha": 0, "hahaha": 0}
     agreed, judged = 0, 0
     t0 = time.time()
     for i, b in enumerate(beats):
         try:
-            ev = interpret_joke(b["text"], prior_context="\n".join(prior[-3:]),
+            ev = interpret_joke(b["text"], earlier_context="\n".join(earlier[-3:]),
                                 beat_id=f"{slug}#{i}",
-                                session="freaktown-attend-sdk")
+                                session="funnier-attend-sdk")
         except Exception as e:
-            prior.append("")
+            earlier.append("")
             continue
-        prior.append(f"{ev.get('setup', '')} -> {ev.get('reveal', '')}")
+        earlier.append(f"{ev.get('setup', '')} -> {ev.get('reveal', '')}")
         conf = float(ev.get("confidence_in_interpretation", 0))
         hp = float(b.get("p_laugh", 0))
         now = b["end"] if fast else int((time.time() - t0) * 1000)
@@ -73,5 +73,5 @@ def attend(slug, persona="normal", cond="sdk", base="http://127.0.0.1:8090",
 
 if __name__ == "__main__":
     import json
-    slug = sys.argv[1] if len(sys.argv) > 1 else "cathy-prior-f3ac25"
+    slug = sys.argv[1] if len(sys.argv) > 1 else "biscuit-4cb995"
     print(json.dumps(attend(slug, cond="sdk-demo"), indent=1))

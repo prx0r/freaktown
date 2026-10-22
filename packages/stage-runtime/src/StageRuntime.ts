@@ -482,10 +482,7 @@ export class StageRuntime {
     // AU prosody (aus.json): brows/eyes lift under beats; phrase blinks
     // OR with the Performer's own blink timer (speech-synced wins ties).
     const pro = playing && this.prosodyTrack ? this.prosodyTrack.sample(t) : null;
-    this.blinks = this.performer.blinkCount; // frame-rate independent (sketch PR)
-    // Composed face pipeline: live FaceChannel (sampled frame) + AU prosody
-    // brow/eye lift from aus.json — setExpression takes prosody as its 2nd
-    // arg (avatar contract), applied after Channel so the lift wins ties.
+    this.blinks = this.performer.blinkCount;
     this.blink = Math.max(frame.blink, pro?.blink ?? 0);
     const face = this.face.sample(wallMs, { open: this.mouthOpen, visemes: vis, emotions: frame.emotions, blink: this.blink });
     this.emotions = face.emotions;

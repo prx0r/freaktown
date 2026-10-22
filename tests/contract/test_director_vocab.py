@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Director vocab: tag synonyms, budgets, beat resolution."""
 
-from backend.services.freaktown.director_vocab import (
+from backend.services.funnier.director_vocab import (
     Budget,
     beat_emotion,
     emotion_for_tag,

@@ -1,10 +1,10 @@
-"""Mutuals Character Harness -> Freaktown performance/party acting vocabulary.
+"""Mutuals Character Harness -> FUNNIER performance/party acting vocabulary.
 
 Source inspiration: https://github.com/mutuals-inc/character-harness
-Apache-2.0. This is a Freaktown-specific interoperable adapter, not the
+Apache-2.0. This is a FUNNIER-specific interoperable adapter, not the
 upstream live voice/runtime/player. No paid APIs, network, or side effects.
 
-Preserve the Freaktown audio clock and immutable delivery.v1. A harness
+Preserve the FUNNIER audio clock and immutable delivery.v1. A harness
 "beat" has an EXACT textual ``span``, ``emotion``, ``register``, ``gesture``
 and ``camera``. We resolve beats against measured word offsets; never
 estimate timings for an acted punchline or invent motions a body can't do.
@@ -50,10 +50,10 @@ def _motion(at_ms: int, action: str, layer: str, *, duration_ms: int = 900) -> d
 
 def compile_harness_beats(text: str, beats: list[dict], words: list[dict],
                           capabilities: dict | None = None) -> dict:
-    """Compile approved Mutuals-style beats into existing Freaktown cues.
+    """Compile approved Mutuals-style beats into existing FUNNIER cues.
 
     Timing source is caller-supplied word offsets. The caller MUST distinguish
-    forced/TTS alignment from estimates (Freaktown's words_from_beats estimates
+    forced/TTS alignment from estimates (FUNNIER's words_from_beats estimates
     offsets proportionally). When text and words disagree we fail closed.
     """
     if not isinstance(text, str) or not text.strip():

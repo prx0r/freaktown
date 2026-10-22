@@ -1,7 +1,7 @@
 /**
  * Gaze — who each character looks at, moment to moment.
  *
- * Priority (highest first), the same order the stage applies:
+ * Precedence (highest first), the same order the stage applies:
  *   1. scripted look      look / double-take / eye-roll / laugh-break (gaze.look events)
  *   2. life touches       idle glances (listeners, seeded per sketch), camera glance on the turn
  *   3. default            listeners watch the current speaker, else the last speaker;

@@ -5,12 +5,12 @@ Port of characters' audition/semantic_interpreter.py (which uses OpenRouter
 + Qwen): same SYSTEM_PROMPT, same MECHANISMS, same joke_event.json shape —
 different wire (Go endpoint, session header, own UA). No OpenRouter, no Qwen.
 
-Key/model come from freaktown/.env (OPENCODE_GO_API_KEY, OPENCODE_GO_MODEL).
+Key/model come from funnier/.env (OPENCODE_GO_API_KEY, OPENCODE_GO_MODEL).
 Each call is a few hundred tokens on the owner's Go subscription.
 
 Usage:
   /usr/bin/python3 scripts/interpret_joke.py --test
-  /usr/bin/python3 scripts/interpret_joke.py "transcript..." [--character character.json] [--prior "earlier beats"]
+  /usr/bin/python3 scripts/interpret_joke.py "transcript..." [--character character.json] [--earlier "earlier beats"]
 """
 import argparse
 import json
@@ -56,7 +56,7 @@ understand what a joke MEANS — not to predict whether anyone laughs.
 You receive:
 1. The transcript of what was said
 2. Character graph context (who is speaking, their identity, contradictions)
-3. Prior context (earlier setup, callbacks)
+3. Earlier context (earlier setup, callbacks)
 
 You output a JSON object describing the joke's structure:
 - mechanism: which comedic mechanisms are at work
@@ -87,8 +87,8 @@ displacement, not_a_joke.
 Reply with ONLY the JSON object, no other text."""
 
 
-def interpret_joke(transcript, character_graph=None, prior_context="",
-                   beat_id="", session="freaktown-interpret"):
+def interpret_joke(transcript, character_graph=None, earlier_context="",
+                   beat_id="", session="funnier-interpret"):
     if not GO_KEY:
         raise RuntimeError("OPENCODE_GO_API_KEY not found")
     if isinstance(character_graph, dict):
@@ -106,7 +106,7 @@ def interpret_joke(transcript, character_graph=None, prior_context="",
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": (
                 f"Transcript:\n{transcript}\n\nCharacter context:\n{char_ctx}\n\n"
-                f"Prior context (earlier beats, callbacks):\n{prior_context or '(none)'}\n\n"
+                f"Earlier context (earlier beats, callbacks):\n{earlier_context or '(none)'}\n\n"
                 "Interpret this joke. Output JSON matching the schema.")},
         ],
         # NOTE: no temperature — the Go route errors on it for mimo-v2.5.
@@ -118,7 +118,7 @@ def interpret_joke(transcript, character_graph=None, prior_context="",
              "-H", f"Authorization: Bearer {GO_KEY}",
              "-H", "Content-Type: application/json",
              "-H", f"x-opencode-session: {session}",
-             "-A", "freaktown-party/1.0",
+             "-A", "funnier-party/1.0",
              "-d", body],
             capture_output=True, text=True, timeout=70)
     except Exception as e:
@@ -141,7 +141,7 @@ def interpret_joke(transcript, character_graph=None, prior_context="",
              "-H", f"Authorization: Bearer {GO_KEY}",
              "-H", "Content-Type: application/json",
              "-H", f"x-opencode-session: {session}",
-             "-A", "freaktown-party/1.0",
+             "-A", "funnier-party/1.0",
              "-d", body],
             capture_output=True, text=True, timeout=70)
         resp = json.loads(proc.stdout or "{}")
@@ -212,7 +212,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("transcript", nargs="?", default="")
     ap.add_argument("--character", default="")
-    ap.add_argument("--prior", default="")
+    ap.add_argument("--earlier", default="")
     ap.add_argument("--test", action="store_true")
     args = ap.parse_args()
     if args.test:
@@ -220,4 +220,4 @@ if __name__ == "__main__":
     char = None
     if args.character:
         char = json.loads(Path(args.character).read_text())
-    print(json.dumps(interpret_joke(args.transcript, char, args.prior), indent=1))
+    print(json.dumps(interpret_joke(args.transcript, char, args.earlier), indent=1))

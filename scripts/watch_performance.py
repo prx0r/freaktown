@@ -53,7 +53,7 @@ def cycle(pg, key, outdir, i):
         method="POST", headers={"Authorization": f"Bearer {key}",
                                  "Content-Type": "application/json",
                                  "HTTP-Referer": "https://funnier.si/",
-                                 "X-Title": "freaktown-watch"})
+                                 "X-Title": "funnier-watch"})
     with urllib.request.urlopen(req, timeout=180) as r:
         d = json.loads(r.read().decode())
     ev = {"t": datetime.datetime.now(datetime.timezone.utc).isoformat(),

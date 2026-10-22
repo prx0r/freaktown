@@ -17,7 +17,7 @@ LiveKit is the proper SFU under it.
   (18.5MB tarball from github.com/livekit/livekit releases).
 - Config: `/root/.livekit/server.yaml` (600, **outside git — keys live
   there**): port 7880, rtc UDP 50000-60000, `keys: {<key-name>: <secret>}`.
-- Keys ALSO in freaktown `.env` (600): `LIVEKIT_API_KEY` (the key NAME),
+- Keys ALSO in funnier `.env` (600): `LIVEKIT_API_KEY` (the key NAME),
   `LIVEKIT_API_SECRET`, `LIVEKIT_URL=ws://127.0.0.1:7880`.
 - Service: `systemctl {status,restart} livekit` (unit `livekit.service`).
   Health: `curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:7880/` → 200.
@@ -58,7 +58,7 @@ character: *"Welcome to bloodline management, folks…"* → **PASS**.
 ## Plugin verdicts (full pass over ~90; see session notes)
 
 Shipped here: `openai` (Qwen via base_url), `fishaudio`, `silero`,
-`typesafe` (Jev), `sarvam` (Hindi), `gradium` (Phonon). Ruled out by prior
+`typesafe` (Jev), `sarvam` (Hindi), `gradium` (Phonon). Ruled out by earlier
 decisions: `spatius`, `inworld` (metered). Paid voice clouds skipped ($0).
 `turn-detector` plugin deprecated → `livekit.agents.inference.TurnDetector`.
 

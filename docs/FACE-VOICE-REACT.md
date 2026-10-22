@@ -28,7 +28,7 @@ Delivery beats carry `expression` (17 words and counting).
 nose + press per AU4+5+7+9+23; etc. — authority: AUBlendNet Table 2,
 map in `face_profiles.py`). VRM avatars keep the 5-preset path; ARKit
 GLBs get brows, squint/wide eyes, cheeks, nose. Where emotion comes
-from, in priority order: (1) authored beat words, (2) room events via
+from, in precedence order: (1) authored beat words, (2) room events via
 `resolve_expression`, (3) Omni tone override (`emotion` + `intensity`),
 (4) procedural stillness.
 
@@ -98,7 +98,7 @@ the GPU voice-bank pattern (render there, ship WAV/JSON back).
 ## 6. Speech-synced upper face (AU prosody track)
 
 Mouth says the words (visemes); the upper face moves *with* them, on
-the same clock. `backend/services/freaktown/au_track.py` reads set.wav
+the same clock. `backend/services/funnier/au_track.py` reads set.wav
 (stdlib only) and emits `aus.json`: per-40ms frames of accent
 (onsets ~ pitch accents -> AU1+AU2 brow flash), arousal (RMS level ->
 AU5 eye widening), phrase_end (silence gaps -> AU45 blink + decay).

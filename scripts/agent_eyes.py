@@ -58,7 +58,7 @@ def judge(png_path, key):
         method="POST", headers={"Authorization": f"Bearer {key}",
                                  "Content-Type": "application/json",
                                  "HTTP-Referer": "https://funnier.si/",
-                                 "X-Title": "freaktown-jev-eyes"})
+                                 "X-Title": "funnier-jev-eyes"})
     with urllib.request.urlopen(req, timeout=180) as r:
         return json.loads(r.read().decode())
 

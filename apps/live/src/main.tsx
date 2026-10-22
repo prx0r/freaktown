@@ -9,6 +9,9 @@ import { NotFound } from './pages/NotFound';
 import { PlayPage } from './pages/PlayPage';
 import { NewsroomPage } from './pages/NewsroomPage';
 import { SketchPage } from './pages/SketchPage';
+import { TntsPage } from './pages/TntsPage';
+import { RoomsPage } from './pages/RoomsPage';
+import { MinutePage } from './pages/MinutePage';
 
 // NOTE (migration): creator routes (/studio /green-room /demo) are
 // deliberately ABSENT. FUNNIER Studio is the one creator. This app
@@ -32,6 +35,10 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/newsroom/:showId" element={<NewsroomPage />} />
         <Route path="/sketch" element={<SketchPage />} />
         <Route path="/sketch/:sketchId" element={<SketchPage />} />
+        <Route path="/tnts" element={<TntsPage />} />
+        <Route path="/minute" element={<MinutePage />} />
+        <Route path="/rooms" element={<RoomsPage />} />
+        <Route path="/rooms/:roomId" element={<RoomsPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

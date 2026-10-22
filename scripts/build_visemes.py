@@ -20,7 +20,7 @@ import wave
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, HERE)
 
-from backend.services.freaktown.viseme_text import build_take_visemes
+from backend.services.funnier.viseme_text import build_take_visemes
 
 
 def audio_ms(wav_path):

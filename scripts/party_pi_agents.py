@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Party Pi agents: freaktown bots as agents with pi harness backends.
+"""Party Pi agents: funnier bots as agents with pi harness backends.
 
 ADDITIVE ONLY: new file, no rewrites. Deck bots in party.py stay the
 default ($0, deterministic, CI-safe). When explicitly enabled, bot seats
@@ -46,7 +46,7 @@ _load_env()
 PI_MODEL = os.getenv("PARTY_PI_MODEL", "deepseek-v4-flash")
 
 # Qwen Omni (Model Studio Singapore, OpenAI-compatible). Key lives in
-# freaktown/.env (QWEN_API_KEY, 600, gitignored) — never in tree, never logged.
+# funnier/.env (QWEN_API_KEY, 600, gitignored) — never in tree, never logged.
 _QWEN_DEFAULT_BASE = "https://ws-h6o7g3oq9mc7u24u.ap-southeast-1.maas.aliyuncs.com"
 QWEN_MODEL = os.getenv("QWEN_MODEL", "qwen-flash-character")
 # Backend order: auto (qwen first when its key is present, else pi),
@@ -142,7 +142,7 @@ def _qwen_line(mode: str, prompt: str, seat: str,
             base + "/compatible-mode/v1/chat/completions", data=body,
             headers={"Content-Type": "application/json",
                      "Authorization": "Bearer " + key,
-                     "User-Agent": "freaktown-party/1.0"})
+                     "User-Agent": "funnier-party/1.0"})
         with urllib.request.urlopen(req, timeout=30) as r:
             d = json.load(r)
         content = ((d.get("choices") or [{}])[0].get("message", {})

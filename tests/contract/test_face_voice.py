@@ -3,14 +3,14 @@
 
 import struct
 
-from backend.services.freaktown.face_voice import (
+from backend.services.funnier.face_voice import (
     DELIVERY_TO_FACE,
     REACTIONS,
     ReactionPolicy,
     expression_envelope,
     mouth_cues_to_face_frames,
 )
-from backend.services.freaktown.omni_reactor import (
+from backend.services.funnier.omni_reactor import (
     _transcript_to_event,
     classify_room,
     frame_rms,
@@ -176,7 +176,7 @@ class TestOmniHttp:
     def test_wav_roundtrip(self):
         import struct
         import wave
-        from backend.services.freaktown.omni_http import (
+        from backend.services.funnier.omni_http import (
             _to_event,
             pcm_to_wav_bytes,
         )
@@ -189,7 +189,7 @@ class TestOmniHttp:
             assert w.readframes(4) == pcm
 
     def test_to_event(self):
-        from backend.services.freaktown.omni_http import _to_event
+        from backend.services.funnier.omni_http import _to_event
         assert _to_event('{"event": "heckle", "tag": null}') == "heckle"
         assert _to_event('{"event": "moonwalk"}') is None
         assert _to_event("not json") is None
@@ -198,14 +198,14 @@ class TestOmniHttp:
 
 class TestResolveExpression:
     def test_event_default(self):
-        from backend.services.freaktown.face_voice import (
+        from backend.services.funnier.face_voice import (
             resolve_expression,
         )
         assert resolve_expression("pog_burst") == ("smile", 1.0)
         assert resolve_expression("heckle") == ("annoyed", 0.8)
 
     def test_omni_emotion_override(self):
-        from backend.services.freaktown.face_voice import (
+        from backend.services.funnier.face_voice import (
             resolve_expression,
         )
         assert resolve_expression("applause", emotion="grin") == (
@@ -214,7 +214,7 @@ class TestResolveExpression:
                                   intensity=0.4) == ("afraid", 0.4)
 
     def test_unknown_everything_deadpans(self):
-        from backend.services.freaktown.face_voice import (
+        from backend.services.funnier.face_voice import (
             resolve_expression,
         )
         assert resolve_expression("moonwalk", emotion="moonwalk") == (
@@ -222,7 +222,7 @@ class TestResolveExpression:
         assert resolve_expression() == ("deadpan", 1.0)
 
     def test_reaction_dict_parsing(self):
-        from backend.services.freaktown.omni_reactor import (
+        from backend.services.funnier.omni_reactor import (
             _transcript_to_reaction,
         )
         r = _transcript_to_reaction(
@@ -240,7 +240,7 @@ class TestResolveExpression:
 
 class TestStageKind:
     def test_mapping(self):
-        from backend.services.freaktown.face_voice import to_stage_kind
+        from backend.services.funnier.face_voice import to_stage_kind
         assert to_stage_kind("room_laugh") == "laugh"
         assert to_stage_kind("pog_burst") == "laugh"
         assert to_stage_kind("applause") == "clap"

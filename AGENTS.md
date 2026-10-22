@@ -84,7 +84,7 @@ npm run build                 # apps/live/dist (static live stage)
 
 ## Theatre warnings (do not claim these work until you verify)
 
-1. `comedy/` does not drive the game. Zero imports in `party.py` — no pregate→director→delivery chain, no vetoes, no priors in scoring.
+1. `comedy/` does not drive the game. Zero imports in `party.py` — no pregate→director→delivery chain, no vetoes, no baked-in weights in scoring.
 2. The game-pack JSON is not loaded. `_fz_next_round` uses hardcoded `FZ_ROUNDS`; pack drift is real (min players 3 vs 4, no SCENE/HALFTIME/CROWNING, 8-seg wheel vs canon 12).
 3. Affect/smile/props rigs are lab-only. `lab.py` validator + `affect-servo.js` vote weights + `smile-referee.js` are never called by `party.py` tallies.
 4. Bots drive freeze-night + quip only. No bot driver for roast-relay / freaktionary (`test_allbots.py` skips them by design).

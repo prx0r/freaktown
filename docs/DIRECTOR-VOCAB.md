@@ -8,7 +8,7 @@ Kaigen player); the vocab contract is, mapped onto our beat bus.
 
 ## What we took
 
-- **`backend/services/freaktown/director_vocab.py`** — `director.json`
+- **`backend/services/funnier/director_vocab.py`** — `director.json`
   per freak: emotions with acting hints, `[tag]`->emotion synonyms,
   intense list, gestures/cameras/registers, per-reply limits.
   `beat_emotion()` resolves a beat's face: tag opener wins, else the
@@ -21,7 +21,7 @@ Kaigen player); the vocab contract is, mapped onto our beat bus.
 
 ## What maps where (their extension -> our equivalent)
 
-| Mutuals | Freaktown | Note |
+| Mutuals | FUNNIER | Note |
 |---|---|---|
 | emotion-tags (`[tag]` -> face at sentence start) | `beat_emotion` + stage beat expressions | Same instant rule; ours resolves at take build, theirs at speak time |
 | director (LLM stages beats in-vocab, budgeted) | `motion_compiler` (authored) + take `performance.*` | When an LLM director writes beats, constrain it to the vocab file; budgets already match |

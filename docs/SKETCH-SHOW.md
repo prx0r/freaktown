@@ -274,7 +274,7 @@ sketch names. Raw downloads stay outside the repo and are gitignored
 - `packages/sketch/tests/`:
   - `schema.test.ts`: the validator and its error lists
   - `director.test.ts`: grammar, no cuts in laugh windows, `lmin` spacing, word-boundary snapping
-  - `gaze.test.ts`: priority order, determinism
+  - `gaze.test.ts`: precedence order, determinism
   - `identities-rundown.test.ts`: registry drift, cast resolution, rundown defaults
 - `apps/live/e2e/sketch.spec.ts`: `/sketch` loads the demos, compiles,
   and plays in capture mode, and the stage follows the compiled shots and

@@ -15,7 +15,7 @@ import sys
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, HERE)
 
-from backend.services.freaktown.au_track import build_aus  # noqa: E402
+from backend.services.funnier.au_track import build_aus  # noqa: E402
 
 
 def main():

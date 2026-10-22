@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Secret gate — freaktown. Prints nothing on success; exits 1 with the
+# Secret gate — funnier. Prints nothing on success; exits 1 with the
 # offending lines if a key-shaped string is in the tracked content.
 # Used by .git/hooks/pre-commit + pre-push (installed locally, never committed).
 #

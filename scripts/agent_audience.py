@@ -113,7 +113,7 @@ def main():
           f"persona={args.persona})")
     if args.persona == "heatsheep":
         return run_heatsheep(args, beats)
-    prior = []
+    earlier = []
     laughs = {"haha": 0, "hahaha": 0}
     room_laughs_ms = []  # laughs the agent has "heard" (own posts for now;
     # multi-agent rooms share warmth via a future reactions feed)
@@ -126,13 +126,13 @@ def main():
             if dt > elapsed:
                 time.sleep(min(dt - elapsed, 30))
         try:
-            ev = interpret_joke(b["text"], prior_context="\n".join(prior[-3:]),
+            ev = interpret_joke(b["text"], earlier_context="\n".join(earlier[-3:]),
                                 beat_id=f"{args.slug}#{i}",
-                                session="freaktown-agent-audience")
+                                session="funnier-agent-audience")
         except Exception as e:
             print(f"  [{i}] judge failed: {e}")
             continue
-        prior.append(f"[{i}] {ev.get('setup', '')} → {ev.get('reveal', '')}")
+        earlier.append(f"[{i}] {ev.get('setup', '')} → {ev.get('reveal', '')}")
         conf = float(ev.get("confidence_in_interpretation", 0))
         heat = float(b.get("p_laugh", 0))
         now_ms = int((time.time() - t0) * 1000) if not args.fast else b["end"]

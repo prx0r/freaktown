@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Per-beat laugh probability from the vendored delivery-aware model.
 
-Reads a freaktown bundle (delivery + measured offsets + set.wav), builds
+Reads a funnier bundle (delivery + measured offsets + set.wav), builds
 [pos, dur, pause_before, wps, energy_mean, energy_std, n_pauses, pause_total]
 per beat, and scores with characters' delivery_aware_model.pkl (AUC 0.654,
 leave-one-comedian-out).

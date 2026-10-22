@@ -67,7 +67,7 @@ def main():
                 paths[emo] = p
     if a.render_only:
         return
-    from backend.services.freaktown.see_face import see_face
+    from backend.services.funnier.see_face import see_face
     report = {}
     for emo, path in paths.items():
         if not path:

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Party agent SDK: TableCraft-style agentRules + player SDK for Freak Town party.
+"""Party agent SDK: TableCraft-style agentRules + player SDK for FUNNIER party.
 
 ADDITIVE ONLY: new file, no rewrites. Game truth stays in party.py;
 this is a front door for agents (and solo humans) to play every mode
@@ -164,7 +164,7 @@ def jev_ask(png_path, questions, key=None):
         headers={"Authorization": f"Bearer {key}",
                  "Content-Type": "application/json",
                  "HTTP-Referer": "https://funnier.si/",
-                 "X-Title": "freaktown-party-agent-sdk"})
+                 "X-Title": "funnier-party-agent-sdk"})
     with urllib.request.urlopen(req, timeout=180) as r:
         return json.loads(r.read().decode())
 

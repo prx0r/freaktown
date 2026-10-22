@@ -136,7 +136,7 @@ for _v in sorted(OCULUS_15):
 #   AU26/27->jaw_open AU45->blink AU64->look (dynamic, not in recipes).
 # Unknown words -> [] so the stage stays procedural instead of guessing
 # a face. BEAT (76h, 30 speakers, measured ARKit weights per emotion)
-# is the future calibration source; these hand weights are the prior.
+# is the future calibration source; these hand weights are the baseline.
 EXPRESSION_INTENTS = {
     "neutral": [],
     "happy": [("smile_left", 1.0), ("smile_right", 1.0),

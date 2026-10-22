@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render a REAL comedian minute (Louis c04) into a freaktown freak pack.
+"""Render a REAL comedian minute (Louis c04) into a funnier freak pack.
 
 Source: /root/characters voicelab louis_decomp (text + technique + laugh
 flags) + timing_profile Louis pause ladder (setup 0.7 / pre-punch 1.7 /

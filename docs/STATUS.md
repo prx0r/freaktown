@@ -1,4 +1,4 @@
-# STATUS — freaktown honest state (2026-10-16 · delta 2026-10-21)
+# STATUS — funnier honest state (2026-10-16 · delta 2026-10-21)
 
 Read this first. Everything else is detail. This file is the anti-mess:
 vision, what's done, what's not, what's theatre, what's next.
@@ -22,7 +22,7 @@ vision, what's done, what's not, what's theatre, what's next.
 
 ## Vision (one paragraph)
 
-Freaktown is the comedy party stage: friends on phones play fast joke games
+FUNNIER is the comedy party stage: friends on phones play fast joke games
 (freeze-night, quip, roast, draw-guess) while a theory-driven comedy engine
 (pregates → director → delivery, callback economy, vote weights, affect
 servo) makes the funny legible and re-playable. Improv canon
@@ -72,7 +72,7 @@ bots fill seats, every point traces to a rule you can read.
    don't match (no SCENE/UNFREEZE/HALFTIME/FINAL/CROWNING), performers
    all-players vs 3/2, 8-seg wheel vs canon 12, 90/60s vs 600/300s.
 6. Comedy wiring: `comedy/` (belief/corpus/director/evaluator/gates/rhythms)
-   has zero imports in `party.py`. No pregates, no vetoes, no priors.
+   has zero imports in `party.py`. No pregates, no vetoes, no baked-in weights.
 7. Missing canon: M3 COURT, M4 DUB-OFF, M5 KING-OF-HILL,
    M6 LAST-JESTER, M8 MAFIA, M10 HEADBANDZ, M11 SOUNDTRACK, M12 JOKERS
    (M1 STONE-FACE shipped 2026-10-16 — template set, self-report cracks);
@@ -129,7 +129,7 @@ PID never pattern-kill.
 ## Harness integration (2026-10-16, feature branch)
 
 Branch `feature/mutuals-acting-party-smiles` (local, unpushed): applied
-`freaktown-harness-integration.zip` from R2 `stallshark` via its installer
+`funnier-harness-integration.zip` from R2 `stallshark` via its installer
 (anchors `--check` passed first). Adds: `harness_beats` acting overlay on
 sealed manifests (`mutuals-beats/v1`, delivery.v1 untouched), embedded-clip
 gesture playback in `StageRuntime.ts`, host-token `/party/<code>/harness`
@@ -141,10 +141,10 @@ the GLB, smile accuracy unguaranteed, no paid calls in installer/preview.
 R2 creds used memory-only + shredded; the fresh `icy-snow` token was pasted
 in chat — delete it there once done.
 
-Implemented end-to-end 2026-10-17 (same branch): `freaktown-party`
-extension installed at `character-harness/extensions/freaktown-party`
+Implemented end-to-end 2026-10-17 (same branch): `funnier-party`
+extension installed at `character-harness/extensions/funnier-party`
 (operator adds 2 lines to their character yaml AFTER director + sets
-`FREAKTOWN_PARTY_ENDPOINT`/`HOST_TOKEN` in the clone's gitignored `.env`;
+`FUNNIER_PARTY_ENDPOINT`/`HOST_TOKEN` in the clone's gitignored `.env`;
 foxglove left pristine so upstream `npm test` stays 132/132). Proven
 without Kaigen: `npm run typecheck` clean, checker grades the extension
 (check-clean with env, explicit fill-in error without), relay POSTs
@@ -228,7 +228,7 @@ api_key_env: OPENCODE_GO_API_KEY, model: mimo-v2.5}` in its director.yaml
   on /api/react). `scripts/agent_audience.py` sits in as an agent-native
   audience member: pulls heat, paces the set clock (or --fast), judges each
   beat with mimo (mechanism × confidence × heat rule, reasoning printed),
-  posts laughs with true set_time_ms. Demo: 2 runs on Cathy, silent through
+  posts laughs with true set_time_ms. Demo: 2 runs on a test character, silent through
   setups, laughed only at the hot late-set beats (2 haha + 2 hahaha, all
   logged). Honest limits: the agent can't hear the bed (negative control
   for A/B, not a bed judge); truncations fail loudly with one retry. Review
@@ -285,9 +285,9 @@ api_key_env: OPENCODE_GO_API_KEY, model: mimo-v2.5}` in its director.yaml
 `GET /perform` (tonight's bill, 21 stage-ready sets) + `GET /perform/<slug>`
 (live room: canonical watch player + LIVE banner + predicted-heat strip +
 finale verdict + next act) + `GET /api/perform/<slug>/heat` (per-beat
-p_laugh contract for the future real laugh model). Shares all freaktown
+p_laugh contract for the future real laugh model). Shares all funnier
 logic (bundles, delivery spans, avatar bodies, /api/react laugh logging);
-laugh-sim is HEURISTIC_V0 (type prior × position ramp, characters'
+laugh-sim is HEURISTIC_V0 (type baseline × position ramp, characters'
 0.55/0.35 thresholds) — the heat endpoint is the swap-in point for
 /characters' retrained laugh model (AUC ~0.55-0.65 upstream). Live at
 `party.funnier.si/perform` (Caddy, zero infra) AND `www.funnier.si/perform`
@@ -346,7 +346,7 @@ VERDICT: live on box + party + www, all 8 endpoints 200, 404s correct,
 - Heatsheep (simulated average human, no judge, taps ~ heat): ran both
   crowd arms on both sets. Calibration read: agents converge on high-heat
   beats (biscuit 0.62-0.78 laughed by everyone, 0.30-0.33 silent except
-  easy); cathy laughs cluster b7-b11 exactly where heat peaks.
+  easy); the other set's laughs cluster b7-b11 exactly where heat peaks.
 - Negative control HOLDS: text agents tap identically bed vs nobed
   (can't hear the bed — as designed). Real A/B awaits humans.
 - Monitor/signal/presence/feed loop verified live; finale/bill/vote paths
@@ -367,7 +367,7 @@ or forced alignment is the queued upgrade (neither on the box); their
 laugh-type/valence files aren't here either.
 CRITIC: scripts/evaluate_performance.py scores served/delivery/acting/
 mouth/crowd/observed 0-10 with stated limits (structure only — looks need
-eyes, funny needs the room). Cathy 9.0, Biscuit 9.8. A/B: both arms served
+eyes, funny needs the room). Test character 9.0, Biscuit 9.8. A/B: both arms served
 (trial asserts), report cards on record; mouth differences are
 browser-visible only, so agents negative-control while humans judge looks.
 
@@ -399,7 +399,7 @@ browser-visible only, so agents negative-control while humans judge looks.
 - SOLO "CRACK ME" specced at docs/SOLO-MODE.md (6 slices: face gate,
   taste profile, live writer, performance, difficulty, record+share).
   Not built. Face cam + live mimo set + stone-face timer + share clips.
-- Kaggle ready: priortrades token stored (~/.kaggle, 600, verified).
+- Kaggle ready: account token stored (~/.kaggle, 600, verified).
   Earshot runs there when wanted (this box can't hold torch+CLAP).
 - FOCUS REVIEW (owner: stage first, laughter-logic second). Honest count:
   this session built ~60% laughter-logic (heat, verdicts, states, agents,

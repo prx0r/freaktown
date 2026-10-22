@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """TalkingHead-en viseme bridge: rules run, shapes hold, stage can eat it."""
 
-from backend.services.freaktown.viseme_text import (
+from backend.services.funnier.viseme_text import (
     build_take_visemes,
     run_wrapper,
     timeline_to_words,

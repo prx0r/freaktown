@@ -65,7 +65,7 @@ Previous: HANDOVER-2026-10-17.md (stage day). This file = venue/cauldron session
   ("mfcc live", wlipsync dep mapped). Fish timestamps reserved for emphasis.
 - 17:00 characters repo pulled (ff-only, clean) — delivery engine map:
   timing_profile, delivery_engine, delivery_laugh, standup_sim,
-  SPEC-JEV-DELIVERY. Freaktown consumes timelines, never reimplements.
+  SPEC-JEV-DELIVERY. FUNNIER consumes timelines, never reimplements.
 - 17:05 R2 inventory: 13 character GLBs (monster/cat/chimp/husky/spider…).
   Husky fetched (1.9MB, 12 embedded clips), staged via `?body=`. Mic
   auto-fits head height. Watcher questions de-speciated (Jev failed the
@@ -77,7 +77,7 @@ FAL ~$0.52 total (fal-a/b/c, angles, bare-1/2, c-canonical). CF $0.
 Marble beta billing unknown (no 402, no receipt — watch project usage).
 Jev ~$0.001 (dozens of $0.0001 judgments).
 
-## Secrets (all in freaktown/.env, 600, gitignored, never in tree)
+## Secrets (all in funnier/.env, 600, gitignored, never in tree)
 WLT_API_KEY · FISH_API_KEY · FAL_API_KEY · MESHY_API_KEY ·
 OPENROUTER_API_KEY (Jev ONLY) · OPENCODE_GO_* (general use).
 All pasted in chat — treat as exposed, rotate if anything strange.
@@ -90,7 +90,7 @@ All pasted in chat — treat as exposed, rotate if anything strange.
   (no CK clone exists); body still default rig. Venue `?set=` param
   (default biscuit). Louis take recorded with audio (`--set` support).
 - characters pulled ff-clean; delivery map done (timing_profile,
-  delivery_engine, SPEC-JEV-DELIVERY). Freaktown consumes timelines.
+  delivery_engine, SPEC-JEV-DELIVERY). FUNNIER consumes timelines.
 - R2 inventory: 13 character GLBs; husky fetched (1.9MB, 12 clips),
   `?body=` performers + auto-mic-to-head. Jev questions de-speciated.
 - Jev eyes LIVE (`typesafe/jev-1.14` Decisions API, OPENROUTER key Jev-only):

@@ -23,7 +23,7 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, HERE)
 from tts_provider import AudioChunk, AudioCompositor, get_provider  # noqa: E402
 from puppet_qa import envelope_cues  # noqa: E402
-from backend.services.freaktown.director_vocab import (  # noqa: E402
+from backend.services.funnier.director_vocab import (  # noqa: E402
     beat_emotion, load_vocab,
 )
 

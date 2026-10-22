@@ -1,5 +1,5 @@
 /**
- * Optional Mutuals Character Harness extension -> Freaktown Party stage.
+ * Optional Mutuals Character Harness extension -> FUNNIER Party stage.
  * Apache-2.0 compatible; only public performed lines and the acting cues are
  * transmitted. NEVER send session history, user mic, credentials or memory.
  *
@@ -19,8 +19,8 @@ const safe = (v: unknown, limit: number) =>
 
 export default async function ({ event, state }: Input) {
   if (event !== 'on_sentence' || !state?.sentence) return;
-  const endpoint = process.env.FREAKTOWN_PARTY_ENDPOINT;
-  const token = process.env.FREAKTOWN_HOST_TOKEN;
+  const endpoint = process.env.FUNNIER_PARTY_ENDPOINT;
+  const token = process.env.FUNNIER_HOST_TOKEN;
   if (!endpoint || !token) return;
   // The endpoint is operator-controlled, NOT supplied in conversation text.
   const beats = Array.isArray(state.beats) ? state.beats.slice(0, 16) : [];
@@ -41,8 +41,8 @@ export default async function ({ event, state }: Input) {
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(2000),
     });
-    if (!response.ok) console.warn(`[freaktown-party] relay HTTP ${response.status}`);
+    if (!response.ok) console.warn(`[funnier-party] relay HTTP ${response.status}`);
   } catch (e) {
-    console.warn(`[freaktown-party] relay unavailable: ${e instanceof Error ? e.message : String(e)}`);
+    console.warn(`[funnier-party] relay unavailable: ${e instanceof Error ? e.message : String(e)}`);
   }
 }

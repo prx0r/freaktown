@@ -46,7 +46,7 @@ survive. Both sides can see the score.
 
 ### S3 — Live writer (mimo via Go, ~1-2 days)
 - `POST /api/solo/write {wants: [mechanisms], avoids: [...], heat: 0-1,
-  prior_lines: [...]}` → returns `{lines: [{text, mechanism}], model}`.
+  earlier_lines: [...]}` → returns `{lines: [{text, mechanism}], model}`.
   heat = difficulty 0-1 (see S5).
 - Rules: SETS LEAD applies to training, but solo lines are generated —
   keep them clean (no punching down, no blue unless blue_ok), max 25 words,

@@ -10,8 +10,8 @@ below. `HANDOVER-2026-10-16.md` (repo root) is the latest build handover —
 | File | What it is |
 |---|---|
 | STATUS.md | Honest state: vision, done, not-done, theatre-vs-real, human-only list, next |
-| BOUNDARIES.md | What lives where: pogtown vs freaktown, old vs new, three rooms, hard rules |
-| BOUNDARIES.md | What lives where: pogtown vs funnier, old vs new, three rooms, hard rules || ARCHITECTURE.md | Live system map: Flask strangler, backend, edge, stage-runtime, contracts |
+| BOUNDARIES.md | What lives where: pogtown vs funnier, old vs new, three rooms, hard rules |
+| ARCHITECTURE.md | Live system map: Flask strangler, backend, edge, stage-runtime, contracts |
 | AGENT-ONBOARDING.md | Quick-start for coding agents joining the project |
 
 ## Avatar and bodies

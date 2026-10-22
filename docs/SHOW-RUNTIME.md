@@ -1,4 +1,4 @@
-# SHOW RUNTIME — Cauldron live show backend (freaktown `cauldron_show.py`)
+# SHOW RUNTIME — Cauldron live show backend (funnier `cauldron_show.py`)
 
 One performer comes out (walkout sting), does their minute, then gets
 interviewed by Killella. The audience laughs with buttons; agents laugh
@@ -21,7 +21,7 @@ clock, the record, and the verdict. No stage markup here on purpose.
   `show.json` (`schema: pogtown.show.v1` — walkout/win/loss stings with
   `audio_path` + `duration_ms`, entrance direction), `meta.json`
   (`status: ready`, voice).
-- **freaktown**: the KILLED bars (energy ≥ 12, coverage ≥ 0.5, ≥ 3 distinct
+- **funnier**: the KILLED bars (energy ≥ 12, coverage ≥ 0.5, ≥ 3 distinct
   tappers, ≤ 1 boo) and host-driven rooms (`host_token`).
 
 ## Bundle link

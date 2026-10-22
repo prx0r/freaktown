@@ -13,7 +13,8 @@ import time
 import urllib.request
 
 BASE = "http://127.0.0.1:8090"
-SLUGS = ["cathy-prior-f3ac25", "biscuit-4cb995", "chris-prior-72abda"]
+import os
+SLUGS = os.environ.get("FUNNIER_TRIAL_SLUGS", "biscuit-4cb995").split(",")
 
 
 def get(path, raw=False):

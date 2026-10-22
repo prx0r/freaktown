@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """AU prosody track: synthetic envelopes, no audio files needed."""
 
-from backend.services.freaktown.au_track import prosody_track, rms_envelope
+from backend.services.funnier.au_track import prosody_track, rms_envelope
 
 
 def _sil(dur_ms, rate=16000, amp=0.0):

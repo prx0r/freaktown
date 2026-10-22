@@ -1,6 +1,6 @@
-"""Freaktown Party integration smoke tests. No camera or paid API calls.
+"""FUNNIER Party integration smoke tests. No camera or paid API calls.
 
-Run inside the full Freaktown environment:
+Run inside the full FUNNIER environment:
   python -m unittest tests.unit.test_harness_party_routes
 """
 import unittest
