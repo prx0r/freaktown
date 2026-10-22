@@ -1,0 +1,148 @@
+name: blender newsroom
+
+# Builds the procedural newsroom studio (sets/blender/newsroom_build.py) in Blender 5.2.2 on x86 Linux:
+# library check, Cycles stills of each preset with the anchor seated (wide / medium / close), baked GLBs for the
+# web stage, and a ~10 s performance clip: a Goodnight timeline baked into keyframes on the anchor's shape keys
+# and head bones (sets/blender/newsroom_perform.py), rendered in parallel chunks, encoded with the programme audio.
+# Blender has no official linux-arm64 build, so the heavy lifting happens here (docs/BLENDER-NEWSROOM.md).
+on:
+  push:
+    branches: [newsroom-blender]
+    paths: ['sets/blender/newsroom*', 'sets/blender/newsroom_presets/**', 'sets/blender/perform/**',
+            'sets/blender/newsroom_cards/**', '.github/workflows/blender-newsroom.yml']
+  workflow_dispatch:
+    inputs:
+      samples:
+        description: Cycles samples for the 1600 px stills
+        default: '96'
+      clip_samples:
+        description: Cycles samples per frame of the performance clip
+        default: '16'
+      clip:
+        description: Clip directory under sets/blender/perform
+        default: 'goodnight-2026-10-22'
+
+env:
+  BLENDER_VERSION: "5.2.2"
+  # From https://download.blender.org/release/Blender5.2/blender-5.2.2.sha256
+  BLENDER_SHA256: "84098912789dc450e95697c4184fb8a90acbe5111c2ba4aede3fecb57806a168"
+  V2B_COMMIT: "bfeca3ff77d1468f3f9c6a801342cb6286e3f6b1"
+  CLIP: ${{ inputs.clip || 'goodnight-2026-10-22' }}
+
+jobs:
+  check:
+    name: video-to-blender library check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with: { path: ~/blender, key: "blender-${{ env.BLENDER_VERSION }}-linux-x64" }
+      - run: bash sets/blender/ci_setup.sh
+      - name: nodes_tools.py check (build, lint, evaluate every NK group)
+        run: python3 "$V2B_SKILL/scripts/nodes_tools.py" check
+
+  preset:
+    name: preset ${{ matrix.preset }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [late-night, goodnight, breaking]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with: { path: ~/blender, key: "blender-${{ env.BLENDER_VERSION }}-linux-x64" }
+      - run: bash sets/blender/ci_setup.sh
+      - name: Build, render stills with the anchor seated (wide, medium, close), export GLB with baked albedo
+        run: |
+          mkdir -p out
+          C=sets/blender/newsroom_cards/${{ matrix.preset }}
+          "$BLENDER" -b --factory-startup --python sets/blender/newsroom_build.py -- --skill "$V2B_SKILL" \
+            --preset ${{ matrix.preset }} --out out/newsroom_${{ matrix.preset }}.blend \
+            --anchor static/avatars/default-v1.vrm --wall-card $C/wall.png --brand-card $C/brand.png \
+            --render out/renders --views wide,medium,close --width 1600 --samples ${{ inputs.samples || '96' }} \
+            --glb out/newsroom-${{ matrix.preset }}.glb --bake 1024 --dump out/newsroom_${{ matrix.preset }}.graph.json \
+            2>&1 | tee out/build_${{ matrix.preset }}.log | grep -vE "INFO|^\s*$|Fra:" || true
+          test -f out/newsroom-${{ matrix.preset }}.glb
+      - name: Reopen and validate the saved .blend
+        run: |
+          "$BLENDER" -b out/newsroom_${{ matrix.preset }}.blend --python "$V2B_SKILL/scripts/validate.py" -- --prefix "News " --no-cameras \
+            2>&1 | tee out/validate_${{ matrix.preset }}.log | tail -25
+      - uses: actions/upload-artifact@v4
+        with:
+          name: newsroom-${{ matrix.preset }}
+          path: |
+            out/renders
+            out/*.glb
+            out/*.log
+            out/*.graph.json
+
+  perform:
+    name: performance ${{ matrix.chunk }}/8
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        chunk: [0, 1, 2, 3, 4, 5, 6, 7]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with: { path: ~/blender, key: "blender-${{ env.BLENDER_VERSION }}-linux-x64" }
+      - run: bash sets/blender/ci_setup.sh
+      - name: Bake the timeline into keyframes and render an eighth of the clip (1280x720, 25 fps)
+        run: |
+          mkdir -p out
+          nproc; lscpu | grep -E "Model name|^CPU\(s\)" || true
+          "$BLENDER" -b --factory-startup --python sets/blender/newsroom_perform.py -- --skill "$V2B_SKILL" \
+            --clip sets/blender/perform/$CLIP --preset goodnight --anchor static/avatars/default-v1.vrm \
+            --frames out/frames --chunk ${{ matrix.chunk }}/8 --width 1280 --samples ${{ inputs.clip_samples || '16' }} \
+            --keys out/frames/keys.json 2>&1 | tee out/perform_${{ matrix.chunk }}.log | grep -E "BIND|BAKED|FRAMETIME|PERFSTATS|ANCHOR|Error|Traceback" || true
+          ls out/frames | wc -l; test "$(ls out/frames/*.png | wc -l)" -gt 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: perform-frames-${{ matrix.chunk }}
+          path: |
+            out/frames/*.png
+            out/frames/stats_*.json
+            out/frames/keys.json
+            out/perform_*.log
+
+  encode:
+    name: encode performance clip
+    needs: perform
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { pattern: perform-frames-*, merge-multiple: true, path: frames }
+      - name: Encode with the programme audio + throughput summary
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg >/dev/null
+          ls frames/*.png | wc -l
+          ffmpeg -y -loglevel error -framerate 25 -start_number 1 -i frames/f_%04d.png -i sets/blender/perform/$CLIP/vo.m4a \
+            -map 0:v -map 1:a -shortest -vf "scale=out_color_matrix=bt709:out_range=tv,format=yuv420p" -c:v libx264 -crf 19 \
+            -preset slow -color_range tv -colorspace bt709 -color_primaries bt709 -color_trc bt709 -c:a aac -b:a 128k \
+            -movflags +faststart newsroom_perform_$CLIP.mp4
+          ls -la *.mp4
+          python3 - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
+          import glob, json
+          st = [json.load(open(f)) for f in sorted(glob.glob("frames/stats_*.json"))]
+          fr = sum(s["frames"] for s in st); rs = sum(s["render_s"] for s in st)
+          steady = [s["steady_s_per_frame"] for s in st if s.get("steady_s_per_frame")]
+          print(f"### Blender performance bake throughput\n")
+          print(f"- chunks: {len(st)}, frames: {fr}, {st[0]['width']}x{st[0]['height']}, {st[0]['samples']} spp, {st[0]['fps']} fps")
+          print(f"- runner-seconds rendering: {rs:.0f} s -> {rs / max(1, fr):.1f} s/frame per runner ({60 * fr / max(1, rs):.2f} frames/min per runner)")
+          if steady: print(f"- steady state (excl. first frame/BVH): {sum(steady) / len(steady):.1f} s/frame")
+          print(f"- wall clock (slowest chunk): {max(s['render_s'] for s in st):.0f} s")
+          json.dump({"chunks": st, "frames": fr, "runner_render_s": rs}, open("throughput.json", "w"), indent=1)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: newsroom-performance
+          path: |
+            *.mp4
+            throughput.json

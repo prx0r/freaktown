@@ -22,7 +22,7 @@ const scale = (a: Vec3, k: number): Vec3 => [a[0] * k, a[1] * k, a[2] * k];
 const len = (a: Vec3) => Math.hypot(a[0], a[1], a[2]);
 const norm = (a: Vec3): Vec3 => { const l = len(a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
 
-export function seatHead(s: SeatAnchor): Vec3 { return [s.position[0], s.position[1] + HEAD_HEIGHT[s.pose], s.position[2]]; }
+export function seatHead(s: SeatAnchor): Vec3 { return [s.position[0], s.position[1] + (s.eyeHeight ?? HEAD_HEIGHT[s.pose]), s.position[2]]; }
 export function seatForward(s: SeatAnchor): Vec3 { return [Math.sin(s.rotation), 0, Math.cos(s.rotation)]; }
 /** Lateral axis (the character's left at yaw 0 is +X). */
 export function seatSide(s: SeatAnchor): Vec3 { return [Math.cos(s.rotation), 0, -Math.sin(s.rotation)]; }

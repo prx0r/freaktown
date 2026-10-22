@@ -1,0 +1,14 @@
+[
+ {
+  "t_ms": 0,
+  "file": "card_0.png",
+  "text": "Euclid discovers new comet.",
+  "layout": "headline"
+ },
+ {
+  "t_ms": 8840,
+  "file": "card_1.png",
+  "text": "Euclid discovers new comet.",
+  "layout": "ambient"
+ }
+]

@@ -108,6 +108,7 @@ const newsStudio: SetBuilder = (def, ctx) => {
     setHeadline: (text, k = 'breaking') => { headline = text; kicker = k; card = null; paintWall(); },
     setWallPainter: (p) => { painter = p; paintWall(); },
     setWall: (c, th) => { card = c; theme = th; headline = c.text; kicker = c.kicker ?? ''; paintWall(); },
+    adoptVariant: (root, opts) => adoptNewsroomGlb(group, root, wallTex, logoTex, opts.shadows),
     setTheme: (th) => {
       theme = th;
       const P = th.palette ?? {};
@@ -123,6 +124,47 @@ const newsStudio: SetBuilder = (def, ctx) => {
     dispose: () => disposeGroup(group),
   };
 };
+
+/**
+ * A Blender newsroom (sets/blender/newsroom_build.py) takes over the procedural one: every procedural mesh hides
+ * (the lights and their theme tints stay), the GLB's blank slots get the live canvases (news_wall_screen = the
+ * wall card the painter draws, news_desk_brand = the desk logo), and the per-seat chairs carry seatId so
+ * hideEmptySeats hides an empty one. glTF UVs run top-down; the canvases are flipY textures, so flip V once.
+ */
+function adoptNewsroomGlb(group: THREE.Group, root: THREE.Object3D, wallTex: THREE.CanvasTexture, logoTex: THREE.CanvasTexture, shadows: boolean): void {
+  for (const o of [...group.children]) {
+    if ((o as THREE.Light).isLight) continue;
+    o.visible = false;
+    o.traverse((c) => { delete c.userData.seatId; }); // so refreshSeatProps never re-shows a procedural chair
+  }
+  const flipV = (m: THREE.Mesh) => {
+    const uv = m.geometry.getAttribute('uv') as THREE.BufferAttribute | undefined;
+    if (!uv || m.userData.flippedV) return;
+    for (let i = 0; i < uv.count; i++) uv.setY(i, 1 - uv.getY(i));
+    uv.needsUpdate = true; m.userData.flippedV = true;
+  };
+  root.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh) return;
+    const mats = Array.isArray(m.material) ? m.material : [m.material];
+    const names = [m.name, o.parent?.name ?? '', ...mats.map((x) => x?.name ?? '')].join(' ');
+    if (names.includes('news_wall_screen')) {
+      flipV(m);
+      m.material = new THREE.MeshBasicMaterial({ map: wallTex, toneMapped: false });
+    } else if (names.includes('news_desk_brand')) {
+      flipV(m);
+      m.material = new THREE.MeshStandardMaterial({ map: logoTex, emissive: 0xffffff, emissiveMap: logoTex, emissiveIntensity: 0.45, roughness: 0.4 });
+    } else {
+      // only small things cast: a big flat that casts and receives in the same light shows shadow acne
+      m.castShadow = shadows && /news_(chair|props|practicals|plants)/.test(names);
+      m.receiveShadow = true;
+    }
+    const seat = /news_chair_(anchor\d)/.exec(names);
+    if (seat) o.userData.seatId = seat[1];
+  });
+  root.name = 'blender-variant';
+  group.add(root);
+}
 
 // ── podcast ──
 const podcast: SetBuilder = (def, ctx) => {

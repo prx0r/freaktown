@@ -1,0 +1,81 @@
+{
+ "Room Width": 14.0,
+ "Ceiling Height": 5.2,
+ "Back Wall Y": 5.2,
+ "Glass Wall": true,
+ "Window Wall": false,
+ "Glow Color": [
+  1.0,
+  0.02315,
+  0.04231,
+  1.0
+ ],
+ "Glow Strength": 8.0,
+ "Desk Wood": 0.0,
+ "Tiles X": 6,
+ "Tiles Y": 3,
+ "Seed": 7,
+ "Floor Color": [
+  0.00304,
+  0.00304,
+  0.00439,
+  1.0
+ ],
+ "Floor Gloss": 0.9,
+ "Riser Color": [
+  0.01033,
+  0.01033,
+  0.016,
+  1.0
+ ],
+ "Flat Color": [
+  0.007,
+  0.007,
+  0.00913,
+  1.0
+ ],
+ "Skyline Density": 0.5,
+ "Desk Color": [
+  0.00605,
+  0.00605,
+  0.00802,
+  1.0
+ ],
+ "Desk Top Color": [
+  0.88792,
+  0.88792,
+  0.90466,
+  1.0
+ ],
+ "Desk Gloss": 0.9,
+ "Grid Cans": 10,
+ "Pendants": 0,
+ "Chair Color": [
+  0.01444,
+  0.01444,
+  0.01764,
+  1.0
+ ],
+ "Frame Color": [
+  0.00243,
+  0.00243,
+  0.00304,
+  1.0
+ ],
+ "Wall Width": 5.6,
+ "Wall Height": 2.7,
+ "Wall Centre Height": 2.1,
+ "_look": {
+  "key": 260,
+  "fill": 60,
+  "rim": 360,
+  "rim_color": "#FFE0E0",
+  "desk": 120,
+  "wash": 40,
+  "wash_color": "#FF5060",
+  "ambient": "#05050A",
+  "ambient_strength": 0.4,
+  "fstop": 2.0,
+  "glow": 0.3
+ }
+}

@@ -14,6 +14,7 @@
  *        [--audio master.wav]   mux this audio (else silent; --tone = quiet placeholder tone)
  *        [--size 1280x720] [--fps 25] [--from ms] [--to ms] [--quality low|high]
  *        [--shots 30000,52000 --viewports desktop,mobile --shots-dir dir]   screenshots only
+ *        [--newsset <id>]       baked Blender studio instead of the procedural one (late-night|goodnight|breaking)
  *        [--build]              rebuild apps/live first (default: build only if dist is missing)
  *        [--keep-frames]
  * Env: CHROMIUM_PATH (system Chromium; linux-arm64 has no Playwright-managed one).
@@ -90,7 +91,7 @@ async function openStage(vw, vh, mobile = false) {
   const ctx = await browser.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: 1, isMobile: mobile, hasTouch: mobile });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => console.error('[pageerror]', e.message));
-  await page.goto(`${base}/newsroom/render?capture=1&quality=${quality}&cpuskin=1`);
+  await page.goto(`${base}/newsroom/render?capture=1&quality=${quality}&cpuskin=1${args.newsset ? `&newsset=${encodeURIComponent(args.newsset)}` : ''}`);
   await page.waitForFunction(() => !!window.__newsroom, null, { timeout: 60000 });
   const info = await page.evaluate((x) => window.__newsroom.load(x), { rundown, timings });
   return { ctx, page, info };
@@ -112,7 +113,7 @@ try {
         await page.evaluate((ms) => window.__newsroom.renderAt(ms), t);
         const file = path.join(dir, `${path.basename(out, '.mp4')}_${vp}_${t}.png`);
         await page.screenshot({ path: file });
-        const tel = await page.evaluate(() => { const x = window.__newsroom.telemetry(); return { cam: x.camera, wall: x.wall, lt: x.overlay.lowerThird }; });
+        const tel = await page.evaluate(() => { const x = window.__newsroom.telemetry(); return { cam: x.camera, wall: x.wall, lt: x.overlay.lowerThird, env: x.environment, envError: x.envError }; });
         console.log('SHOT', file, JSON.stringify(tel));
       }
       await ctx.close();
