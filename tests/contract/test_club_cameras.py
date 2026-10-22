@@ -86,11 +86,11 @@ def test_crowd_cutaway_never_sees_the_comic_or_the_mic():
 
 
 def test_close_clears_the_mic():
-    # the mic head sits 0.13 m in front of the mouth and 0.07 m below it: in CAM_CLOSE it must project below the mouth
+    # the mic head sits 0.13 m in front of the mouth and 0.045 m below it: in CAM_CLOSE it must project below the mouth
     for p in PRESETS:
         s = CK.shots(room(p), EYE)[0]
         mouth = (0.0, -0.08, EYE - 0.075)
-        mic = (0.0, -0.1 - 0.13, EYE - 0.075 - 0.07 - 0.02)
+        mic = (0.0, -0.1 - 0.13, EYE - 0.075 - 0.045 - 0.02)
         _, my = project(s["CAM_CLOSE"], mouth)
         mx, iy = project(s["CAM_CLOSE"], mic)
         assert iy < my - 0.08, (p.name, iy, my)

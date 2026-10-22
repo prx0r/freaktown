@@ -71,7 +71,8 @@ VRM with full expressions.
 ## 4. How the Blender bake acts a beat (club_face.py)
 
 - mouth: the measured word under the playhead → its vowel group → viseme; amplitude is the VO's own loudness per frame
-  (timeline `env`) × a syllable shape, so the jaw follows the real audio
+  (timeline `env`, through a square-root curve with a noise gate so ordinary syllables open the jaw, not just the
+  peaks) × a syllable shape, so the jaw follows the real audio
 - blinks: seeded 2.2–4.5 s, none during the stare, one right after the punch lands
 - gaze: darts across the house during setups; eyes and head on the lens for the look and the punch
 - the look before the punch: brows down 0.35, squint 0.3; the hit word: brow flash; after the line: smirk + squint +

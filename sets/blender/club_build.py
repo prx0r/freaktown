@@ -1471,8 +1471,9 @@ def main():
         comic = C.import_comic(sc, a.comic)
         eye = comic["eye"]
         C.bind_face(comic)
-        # the mic sits at the chin, a hand in front: never across the lips from the kit's eye-line cameras
-        inspect.set_modifier_inputs(mod, {"Mouth Height": comic["mouth"] - 0.07, "Mic Gap": 0.13})
+        # the mic sits just under the chin, a hand in front: never across the lips from the kit's eye-line cameras
+        # (0.07 m below the mouth read as chest height on a toon head with a short neck)
+        inspect.set_modifier_inputs(mod, {"Mouth Height": comic["mouth"] - 0.045, "Mic Gap": 0.13})
         ks = bpy.data.objects.get("Key Spot")
         if ks is not None:
             ks.data.energy *= look.get("key_on_comic", 0.32)

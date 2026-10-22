@@ -189,6 +189,7 @@ def bind_meshes(meshes, arm=None, force=None, generate=True):
                 basis = ob.data.shape_keys.reference_key
                 s = kbs[src]
                 new = ob.shape_key_add(name=nm, from_mix=False)
+                new.value = 0.0         # Blender 5.x adds a key at value 1.0: a generated smile would sit on the face
                 for i, (bv, sv) in enumerate(zip(basis.data, s.data)):
                     m = side_mask(bv.co.x, side) * gain
                     new.data[i].co = bv.co + (sv.co - bv.co) * m

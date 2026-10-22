@@ -10,7 +10,7 @@ expressive channels (face_express.py / expressive-map.json — the same numbers 
 
 The performance bake (per frame, from the club-clip timeline written by club_clip.py):
     mouth    the measured word under the playhead -> its vowel group -> viseme (aa ih ou ee oh); amplitude = the VO's
-             own loudness (timeline env, per frame) x a syllable shape, so the jaw follows the real audio; VRoid
+             own loudness (timeline env, per frame, square-root curve + noise gate) x a syllable shape, so the jaw follows the real audio; VRoid
              visemes reach 1.35 through the map's gain (the old bake's 0.85 barely parted the lips)
     blinks   seeded 2.2-4.5 s cadence, none during the stare, one right after the punch lands
     gaze     eye darts across the house (3 points, 60 ms saccades) during setups; locked on the lens for the look
@@ -54,7 +54,7 @@ def setup(preset, comic_path, strict=False):
     CB.lights(sc, mod, look)
     comic = C.import_comic(sc, comic_path)
     C.bind_face(comic, strict=strict)
-    CB.inspect.set_modifier_inputs(mod, {"Mouth Height": comic["mouth"] - 0.07, "Mic Gap": 0.13})
+    CB.inspect.set_modifier_inputs(mod, {"Mouth Height": comic["mouth"] - 0.045, "Mic Gap": 0.13})
     ks = bpy.data.objects.get("Key Spot")
     if ks is not None:
         ks.data.energy *= look.get("key_on_comic", 0.32)
@@ -142,6 +142,12 @@ def render_stills(sc, mod, comic, cams, out, width, samples, pname, only=""):
     (out / f"face_{pname}_stills.json").write_text(json.dumps({"check": comic["check"], "stills": report}, indent=1))
 
 
+def loud_to_open(e):
+    """VO loudness (timeline env, ~0..1.1) -> jaw amplitude. A square-root curve with a noise gate: the old linear
+    env x 1.3 left ordinary syllables (env 0.2-0.4) at a third open, which on VRoid's I/E shapes read as closed lips."""
+    return 0.0 if e < 0.03 else min(1.0, 1.15 * math.sqrt(e))
+
+
 VOWEL_VIS = {"a": "aa", "e": "ee", "i": "ih", "o": "oh", "u": "ou", "y": "ih"}
 
 
@@ -202,7 +208,7 @@ def bake_perform(sc, mod, comic, cams, tl, fps, seed=5):
                         local = (t - w["start_ms"]) / max(1, w["end_ms"] - w["start_ms"]) * len(vs)
                         syl = min(len(vs) - 1, int(local))
                         shape = 0.35 + 0.65 * math.sin(math.pi * min(1.0, local - math.floor(local)))
-                        amp = min(1.0, (env[f] if f < len(env) else 0.0) * 1.3)
+                        amp = loud_to_open(env[f] if f < len(env) else 0.0)
                         open_, vis, speaking = amp * shape, VOWEL_VIS.get(vs[syl][0], "aa"), True
         mouth = open_ if open_ > mouth else mouth + (open_ - mouth) * min(1.0, 18.0 / fps)
         state = {"speaking": speaking or mouth > 0.05}
