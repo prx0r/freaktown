@@ -1,18 +1,28 @@
 {
-  "name": "freaktown-ts",
+  "name": "funnier-ts",
   "private": true,
   "description": "TS workspace: contracts + stage-runtime + apps/live (live stage). Python stays the product shell.",
   "workspaces": [
     "packages/contracts",
     "packages/stage-runtime",
+    "packages/newsroom",
+    "packages/sketch",
+    "packages/party",
     "apps/live"
   ],
   "scripts": {
-    "build": "npm run typecheck && npm run build -w @freaktown/live",
-    "typecheck": "tsc -p packages/contracts && tsc -p packages/stage-runtime && tsc -p apps/live --noEmit",
+    "build": "npm run typecheck && npm run build -w @funnier/live",
+    "typecheck": "tsc -p packages/contracts && tsc -p packages/stage-runtime && tsc -p packages/newsroom && tsc -p packages/sketch && tsc -p packages/party && tsc -p apps/live --noEmit",
     "test": "vitest run",
-    "test:e2e": "npm run test:e2e -w @freaktown/live",
-    "dev": "npm run dev -w @freaktown/live"
+    "test:e2e": "npm run test:e2e -w @funnier/live",
+    "dev": "npm run dev -w @funnier/live",
+    "newsroom:render": "node packages/newsroom/cli/render.mjs",
+    "sketch:render": "node packages/sketch/cli/render.mjs",
+    "sketch:stats": "python3 packages/sketch/scripts/snl_structure_stats.py",
+    "sketch:identities": "node packages/sketch/scripts/build-identities.mjs",
+    "party:rooms": "vite-node packages/party/server/rooms-server.ts",
+    "party:identity": "vite-node packages/party/cli/create-identity.ts --",
+    "party:alien-news": "vite-node packages/party/cli/alien-news.ts --"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

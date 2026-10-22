@@ -1,0 +1,15 @@
+{
+  "name": "@funnier/sketch",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Sketch show layer: sketch script schema (cast of persistent identities, beats, lines, stage directions), gaze system, a sketch director on the newsroom's Ed timing (cadence profile `sketch`), compileSketch() to set stage events, and a show-rundown template from public structure stats.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "bin": { "sketch-render": "cli/render.mjs" },
+  "dependencies": {
+    "@funnier/contracts": "*",
+    "@funnier/newsroom": "*"
+  }
+}

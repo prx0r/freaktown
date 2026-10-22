@@ -4,6 +4,7 @@ __pycache__/
 audio_output/
 transcript_*.json
 .venv/
+.venv-heat/
 training_data/
 *.jsonl
 .hf_token
@@ -19,6 +20,8 @@ emails/.state.json
 funnel.jsonl
 party_records.json
 party_rooms.json
+party_events.jsonl
+show_rooms.json
 var/
 
 data/
@@ -30,3 +33,12 @@ dist/
 .dev.vars
 apps/live/test-results/
 apps/live/playwright-report/
+
+# snldb raw data (hhllcks/snldb has no LICENSE): never commit raw files or transcripts.
+# Only the aggregate packages/sketch/data/structure-stats.json is committed.
+data/snldb/
+snldb/
+**/snldb/
+!packages/sketch/data/
+packages/sketch/data/*
+!packages/sketch/data/structure-stats.json

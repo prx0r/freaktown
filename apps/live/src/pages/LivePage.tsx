@@ -9,7 +9,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { EventConsumer } from '@freaktown/stage-runtime';
+import { EventConsumer } from '@funnier/stage-runtime';
 import { showRoomStore, useShowStore } from '../store/showStore';
 import { createTransport, transportMode } from '../live/transport';
 
@@ -84,7 +84,7 @@ export function LivePage() {
     consumerRef.current?.sendReaction(
       type,
       useShowStore.getState().currentTimeMs,
-      { source: 'freaktown_web' }
+      { source: 'funnier_web' }
     );
   };
 

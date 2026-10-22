@@ -17,7 +17,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { EventConsumer, SET_REGISTRY, StageEventExecutor, StageRuntime, type StageTelemetry } from '@freaktown/stage-runtime';
+import { EventConsumer, SET_REGISTRY, StageEventExecutor, StageRuntime, type StageTelemetry } from '@funnier/stage-runtime';
 import { SetStagePage } from './SetStagePage';
 import { showClockSink, showRoomStore, useShowStore } from '../store/showStore';
 import { createTransport, resolveAsset, transportMode } from '../live/transport';
@@ -70,6 +70,8 @@ export function ClubStagePage() {
   const capture = search.get('capture') === '1';
   const quality = search.get('quality') === 'low' ? 'low' : 'high';
   const cpuSkinning = search.get('cpuskin') === '1';
+  // ?clubset=dive|late-night-tv|basement-open-mic|theatre: Blender-built room (procedural three.js set otherwise)
+  const setVariant = search.get('clubset') ?? undefined;
   const mode = transportMode(search);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -93,6 +95,8 @@ export function ClubStagePage() {
       capture,
       quality,
       cpuSkinning,
+      setVariant,
+      resolveUrl: resolveAsset,
     });
     runtimeRef.current = runtime;
     const executor = new StageEventExecutor(runtime, runtime.consumer, {
@@ -125,7 +129,7 @@ export function ClubStagePage() {
       runtimeRef.current = null;
       if (window.__stage?.runtime === runtime) delete window.__stage;
     };
-  }, [episodeId, token, mode, debug, capture, quality, cpuSkinning]);
+  }, [episodeId, token, mode, debug, capture, quality, cpuSkinning, setVariant]);
 
   const unlockAudio = async () => {
     await runtimeRef.current?.unlockAudio().catch(() => {});

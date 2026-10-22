@@ -1,5 +1,5 @@
 /**
- * StageRuntime — the single renderer for Freak Town.
+ * StageRuntime — the single renderer for FUNNIER.
  *
  * One Three.js scene. One AudioContext. One Transport (the show clock).
  * Data/events in, performance out. No React, no app imports: the host
@@ -16,18 +16,23 @@
  */
 
 import * as THREE from 'three';
-import type { CameraCue, MotionCue, PerformancePlan, WordTiming } from '@freaktown/contracts';
+import type { CameraCue, MotionCue, PerformancePlan, WordTiming } from '@funnier/contracts';
 import { Transport } from './Transport';
 import { AudioBus } from './AudioBus';
 import { CameraDirector, type CameraPresetName } from './CameraDirector';
 import { EventConsumer } from './EventConsumer';
 import { StageSet } from './StageSet';
+import { COMEDY_CLUB } from './sets/definitions';
 import { SfxSynth } from './SfxSynth';
 import { NULL_CLOCK_SINK, type ClockSink, type RoomStore } from './ports';
 import type { LiveTransport } from './live/LiveTransport';
 import { loadAvatar } from './avatars/loadAvatar';
 import type { AvatarCapabilities, AvatarDriver, Emotions, Visemes } from './avatars/types';
 import { MouthTrack } from './performance/MouthTrack';
+import { toPhonetics } from './performance/MouthTrack';
+import type { PhoneticViseme } from './performance/MouthTrack';
+import { ProsodyTrack } from './performance/ProsodyTrack';
+import type { ProsodyFrame } from './performance/ProsodyTrack';
 import { Performer } from './performance/Performer';
 import { FaceChannel } from './face/FaceChannel';
 import { emotionToFaceAction } from './face/vocab';
@@ -44,6 +49,11 @@ export interface PreloadSpec {
   walkoutUrl?: string;
   name?: string;
   seed?: string;
+  /** Take visemes.json (TalkingHead-en phonetics). Preferred over vowel
+   *  groups when present; may also ride the adapted plan. */
+  visemes?: { visemes: string[]; vtimes: number[]; vdurations: number[] };
+  /** Take aus.json (AU prosody track). Brows/eyes/blink under beats. */
+  aus?: { frames: ProsodyFrame[] };
 }
 
 export interface StageConfig {
@@ -63,6 +73,10 @@ export interface StageConfig {
   quality?: 'high' | 'low';
   /** CPU skinning/morphs for GPUs without vertex texture fetch (CI/SwiftShader). */
   cpuSkinning?: boolean;
+  /** Optional comedy-club environment variant id (COMEDY_CLUB.variants, e.g. 'dive'); procedural if unset. */
+  setVariant?: string;
+  /** Resolve asset URLs (variant GLBs). */
+  resolveUrl?: (u: string) => string;
 }
 
 export interface CutRecord {
@@ -88,7 +102,7 @@ export interface StageTelemetry {
   word: string | null;
   avatar: AvatarCapabilities | null;
   avatarFallback: string | null;
-  mouthSource: 'plan' | 'analyser' | 'none';
+  mouthSource: 'plan' | 'phonetic' | 'analyser' | 'none';
   frames: number;
   fps: number;
 }
@@ -114,9 +128,12 @@ export class StageRuntime {
 
   private avatar: AvatarDriver | null = null;
   private avatarFallback: string | null = null;
+  private mouthAnchor: THREE.Object3D | null = null;
+  private restMouth = new THREE.Vector3(0, 1.5, 0.1);
   private performer = new Performer();
   private face = new FaceChannel();
   private mouthTrack: MouthTrack | null = null;
+  private prosodyTrack: ProsodyTrack | null = null;
   private analyserData: Uint8Array<ArrayBuffer>;
 
   private plan: PerformancePlan | null = null;
@@ -145,6 +162,8 @@ export class StageRuntime {
   private lastCutSource: CutRecord['source'] = 'initial';
 
   status: RuntimeStatus = 'EMPTY';
+  /** Resolves once an optional set variant (config.setVariant) has loaded or failed. */
+  variantReady: Promise<void> = Promise.resolve();
 
   constructor(config: StageConfig) {
     this.config = config;
@@ -168,7 +187,12 @@ export class StageRuntime {
     this.renderer.domElement.style.display = 'block';
     config.container.appendChild(this.renderer.domElement);
 
-    this.set = new StageSet(this.scene, { shadows: config.shadows ?? !low, sign: config.sign });
+    this.set = new StageSet(this.scene, { shadows: config.shadows ?? !low, sign: config.sign, lite: low });
+    if (config.setVariant) {
+      const v = COMEDY_CLUB.variants?.find((x) => x.id === config.setVariant);
+      if (v) this.variantReady = this.set.loadVariant(v, config.resolveUrl);
+      else this.set.variantStatus = `error:${config.setVariant}: unknown club set variant`;
+    }
     this.gaze.position.set(0, 1.5, 6);
     this.scene.add(this.gaze);
 
@@ -240,6 +264,27 @@ export class StageRuntime {
     if (loaded.fallbackReason) console.warn('[stage]', loaded.fallbackReason);
     this.avatar.setGazeTarget(this.gaze);
     this.scene.add(this.avatar.root);
+    this.fitMicToAvatar();
+  }
+
+  /** Stand-up: the mic goes in front of this body's mouth; the performer works it. */
+  private fitMicToAvatar(): void {
+    const anchor = this.avatar?.mouthAnchor?.() ?? null;
+    this.mouthAnchor = anchor;
+    this.performer.micMode = true;
+    if (!anchor) return;
+    this.avatar!.root.updateMatrixWorld(true);
+    const mouth = anchor.getWorldPosition(new THREE.Vector3());
+    this.restMouth.copy(mouth);
+    this.set.fitMic(mouth);
+  }
+
+  /** Mic ↔ mouth geometry in metres (e2e + framing checks). */
+  micReport(): { mouth: number[]; mic: number[]; distance: number; restMouth: number[]; avatar: string | null } {
+    const mic = this.set.mic.grilleWorld();
+    const mouth = this.mouthAnchor ? this.mouthAnchor.getWorldPosition(new THREE.Vector3()) : this.restMouth.clone();
+    const r = (v: THREE.Vector3) => [v.x, v.y, v.z].map((x) => Math.round(x * 1000) / 1000);
+    return { mouth: r(mouth), mic: r(mic), distance: Math.round(mic.distanceTo(mouth) * 1000) / 1000, restMouth: r(this.restMouth), avatar: this.avatar?.caps.kind ?? null };
   }
 
   async loadAudio(url: string): Promise<void> { await this.transport.loadAudio(url); }
@@ -255,10 +300,14 @@ export class StageRuntime {
     return !this.config.capture && !!ctx && ctx.state === 'suspended';
   }
 
-  setPlan(plan: PerformancePlan, wordTimings: WordTiming[] = []): void {
+  setPlan(plan: PerformancePlan, wordTimings: WordTiming[] = [], phonemes?: PhoneticViseme[], aus?: ProsodyFrame[]): void {
     this.plan = plan;
     this.wordTimings = wordTimings.length ? wordTimings : plan.word_timings ?? [];
-    this.mouthTrack = MouthTrack.fromPlan(plan, this.wordTimings);
+    const planPhonemes = (plan as unknown as { visemes?: { visemes: string[]; vtimes: number[]; vdurations: number[] } }).visemes;
+    const pv = phonemes ?? (planPhonemes ? toPhonetics(planPhonemes) : undefined);
+    this.mouthTrack = MouthTrack.fromPlan(plan, this.wordTimings, pv);
+    const planAus = (plan as unknown as { aus?: { frames: ProsodyFrame[] } }).aus;
+    this.prosodyTrack = new ProsodyTrack(aus ?? planAus?.frames);
     this.performer.energy = plan.energy ?? 0.7;
     this.cueIndex = 0;
     this.camIndex = 0;
@@ -272,7 +321,12 @@ export class StageRuntime {
       this.setAvatar({ avatarUrl: spec.avatarUrl, name: spec.name, seed: spec.seed ?? spec.plan?.character_id }),
       this.loadAudio(spec.audioUrl),
     ]);
-    this.setPlan(spec.plan, spec.wordTimings ?? []);
+    this.setPlan(
+      spec.plan,
+      spec.wordTimings ?? [],
+      spec.visemes ? toPhonetics(spec.visemes) : undefined,
+      spec.aus?.frames,
+    );
     this.performer.reset();
     this.cutCamera('WIDE_STAGE', 'auto_director');
     this.setStatus('READY');
@@ -437,13 +491,17 @@ export class StageRuntime {
 
     const frame = this.performer.update(this.performerClock(), wallMs, dt, this.mouthOpen);
     this.emotions = frame.emotions;
-    if (frame.blink > 0.5 && this.blink <= 0.5) this.blinks++;
-    this.blink = frame.blink;
-    const face = this.face.sample(wallMs, { open: this.mouthOpen, visemes: vis, emotions: frame.emotions, blink: frame.blink });
+    // AU prosody (aus.json): brows/eyes lift under beats; phrase blinks
+    // OR with the Performer's own blink timer (speech-synced wins ties).
+    const pro = playing && this.prosodyTrack ? this.prosodyTrack.sample(t) : null;
+    this.blinks = this.performer.blinkCount;
+    this.blink = Math.max(frame.blink, pro?.blink ?? 0);
+    const face = this.face.sample(wallMs, { open: this.mouthOpen, visemes: vis, emotions: frame.emotions, blink: this.blink });
     this.emotions = face.emotions;
     if (this.avatar) {
       this.avatar.setPose(frame.pose);
       FaceChannel.apply(this.avatar, face);
+      if (pro) this.avatar.setExpression(this.emotions, { brow: pro.brow, eye: pro.eye });
       this.avatar.update(dt);
     }
     this.gaze.position.set(frame.pose.headYaw * 4, 1.5 - frame.pose.headPitch * 4, 6);
@@ -494,6 +552,9 @@ export class StageRuntime {
   private currentWordCb?: (index: number, word: string) => void;
   setWordCallback(cb: (index: number, word: string) => void): void { this.currentWordCb = cb; }
 
+  /** Which comedy-club environment is showing ('procedural', a variant id, 'loading:…' or 'error:…'). */
+  setVariantStatus(): string { return this.set.variantStatus; }
+
   telemetry(): StageTelemetry {
     const w = this.wordIndex >= 0 ? this.wordTimings[this.wordIndex] : undefined;
     if (w) this.currentWordCb?.(this.wordIndex, w.word);
@@ -513,7 +574,7 @@ export class StageRuntime {
       word: w?.word ?? null,
       avatar: this.avatar?.caps ?? null,
       avatarFallback: this.avatarFallback,
-      mouthSource: this.mouthTrack ? 'plan' : this.avatar?.caps.mouthMode === 'none' ? 'none' : 'analyser',
+      mouthSource: this.mouthTrack?.hasPhonetics ? 'phonetic' : this.mouthTrack ? 'plan' : this.avatar?.caps.mouthMode === 'none' ? 'none' : 'analyser',
       frames: this.frames,
       fps: this.fps,
     };

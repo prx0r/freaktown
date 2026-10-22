@@ -1,6 +1,6 @@
-/* Freak Town service worker: app-shell cache + offline drafts page.
+/* FUNNIER service worker: app-shell cache + offline drafts page.
    Audio/TTS stays network-only (fresh voices beat stale bytes). */
-const CACHE = 'freaktown-shell-v2';
+const CACHE = 'funnier-shell-v2';
 const SHELL = ['/', '/manifest.json', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', e => {

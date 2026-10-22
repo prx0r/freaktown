@@ -1,0 +1,42 @@
+{
+  "id": "sketchbook",
+  "name": "Sketchbook",
+  "size": "S",
+  "room": {"w": 10, "d": 8, "h": 3.6},
+  "stage": {"w": 5, "d": 3, "top_y": 0.0, "front_z": 0, "back_z": -3},
+  "marks": [
+    {"id": "mic", "pos": [-1.5, 0.0, -1.5], "facing": "+Z"},
+    {"id": "easel", "pos": [1.5, 0.0, -1.5], "facing": "+Z"}
+  ],
+  "props": [
+    {"id": "mic-stand", "anchor": [-1.5, 0.0, -1.5], "pack": "base", "variant": "black"},
+    {"id": "easel", "anchor": [1.5, 0.0, -1.5], "pack": "base"},
+    {"id": "stool-tall", "anchor": [-1.5, 0.0, -0.5], "pack": "base"},
+    {"id": "bulb-cage", "anchor": [0, 3.5, 2.0], "pack": "base"},
+    {"id": "exit-sign", "anchor": [-4.5, 2.2, 3.8], "pack": "base"}
+  ],
+  "light_rig": {
+    "house": {"temp_k": 4500, "level": 0.55, "pos": [0, 3.5, 2.5]},
+    "spot": {"temp_k": 5000, "level": 1.0, "pos": [1.5, 3.2, 0.5]},
+    "washes": [
+      {"temp_k": 5000, "level": 0.5, "pos": [-3, 3.2, 0.0]}
+    ],
+    "practicals": ["skylight spill", "EXIT green"]
+  },
+  "cameras": [
+    {"id": "wide", "pos": [0, 2.4, 6.5], "fov": 46},
+    {"id": "medium", "pos": [0, 1.8, 4.0], "fov": 34},
+    {"id": "close", "pos": [1.5, 1.6, 1.5], "fov": 28}
+  ],
+  "crowd": {
+    "capacity": 24,
+    "zones": [
+      {"id": "stools", "tier": "face", "count": 12},
+      {"id": "back", "tier": "pip", "count": 12}
+    ]
+  },
+  "budgets": {"glb_mb": 30, "parses": 3},
+  "glb": {"sha256": "pending-atlas-job"},
+  "acoustics": {"rt60": 0.8, "warmth": 0.4, "bed_db": -16},
+  "physics": {"decay": 0.86, "laugh_gain": 0.16, "resist_start": 0.4}
+}

@@ -6,6 +6,20 @@ import {
 
 const dist = (a: number[], b: number[]) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
+describe('comedy-club Blender variants', () => {
+  it('ships four opt-in GLB variants; the procedural builder stays the default', () => {
+    expect(COMEDY_CLUB.environment.builder).toBe('comedy-club');
+    expect(COMEDY_CLUB.environment.glb).toBeUndefined();
+    const v = COMEDY_CLUB.variants ?? [];
+    expect(v.map((x) => x.id)).toEqual(['dive', 'late-night-tv', 'basement-open-mic', 'theatre']);
+    for (const x of v) {
+      expect(x.url).toBe(`/stage-sets/club-${x.id}.glb`);
+      expect(x.hideNodes).toContain('club_mic');
+      expect(x.signNode).toBe('club_neon');
+    }
+  });
+});
+
 describe('set registry', () => {
   it('ships comedy club as set #1 plus news, podcast, poker', () => {
     expect(SET_REGISTRY.list().map((s) => s.id)).toEqual(['comedy-club', 'news-studio', 'podcast', 'poker-table']);
@@ -129,9 +143,9 @@ describe('demo timelines', () => {
     for (const c of cams) expect(isValidCameraCue(NEWS_STUDIO, String(c))).toBe(true);
     for (let i = 1; i < t.length; i++) expect(t[i].at_ms).toBeGreaterThanOrEqual(t[i - 1].at_ms);
   });
-  it('podcast: 3 speakers, auto director on', () => {
+  it('podcast: 4 speakers, auto director on', () => {
     const t = podcastDemo();
-    expect(new Set(t.filter((c) => c.type === 'dialogue.line').map((c) => c.payload.seat)).size).toBe(3);
+    expect(new Set(t.filter((c) => c.type === 'dialogue.line').map((c) => c.payload.seat)).size).toBe(4);
     expect(t.some((c) => c.type === 'set.auto_director' && c.payload.on === true)).toBe(true);
   });
 });

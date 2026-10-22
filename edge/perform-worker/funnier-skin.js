@@ -1,5 +1,5 @@
-// Funnier skin at the edge: a line-for-line JS port of funnier_skin.py's reskin() (freaktown repo root), so the
-// Freak Town box's /perform*, /play, /party*, /join/* pages look like Funnier without a box deploy.
+// Funnier skin at the edge: a line-for-line JS port of funnier_skin.py's reskin() (funnier repo root), so the
+// FUNNIER box's /perform*, /play, /party*, /join/* pages look like Funnier without a box deploy.
 // Canonical copy: prx0r/freaktown edge/perform-worker/funnier-skin.js. Copied verbatim to
 // prx0r/characters funnier/web-worker/funnier-skin.js (the funnier-web Worker's party proxy). Edit here, then copy.
 //
@@ -99,7 +99,7 @@ function header(path) {
   const lab = path.startsWith('/party/lab');
   const on = (yes) => (yes ? ' class=on' : '');
   return `<header class='fn-top ft-top'><a class='fn-wordmark' href='${HOME_URL}' aria-label='Funnier home'>FUNNIER</a>` +
-    `<nav class='fn-nav' aria-label='Freak Town'><a href='/perform'${on(path.startsWith('/perform'))}>Tonight&#39;s bill</a>` +
+    `<nav class='fn-nav' aria-label='FUNNIER'><a href='/perform'${on(path.startsWith('/perform'))}>Tonight&#39;s bill</a>` +
     `<a href='/party'${on(!lab && /^\/(play|party|join)/.test(path))}>Party games</a><a href='/party/lab'${on(lab)}>Tech lab</a></nav>` +
     `<a class='fn-userbtn' href='${HOME_URL}#you' aria-label='Your Funnier account'>${USER_SVG}</a></header>`;
 }
@@ -144,7 +144,8 @@ export function reskin(html, path) {
   const head = `<link rel='stylesheet' href='${THEME_URL}'><style id='funnier-skin'>${SKIN_CSS}</style><meta name='theme-color' content='#07070a'>`;
   html = html.replace(/<meta name="theme-color"[^>]*>/g, '');
   html = html.replace(/<\/head>/i, () => head + '</head>');
-  html = html.replace(/<title>([^<]*)Freak Town( Party)?/, (_, a, b) => `<title>${a}Freak Town${b || ''} · Funnier`);
+  // Accepts the legacy "Freak Town" brand too (a box still on older code); the brand is now FUNNIER.
+  html = html.replace(/<title>([^<]*)(?:Freak Town|FUNNIER)( Party)?(?! · Funnier)/, (_, a, b) => `<title>${a}FUNNIER${b || ''} · Funnier`);
   const p = path.replace(/\/+$/, '');
   const index = ['/play', '/party', '/perform'].includes(p);
   html = html.replace(/<body([^>]*)>/i, (_, attrs) => bodyOpen(attrs, index) + header(path));

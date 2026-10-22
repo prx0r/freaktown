@@ -5,8 +5,8 @@
  *   ?debug=1  telemetry · ?quality=low · ?cpuskin=1 · ?setglb=1 (load unverified CC0 GLB decor)
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { EventConsumer, SetEventExecutor, SetStage, type SetStageTelemetry } from '@freaktown/stage-runtime';
-import type { CardV1 } from '@freaktown/contracts';
+import { EventConsumer, SetEventExecutor, SetStage, type SetStageTelemetry } from '@funnier/stage-runtime';
+import type { CardV1 } from '@funnier/contracts';
 import { createTransport, resolveAsset, type TransportMode } from '../live/transport';
 
 declare global {
@@ -55,7 +55,7 @@ export function SetStagePage(props: { episodeId: string; mode: TransportMode; to
       )}
       {tele?.setId === 'news-studio' && !!o?.ticker.length && (
         <div style={tickerBar} data-testid="ticker">
-          <div style={{ background: '#ffcc33', color: '#111', fontWeight: 800, padding: '0 12px', display: 'flex', alignItems: 'center', zIndex: 2 }}>FREAK NEWS</div>
+          <div style={{ background: '#ffcc33', color: '#111', fontWeight: 800, padding: '0 12px', display: 'flex', alignItems: 'center', zIndex: 2 }}>FUNNIER NEWS</div>
           <div style={{ overflow: 'hidden', flex: 1, position: 'relative' }}>
             <div style={tickerText}>{[...o.ticker, ...o.ticker].join('   •   ')}</div>
           </div>
@@ -64,7 +64,7 @@ export function SetStagePage(props: { episodeId: string; mode: TransportMode; to
 
       {tele?.setId === 'podcast' && (
         <>
-          <div style={onAir} data-testid="on-air">● ON AIR · FREAK TALK</div>
+          <div style={onAir} data-testid="on-air">● ON AIR · FUNNIER TALK</div>
           {o?.speaker && tele.activeSpeaker && (
             <div style={strap} data-testid="speaker-strap">
               <div style={{ fontWeight: 800 }}>{o.speaker.name}</div>

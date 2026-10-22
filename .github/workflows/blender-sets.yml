@@ -1,0 +1,119 @@
+name: blender sets
+
+# Builds the procedural comedy-club set (sets/blender/club_build.py) in Blender 5.2.2 on x86 Linux:
+# library checks, Cycles stills, baked GLBs and a ~10 s camera-move clip (4 parallel frame chunks + an encode job),
+# uploaded as artifacts.
+# Blender has no official linux-arm64 build, so the heavy lifting happens here (docs/BLENDER-SETS.md).
+on:
+  push:
+    branches: [sets-blender-club]
+    paths: ['sets/blender/**', '.github/workflows/blender-sets.yml']
+  workflow_dispatch:
+    inputs:
+      samples:
+        description: Cycles samples for the 1600 px stills
+        default: '96'
+      turntable:
+        description: Preset for the camera-move clip
+        default: 'dive'
+      frames:
+        description: Frames in the clip (24 fps)
+        default: '240'
+
+env:
+  BLENDER_VERSION: "5.2.2"
+  # From https://download.blender.org/release/Blender5.2/blender-5.2.2.sha256
+  BLENDER_SHA256: "84098912789dc450e95697c4184fb8a90acbe5111c2ba4aede3fecb57806a168"
+  V2B_COMMIT: "bfeca3ff77d1468f3f9c6a801342cb6286e3f6b1"
+
+jobs:
+  check:
+    name: video-to-blender library check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with: { path: ~/blender, key: "blender-${{ env.BLENDER_VERSION }}-linux-x64" }
+      - run: bash sets/blender/ci_setup.sh
+      - name: nodes_tools.py check (build, lint, evaluate every NK group)
+        run: python3 "$V2B_SKILL/scripts/nodes_tools.py" check
+
+  preset:
+    name: preset ${{ matrix.preset }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [dive, late-night-tv, basement-open-mic, theatre]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with: { path: ~/blender, key: "blender-${{ env.BLENDER_VERSION }}-linux-x64" }
+      - run: bash sets/blender/ci_setup.sh
+      - name: Build, render stills (wide + performer eye), export GLB with baked albedo
+        run: |
+          mkdir -p out
+          "$BLENDER" -b --factory-startup --python sets/blender/club_build.py -- --skill "$V2B_SKILL" \
+            --preset ${{ matrix.preset }} --out out/club_${{ matrix.preset }}.blend \
+            --render out/renders --views wide,eye --width 1600 --samples ${{ inputs.samples || '96' }} \
+            --glb out/club-${{ matrix.preset }}.glb --bake 2048 --dump out/club_${{ matrix.preset }}.graph.json \
+            2>&1 | tee out/build_${{ matrix.preset }}.log | grep -vE "INFO|^\s*$|Fra:" || true
+          test -f out/club-${{ matrix.preset }}.glb
+      - name: Reopen and validate the saved .blend
+        run: |
+          "$BLENDER" -b out/club_${{ matrix.preset }}.blend --python "$V2B_SKILL/scripts/validate.py" -- --prefix "Club " --no-cameras \
+            2>&1 | tee out/validate_${{ matrix.preset }}.log | tail -25
+      - uses: actions/upload-artifact@v4
+        with:
+          name: club-${{ matrix.preset }}
+          path: |
+            out/renders
+            out/*.glb
+            out/*.log
+            out/*.graph.json
+
+  turntable:
+    name: camera move ${{ matrix.chunk }}/4
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        chunk: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with: { path: ~/blender, key: "blender-${{ env.BLENDER_VERSION }}-linux-x64" }
+      - run: bash sets/blender/ci_setup.sh
+      - name: Render a quarter of the camera move
+        run: |
+          mkdir -p out
+          "$BLENDER" -b --factory-startup --python sets/blender/club_build.py -- --skill "$V2B_SKILL" \
+            --preset ${{ inputs.turntable || 'dive' }} --turntable out/tt --frames ${{ inputs.frames || '240' }} \
+            --chunk ${{ matrix.chunk }}/4 --tt-width 1280 --tt-samples 16 2>&1 | grep -E "PRESET|LINT|TURNTABLE|Error" || true
+          ls out/tt | wc -l; test "$(ls out/tt | wc -l)" -gt 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tt-frames-${{ matrix.chunk }}
+          path: out/tt/*.png
+
+  encode:
+    name: encode camera move
+    needs: turntable
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { pattern: tt-frames-*, merge-multiple: true, path: tt }
+      - run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg >/dev/null
+          ls tt | head -3; ls tt | wc -l
+          ffmpeg -y -loglevel error -framerate 24 -start_number 1 -i tt/tt_%04d.png -c:v libx264 -pix_fmt yuv420p \
+            -crf 20 -movflags +faststart club_${{ inputs.turntable || 'dive' }}_camera_move.mp4
+          ls -la *.mp4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: club-camera-move
+          path: '*.mp4'

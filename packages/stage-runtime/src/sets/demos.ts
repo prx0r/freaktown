@@ -2,7 +2,7 @@
  * Demo episodes per set — plain command timelines (control sends them through
  * the transport like any operator action, so the room log replays them).
  */
-import type { CastMemberV1 } from '@freaktown/contracts';
+import type { CastMemberV1 } from '@funnier/contracts';
 import type { DealerSeat } from './poker/PokerDealer';
 
 export interface TimedCommand { at_ms: number; type: string; payload: Record<string, unknown> }
@@ -15,12 +15,12 @@ export const NEWS_CAST: CastMemberV1[] = [
 export const NEWS_HEADLINES = [
   { kicker: 'breaking', text: 'Local robot wins pie contest, refuses to eat pie', a: 'Breaking tonight: a local robot has won the county pie contest. It then refused to eat the pie, citing firmware.', b: 'I can confirm the pie was excellent. Structurally.' },
   { kicker: 'weather', text: 'Forecast: 90% chance of puns by Friday', a: 'Weather now. Forecasters say there is a ninety percent chance of puns by Friday.', b: 'I would bring an umbrella. The puns will be dry.' },
-  { kicker: 'sport', text: 'Freak Town poker night ends in a five-way tie', a: 'And in sport, the Freak Town poker night ended in a five way tie, which the rules say is impossible.', b: 'The rules have been informed. They are taking it badly.' },
+  { kicker: 'sport', text: 'FUNNIER poker night ends in a five-way tie', a: 'And in sport, the FUNNIER poker night ended in a five way tie, which the rules say is impossible.', b: 'The rules have been informed. They are taking it badly.' },
 ];
 
 export function newsDemo(): TimedCommand[] {
   const out: TimedCommand[] = [
-    { at_ms: 0, type: 'set.load', payload: { setId: 'news-studio', title: 'Freak Town News', cast: NEWS_CAST } },
+    { at_ms: 0, type: 'set.load', payload: { setId: 'news-studio', title: 'FUNNIER News', cast: NEWS_CAST } },
     { at_ms: 600, type: 'overlay.ticker', payload: { items: NEWS_HEADLINES.map((h) => `${h.kicker.toUpperCase()}: ${h.text}`).concat(['Markets: chips up 4%', 'Traffic: the mic stand is blocking lane two']) } },
     { at_ms: 900, type: 'set.auto_director', payload: { on: false } },
     { at_ms: 1000, type: 'set.camera', payload: { cue: 'wide' } },
@@ -46,6 +46,7 @@ export const PODCAST_CAST: CastMemberV1[] = [
   { seat: 'seat1', character_id: 'pog.captain-ata-ashcroft', name: 'Captain Ata', avatar_url: 'basic', kind: 'character' },
   { seat: 'seat2', character_id: 'pog.chairman-meow', name: 'Chairman Meow', avatar_url: 'basic', kind: 'character' },
   { seat: 'seat3', character_id: 'pog.the-algorithm', name: 'The Algorithm', avatar_url: 'basic:robot', kind: 'character' },
+  { seat: 'seat4', character_id: 'pog.buddha-ultimate-deadpan', name: 'Buddha', avatar_url: 'basic', kind: 'character' },
 ];
 
 export const PODCAST_LINES: Array<[string, string, string?]> = [
@@ -58,6 +59,8 @@ export const PODCAST_LINES: Array<[string, string, string?]> = [
   ['seat1', 'Okay. Next question. Should robots pay rent?', 'playful'],
   ['seat3', 'I live in the cloud. The cloud is very expensive.', 'sad'],
   ['seat2', 'I knock things off the cloud. For free.', 'smug'],
+  ['seat4', 'I once meditated for forty-nine days. The Wi-Fi never came back.', 'deadpan'],
+  ['seat2', 'That explains the buffering.', 'smug'],
 ];
 
 export function podcastDemo(): TimedCommand[] {
@@ -75,6 +78,7 @@ export function podcastDemo(): TimedCommand[] {
 
 export const POKER_CAST: CastMemberV1[] = [
   { seat: 'seat0', character_id: 'pog.captain-ata-ashcroft', name: 'Captain Ata', avatar_url: 'basic', kind: 'bot' },
+  { seat: 'seat1', character_id: 'pog.buddha-ultimate-deadpan', name: 'Buddha', avatar_url: 'basic', kind: 'bot' },
   { seat: 'seat2', character_id: 'pog.chairman-meow', name: 'Chairman Meow', avatar_url: 'basic', kind: 'bot' },
   { seat: 'seat3', character_id: 'pog.the-algorithm', name: 'The Algorithm', avatar_url: 'basic:robot', kind: 'bot' },
   { seat: 'seat6', character_id: 'pog.dana-deadline', name: 'Dana Deadline', avatar_url: 'basic', kind: 'bot' },
@@ -85,6 +89,7 @@ export const POKER_HUMAN_SEAT = 4;
 export function pokerSeats(humanName = 'You'): DealerSeat[] {
   return [
     { seat: 0, name: 'Captain Ata', stack: 1000, kind: 'bot', style: 'loose' },
+    { seat: 1, name: 'Buddha', stack: 1000, kind: 'bot', style: 'tight' },
     { seat: 2, name: 'Chairman Meow', stack: 1000, kind: 'bot', style: 'calling-station' },
     { seat: 3, name: 'The Algorithm', stack: 1000, kind: 'bot', style: 'tight' },
     { seat: POKER_HUMAN_SEAT, name: humanName, stack: 1000, kind: 'human' },
@@ -94,7 +99,7 @@ export function pokerSeats(humanName = 'You'): DealerSeat[] {
 
 export function pokerDemoIntro(): TimedCommand[] {
   return [
-    { at_ms: 0, type: 'set.load', payload: { setId: 'poker-table', title: 'Freak Town Poker', cast: POKER_CAST } },
+    { at_ms: 0, type: 'set.load', payload: { setId: 'poker-table', title: 'FUNNIER Poker', cast: POKER_CAST } },
     { at_ms: 400, type: 'set.camera', payload: { cue: 'orbit' } },
   ];
 }

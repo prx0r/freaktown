@@ -2,6 +2,7 @@
 
 import * as THREE from 'three';
 import type { VRM } from '@pixiv/three-vrm';
+import { attachMouthAnchor } from './mouthAnchor';
 import type { AvatarCapabilities, AvatarDriver, Emotions, PoseState, Visemes } from './types';
 
 const VISEMES = ['aa', 'ih', 'ou', 'ee', 'oh'] as const;
@@ -51,6 +52,16 @@ export class VrmAvatar implements AvatarDriver {
 
   setExpression(em: Emotions): void {
     for (const k of EMOTIONS) this.set(k, em[k]);
+  }
+
+  private mouth: THREE.Object3D | null = null;
+  mouthAnchor(): THREE.Object3D | null {
+    if (!this.mouth) {
+      const h = this.vrm.humanoid;
+      const raw = (n: 'head' | 'leftEye' | 'rightEye') => h?.getRawBoneNode(n) ?? null;
+      this.mouth = attachMouthAnchor(this.root, raw('head'), [raw('leftEye'), raw('rightEye')].filter((x): x is THREE.Object3D => !!x));
+    }
+    return this.mouth;
   }
 
   setGazeTarget(target: THREE.Object3D): void {

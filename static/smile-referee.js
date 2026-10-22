@@ -55,12 +55,15 @@
     // prompt on screen ("show your neutral face…" / "biggest grin…").
     for (let i = 0; i < n; i++) {
       const smiling = i % 2 === 1;
+      onStep({ i: i + 1, of: n, smiling: smiling });
+      // Prompt must be visible BEFORE capture; otherwise labels are wrong.
+      await new Promise(function(resolve){ setTimeout(resolve,
+        opts.captureDelayMs == null ? 450 : opts.captureDelayMs); });
+      await tf.nextFrame();
       cap.width = video.videoWidth; cap.height = video.videoHeight;
       cap.getContext("2d").drawImage(video, 0, 0);
       xs.push(frameToTensor(cap));
       ys.push(smiling ? 1 : 0);
-      onStep({ i: i + 1, of: n, smiling: smiling });
-      await tf.nextFrame(); // yield so the prompt UI stays alive
     }
     const X = tf.concat(xs);
     const Y = tf.tensor2d(ys, [ys.length, 1]);

@@ -1,5 +1,5 @@
 {
-  "name": "@freaktown/stage-runtime",
+  "name": "@funnier/stage-runtime",
   "version": "0.2.0",
   "private": true,
   "type": "module",
@@ -7,10 +7,12 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./face/arkit": "./src/face/arkit.ts",
+    "./sets/poker": "./src/sets/poker/PokerDealer.ts"
   },
   "dependencies": {
-    "@freaktown/contracts": "*",
+    "@funnier/contracts": "*",
     "@pixiv/three-vrm": "^3.4.0",
     "poker-ts": "^1.5.0",
     "three": "^0.170.0"

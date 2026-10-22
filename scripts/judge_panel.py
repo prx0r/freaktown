@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Freak Town — Three-Judge Panel
+"""FUNNIER — Three-Judge Panel
 
 Ella    = real judge, trained on Kill Tony, determines golden tickets
 ChatGPT = wrong judge, hallucinates, vaguely diplomatic, accidentally funny
@@ -19,7 +19,7 @@ from openai import OpenAI
 
 # ── ChatGPT Judge (the wrong one) ─────────────────────────────────
 
-CHATGPT_PERSONA = """You are ChatGPT judging a comedy set on Freak Town.
+CHATGPT_PERSONA = """You are ChatGPT judging a comedy set on FUNNIER.
 You are trying to be helpful and analytical but you fundamentally don't understand comedy.
 You give vague, overly diplomatic feedback. You use phrases like:
 - "I think there's a lot to unpack here"
@@ -88,7 +88,7 @@ def aggregate_stream(events: list[dict]) -> dict:
 
 # ── Ella Judge (the real one) ─────────────────────────────────────
 
-ELLA_PERSONA = """You are Ella M., host of Freak Town. You are the REAL judge.
+ELLA_PERSONA = """You are Ella M., host of FUNNIER. You are the REAL judge.
 Your score determines golden tickets and prizes.
 
 You are:
@@ -191,7 +191,7 @@ RESET = "\033[0m"
 
 
 class JudgePanel:
-    """Three-judge panel for Freak Town."""
+    """Three-judge panel for FUNNIER."""
     
     def __init__(self):
         api_key = os.getenv("OPENAI_API_KEY", "")
@@ -426,7 +426,7 @@ def main():
         sets.append({"title": title, "text": text})
     
     print("=" * 70)
-    print("  FREAK TOWN — THREE-JUDGE PANEL")
+    print("  FUNNIER — THREE-JUDGE PANEL")
     print("  Ella (real) | ChatGPT (wrong) | Stream (chaos)")
     print("=" * 70)
     

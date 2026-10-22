@@ -18,7 +18,7 @@
  * that performance (replay never duplicates ACKs).
  */
 
-import { CAMERA_NAMES, type CameraPresetV1, type PerformancePlan, type ShowEvent } from '@freaktown/contracts';
+import { CAMERA_NAMES, type CameraPresetV1, type PerformancePlan, type ShowEvent } from '@funnier/contracts';
 import type { StageRuntime } from './StageRuntime';
 import type { EventConsumer } from './EventConsumer';
 import { loadSealedSet } from './plan/setAdapter';
@@ -96,6 +96,10 @@ export class StageEventExecutor {
           walkoutUrl: payload.walkout_url as string | undefined,
           name: payload.character_name as string | undefined,
           seed: payload.performance_id as string | undefined,
+          // Face tracks: explicit payload wins; otherwise whatever the
+          // sealed-set adapter found (visemes.json / aus.json in the dir).
+          visemes: (payload.visemes as never) ?? (plan as unknown as { visemes?: never }).visemes,
+          aus: (payload.aus as never) ?? (plan as unknown as { aus?: never }).aus,
         });
         const pid = payload.performance_id as string | undefined;
         if (!pid || !this.readySeen.has(pid)) {

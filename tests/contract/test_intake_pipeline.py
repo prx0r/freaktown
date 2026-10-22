@@ -3,13 +3,13 @@
 
 character + delivery + offsets → validate → score → spans → words →
 sealed manifest → stage cues + avatar resolution. Proves the imported
-backend/services/freaktown tree works in its new home.
+backend/services/funnier tree works in its new home.
 """
 
 import json
 from pathlib import Path
 
-from backend.services.freaktown.bundle import (
+from backend.services.funnier.bundle import (
     build_performance_manifest,
     bundle_to_score,
     resolve_avatar,
@@ -17,7 +17,7 @@ from backend.services.freaktown.bundle import (
     validate_bundle,
     words_from_beats,
 )
-from backend.services.freaktown.cues import resolve_cues
+from backend.services.funnier.cues import resolve_cues
 
 FIX = Path(__file__).parent.parent.parent / "contracts" / "fixtures" / "golden-freak-v1"
 

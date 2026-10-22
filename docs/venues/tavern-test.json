@@ -1,0 +1,127 @@
+{
+  "id": "tavern-test",
+  "name": "Tavern Test (P0 borrowed room)",
+  "size": "S",
+  "room": {
+    "w": 12,
+    "d": 9,
+    "h": 3.4
+  },
+  "stage": {
+    "w": 3.0,
+    "d": 2.5,
+    "top_y": 0.0,
+    "front_z": 0,
+    "back_z": -2.5
+  },
+  "marks": [
+    {
+      "id": "mic",
+      "pos": [
+        0,
+        0.0,
+        -1.0
+      ],
+      "facing": "+Z"
+    }
+  ],
+  "props": [
+    {
+      "id": "mic-stand",
+      "anchor": [
+        0,
+        0.0,
+        -1.0
+      ],
+      "pack": "base",
+      "variant": "brass-worn"
+    }
+  ],
+  "light_rig": {
+    "house": {
+      "temp_k": 2700,
+      "level": 0.35,
+      "pos": [
+        0,
+        3.0,
+        2.0
+      ]
+    },
+    "spot": {
+      "temp_k": 3400,
+      "level": 1.0,
+      "pos": [
+        0,
+        3.0,
+        2.0
+      ]
+    },
+    "washes": [],
+    "practicals": [
+      "bar amber"
+    ]
+  },
+  "cameras": [
+    {
+      "id": "wide",
+      "pos": [
+        0,
+        2.0,
+        5.5
+      ],
+      "fov": 46
+    },
+    {
+      "id": "medium",
+      "pos": [
+        0,
+        1.6,
+        3.5
+      ],
+      "fov": 34
+    },
+    {
+      "id": "close",
+      "pos": [
+        0,
+        1.5,
+        2.2
+      ],
+      "fov": 28
+    }
+  ],
+  "crowd": {
+    "capacity": 20,
+    "zones": [
+      {
+        "id": "room",
+        "tier": "pip",
+        "count": 20
+      }
+    ]
+  },
+  "budgets": {
+    "glb_mb": 30,
+    "parses": 3
+  },
+  "glb": {
+    "sha256": "c9ef18050dba571b",
+    "local": "/venues/tavern-test.glb",
+    "note": "P0 borrowed tavern, full-geo + webp2048: 34.6MB -> 5.2MB. NOT the Cauldron."
+  },
+  "acoustics": {
+    "rt60": 0.9,
+    "warmth": 0.7,
+    "bed_db": -16
+  },
+  "physics": {
+    "decay": 0.85,
+    "laugh_gain": 0.18,
+    "resist_start": 0.35
+  },
+  "splat": {
+    "local": "/venues/tavern.spz",
+    "bytes": 38848796,
+    "note": "P0 borrowed tavern splat (Marble world aecb0abb). Photoreal room; GLB is fallback."
+  }
+}

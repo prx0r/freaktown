@@ -1,0 +1,35 @@
+{
+  "id": "holding-cell",
+  "name": "Holding Cell",
+  "size": "S",
+  "room": {"w": 5, "d": 6, "h": 2.8},
+  "stage": {"w": 2.5, "d": 2.0, "top_y": 0.0, "front_z": 0, "back_z": -2.0},
+  "marks": [
+    {"id": "mic", "pos": [0, 0.0, -1.0], "facing": "+Z"},
+    {"id": "stool", "pos": [0, 0.0, -0.2], "facing": "-Z"}
+  ],
+  "props": [
+    {"id": "mic-stand", "anchor": [0.8, 0.0, -1.0], "pack": "base", "variant": "steel-gray"},
+    {"id": "stool-tall", "anchor": [0, 0.0, -0.2], "pack": "base"},
+    {"id": "bulb-cage", "anchor": [0, 2.7, -1.0], "pack": "base"},
+    {"id": "exit-sign", "anchor": [-2.2, 2.0, 2.8], "pack": "base"}
+  ],
+  "light_rig": {
+    "house": {"temp_k": 4000, "level": 0.08, "pos": [0, 2.7, 1.0]},
+    "spot": {"temp_k": 5000, "level": 1.0, "pos": [0, 2.7, -0.5]},
+    "washes": [],
+    "practicals": ["caged bulb", "EXIT green"]
+  },
+  "cameras": [
+    {"id": "wide", "pos": [0, 1.8, 4.5], "fov": 46},
+    {"id": "close", "pos": [0, 1.5, 1.8], "fov": 28}
+  ],
+  "crowd": {
+    "capacity": 6,
+    "zones": [{"id": "wall", "tier": "face", "count": 6}]
+  },
+  "budgets": {"glb_mb": 30, "parses": 3},
+  "glb": {"sha256": "pending-atlas-job"},
+  "acoustics": {"rt60": 0.4, "warmth": 0.3, "bed_db": -20},
+  "physics": {"decay": 0.8, "laugh_gain": 0.22, "resist_start": 0.55}
+}

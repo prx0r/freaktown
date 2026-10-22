@@ -9,6 +9,7 @@ need spend sign-off).
 import json
 
 from flask import Blueprint, jsonify, request
+from harness_adapter import compile_harness_beats
 
 lab_bp = Blueprint("lab", __name__)
 
@@ -27,7 +28,7 @@ LAB_RIGS = [
 
 LAB_HOME = """<!DOCTYPE html><html><head><meta charset=utf-8>
 <meta name=viewport content='width=device-width,initial-scale=1'>
-<title>Tech Lab — Freak Town Party</title></head>
+<title>Tech Lab — FUNNIER Party</title></head>
 <body style='background:#0a0a0f;color:#eee;font-family:monospace;text-align:center;padding:32px 16px'>
 <div style='color:#ff2fa8;letter-spacing:2px'>TECH LAB</div>
 <h1>TEST THE TECH</h1>
@@ -88,7 +89,7 @@ VOICE_RIG = """<!DOCTYPE html><html><head><meta charset=utf-8>
 <body style='background:#0a0a0f;color:#eee;font-family:monospace;text-align:center;padding:32px 16px'>
 <div style='color:#ff2fa8'>TECH LAB · E2 VOICE</div>
 <h1>SAY IT</h1>
-<textarea id=t rows=3 style='width:min(92vw,480px);font-size:16px;background:#111;color:#eee;border:1px solid #333;border-radius:10px;padding:10px'>Welcome to Freak Town. I am not optimistic.</textarea><br><br>
+<textarea id=t rows=3 style='width:min(92vw,480px);font-size:16px;background:#111;color:#eee;border:1px solid #333;border-radius:10px;padding:10px'>Welcome to FUNNIER. I am not optimistic.</textarea><br><br>
 <button onclick='say()' style='font-size:18px;padding:12px 32px;background:#ff2fa8;border:0;color:#fff;border-radius:24px'>SPEAK</button>
 <p id=m style='color:#888'></p><audio id=a controls style='margin-top:12px'></audio>
 <script>
@@ -210,6 +211,25 @@ def lab_servo():
 
 PROP_OPS = {"uv_sphere", "cube", "cylinder", "torus", "cone", "plane"}
 PROP_STYLES = {"matcap", "anime", "noir", "clay", "hero"}
+
+
+@lab_bp.route("/party/acting/preview", methods=["POST"])
+def acting_preview():
+    """Free, deterministic staging preview for stand-up or Party actors.
+
+    Supply text + Mutuals-style beats + measured word timings. No external
+    model, voice provider, camera or paid inference is called.
+    """
+    data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict) or len(str(data.get("text", ""))) > 4000:
+        return jsonify({"ok": False, "error": "invalid or oversized request"}), 400
+    try:
+        output = compile_harness_beats(data.get("text", ""),
+                                       data.get("beats", []), data.get("words", []),
+                                       data.get("capabilities", {}))
+    except (ValueError, TypeError) as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    return jsonify({"ok": True, **output})
 
 
 @lab_bp.route("/party/prop/validate", methods=["POST"])

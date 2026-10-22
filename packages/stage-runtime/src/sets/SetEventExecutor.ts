@@ -6,11 +6,16 @@
  *   camera.cut {camera}          accepted too when the camera is a cue of this set
  *   set.auto_director {on}
  *   dialogue.line {seat,text}    speaker mouth + auto cut (skipped on replay once it's over)
- *   overlay.lower_third / overlay.ticker / overlay.headline
+ *   overlay.lower_third / overlay.ticker / overlay.headline (+ wall card fields: layout/body/figure/credit)
+ *   set.theme {style, palette, lighting…}   show style (newsroom)
+ *   set.camera {cue, move_ms?, creep?}      eased move / slow push-in (newsroom)
  *   seat.join {seat,name,avatar_url}  a human/bot takes a seat (BASIC by default)
  *   poker.*                      cards / chips / reactions
+ *   gaze.look {seat,target,duration_ms}   scripted look (sketch) — overrides "listeners watch the speaker"
+ *   stage.move {seat,to,duration_ms}      walk to another seat/mark (sketch move-to)
+ *   overlay.blackout {on,fade_ms}         fade to black (sketch ending)
  */
-import type { ShowEvent } from '@freaktown/contracts';
+import type { SetThemePayloadV1, ShowEvent } from '@funnier/contracts';
 import type { EventConsumer } from '../EventConsumer';
 import type { SetStage } from './SetStage';
 import { estimateLineMs } from './textMouth';
@@ -48,7 +53,7 @@ export class SetEventExecutor {
         break;
       }
       case 'set.camera':
-        if (typeof p.cue === 'string') s.cut(p.cue, p.source === 'auto_director' ? 'auto_director' : 'human_director');
+        if (typeof p.cue === 'string') s.cut(p.cue, p.source === 'auto_director' ? 'auto_director' : 'human_director', { move_ms: p.move_ms, ease: p.ease, creep: p.creep, creep_ms: p.creep_ms });
         break;
       case 'camera.cut':
         if (typeof p.camera === 'string' && s.definition && !/^[A-Z_]+$/.test(p.camera)) s.cut(p.camera, 'human_director');
@@ -79,7 +84,19 @@ export class SetEventExecutor {
         s.ticker(Array.isArray(p.items) ? p.items.map(String) : []);
         break;
       case 'overlay.headline':
-        s.headline(String(p.text ?? ''), p.kicker);
+        s.headline(String(p.text ?? ''), p.kicker, p.layout || p.body || p.figure || p.credit ? { layout: p.layout, body: p.body, figure: p.figure, credit: p.credit, image_url: p.image_url, image_license: p.image_license } : undefined);
+        break;
+      case 'gaze.look':
+        if (typeof p.seat === 'string' && p.target) s.look({ seat: p.seat, target: p.target, duration_ms: Number(p.duration_ms ?? 1200), snap: p.snap });
+        break;
+      case 'stage.move':
+        if (typeof p.seat === 'string' && typeof p.to === 'string') s.moveTo({ seat: p.seat, to: p.to, duration_ms: Number(p.duration_ms ?? 1200) });
+        break;
+      case 'overlay.blackout':
+        s.blackout({ on: p.on !== false, fade_ms: p.fade_ms });
+        break;
+      case 'set.theme':
+        if (typeof p.style === 'string') s.theme(p as SetThemePayloadV1);
         break;
       default:
         if (event.type.startsWith('poker.') && event.type !== 'poker.intent') s.poker(event.type, p);

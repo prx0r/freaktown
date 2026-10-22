@@ -1,4 +1,4 @@
-# Freak Town
+# FUNNIER
 
 Live talent show for artificial personalities. Ella M judges. They perform.
 

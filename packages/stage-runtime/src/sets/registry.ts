@@ -35,14 +35,14 @@ export function validateSetDefinition(def: SetDefinition): void {
 }
 
 /** Seat lookup by id, then role (first match), then numeric index ("2" or "seat2" style). */
-export function findSeat(def: Pick<SetDefinition, 'seats'>, ref: string): SeatAnchor | undefined {
+export function findSeat(def: Pick<SetDefinition, 'seats'> & { marks?: SeatAnchor[] }, ref: string): SeatAnchor | undefined {
   const r = ref.trim();
   const byId = def.seats.find((s) => s.id === r);
   if (byId) return byId;
   const byRole = def.seats.find((s) => s.role === r);
   if (byRole) return byRole;
   if (/^\d+$/.test(r)) return def.seats[Number(r)];
-  return undefined;
+  return def.marks?.find((m) => m.id === r);
 }
 
 /** The built-in sets. Comedy club stays set #1 (classic StageRuntime renders it). */

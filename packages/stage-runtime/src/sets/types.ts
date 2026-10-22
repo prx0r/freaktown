@@ -37,6 +37,11 @@ export interface CameraPresetDef {
   label?: string;
   /** Slow orbit around `target` (rad/s). */
   orbit?: number;
+  /**
+   * Portrait framing (aspect < 1, phones): replaces position/target and uses `fov`
+   * as the vertical FOV as-is (no automatic widening). Additive (newsroom).
+   */
+  portrait?: { position: Vec3; target: Vec3; fov: number };
 }
 
 export interface LightingRig {
@@ -63,6 +68,23 @@ export interface EnvironmentDef {
   };
 }
 
+/**
+ * Optional pre-built environment that REPLACES the procedural decor (walls, deck, curtains, crowd) while
+ * keeping the set's lights, camera presets and fitted props. Opt-in per page (e.g. ?clubset=dive); the
+ * procedural builder stays the default and the fallback if the GLB fails to load.
+ */
+export interface SetVariantDef {
+  id: string;
+  label: string;
+  url: string;
+  license: string;
+  source: string;
+  /** glTF node names to hide (parts the runtime draws itself, e.g. the fitted mic, the light cone). */
+  hideNodes?: string[];
+  /** glTF node whose bounding-box centre the set's sign text moves onto. */
+  signNode?: string;
+}
+
 export type OverlayHook = 'lower_third' | 'ticker' | 'headline' | 'on_air' | 'speaker_strap' | 'poker_hud';
 
 export interface SetDefinition {
@@ -71,6 +93,12 @@ export interface SetDefinition {
   description: string;
   environment: EnvironmentDef;
   seats: SeatAnchor[];
+  /**
+   * Extra standing positions characters can walk to (stage.move / sketch move-to).
+   * Not cast seats: nothing sits there until something moves there. Camera cues
+   * ("close:<mark>") and gaze targets resolve marks like seats.
+   */
+  marks?: SeatAnchor[];
   cameras: Record<string, CameraPresetDef>;
   /** Cue used on load and when nobody is talking. */
   defaultCamera: string;
@@ -79,6 +107,8 @@ export interface SetDefinition {
   overlays: OverlayHook[];
   /** Ordered camera buttons for /control. */
   controlCameras: string[];
+  /** Optional GLB environments (see SetVariantDef); none of them is loaded unless asked for. */
+  variants?: SetVariantDef[];
   /** Max seats a cast may fill (defaults to seats.length). */
   maxCast?: number;
 }

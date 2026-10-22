@@ -36,7 +36,7 @@ class Character:
 
     @staticmethod
     def from_bundle(slug: str, character: dict, avatar: dict | None = None) -> "Character":
-        """Freak Town bundle files → portable Character. Renderers vary;
+        """FUNNIER bundle files → portable Character. Renderers vary;
         the record is stable."""
         rt = ((avatar or {}).get("appearance") or {}).get("runtime", {})
         return Character(

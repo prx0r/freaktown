@@ -1,4 +1,4 @@
-"""Freak Town config — env vars with sensible defaults."""
+"""FUNNIER config — env vars with sensible defaults."""
 
 import os
 

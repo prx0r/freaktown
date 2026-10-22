@@ -20,7 +20,7 @@ import subprocess
 from backend.services.tts.base import TTSAdapter, TTSResult, ProviderInfo
 from backend.models.draft import WordTiming
 
-logger = logging.getLogger("freak_town.tts.chattts")
+logger = logging.getLogger("funnier.tts.chattts")
 
 COMEDY_TAGS = [
     "[uv_break]", "[lbreak]",

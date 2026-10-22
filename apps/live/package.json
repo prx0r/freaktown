@@ -1,5 +1,5 @@
 {
-  "name": "@freaktown/live",
+  "name": "@funnier/live",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,12 +10,15 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@freaktown/contracts": "*",
-    "@freaktown/stage-runtime": "*",
+    "@funnier/contracts": "*",
+    "@funnier/newsroom": "*",
+    "@funnier/sketch": "*",
+    "@funnier/stage-runtime": "*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.0",
-    "zustand": "^5.0.1"
+    "zustand": "^5.0.1",
+    "@funnier/party": "*"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",

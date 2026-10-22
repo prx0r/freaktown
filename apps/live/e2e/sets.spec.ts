@@ -10,7 +10,7 @@ import { test, expect, type Page, type ConsoleMessage, type BrowserContext } fro
 import fs from 'node:fs';
 import path from 'node:path';
 
-const SHOTS = path.join(process.env.SHOTS_DIR || '/workspace/work/freaktown-live/shots', 'sets');
+const SHOTS = path.join(process.env.SHOTS_DIR || '/workspace/work/funnier-live/shots', 'sets');
 fs.mkdirSync(SHOTS, { recursive: true });
 const Q = 'quality=low&cpuskin=1';
 
@@ -114,7 +114,7 @@ test('podcast: 3 characters trade lines with active-speaker auto cuts', async ({
   expect(errors).toEqual([]);
 });
 
-test('poker: 4 bots + a human from /play play a hand to showdown; stage reflects the human', async ({ context }) => {
+test('poker: 5 bots + a human from /play play a hand to showdown; stage reflects the human', async ({ context }) => {
   test.setTimeout(300_000);
   const errors: string[] = [];
   const { control, stage } = await open(context, 'sets-poker', errors);

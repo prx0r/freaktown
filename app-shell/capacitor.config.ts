@@ -6,7 +6,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 // push for show nights. Web fallback paths already in editor.html.
 const config: CapacitorConfig = {
   appId: 'town.freak.blackroom',
-  appName: 'Freak Town',
+  appName: 'FUNNIER',
   webDir: 'www',
   server: {
     url: 'https://freaktown.egoic.ai',

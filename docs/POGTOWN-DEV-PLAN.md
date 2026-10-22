@@ -31,7 +31,7 @@ Two modes from day one, same canonical identities and JokeBlocks:
 | Repo | Owns | New role |
 |---|---|---|
 | Pogtown | Rooms, Freak Packs, stand-up events, reactions, replay, director cuts, clip metadata | Spatial performance runtime |
-| Freaktown | Comedians, set delivery, host/Ella, TTS show flow | Principal comedy-writing + performance-control service |
+| FUNNIER | Comedians, set delivery, host/Ella, TTS show flow | Principal comedy-writing + performance-control service |
 | Pogpet | Character assets, GLB pipeline, voice/video infra | Canonical puppet bodies and rigs |
 | New spatial pkg | — | Marble jobs, Spark renderer, anchors, GLB composition (LATER) |
 | Comedy mining | Set foundations exist | Theory-grounded premise search, rehearsal, evaluation, memory |
@@ -106,8 +106,8 @@ retries, runtime commits authoritative state only.
 
 ## Boundaries
 
-Character mesh/body: Pogpet. Comic psychology: Freaktown (by
-character ID). JokeBlocks/sets: Freaktown. Worlds/calibration:
+Character mesh/body: Pogpet. Comic psychology: FUNNIER (by
+character ID). JokeBlocks/sets: FUNNIER. Worlds/calibration:
 Pogtown. Performance/game events: Pogtown. Media: R2. Audience
 evidence: Pogtown records. Publishing: auth store. Replay pins
 resolved snapshot IDs so later edits can't rewrite old shows.

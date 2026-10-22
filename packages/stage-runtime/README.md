@@ -1,4 +1,4 @@
-# @freaktown/stage-runtime
+# @funnier/stage-runtime
 
 Extracted from Killella `apps/web/src/stage/` (see `docs/migration/KILLELLA_IMPORT.md`).
 It accepts data/events. It renders. No React, no Green Room, no pages.
@@ -26,7 +26,7 @@ Architecture, run and deploy notes: `docs/LIVE-STAGE.md`; extending it:
 2. ~~`EventConsumer` binds `useShowStore`~~ → injected `RoomStore`
    (`applyEvent/setEpisode/setPhase/setCrowd`); apps/live passes
    `showRoomStore`, tests use `createMemoryRoomStore()`.
-3. ~~`../contracts/show` + app store types~~ → `@freaktown/contracts`
+3. ~~`../contracts/show` + app store types~~ → `@funnier/contracts`
    (`packages/contracts`), the one place; edge re-exports it.
 
 `StageRenderer.ts` (a second, older renderer) was removed: one renderer.

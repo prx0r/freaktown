@@ -11,7 +11,7 @@ import os
 from backend.services.tts.base import TTSAdapter, TTSResult, ProviderInfo
 from backend.models.draft import WordTiming
 
-logger = logging.getLogger("freak_town.tts.edge")
+logger = logging.getLogger("funnier.tts.edge")
 
 EDGE_VOICES = {
     "en-US-GuyNeural": {"name": "Guy", "gender": "male", "style": "neutral"},

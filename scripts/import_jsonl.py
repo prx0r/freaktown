@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Replayable, idempotent JSONL importers (§15).
 
-Reads legacy freaktown JSONL state (funnel/reactions/votes/party rooms),
+Reads legacy funnier JSONL state (funnel/reactions/votes/party rooms),
 normalizes each line to {"source","ts",...}, dedupes by content hash, and
 writes var/imports/<name>.jsonl. Reruns produce byte-identical output.
 Missing sources are skipped (exit 0) — import what exists.
