@@ -118,19 +118,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
-        with: { pattern: perform-frames-*, merge-multiple: true, path: frames }
+        with: { pattern: perform-frames-*, merge-multiple: true, path: dl }
       - name: Encode with the programme audio + throughput summary
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg >/dev/null
-          ls frames/*.png | wc -l
-          ffmpeg -y -loglevel error -framerate 25 -start_number 1 -i frames/f_%04d.png -i sets/blender/perform/$CLIP/vo.m4a \
+          # artifacts keep their paths below out/: dl/frames/f_NNNN.png, dl/frames/stats_K.json
+          ls dl/frames/*.png | wc -l
+          ffmpeg -y -loglevel error -framerate 25 -start_number 1 -i dl/frames/f_%04d.png -i sets/blender/perform/$CLIP/vo.m4a \
             -map 0:v -map 1:a -shortest -vf "scale=out_color_matrix=bt709:out_range=tv,format=yuv420p" -c:v libx264 -crf 19 \
             -preset slow -color_range tv -colorspace bt709 -color_primaries bt709 -color_trc bt709 -c:a aac -b:a 128k \
             -movflags +faststart newsroom_perform_$CLIP.mp4
           ls -la *.mp4
           python3 - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
           import glob, json
-          st = [json.load(open(f)) for f in sorted(glob.glob("frames/stats_*.json"))]
+          st = [json.load(open(f)) for f in sorted(glob.glob("dl/frames/stats_*.json"))]
           fr = sum(s["frames"] for s in st); rs = sum(s["render_s"] for s in st)
           steady = [s["steady_s_per_frame"] for s in st if s.get("steady_s_per_frame")]
           print(f"### Blender performance bake throughput\n")

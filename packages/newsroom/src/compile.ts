@@ -178,9 +178,13 @@ export function compile(rundown: RundownV1, timings: TimingsInput = {}, opts: Co
     for (const h of heads) if (h.t_ms > swap && h.t_ms < sh.end_ms) { h.payload = { ...h.payload, layout: 'ambient', card_layout: h.payload.layout }; }
     const next = dir.shots[i + 1];
     if (next && next.cls !== 'one' && next.cls !== 'reaction') {
-      const back = [...heads].reverse().find((h) => h.t_ms <= next.start_ms);
-      const fresh = heads.find((h) => h.t_ms > next.start_ms && h.t_ms - next.start_ms <= 1500 && h.payload.layout !== 'ambient');
-      if (back && !fresh) extra.push({ t_ms: next.start_ms, type: 'overlay.headline', payload: { ...back.payload, layout: (back.payload.card_layout as string) ?? back.payload.layout, card_layout: undefined } });
+      // an eased pull-out (the close) still frames the cropped wall for a while: keep it ambient until 60% of
+      // the move, mirroring the push-in swap above, so the card's title never slides in clipped at the edge
+      const backAt = next.start_ms + Math.round((next.move_ms ?? 0) * 0.6);
+      for (const h of heads) if (backAt > next.start_ms && h.t_ms >= next.start_ms && h.t_ms < backAt && h.payload.layout !== 'ambient') { h.payload = { ...h.payload, layout: 'ambient', card_layout: h.payload.layout }; }
+      const back = [...heads].reverse().find((h) => h.t_ms <= backAt);
+      const fresh = heads.find((h) => h.t_ms > backAt && h.t_ms - backAt <= 1500 && h.payload.layout !== 'ambient');
+      if (back && !fresh) extra.push({ t_ms: backAt, type: 'overlay.headline', payload: { ...back.payload, layout: (back.payload.card_layout as string) ?? back.payload.layout, card_layout: undefined } });
     }
   });
   for (const e of extra) { if (e.payload.card_layout === undefined) delete e.payload.card_layout; ev.push(e); }

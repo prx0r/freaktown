@@ -65,8 +65,8 @@ exports[`compile > matches the snapshot (timeline shape) 1`] = `
     "141930 face.expression",
     "141930 dialogue.line",
     "143030 overlay.headline [ambient] Fixture Night",
-    "148674 overlay.headline [close] Fixture Night",
     "148674 set.camera wide",
+    "152874 overlay.headline [close] Fixture Night",
     "159973 audio.sting",
   ],
   "shots": [

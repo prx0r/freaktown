@@ -152,9 +152,10 @@ CUE_MARK = {"wide": "wide", "anchor1-single": "close", "close:anchor1": "close",
 
 def mark_pose(cam):
     """(position, target, fov_deg) of a camera mark: target 1 m along its view axis."""
-    m = cam.matrix_world
-    pos = m.translation.copy()
-    fwd = (m.to_3x3() @ Vector((0, 0, -1))).normalized()
+    # from location/rotation, not matrix_world: a camera made this run has no evaluated matrix until a
+    # depsgraph update (reading it gave the origin, looking at the floor: black frames)
+    pos = cam.location.copy()
+    fwd = (cam.rotation_euler.to_matrix() @ Vector((0, 0, -1))).normalized()
     return pos, pos + fwd * (cam.data.dof.focus_distance or 3.0), math.degrees(cam.data.angle_y)
 
 
@@ -379,7 +380,9 @@ def bake(sc, tl, clip, cams, arm, binding, fps, seed=7):
             for pb in (chest, neck, head):
                 if pb is not None:
                     pb.keyframe_insert("rotation_quaternion", frame=frame)
-        rec.append({"f": frame, "t_ms": round(t), "cam": shot["mark"] if shot else "wide", "mouth": round(mouth, 3),
+        rec.append({"f": frame, "t_ms": round(t), "cam": shot["mark"] if shot else "wide",
+                    "cam_pos": [round(x, 3) for x in pos], "cam_tgt": [round(x, 3) for x in tgt], "fov": round(fov, 2),
+                    "mouth": round(mouth, 3),
                     "vis": last_vis if mouth > 0.01 else None, "blink": round(bl, 2),
                     "affect": {k: round(v, 2) for k, v in aff.items()}})
     sc.camera = prog
