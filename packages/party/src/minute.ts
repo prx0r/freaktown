@@ -29,6 +29,8 @@ export interface MinuteLine {
   hold_ms: number;
   /** Words to hit (rendered as emphasis in captions; slows them slightly). */
   emphasis: string[];
+  /** True once the human has set the emphasis by hand (even to nothing): the agent's re-suggest keeps it. */
+  emphasis_user?: boolean;
 }
 
 export interface MinuteDraft { schema: 'funnier.minute/v1'; id: string; title: string; premise: string; performer: string; performer_name: string; lines: MinuteLine[] }
@@ -81,8 +83,15 @@ export function draftMinute(premise: string, performer: PartyIdentity, seed = pr
   return { schema: 'funnier.minute/v1', id: `minute-${performer.id.replace(/^[a-z]+\./, '')}-${Math.floor(rng() * 1e6).toString(36)}`, title: cap(premise.replace(/[.!]+$/, '')), premise, performer: performer.id, performer_name: performer.name, lines: suggestDelivery(lines, performer) };
 }
 
-/** The agent's delivery suggestions (the human can override any of them). */
+/**
+ * The agent's delivery suggestions (the human can override any of them).
+ * Re-suggesting never overwrites emphasis the human chose (`emphasis_user`).
+ */
 export function suggestDelivery(lines: MinuteLine[], performer: PartyIdentity): MinuteLine[] {
+  return suggestDeliveryRaw(lines, performer).map((l, i) => (lines[i].emphasis_user ? { ...l, emphasis: lines[i].emphasis, emphasis_user: true } : l));
+}
+
+function suggestDeliveryRaw(lines: MinuteLine[], performer: PartyIdentity): MinuteLine[] {
   const home = performer.persona.delivery;
   return lines.map((l, i) => {
     const words = l.text.replace(/["—.,!?]/g, '').split(/\s+/).filter((w) => w.length > 2);

@@ -21,6 +21,7 @@ import { SetEventExecutor, SetStage, type EventConsumer } from '@funnier/stage-r
 import type { ShowEvent } from '@funnier/contracts';
 import { TntsGame, calibrateNeutral, smileScore, adjustSmile, type TntsEvent, type TntsConfig, type StageCue } from '@funnier/party';
 import { resolveAsset } from '../live/transport';
+import { IconBulb, IconHeart, IconLock, IconMic, IconSkull, IconSmile } from '../party/icons';
 import { cameraSource, recordedSource, syntheticSource, type FaceSource, type RecordedFeed } from '../party/faceSource';
 
 export const DEFAULT_AGENTS = ['pog.doug-deadline', 'pog.madame-chrysalis', 'pog.the-algorithm'];
@@ -271,14 +272,17 @@ export function TntsPage() {
       {snap?.line && snap.phase === 'turn' && snap.line.seat === perf?.seat && (
         <div data-testid="tnts-caption" className="tnts-caption"><b>{snap.line.who}:</b> {snap.line.text}</div>
       )}
-      {toast && (
-        <div data-testid="tnts-toast" className="tnts-toast">
-          {toast.type === 'smile.break' && <>😄 <b>{nameOf(toast.id)}</b> cracked{toast.by ? <> at {toast.by === HUMAN.id ? 'your' : `${nameOf(toast.by)}'s`} bit</> : null} · {toast.lives} {toast.lives === 1 ? 'life' : 'lives'} left{toast.simulated ? ' (simulated)' : ''}</>}
-          {toast.type === 'player.out' && <>💀 <b>{nameOf(toast.id)}</b> is OUT</>}
-          {toast.type === 'fairness.resting_smiler' && <>Resting smiler detected: scoring relative to your neutral face</>}
-        </div>
-      )}
-      {lighting === 'dark' && <div data-testid="tnts-lighting" className="tnts-warn">💡 Too dark to read your face — judging paused. Face a light.</div>}
+      <div className="tnts-notices" data-testid="tnts-notices">
+        {toast && (
+          <div data-testid="tnts-toast" className="tnts-toast">
+            {toast.type === 'smile.break' && <><IconSmile /> <b>{toast.id === HUMAN.id ? 'You' : nameOf(toast.id)}</b> cracked{toast.by ? <> at {toast.by === HUMAN.id ? 'your' : `${nameOf(toast.by)}'s`} bit</> : null} · {toast.lives} {toast.lives === 1 ? 'life' : 'lives'} left{toast.simulated ? ' (simulated)' : ''}</>}
+            {toast.type === 'player.out' && (toast.id === HUMAN.id ? <><IconSkull /> <b>You're out</b>: spectating now</> : <><IconSkull /> <b>{nameOf(toast.id)}</b> is out</>)}
+            {toast.type === 'fairness.resting_smiler' && <>Resting smiler detected: scoring relative to your neutral face</>}
+          </div>
+        )}
+        {human?.out && snap?.phase === 'turn' && !(toast?.type === 'player.out' && toast.id === HUMAN.id) && <div className="tnts-spect" data-testid="tnts-spectating">You're out: spectating</div>}
+        {lighting === 'dark' && <div data-testid="tnts-lighting" className="tnts-warn"><IconBulb /> Too dark to read your face — judging paused. Face a light.</div>}
+      </div>
 
       <section className="tnts-seats" data-testid="tnts-seats">
         {(snap?.seats ?? []).map((p) => (
@@ -287,14 +291,14 @@ export function TntsPage() {
               <div className="tnts-tile" ref={tileRef}>
                 {showFace && <canvas ref={faceCanvas} width={120} height={96} className="tnts-face" />}
                 {!showFace && !engine.current?.source && <div className="tnts-nocam">camera off</div>}
-                <div className="tnts-priv"><span className="long">🔒 video stays on this device · only scores leave</span><span className="short">🔒 on-device</span></div>
+                <div className="tnts-priv"><IconLock size={9} /> <span className="long">video stays on this device · only scores leave</span><span className="short">on-device</span></div>
               </div>
             ) : (
               <div className="tnts-avatar">{p.name.split(' ').map((w) => w[0]).join('').slice(0, 2)}</div>
             )}
             <div className="tnts-meta">
-              <div className="tnts-name">{p.name}{snap?.performer === p.id ? ' 🎤' : ''}</div>
-              <div className="tnts-lives" aria-label={`${p.lives} lives`}>{p.out ? 'OUT' : '❤'.repeat(Math.max(0, p.lives))}<span className="pts"> · {p.score} pts</span></div>
+              <div className="tnts-name" title={p.name}>{p.name}{snap?.performer === p.id ? <> <IconMic className="tnts-mic" /></> : ''}</div>
+              <div className="tnts-lives" aria-label={`${p.lives} lives`}>{p.out ? 'OUT' : Array.from({ length: Math.max(0, p.lives) }, (_, i) => <IconHeart key={i} />)}<span className="pts"> · {p.score} pts</span></div>
               <div className="tnts-meter"><i style={{ width: `${Math.round(p.smile * 100)}%`, background: p.smile > 0.5 ? '#ff2fa8' : '#F5C86B' }} /><em style={{ left: `${(snapThreshold(config) * 100).toFixed(0)}%` }} /></div>
               <div className="tnts-src">{p.kind === 'agent' ? 'smile: simulated (taste model)' : p.restingSmiler ? 'smile: measured · resting-smile adjusted' : showFace ? `smile: measured (${capture ? (q.get('src') ? 'recorded' : 'synthetic') : feedKind} feed)` : 'smile: measured on-device'}</div>
             </div>
@@ -330,7 +334,6 @@ export function TntsPage() {
         </div>
       )}
       <footer className="tnts-rules">Smile above {snapThreshold(config)} for {((config.holdMs ?? 400) / 1000).toFixed(1)}s = lose a life · agent smiles are simulated from their taste · your face is read on this device</footer>
-      {human?.out && snap?.phase === 'turn' && !toast && <div className="tnts-spect" data-testid="tnts-spectating">You're out: spectating</div>}
     </div>
   );
 }
@@ -347,8 +350,11 @@ const CSS = `
 .tnts-status{font-size:14px}
 .tnts-caption{position:absolute;left:50%;bottom:190px;transform:translateX(-50%);max-width:min(92%,900px);text-align:center;font-size:clamp(14px,2vw,22px);background:#0008;padding:6px 14px;border-radius:6px;z-index:6;text-shadow:0 2px 6px #000}
 .tnts-caption b{color:#F5C86B}
-.tnts-toast{position:absolute;top:52px;left:50%;transform:translateX(-50%);background:#ff2fa8;color:#fff;padding:8px 16px;border-radius:20px;font-size:15px;z-index:7;white-space:nowrap}
-.tnts-warn{position:absolute;top:96px;left:50%;transform:translateX(-50%);background:#ffd28a;color:#222;padding:6px 12px;border-radius:6px;z-index:7}
+.tnts-notices{position:absolute;top:52px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px;z-index:7;pointer-events:none;max-width:92vw}
+.tnts-toast{background:#ff2fa8;color:#fff;padding:8px 16px;border-radius:20px;font-size:15px;white-space:nowrap;box-shadow:0 4px 14px #0008}
+.tnts-toast .ic{width:1.25em;height:1.25em}
+.tnts-warn{background:#ffd28a;color:#222;padding:6px 12px;border-radius:6px}
+.tnts-spect{background:#2a2836;padding:4px 10px;border-radius:6px;font-size:12px}
 .tnts-seats{position:absolute;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;padding:10px 14px 14px;z-index:6;background:linear-gradient(#0000,#000c 30%)}
 .tnts-seat{display:flex;gap:10px;align-items:center;background:#14131cdd;border:1px solid #2a2836;border-radius:10px;padding:8px;min-width:0}
 .tnts-seat.on{border-color:#F5C86B;box-shadow:0 0 0 2px #F5C86B55}
@@ -362,13 +368,14 @@ const CSS = `
 .tnts-meta{min-width:0;flex:1}
 .tnts-rules{display:none}
 .tnts-priv .short{display:none}
-.tnts-name{font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tnts-lives{color:#ff2fa8;font-size:13px}
+.tnts-name{font-weight:700;font-size:14px;line-height:1.2;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tnts-name .tnts-mic{color:#F5C86B}
+.tnts-lives{color:#ff2fa8;font-size:13px;display:flex;align-items:center;gap:2px;flex-wrap:wrap}
 .tnts-lives .pts{color:#aaa}
 .tnts-meter{position:relative;height:7px;background:#2a2836;border-radius:4px;margin:5px 0 3px;overflow:visible}
 .tnts-meter i{display:block;height:100%;border-radius:4px;transition:width .1s}
 .tnts-meter em{position:absolute;top:-3px;width:2px;height:13px;background:#fff8}
-.tnts-src{font-size:10.5px;color:#9a98a8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tnts-src{font-size:10.5px;color:#9a98a8;line-height:1.25}
 .tnts-modal{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);background:#14131cf2;border:1px solid #2a2836;border-radius:14px;padding:20px 24px;z-index:9;width:min(460px,90vw);text-align:center}
 .tnts-modal.small{width:min(380px,88vw)}
 .tnts-modal h2{margin:0 0 8px;color:#F5C86B}
@@ -377,22 +384,23 @@ const CSS = `
 .tnts button,.tnts .btn{background:#ff2fa8;color:#fff;border:0;border-radius:8px;padding:9px 16px;font-weight:700;font-size:14px;cursor:pointer;text-decoration:none}
 .tnts .btn.ghost{background:transparent;border:1px solid #555}
 .tnts-yourturn{position:absolute;left:50%;bottom:200px;transform:translateX(-50%);background:#14131cf2;padding:10px 16px;border-radius:10px;z-index:8;display:flex;gap:10px;align-items:center;white-space:nowrap}
-.tnts-spect{position:absolute;top:52px;right:16px;background:#2a2836;padding:4px 10px;border-radius:6px;font-size:12px;z-index:7}
 @media (max-width:760px){
-  .tnts-stage{bottom:auto;height:56%}
-  .tnts-seats{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:8px;top:56%;bottom:auto;align-content:start;background:#07060a}
-  .tnts-seat{padding:6px;gap:7px}
-  .tnts-avatar{width:40px;height:40px;font-size:14px}
-  .tnts-tile{width:64px;height:56px}
+  /* phone: stage on top (62%), seat grid fills the rest above the rules line */
+  .tnts-stage{bottom:auto;height:62%}
+  .tnts-seats{grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:1fr;gap:8px;padding:8px 10px;top:62%;bottom:52px;background:#07060a}
+  .tnts-seat{padding:10px 8px;gap:9px;align-items:center}
+  .tnts-avatar{width:52px;height:52px;font-size:17px}
+  .tnts-tile{width:66px;height:66px}
   .tnts-priv .long{display:none}
   .tnts-priv .short{display:inline}
-  .tnts-name{font-size:12.5px}
-  .tnts-src{font-size:9.5px}
-  .tnts-caption{bottom:auto;top:calc(56% + 178px);font-size:15px;width:92%;background:#14131c}
-  .tnts-yourturn{bottom:12px;white-space:normal;width:90vw}
-  .tnts-toast{white-space:normal;width:max-content;max-width:92vw;font-size:13px;top:64px}
+  .tnts-name{font-size:15px}
+  .tnts-lives{font-size:14px}
+  .tnts-src{font-size:10.5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .tnts-caption{bottom:calc(38% + 10px);font-size:15px;width:92%;background:#0c0b12d9}
+  .tnts-yourturn{bottom:60px;white-space:normal;width:90vw}
+  .tnts-notices{top:66px;width:92vw}
+  .tnts-toast{white-space:normal;text-align:center;font-size:13px;padding:7px 14px}
   .tnts-top{flex-direction:column;align-items:flex-start;gap:2px;padding:8px 10px}
-  .tnts-spect{top:64px}
-  .tnts-rules{display:block;position:absolute;left:12px;right:12px;bottom:14px;font-size:11.5px;color:#8a8898;text-align:center;line-height:1.4}
+  .tnts-rules{display:block;position:absolute;left:12px;right:12px;bottom:10px;font-size:11px;color:#8a8898;text-align:center;line-height:1.35}
 }
 `;

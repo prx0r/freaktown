@@ -35,6 +35,23 @@ describe('write-a-minute', () => {
     expect(items.some((i) => i.type === 'hold_for_laugh')).toBe(true);
     expect(suggestDelivery(edited.lines, hark).find((l) => l.id === punch.id)!.delivery).toBe('deadpan');
   });
+  it('re-suggesting delivery keeps the emphasis the human set (including none)', () => {
+    const m = draftMinute(DEMO, hark);
+    const punch = m.lines.find((l) => l.role === 'punch')!;
+    const tag = m.lines.find((l) => l.role === 'tag')!;
+    const cb = m.lines.find((l) => l.role === 'callback')!;
+    const edited = m.lines.map((l) => (l.id === punch.id ? { ...l, emphasis: ['seagull', 'phone'], emphasis_user: true, delivery: 'warm' as const }
+      : l.id === tag.id ? { ...l, emphasis: ['eyes'], emphasis_user: true }
+        : l.id === cb.id ? { ...l, emphasis: [], emphasis_user: true } : l));
+    const again = suggestDelivery(edited, hark);
+    expect(again.find((l) => l.id === punch.id)).toMatchObject({ emphasis: ['seagull', 'phone'], emphasis_user: true, delivery: 'deadpan' });
+    expect(again.find((l) => l.id === tag.id)!.emphasis).toEqual(['eyes']);
+    expect(again.find((l) => l.id === cb.id)!.emphasis).toEqual([]);
+    // lines the human never touched still get the agent's emphasis
+    const otherPunch = m.lines.filter((l) => l.role === 'punch')[1];
+    expect(again.find((l) => l.id === otherPunch.id)!.emphasis).toEqual(otherPunch.emphasis);
+    expect(otherPunch.emphasis.length).toBe(1);
+  });
   it('submits as a performance (funnier.sketch/v1 on the comedy club) that compiles', () => {
     const sub = submitMinute(draftMinute(DEMO, hark), 'identities/agent.hark-lantern.glb', '2026-10-22T00:00:00Z');
     expect(sub.performance).toMatchObject({ schema: 'funnier.sketch/v1', set: 'comedy-club' });
