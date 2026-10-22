@@ -50,10 +50,10 @@
  "Candle Chance": 0.2,
  "Table Spacing": 1.4,
  "_look": {
-  "key": 500,
+  "key": 900,
   "rim": 40,
   "neon": 30,
-  "house": 160,
+  "house": 110,
   "house_color": "#E8F0FF",
   "wash": 40,
   "haze": 0.15,

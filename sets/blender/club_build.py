@@ -620,9 +620,11 @@ def neon(mats):
     z = g.input("Sign Height Above Stage", "FLOAT", 3.25, min=0.5, max=15.0, subtype="DISTANCE",
                 desc="Centre height (clamped below the ceiling)")
     col = g.input("Neon Color", "COLOR", lin("#FF2FA0"), desc="Tube colour")
-    with g.frame("Placement: centred on the back wall, kept 0.25 m under the ceiling"):
+    drape = g.input("Back Drape", "BOOL", False, desc="A drape hangs on the back wall: mount the sign in front of it")
+    with g.frame("Placement: centred on the back wall (in front of a drape), kept 0.35 m under the ceiling"):
         zc = g.math("MINIMUM", z, g.math("SUBTRACT", g.math("SUBTRACT", H, g.math("MULTIPLY", h, 0.5)), 0.35))
-        centre = g.combine(0.0, g.math("SUBTRACT", wy, 0.06), zc)
+        off = g.math("ADD", 0.06, g.math("MULTIPLY", drape, 0.3))
+        centre = g.combine(0.0, g.math("SUBTRACT", wy, off), zc)
     with g.frame("Tubes: rounded rectangles swept by a 15 mm circle"):
         def tube(ww, hh, rr):
             q = g.node("GeometryNodeCurvePrimitiveQuadrilateral", Width=ww, Height=hh)["Curve"]
@@ -657,6 +659,8 @@ def spot(mats):
                      desc="Radius of the pool of light on the stage")
     strength = g.input("Beam Strength", "FLOAT", 0.35, min=0.0, max=5.0, desc="Brightness of the visible cone")
     col = g.input("Beam Color", "COLOR", (1.0, 0.92, 0.8, 1.0), desc="Cone colour")
+    show = g.input("Show Beam", "BOOL", True, desc="Draw the visible cone (off for the performer's-eye view, "
+                                                   "which sits inside it)")
     with g.frame("Lamp position: under the ceiling, Spot Throw in front, aimed at the floor behind the performer"):
         lamp = g.combine(0.45, g.math("MULTIPLY", throw, -1.0), g.math("SUBTRACT", H, 0.45))
         target = (0.0, 0.15, 0.0)
@@ -674,6 +678,7 @@ def spot(mats):
         cone = store(g, cone, "club_beam_color", col, "FLOAT_COLOR", "POINT")
         cone = store(g, cone, "club_beam_strength", strength, "FLOAT", "POINT")
         cone = part(g, setmat(g, cone, mats["beam"]), 9)
+        cone = switch(g, "GEOMETRY", show, None, cone)
     with g.frame("Hardware: truss across the room, the key can and two coloured side cans"):
         ls = g.separate(lamp)
         ty = ls["Y"]
@@ -794,11 +799,11 @@ def audience(mats):
         scat = g.group(sc, Surface=area, Instance=tbl, Density=dens, Seed=seed, Align=0.0,
                        **{"Min Distance": spacing})
         in_aisle = g.math("LESS_THAN", g.math("ABSOLUTE", g.separate(position(g))["X"]),
-                          g.math("ADD", g.math("MULTIPLY", aisle, 0.5), 0.35))
+                          g.math("ADD", g.math("MULTIPLY", aisle, 0.5), 0.8))
         tables = g.node("GeometryNodeDeleteGeometry", props={"domain": "INSTANCE"}, Geometry=scat["Instances"],
                         Selection=in_aisle)["Geometry"]
         in_aisle2 = g.math("LESS_THAN", g.math("ABSOLUTE", g.separate(position(g))["X"]),
-                           g.math("ADD", g.math("MULTIPLY", aisle, 0.5), 0.35))
+                           g.math("ADD", g.math("MULTIPLY", aisle, 0.5), 0.8))
         tpts = g.node("GeometryNodeDeleteGeometry", props={"domain": "POINT"}, Geometry=scat["Points"],
                       Selection=in_aisle2)["Geometry"]
         tidx = g.node("GeometryNodeInputIndex")["Index"]
@@ -1038,8 +1043,10 @@ def cameras(sc, mod):
     H = value(mod, "Ceiling Height")
     back = wy - D
     wide_y = max(back + 0.6, -8.2)
-    wide = S.camera("Wide", lens=24.0, loc=(1.2, wide_y, min(1.85, H - 0.4)), target=(0.0, 0.0, 1.1))
-    eye = S.camera("Performer Eye", lens=20.0, loc=(0.0, 0.05, 1.62), target=(0.0, back, 0.4 - R))
+    rows = value(mod, "Theatre Rows")
+    wide = S.camera("Wide", lens=24.0, loc=(0.25, wide_y, min(1.85 + (1.0 if rows else 0.0), H - 0.9)),
+                    target=(0.0, 0.0, 1.1))
+    eye = S.camera("Performer Eye", lens=20.0, loc=(0.0, 0.05, 1.62), target=(0.0, back, 0.7 - R))
     return {"wide": wide[0], "eye": eye[0]}
 
 
@@ -1079,7 +1086,7 @@ def render_setup(sc, width, height, samples):
 
 
 # ---- export ----------------------------------------------------------------------------------------------------------
-BAKE_PARTS = {1: 1024, 2: 2048, 3: 1024, 4: 1024, 5: 1024, 11: 512, 12: 512, 14: 1024, 18: 512}
+BAKE_PARTS = {1: 1024, 2: 2048, 3: 1024, 4: 1024, 5: 1024, 11: 512, 12: 512}
 EMISSIVE_PARTS = {8, 9, 15, 16}
 
 
@@ -1213,12 +1220,74 @@ def bake_part(sc, ob, size, workdir):
     return img
 
 
-def export_glb(sc, holder, path, bake=0, workdir="/tmp"):
+def vertex_colors(objs):
+    """Crowd parts carry their colour per vertex instead of a texture (a baked atlas of 100k faces is mush):
+    people = clothes (nk_color) or skin (club_skin, club_tone), bottles = nk_color, seats = club_seat_color."""
+    import numpy as np
+
+    def read(me, name, comps):
+        a = me.attributes.get(name)
+        n = len(me.vertices)
+        if a is None or a.domain != "POINT":
+            return None
+        buf = np.zeros(n * comps, dtype=np.float32)
+        a.data.foreach_get("color" if comps == 4 else "value", buf)
+        return buf.reshape(n, comps) if comps > 1 else buf
+
+    lo, hi = np.array(lin("#4A2C1E")[:3]), np.array(lin("#D9A88A")[:3])
+    for pid, ob in objs.items():
+        me = ob.data
+        n = len(me.vertices)
+        if pid == 14:
+            cloth, skin, tone = read(me, "nk_color", 4), read(me, "club_skin", 1), read(me, "club_tone", 1)
+            if cloth is None:
+                continue
+            skin = np.zeros(n) if skin is None else skin
+            tone = np.full(n, 0.5) if tone is None else tone
+            sk = lo[None, :] * (1 - tone[:, None]) + hi[None, :] * tone[:, None]
+            rgb = cloth[:, :3] * (1 - skin[:, None]) + sk * skin[:, None]
+        elif pid in (13, 18):
+            c = read(me, "nk_color" if pid == 13 else "club_seat_color", 4)
+            if c is None:
+                continue
+            rgb = c[:, :3]
+        else:
+            continue
+        col = me.color_attributes.new("Col", "FLOAT_COLOR", "POINT")
+        col.data.foreach_set("color", np.concatenate([rgb, np.ones((n, 1))], axis=1).astype(np.float32).ravel())
+        me.color_attributes.active_color = col
+        me["club_vcol"] = 1
+
+
+CROWD_PARTS = (14, 18, 12, 13)        # audience, theatre seats, chairs, bottles: the bulk of a big house
+
+
+def decimate_crowd(objs, budget):
+    """Keep the GLB light: if the set has more faces than budget, collapse-decimate the crowd parts (never the
+    room, stage, props or sign) by one shared ratio, at least 0.2."""
+    total = sum(len(o.data.polygons) for o in objs.values())
+    heavy = [objs[p] for p in CROWD_PARTS if p in objs]
+    hf = sum(len(o.data.polygons) for o in heavy)
+    if total <= budget or not hf:
+        return 1.0
+    ratio = max(0.2, (budget - (total - hf)) / hf)
+    for ob in heavy:
+        md = ob.modifiers.new("Decimate", "DECIMATE")
+        md.ratio = ratio
+        with bpy.context.temp_override(object=ob, active_object=ob, selected_objects=[ob]):
+            bpy.ops.object.modifier_apply(modifier=md.name)
+    print(f"DECIMATE crowd parts to {ratio:.2f} ({total} faces > budget {budget})")
+    return ratio
+
+
+def export_glb(sc, holder, path, bake=0, workdir="/tmp", budget=60000):
     """Realize + split by club_part, swap every material for a glTF-friendly Principled (baked albedo where
     baking is on, attribute or flat colour otherwise, emission for neon/candles/exit), export GLB (Y up)."""
     objs = split_parts(holder, sc)
     holder.hide_render = True
     holder.hide_set(True)
+    vertex_colors(objs)
+    decimate_crowd(objs, budget)
     neon_c = value(holder.modifiers[0], "Neon Color")
     flat = {2: lin("#5A2C22"), 1: lin("#16120F"), 3: lin("#1A1418"), 4: lin("#2E1C10"), 5: lin("#5E0B16"),
             6: lin("#202024"), 7: lin("#2A2A2E"), 10: lin("#0E0D10"), 11: lin("#2A1810"), 12: lin("#2C1A12"),
@@ -1243,6 +1312,11 @@ def export_glb(sc, holder, path, bake=0, workdir="/tmp"):
             mat = principled("club_exit_mat", color=(0, 0, 0, 1), emit=lin("#21FF6A"), emit_strength=4.0)
         elif img is not None:
             mat = principled(f"{ob.name}_mat", rough=0.75, image=img)
+        elif me.get("club_vcol"):
+            mat = principled(f"{ob.name}_mat", color=(1, 1, 1, 1), rough=0.3 if pid == 13 else 0.8)
+            ca = mat.node_tree.nodes.new("ShaderNodeVertexColor")
+            ca.layer_name = "Col"
+            mat.node_tree.links.new(ca.outputs["Color"], mat.node_tree.nodes["Principled BSDF"].inputs["Base Color"])
         else:
             c = mean_attr_color(ob, attr_col[pid], flat.get(pid)) if pid in attr_col else flat.get(pid, lin("#555555"))
             metal = 1.0 if pid in (6, 7) else 0.0
@@ -1254,12 +1328,28 @@ def export_glb(sc, holder, path, bake=0, workdir="/tmp"):
         if not bake:
             for uv in list(me.uv_layers):
                 me.uv_layers.remove(uv)
+    # only the crowd's "Col" may reach glTF as COLOR_0 (three.js multiplies any COLOR_0 into the albedo)
+    for ob in objs.values():
+        me = ob.data
+        for ca in [c for c in me.color_attributes if c.name != "Col"]:
+            me.color_attributes.remove(ca)
+        for at in [a for a in me.attributes if a.data_type in {"FLOAT_COLOR", "BYTE_COLOR"} and a.name != "Col"]:
+            me.attributes.remove(at)
+    # an empty at the key lamp, so the web stage can hang its own spot and cone where this room's lamp is
+    mod = holder.modifiers[0]
+    lamp = bpy.data.objects.new("club_key_lamp", None)
+    lamp.location = (0.45, -value(mod, "Spot Throw"), value(mod, "Ceiling Height") - 0.45)
+    sc.collection.objects.link(lamp)
+    names = {ob.name for ob in objs.values()} | {lamp.name}
     for o in sc.objects:
-        o.select_set(o.name in {ob.name for ob in objs.values()})
-    bpy.ops.export_scene.gltf(filepath=str(path), export_format="GLB", use_selection=True, export_apply=True,
-                              export_yup=True, export_image_format="JPEG", export_jpeg_quality=82,
-                              export_attributes=False, export_cameras=False, export_lights=False,
-                              export_extras=False, export_materials="EXPORT")
+        o.select_set(o.name in names)
+    kw = dict(filepath=str(path), export_format="GLB", use_selection=True, export_apply=True, export_yup=True,
+              export_image_format="JPEG", export_jpeg_quality=82, export_attributes=False, export_cameras=False,
+              export_lights=False, export_extras=False, export_materials="EXPORT")
+    try:
+        bpy.ops.export_scene.gltf(**kw, export_vertex_color="MATERIAL")
+    except TypeError:
+        bpy.ops.export_scene.gltf(**kw)
     return {PARTS.get(pid, pid): len(ob.data.polygons) for pid, ob in objs.items()}
 
 
@@ -1275,6 +1365,7 @@ def main():
     ap.add_argument("--samples", type=int, default=64)
     ap.add_argument("--glb", default="")
     ap.add_argument("--bake", type=int, default=0, help="bake albedo textures up to this size (0 = flat colours)")
+    ap.add_argument("--face-budget", type=int, default=60000, help="decimate the crowd above this many faces")
     ap.add_argument("--turntable", default="", help="directory for a camera-move frame sequence")
     ap.add_argument("--frames", type=int, default=240)
     ap.add_argument("--tt-width", type=int, default=1280)
@@ -1313,10 +1404,12 @@ def main():
         if bpy.context.window:
             bpy.context.window.scene = sc
         for v in a.views.split(","):
+            inspect.set_modifier_inputs(mod, {"Show Beam": v != "eye"})
             sc.camera = cams[v]
             sc.render.filepath = str(rd / f"club_{pname}_{v}.png")
             bpy.ops.render.render(write_still=True, scene=sc.name)
             print("RENDERED", sc.render.filepath)
+        inspect.set_modifier_inputs(mod, {"Show Beam": True})
     if a.turntable:
         td = pathlib.Path(a.turntable).resolve()
         td.mkdir(parents=True, exist_ok=True)
@@ -1343,7 +1436,9 @@ def main():
     if a.glb:
         p = pathlib.Path(a.glb).resolve()
         p.parent.mkdir(parents=True, exist_ok=True)
-        counts = export_glb(sc, ob, p, bake=a.bake, workdir=str(p.parent))
+        bake_dir = p.parent / f"{p.stem}_bake"
+        bake_dir.mkdir(exist_ok=True)
+        counts = export_glb(sc, ob, p, bake=a.bake, workdir=str(bake_dir), budget=a.face_budget)
         print("GLB", p, p.stat().st_size, json.dumps(counts))
 
 
