@@ -1,0 +1,54 @@
+{
+ "Room Width": 18.0,
+ "Room Depth": 20.0,
+ "Ceiling Height": 8.0,
+ "Riser Height": 0.9,
+ "Theatre Rows": true,
+ "Crowd": 0.85,
+ "Clutter": 0.0,
+ "Paint Cover": 0.0,
+ "Side Curtain Width": 3.0,
+ "Neon Color": [
+  1.0,
+  0.43966,
+  0.02732,
+  1.0
+ ],
+ "Seed": 5,
+ "Brick Color": [
+  0.06848,
+  0.02315,
+  0.016,
+  1.0
+ ],
+ "Curtain Color": [
+  0.19462,
+  0.00304,
+  0.00913,
+  1.0
+ ],
+ "Valance": true,
+ "Stage Width": 12.0,
+ "Stage Depth": 5.5,
+ "Rake": 0.28,
+ "Row Pitch": 1.0,
+ "Spot Throw": 9.0,
+ "Spot Radius": 1.2,
+ "Beam Strength": 0.4,
+ "Sign Width": 5.0,
+ "Sign Height": 1.2,
+ "Folds Per Metre": 2.4,
+ "Fold Depth": 0.16,
+ "_look": {
+  "key": 2600,
+  "rim": 400,
+  "neon": 120,
+  "house": 260,
+  "wash": 220,
+  "haze": 0.3,
+  "haze_color": "#2C2026",
+  "haze_depth": 26,
+  "ambient": "#140C10",
+  "haze_start": 4.0
+ }
+}
