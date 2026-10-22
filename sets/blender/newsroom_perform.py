@@ -371,7 +371,8 @@ def bake(sc, tl, clip, cams, arm, binding, fps, seed=7):
             sway = 0.025 * math.sin(ts * 0.45 + 0.7)
             # three.js head pitch +x looks down; Blender world: about +X tips the face (-Y) down too
             neck_aa = [((0, 0, 1), yaw * 0.4), ((1, 0, 0), -(pitch * 0.4) + nod * 0.4)]
-            head_aa = [((0, 0, 1), yaw * 0.6), ((1, 0, 0), -(pitch * 0.6) + nod * 0.6), ((0, 1, 0), sway)]
+            # pose matrices are absolute (armature space): the head carries the whole turn, the neck its 0.4 share
+            head_aa = [((0, 0, 1), yaw), ((1, 0, 0), -pitch + nod), ((0, 1, 0), sway)]
             rotate_from_base(chest, [((1, 0, 0), 0.01 * math.sin(ts * 2 * math.pi / 4.2))])
             rotate_from_base(neck, neck_aa)
             rotate_from_base(head, head_aa)
