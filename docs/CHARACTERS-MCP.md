@@ -21,7 +21,7 @@ Browse the results at **`/characters3`** in the live app.
 
 Prerequisite (once): `npm ci` in the repo root (Node 20+). The server runs
 TypeScript directly through `vite-node`, which is already a dev dependency.
-Replace `/ABS/freaktown` with your checkout path.
+Replace `/ABS/<checkout>` with your checkout path.
 
 ### Claude Desktop
 

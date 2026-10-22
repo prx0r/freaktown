@@ -15,7 +15,7 @@ from .dsp import SR, envelope, smooth_ar, blocks_to_samples
 
 def measure(path: str) -> dict:
     """Integrated LUFS, LRA and true peak (dBTP) of any file ffmpeg can decode (wav, aac in mp4...)."""
-    p = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", path, "-map", "0:a:0", "-af", "ebur128=peak=true:framelog=quiet",
+    p = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", path, "-map", "0:a:0", "-af", "ebur128=peak=true",
                         "-f", "null", "-"], capture_output=True, text=True)
     s = p.stderr
     tail = s[s.rfind("Summary:"):]
