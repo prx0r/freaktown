@@ -1,5 +1,5 @@
-// Canonical TypeScript wire contracts for the freaktown stage.
-// Home: packages/contracts (@freaktown/contracts). Edge + stage-runtime
+// Canonical TypeScript wire contracts for the funnier stage.
+// Home: packages/contracts (@funnier/contracts). Edge + stage-runtime
 // re-export this file; never fork it.
 // GENERATED MIRROR — source of truth is split, deliberately:
 //   - show-event shapes mirror /home/ubuntu/freaktown/backend/contracts.py

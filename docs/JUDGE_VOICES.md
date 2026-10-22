@@ -1,4 +1,4 @@
-# Freak Town Judge Voices
+# FUNNIER Judge Voices
 
 > Each judge gets their own voice, personality, and information access level.
 

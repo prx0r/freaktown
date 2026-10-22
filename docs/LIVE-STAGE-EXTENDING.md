@@ -4,6 +4,15 @@ Companion to [`LIVE-STAGE.md`](LIVE-STAGE.md). Every recipe keeps the three
 rules: **contracts in one place** (`packages/contracts`), **control only sends
 commands**, **the stage only obeys events**. Paths are from the repo root.
 
+> **News shows:** for rundown-driven news (anchors, reporters, wall headlines,
+> a BBC-Ed-style camera director, show styles, headless MP4 render) use the
+> newsroom SDK: [`docs/NEWSROOM-SDK.md`](NEWSROOM-SDK.md) (`packages/newsroom`).
+>
+> **Sketches:** for scripted comedy in any set (beats, stage directions,
+> persistent identities, laugh holds, a comedy shot grammar, headless MP4
+> render) use the sketch layer: [`docs/SKETCH-SHOW.md`](SKETCH-SHOW.md)
+> (`packages/sketch`).
+
 ---
 
 ## 1. Add a character
@@ -152,7 +161,7 @@ and `performance.{expression,gesture,look}` in the delivery. To precompute inste
 (e.g. a server endpoint), send the plan inline:
 
 ```ts
-import { adaptSealedSet } from '@freaktown/stage-runtime';
+import { adaptSealedSet } from '@funnier/stage-runtime';
 const plan = adaptSealedSet({ timeline, mouthCues, setPlan, durationMs });
 await client.preloadPerformance({ performance_id, audio_url, avatar_url, plan });
 ```
@@ -297,7 +306,7 @@ CHROMIUM_PATH=/usr/bin/chromium NO_PROXY=127.0.0.1 npx playwright test
 #   live-stage.spec.ts  control→stage (local): clock, mouth, face, blink, cuts,
 #                       pause/resume, reactions, screenshots; BASIC + mobile; late join
 #   room.spec.ts        same over wrangler dev EpisodeRoom (needs ROOM_URL)
-SHOTS_DIR=/tmp/shots npx playwright test   # where screenshots go (default /workspace/work/freaktown-live/shots)
+SHOTS_DIR=/tmp/shots npx playwright test   # where screenshots go (default /workspace/work/funnier-live/shots)
 ```
 
 Python stays as before: `pytest tests/contract -q`, `python3 test_party.py`.
@@ -402,7 +411,7 @@ otherwise load the publisher's CC0 CDN URL (CORS) and rely on the procedural fal
 
 - **comedy-club** — set #1; one standing seat; rendered by the classic `StageRuntime`
   (sealed-set plans, VRM visemes). `set.load {setId:'comedy-club'}` switches back.
-- **news-studio** — anchors `anchor1`/`anchor2` seated behind a curved FREAK NEWS desk;
+- **news-studio** — anchors `anchor1`/`anchor2` seated behind a curved FUNNIER NEWS desk;
   video wall (canvas texture) shows `overlay.headline`; lower third + scrolling ticker.
   Cameras: wide, anchor1-single, anchor2-single, two-shot, screen (3/4 over-shoulder with
   the wall). Demo: 3 headlines, anchor + co-anchor tag, scripted cuts.
@@ -654,3 +663,26 @@ Tests: `packages/stage-runtime/tests/face.test.ts` (maps, smileFusion/affect par
 fail-closed cases, sealed-set measured words + acting overlay, FaceChannel layering/staleness,
 BASIC + GLB `setBlendshapes`); e2e podcast test sends `face.expression` and a synthetic
 ARKit stream from the Set panel and checks the seat's face telemetry.
+
+## 11. News shows: the newsroom SDK
+
+Rundown-driven news on the `news-studio` set lives in `packages/newsroom`.
+It covers a Sofie-style rundown (show → segment → story → piece), show styles
+(`goodnight` calm, `default-news` brisk), a camera director that follows BBC
+R&D's Ed rules plus broadcast grammar, `compile()` to the set events above,
+procedural wall cards, the `/newsroom/:id` page and a headless render CLI.
+Channel adapters live in the channel's own repo. Full guide:
+[`docs/NEWSROOM-SDK.md`](NEWSROOM-SDK.md).
+
+## 12. Sketches: the sketch layer
+
+Scripted sketches in any set live in `packages/sketch`. A
+`funnier.sketch/v1` script contains a cast of persistent `pog.*`
+identities on seats, plus scenes → beats → lines and stage directions
+(look, react, gesture, move, pause, hold_for_laugh, headline, prop,
+camera, button, blackout). `compileSketch()` lays it on one clock, plans
+gaze, directs cameras (Ed timing plus a comedy grammar: game-reveal wide,
+reaction cutaways, no cuts inside laugh windows) and emits the set events
+above. It has a `/sketch` page and a headless render CLI
+(`npm run sketch:render`). Full guide, direction reference and timing
+knobs: [`docs/SKETCH-SHOW.md`](SKETCH-SHOW.md).

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Freak Town MCP server — Black Room tools.
+"""FUNNIER MCP server — Black Room tools.
 
 The LLM driver writes the comedy. MCP does the stage work:
 - detect_beats: split a minute into beats with pauses
@@ -30,7 +30,7 @@ BASE = Path(__file__).parent
 AUDIO_DIR = BASE / "audio_output"
 AUDIO_DIR.mkdir(exist_ok=True)
 
-server = MCPServer("freaktown")
+server = MCPServer("funnier")
 
 
 # ── Beat detection (same rules as black_room.py) ────────────────────
@@ -173,7 +173,7 @@ def detect_beats(text: str) -> dict:
 async def compose_minute(text: str, voice: str = "en-US-AriaNeural", pauses_json: str = "") -> dict:
     """TTS each beat then join with EXACT silence. Returns the WAV path and timing.
     pauses_json (optional): e.g. '{"b3": 1200}' to override pause_after_ms per beat.
-    Freak Town owns timing — TTS only speaks the chunks."""
+    FUNNIER owns timing — TTS only speaks the chunks."""
     beats = _detect_beats(text)
     if pauses_json.strip():
         try:

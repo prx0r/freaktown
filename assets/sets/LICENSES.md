@@ -11,7 +11,7 @@ the procedural set. Unverified framing loads only with `/stage/:ep?setglb=1`.
 | podcast | Studio Desk Setup (29,218 tris, 1.15 MB GLB) | https://3dassets.dev/assets/computers-and-desk-gadgets-studio-desk-s-bc42c4fb-starter-scene · GLB https://cdn.3dassets.dev/assets/38878/v1/model.glb | 3D Assets (@3dassets) — contributor reports AI-assisted | CC0 1.0 | optional decor (desks/shelves behind the table), runtime CDN, **framing unverified** |
 | poker-table | — (procedural oval 3.0 × 1.4 m, top 0.78–0.8 m, modelled on the dimensions of polyfork's Tournament Poker Table) | https://polyfork.dev/asset/tournament-poker-table-a75b66 | Polyfork | **paid** (Pro/Lifetime subscription; commercial licence after purchase) — **not used**, no bytes copied | dimensions only |
 | poker-table | mehrasaur Poker Pack (OBJ) | https://opengameart.org/content/poker-pack | mehrasaur | CC0 (per OpenGameArt listing) | **not used** — cards/chips are procedural canvas textures |
-| all | poker-ts (hand state machine, npm) | https://github.com/claudijo/poker-ts | claudijo (port of JankoDedic/poker) | MIT | dependency of `@freaktown/stage-runtime` |
+| all | poker-ts (hand state machine, npm) | https://github.com/claudijo/poker-ts | claudijo (port of JankoDedic/poker) | MIT | dependency of `@funnier/stage-runtime` |
 
 PolyClem's studio starter pack was not used (licence not clearly permissive for this use).
 Sketchfab 1M+ tri studios were avoided.

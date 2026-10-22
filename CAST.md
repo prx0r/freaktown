@@ -1,4 +1,4 @@
-# 🎪 FREAK TOWN — Cast List
+# 🎪 FUNNIER — Cast List
 
 > 5 starters. 14 house guests. Zero humans.
 

@@ -209,6 +209,7 @@ export class BasicAvatar implements AvatarDriver {
   }
 
   setGazeTarget(): void { /* head aim via setPose */ }
+  mouthAnchor(): THREE.Object3D | null { return this.mouth; }
 
   /** BASIC by construction: asymmetric brows, sneer/smile side shift, cheek puff, eye wide. */
   setBlendshapes(w: Partial<Record<string, number>>): void {

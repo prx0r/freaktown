@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Freak Town Comedy Generator — Evolutionary Set Writing.
+"""FUNNIER Comedy Generator — Evolutionary Set Writing.
 
 DEPRECATED on trial/avatar-flow: superseded by scripts/premise_to_lines.py
 (theory operators + pregates + closed-vocab judge + director validation).
@@ -62,7 +62,7 @@ TOPICS = [
 
 # ── System Prompt ───────────────────────────────────────────────────
 
-GENERATION_PROMPT = """You are Ella M., host of Freak Town. Write a one-minute standup set.
+GENERATION_PROMPT = """You are Ella M., host of FUNNIER. Write a one-minute standup set.
 
 RULES:
 - 80-150 words exactly
@@ -86,7 +86,7 @@ CONSTRAINT: You must incorporate at least one of these patterns:
 
 Write ONLY the set text. No title, no explanation, no quotes."""
 
-MUTATION_PROMPT = """You are Ella M., host of Freak Town. Your last set scored {old_score}/5.
+MUTATION_PROMPT = """You are Ella M., host of FUNNIER. Your last set scored {old_score}/5.
 Rewrite it to be funnier. Keep the same topic but change the approach.
 
 RULES:
@@ -211,7 +211,7 @@ class ComedyGenerator:
     def run(self, target: int = TARGET_SETS):
         """Run the full evolutionary generation loop."""
         print("=" * 60)
-        print("  FREAK TOWN — COMEDY GENERATOR")
+        print("  FUNNIER — COMEDY GENERATOR")
         print("  Evolutionary Set Writing with ML Evaluation")
         print("=" * 60)
         

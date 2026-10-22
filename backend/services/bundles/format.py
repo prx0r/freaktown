@@ -19,7 +19,7 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
-logger = logging.getLogger("freak_town.bundle")
+logger = logging.getLogger("funnier.bundle")
 
 BUNDLE_VERSION = "freaktown.bundle.v1"
 

@@ -24,7 +24,7 @@ import httpx
 from backend.services.tts.base import TTSAdapter, TTSResult, ProviderInfo
 from backend.models.draft import WordTiming
 
-logger = logging.getLogger("freak_town.tts.gemini")
+logger = logging.getLogger("funnier.tts.gemini")
 
 GEMINI_VOICES = {
     "Puck": {"name": "Puck", "gender": "male", "style": "playful"},

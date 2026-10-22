@@ -11,7 +11,7 @@
  * reacts to events it receives. Nothing mutates the stage directly.
  */
 
-import type { ShowEvent } from '@freaktown/contracts';
+import type { ShowEvent } from '@funnier/contracts';
 
 export type LiveRole = 'stage' | 'audience' | 'puppeteer';
 

@@ -8,7 +8,7 @@
  *     apps/live wires its zustand showStore; tests use createMemoryRoomStore.
  */
 
-import type { ShowEvent, ShowPhase } from '@freaktown/contracts';
+import type { ShowEvent, ShowPhase } from '@funnier/contracts';
 
 export interface ClockSink {
   setCurrentTime(ms: number): void;

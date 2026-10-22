@@ -22,7 +22,7 @@ from sqlalchemy import select
 from backend.db import async_session
 from backend.models import Episode, Appearance, ShowEvent
 
-logger = logging.getLogger("freak_town.legacy")
+logger = logging.getLogger("funnier.legacy")
 
 router = APIRouter()
 

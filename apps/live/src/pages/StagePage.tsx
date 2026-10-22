@@ -17,7 +17,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { EventConsumer, SET_REGISTRY, StageEventExecutor, StageRuntime, type StageTelemetry } from '@freaktown/stage-runtime';
+import { EventConsumer, SET_REGISTRY, StageEventExecutor, StageRuntime, type StageTelemetry } from '@funnier/stage-runtime';
 import { SetStagePage } from './SetStagePage';
 import { showClockSink, showRoomStore, useShowStore } from '../store/showStore';
 import { createTransport, resolveAsset, transportMode } from '../live/transport';

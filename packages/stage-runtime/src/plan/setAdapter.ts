@@ -21,7 +21,7 @@
 import { compileHarnessBeats } from '../face/harnessBeats';
 import type {
   CameraCue, CameraPresetV1, MotionCue, MouthSpan, PerformancePlan, PlanBeat, WordTiming,
-} from '@freaktown/contracts';
+} from '@funnier/contracts';
 
 export interface TimelineBeat {
   beat_id: string;

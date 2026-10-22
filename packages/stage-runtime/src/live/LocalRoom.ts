@@ -11,7 +11,7 @@
 import {
   applyEpisodeEvent, initialEpisodeState, validateCameraCut,
   type EpisodeState, type ShowEvent,
-} from '@freaktown/contracts';
+} from '@funnier/contracts';
 
 export interface KeyValueStorage {
   getItem(key: string): string | null;

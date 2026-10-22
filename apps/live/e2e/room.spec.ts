@@ -45,6 +45,6 @@ test('EpisodeRoom transport: control → DO → stage (token-gated)', async ({ c
   // The DO persisted the stage ACK as an event (replay invariant).
   const types = await stage.evaluate(() => window.__stage!.executor.executed.map((e) => e.type));
   expect(types).toEqual(expect.arrayContaining(['show.start', 'performance.preload', 'performance.ready', 'performance.start', 'camera.cut']));
-  await stage.screenshot({ path: '/workspace/work/freaktown-live/shots/stage_room_mode.png' });
+  await stage.screenshot({ path: '/workspace/work/funnier-live/shots/stage_room_mode.png' });
   expect(errors, errors.join('\n')).toEqual([]);
 });

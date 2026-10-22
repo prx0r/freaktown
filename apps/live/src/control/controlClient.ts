@@ -10,8 +10,8 @@
  * That invariant is what makes replay/ML possible later.
  */
 
-import type { CommandResult, LiveTransport } from '@freaktown/stage-runtime';
-import { EpisodeRoomTransport } from '@freaktown/stage-runtime';
+import type { CommandResult, LiveTransport } from '@funnier/stage-runtime';
+import { EpisodeRoomTransport } from '@funnier/stage-runtime';
 
 export type { CommandResult };
 

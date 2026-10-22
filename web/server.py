@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Freak Town — Ella's Stage.
+"""FUNNIER — Ella's Stage.
 
 Minimal web server. Ella does 1-minute sets.
 You listen, laugh, clap. That's it.
@@ -85,7 +85,7 @@ SETS = [
             "starts talking about hustle culture from the fourteenth century? "
             "You laugh, you cry, you question every decision that led you to this moment. "
             "That's comedy. "
-            "That's Freak Town."
+            "That's FUNNIER."
         ),
     },
     {
@@ -231,7 +231,7 @@ class StageHandler(SimpleHTTPRequestHandler):
 
 def main():
     print(f"""
-\033[36m\033[1m  FREAK TOWN — Ella's Stage\033[0m
+\033[36m\033[1m  FUNNIER — Ella's Stage\033[0m
 \033[2m  http://localhost:{PORT}\033[0m
 \033[2m  Press Ctrl+C to stop\033[0m
 """)

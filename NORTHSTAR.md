@@ -12,7 +12,7 @@ BASIC procedural body stays as the guaranteed instant fallback.
 
 ## Why MetaPerson fits this codebase
 
-The Freaktown avatar path is already:
+The FUNNIER avatar path is already:
 
 ```text
 portrait → generator → avatar.glb → sniff actual capabilities → avatar.json → Freak Pack → renderers
@@ -60,7 +60,7 @@ identity"; "Unreal is a renderer, never the rules authority"). Rented
 | Runway | viral/cinematic clip | expensive | no |
 | Unreal | PogWorld/show | GPU | consumes canonical |
 
-## Two creation lanes (Freaktown is weird; MetaPerson is human)
+## Two creation lanes (FUNNIER is weird; MetaPerson is human)
 
 - `HUMANOID`: photo → MetaPerson → skeleton + face.
 - `FREAK`: portrait/prompt → three.ws / Meshy / future generators →

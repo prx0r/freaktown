@@ -36,6 +36,13 @@ export const SET_EVENT_TYPES = [
   "face.expression",
   "face.blendshapes",
   "face.affect",
+  // newsroom (additive): show-style theme + jingle/sting cue (stage ignores audio cues; render CLI mixes them)
+  "set.theme",
+  "audio.sting",
+  // sketch (additive): scripted looks, blocking moves between marks, blackout ending
+  "gaze.look",
+  "stage.move",
+  "overlay.blackout",
 ] as const;
 export type SetEventTypeV1 = (typeof SET_EVENT_TYPES)[number];
 
@@ -63,6 +70,14 @@ export interface SetCameraPayloadV1 {
   /** A camera target cue string (see header). */
   cue: string;
   source?: "human_director" | "auto_director";
+  /** Optional eased move into the shot instead of a hard cut (ms). Additive (newsroom). */
+  move_ms?: number;
+  /** Easing for move_ms: "smooth" (default, smootherstep ease-in-out) | "linear". */
+  ease?: "smooth" | "linear";
+  /** Slow push-in while the shot holds: fraction of the camera→target distance (0..0.3). */
+  creep?: number;
+  /** Duration over which creep completes (defaults to 12s). */
+  creep_ms?: number;
 }
 
 export interface DialogueLinePayloadV1 {
@@ -84,7 +99,57 @@ export interface DialogueLinePayloadV1 {
 
 export interface LowerThirdPayloadV1 { name: string; title?: string; show?: boolean }
 export interface TickerPayloadV1 { items: string[] }
-export interface HeadlinePayloadV1 { text: string; kicker?: string }
+export interface HeadlinePayloadV1 {
+  text: string;
+  kicker?: string;
+  /** Wall card layout (additive, newsroom): "headline" | "country" | "numbers" | "title" | "close" | "ambient" (background only, behind one-shots). */
+  layout?: "headline" | "country" | "numbers" | "title" | "close" | (string & {});
+  /** Secondary line (reporter name + locale, a short dek). */
+  body?: string;
+  /** The figure for a numbers card ("21.7%"). */
+  figure?: string;
+  /** Source credit shown small on the card ("Good News Network"). */
+  credit?: string;
+  /** Optional image; renderers draw it only when image_license allows it. */
+  image_url?: string;
+  image_license?: string;
+}
+
+/** set.theme — a show style for the set (newsroom). Every field optional; unknown keys ignored. */
+export interface SetThemePayloadV1 {
+  style: string;
+  palette?: { bg?: string; paper?: string; ink?: string; accent?: string; accent2?: string; muted?: string; glow?: string };
+  fonts?: { display?: string; body?: string };
+  brand?: string;
+  /** Wall painter family ("paper-sunrise" | "broadcast" | your own). */
+  wall?: { family?: string; brandLine?: string };
+  lighting?: { ambient?: string; key?: string; fill?: string; rim?: string; background?: string; exposure?: number };
+  overlay?: { lowerThird?: "broadcast" | "paper"; ticker?: { label?: string; speed_px_s?: number; enabled?: boolean }; bug?: string };
+}
+
+/** audio.sting — a jingle/sting cue on the show clock (renderers may ignore it). */
+export interface AudioStingPayloadV1 { kind: "open" | "sting" | "close" | (string & {}); asset?: string; duration_ms: number }
+
+// ── sketch (additive) ───────────────────────────────────────────────
+
+/**
+ * gaze.look — a scripted look that overrides the default gaze (listeners watch the speaker).
+ * target: "<seat>" | "camera" | "audience" | "up" | "down" | "prop:<name>" (set props: wall, table, board, cards, pot)
+ * | { point: [x, y, z] } (world). Ends after duration_ms; the default gaze resumes.
+ */
+export interface GazeLookPayloadV1 {
+  seat: string;
+  target: string | { point: [number, number, number] };
+  duration_ms: number;
+  /** Turn speed multiplier (double-takes snap: 2–3). Default 1. */
+  snap?: number;
+}
+
+/** stage.move — walk/slide a character from its current seat to another seat anchor (a mark) of the set. */
+export interface StageMovePayloadV1 { seat: string; to: string; duration_ms: number }
+
+/** overlay.blackout — fade the picture to black (on) or back up (off). */
+export interface BlackoutPayloadV1 { on: boolean; fade_ms?: number }
 
 // ── poker ───────────────────────────────────────────────────────────
 

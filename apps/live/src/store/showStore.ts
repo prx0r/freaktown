@@ -13,10 +13,10 @@ import { create } from 'zustand';
 
 import type {
   CameraPresetV1, MotionCue, PerformancePlan, ShowEvent, ShowPhase, WordTiming,
-} from '@freaktown/contracts';
-import type { RoomStore } from '@freaktown/stage-runtime';
+} from '@funnier/contracts';
+import type { RoomStore } from '@funnier/stage-runtime';
 
-// Shared shapes now live in @freaktown/contracts (one place); re-exported
+// Shared shapes now live in @funnier/contracts (one place); re-exported
 // so existing imports from this module keep working.
 export type { MotionCue, PerformancePlan, ShowEvent, ShowPhase, WordTiming };
 

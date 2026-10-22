@@ -29,7 +29,7 @@ See LIVE-STAGE-EXTENDING.md §10.
 
 | Where | What |
 |---|---|
-| `packages/contracts` (`@freaktown/contracts`) | wire types (`ShowEventV1`, cameras, `PerformancePlan`, `WordTiming`, `MotionCue`, `CameraCue`), `validateCameraCut`, **`applyEpisodeEvent`** — the one state reducer used by both the DO and LocalRoom |
+| `packages/contracts` (`@funnier/contracts`) | wire types (`ShowEventV1`, cameras, `PerformancePlan`, `WordTiming`, `MotionCue`, `CameraCue`), `validateCameraCut`, **`applyEpisodeEvent`** — the one state reducer used by both the DO and LocalRoom |
 | `packages/stage-runtime` | the renderer + executor + transports + set adapter (README there) |
 | `apps/live` | Vite + React: `/control/:ep`, `/stage/:ep`, `/live/:ep` (audience), `/`; demo sets in `public/sets/` |
 | `edge/worker` | EpisodeRoom DO (unchanged semantics; now calls the shared reducer); ws forwarding fixed; `LIVE_DEV_OPEN` for local dev |
