@@ -160,7 +160,8 @@ One kit for every preset and every show, derived from the room numbers and the c
 theatre doesn't shrink the comic to a speck), `CAM_MEDIUM` (waist-up), `CAM_CLOSE` (head and shoulders, 3/4 from
 camera-right so the mic never crosses the lips), `CAM_XCU` (eyes and mouth, f/2), `CAM_OTS` (over the comic's right
 shoulder onto the house), `CAM_PUSH_A/B` (the two ends of the slow push-in), `CAM_CROWD` (low from the stage lip,
-aimed at the measured centroid of the seated people near the stage, so a sparse open mic still has faces in it),
+aimed at the measured centroid of the seated people near the stage, so a sparse open mic still has faces in it; the lip position walks out into the house until no part of the comic or
+the mic stand is in its 20 mm frame, which matters on a shallow basement deck),
 `CAM_PERFORMER_EYE`, plus marks `MARK_EYE / MARK_MOUTH / MARK_CROWD / MARK_LIP`. Medium, close and push frame the
 eyes exactly on the upper third (camera pitch solved for cameras above or below the eye line).
 
@@ -183,6 +184,9 @@ Look fixes in this round:
   bright MToon albedo (`key_on_comic`).
 - **Basement / theatre wide:** the wide is no longer a fixed 24 mm from y = -8.2 (inside the theatre rows, a fish-eye
   in the basement): it is solved per room (see above).
+- **Crowd reverse too dark (dive):** a soft "House Spill" area light over the stage lip faces the audience (it cannot
+  reach the comic behind it), so CAM_CROWD / CAM_OTS show faces instead of silhouettes. `_look.house_spill`
+  (default 220 W; late-night TV 120 because its house is already lit).
 - OIDN denoising is explicit on CI; `CLUB_DENOISE=0` for local aarch64 previews (OIDN dies with SIGILL there).
 
 ## Expressive face proof (sets/blender/club_face.py)

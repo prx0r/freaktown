@@ -55,6 +55,34 @@ def _floor_z(room, y):
     return -R + math.floor(k + 0.5) * room.get("Rake", 0.18)
 
 
+def comic_points(eye, riser=0.0):
+    """Sample points on the comic at the mic (stands at the origin facing -Y) and the mic stand: head, shoulders,
+    hands, hips, feet, and the stand pole up to the mic head 0.13 m in front of the mouth."""
+    pts = [(0.0, 0.0, eye + 0.12), (0.0, 0.0, eye), (0.0, 0.0, 1.0), (0.0, 0.0, riser + 0.05)]
+    pts += [(sx, 0.0, z) for sx in (-0.38, 0.38) for z in (eye - 0.2, 1.0, 0.8)]
+    pts += [(0.0, -0.13, riser + f * (eye - 0.1 - riser)) for f in (0.0, 0.25, 0.5, 0.75, 1.0)]
+    return pts
+
+
+def in_frame(pos, tgt, lens, pt, aspect=16 / 9, margin=1.0):
+    """True when a world point projects inside the frame (|NDC| <= margin) of a camera at pos aimed at tgt (vertical
+    sensor fit, SENSOR_H, no roll)."""
+    f = [tgt[i] - pos[i] for i in range(3)]
+    n = math.sqrt(sum(c * c for c in f))
+    f = [c / n for c in f]
+    rn = math.hypot(f[1], f[0]) or 1.0
+    r = [f[1] / rn, -f[0] / rn, 0.0]
+    u = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]]
+    d = [pt[i] - pos[i] for i in range(3)]
+    z = sum(a * b for a, b in zip(d, f))
+    if z <= 0.05:
+        return False
+    half_h = (SENSOR_H / 2) / lens
+    y = sum(a * b for a, b in zip(d, u)) / z / half_h
+    x = sum(a * b for a, b in zip(d, r)) / z / (half_h * aspect)
+    return abs(x) <= margin and abs(y) <= margin
+
+
 def shots(room, eye, aspect=16 / 9, crowd=None):
     """Every shot as {name: dict(pos, tgt, lens, focus, fstop)} from the room numbers and the comic's eye height.
     crowd: optional (x, y, z) centroid of the seated people near the stage (measured from the built set), so the crowd
@@ -112,7 +140,19 @@ def shots(room, eye, aspect=16 / 9, crowd=None):
     if crowd is not None:
         tgt = (crowd[0], crowd[1], crowd[2])
         side = -1.0 if crowd[0] > 0 else 1.0          # shoot across the house from the other side of the lip
-    pos = (side * lip_x, front + 0.25, max(cz, 0.6))
+    # a shallow deck (basement: the lip is 0.5 m in front of the comic) puts a lip camera level with the mic: walk the
+    # candidates (this side, the other side, then further out into the house) until no part of the comic or the mic
+    # stand is in the 20 mm frame
+    pos = None
+    for dy in (0.25, -0.6, -1.2, -1.8):
+        for sd in (side, -side):
+            cand = (sd * lip_x, front + dy, max(cz, 0.6))
+            if not any(in_frame(cand, tgt, 20.0, q, aspect, 1.15) for q in comic_points(eye, R)):
+                pos = cand
+                break
+        if pos:
+            break
+    pos = pos or (side * lip_x, front + 0.25, max(cz, 0.6))
     dist = math.dist(pos, tgt)
     out["CAM_CROWD"] = dict(pos=pos, tgt=tgt, lens=20.0, focus=tuple(pos[i] + (tgt[i] - pos[i]) * 0.8 for i in range(3)),
                             fstop=2.8 if dist > 2 else 4.0)

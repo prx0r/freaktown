@@ -57,7 +57,7 @@ def test_house_avatar_file_passes():
     names, nodes = F.glb_names(vrm)
     r = F.check_face(names, nodes)
     assert r["level"] == "ok", r
-    assert r["generated"] == ["Fcl_MTH_Fun_L", "Fcl_MTH_Fun_R"]
+    assert r["generated"] == ["Fcl_MTH_Fun_L", "Fcl_MTH_Fun_R", "Fcl_MTH_Joy_L", "Fcl_MTH_Joy_R"]
 
 
 def test_side_mask():

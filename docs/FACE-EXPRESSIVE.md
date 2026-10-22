@@ -32,12 +32,19 @@ Fix: the map drives `aa → Fcl_MTH_A × 1.35`, gives I/E/U/O some A for jaw, an
 
 ## 2. The channels
 
-`open, aa, ih, ou, ee, oh, blinkL, blinkR, smileL, smileR, frown, browUp, browDown, browSad, squint, eyeWide, lookX,
-lookY`. Emotions mix into channels (`happy` = both smiles 0.8 + squint 0.35 + a little brow), and expressions are
+`open, aa, ih, ou, ee, oh, blinkL, blinkR, smileL, smileR, grin, frown, browUp, browDown, browSad, squint, eyeWide,
+lookX, lookY`. Emotions mix into channels (`happy` = both smiles 0.8 + grin 0.7 + squint 0.5 + a little brow), and expressions are
 composed from brow / eye / mouth parts, never VRoid's `Fcl_ALL_*`. While speaking, smiles and frowns are scaled down so
 they don't fight the lips; brows and eyes keep full range. A missing one-sided smile is **generated** from the
 symmetric one with the same soft side mask in both engines (`Fcl_MTH_Fun_L/R` on VRoid), so smirks work on the house
 avatar.
+
+**Readability on toon faces (CI review, round 2).** On the house VRoid a closed smile (`Fcl_MTH_Fun`, even at 1.5) is a
+faint line that doesn't read at close-up distance: the first CI `happy` and `smirk` stills looked nearly neutral. So
+`grin` (an open smile, `Fcl_MTH_Joy` on VRoid) carries `happy`, the one-sided smile adds a generated one-sided
+`Fcl_MTH_Joy_L/R` (lips part on one side: a real smirk), `open` gets the same 1.35 gain as `aa` (VRoid's A shape is
+small), surprise opens the mouth further, and eye-bone gaze is ±16° yaw / ±9° pitch (±12° barely moved the iris).
+`grin` is scaled to 0.25 while speaking so it never fights the visemes.
 
 Rigs in the map: `vroid` (Fcl_*), `arkit` (ARKit-52 + eyeLook* gaze morphs), `oculus` (viseme_*), `vrm` (presets, the
 fallback). Gaze uses eye bones when the rig has them (`J_Adj_L/R_FaceEye`, ±12° yaw / ±8° pitch).
@@ -53,7 +60,7 @@ fallback). Gaze uses eye bones when the rig has them (`J_Adj_L/R_FaceEye`, ±12�
 
 | Mesh | Result |
 |---|---|
-| `static/avatars/default-v1.vrm` (VRoid) | ok: all 16 shape channels + eye-bone gaze (smirk shapes generated) |
+| `static/avatars/default-v1.vrm` (VRoid) | ok: all 17 shape channels + eye-bone gaze (one-sided smile shapes generated) |
 | a full ARKit-52 head | ok |
 | `agent.hark-lantern.glb` (5 morphs, no skeleton; characters MCP branch) | **fail**: no brow; warns no visemes, frown, sad brow, squint, wide eyes, gaze |
 | a mesh with no recognisable shapes | fail: mouth, blink, smile, brow |

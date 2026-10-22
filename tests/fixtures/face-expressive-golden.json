@@ -194,9 +194,10 @@
   "happy_talk": {
    "browUp": 0.15,
    "ee": 0.8,
+   "grin": 0.175,
    "smileL": 0.48,
    "smileR": 0.48,
-   "squint": 0.35
+   "squint": 0.5
   },
   "smirk_left": {
    "smileL": 0.8,
@@ -213,8 +214,8 @@
   },
   "surprised": {
    "browUp": 0.9,
-   "eyeWide": 0.7,
-   "open": 0.12
+   "eyeWide": 0.9,
+   "open": 0.35
   },
   "sad": {
    "browSad": 0.72,
@@ -245,22 +246,27 @@
     "Face_Blendshape.Fcl_MTH_A": 0.125
    },
    "jaw_only": {
-    "Face_Blendshape.Fcl_MTH_A": 0.7
+    "Face_Blendshape.Fcl_MTH_A": 0.945
    },
    "happy_talk": {
     "Face_Blendshape.Fcl_BRW_Surprised": 0.18,
     "Face_Blendshape.Fcl_MTH_E": 0.8,
     "Face_Blendshape.Fcl_MTH_A": 0.32,
+    "Face_Blendshape.Fcl_MTH_Joy": 0.14,
     "Fcl_MTH_Fun_L": 0.48,
+    "Fcl_MTH_Joy_L": 0.216,
     "Fcl_MTH_Fun_R": 0.48,
-    "Face_Blendshape.Fcl_EYE_Joy": 0.147
+    "Fcl_MTH_Joy_R": 0.216,
+    "Face_Blendshape.Fcl_EYE_Joy": 0.21
    },
    "smirk_left": {
     "Fcl_MTH_Fun_L": 0.8,
+    "Fcl_MTH_Joy_L": 0.36,
     "Face_Blendshape.Fcl_EYE_Joy": 0.126
    },
    "smirk_right": {
-    "Fcl_MTH_Fun_R": 0.6
+    "Fcl_MTH_Fun_R": 0.6,
+    "Fcl_MTH_Joy_R": 0.27
    },
    "the_look": {
     "Face_Blendshape.Fcl_BRW_Angry": 0.455,
@@ -268,8 +274,8 @@
    },
    "surprised": {
     "Face_Blendshape.Fcl_BRW_Surprised": 1.08,
-    "Face_Blendshape.Fcl_EYE_Surprised": 0.7,
-    "Face_Blendshape.Fcl_MTH_A": 0.12
+    "Face_Blendshape.Fcl_EYE_Surprised": 0.9,
+    "Face_Blendshape.Fcl_MTH_A": 0.4725
    },
    "sad": {
     "Face_Blendshape.Fcl_BRW_Sorrow": 0.864,
@@ -304,13 +310,13 @@
     "browInnerUp": 0.09,
     "mouthStretchLeft": 0.48,
     "mouthStretchRight": 0.48,
-    "jawOpen": 0.24,
-    "mouthSmileLeft": 0.48,
-    "cheekSquintLeft": 0.284,
-    "mouthSmileRight": 0.48,
-    "cheekSquintRight": 0.284,
-    "eyeSquintLeft": 0.28,
-    "eyeSquintRight": 0.28
+    "jawOpen": 0.28375,
+    "mouthSmileLeft": 0.585,
+    "mouthSmileRight": 0.585,
+    "cheekSquintLeft": 0.3965,
+    "cheekSquintRight": 0.3965,
+    "eyeSquintLeft": 0.4,
+    "eyeSquintRight": 0.4
    },
    "smirk_left": {
     "mouthSmileLeft": 0.8,
@@ -339,9 +345,9 @@
     "browOuterUpLeft": 0.72,
     "browOuterUpRight": 0.72,
     "browInnerUp": 0.54,
-    "eyeWideLeft": 0.7,
-    "eyeWideRight": 0.7,
-    "jawOpen": 0.12
+    "eyeWideLeft": 0.9,
+    "eyeWideRight": 0.9,
+    "jawOpen": 0.35
    },
    "sad": {
     "browInnerUp": 0.72,
@@ -383,9 +389,9 @@
     "jawOpen": 0.7
    },
    "happy_talk": {
-    "jawOpen": 0.24,
-    "mouthSmileLeft": 0.48,
-    "mouthSmileRight": 0.48
+    "jawOpen": 0.28375,
+    "mouthSmileLeft": 0.585,
+    "mouthSmileRight": 0.585
    },
    "smirk_left": {
     "mouthSmileLeft": 0.8
@@ -395,7 +401,7 @@
    },
    "the_look": {},
    "surprised": {
-    "jawOpen": 0.12
+    "jawOpen": 0.35
    },
    "sad": {},
    "angry_flash": {},
@@ -435,6 +441,7 @@
     "blinkR",
     "smileL",
     "smileR",
+    "grin",
     "frown",
     "browUp",
     "browDown",
@@ -446,7 +453,9 @@
    "warnings": [],
    "generated": [
     "Fcl_MTH_Fun_L",
-    "Fcl_MTH_Fun_R"
+    "Fcl_MTH_Fun_R",
+    "Fcl_MTH_Joy_L",
+    "Fcl_MTH_Joy_R"
    ]
   },
   "arkit": {
@@ -463,6 +472,7 @@
     "blinkR",
     "smileL",
     "smileR",
+    "grin",
     "frown",
     "browUp",
     "browDown",
@@ -487,7 +497,8 @@
     "blinkL",
     "blinkR",
     "smileL",
-    "smileR"
+    "smileR",
+    "grin"
    ],
    "missingCore": [
     "brow"

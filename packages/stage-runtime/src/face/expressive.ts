@@ -1,7 +1,7 @@
 /**
  * Expressive face: one channel set for every mesh, with the SAME numbers in three.js and the Blender bake.
  *
- *   expressive-map.json  channels (open, aa ih ou ee oh, blinkL/R, smileL/R, frown, browUp/Down/Sad, squint,
+ *   expressive-map.json  channels (open, aa ih ou ee oh, blinkL/R, smileL/R, grin, frown, browUp/Down/Sad, squint,
  *                        eyeWide, lookX/Y) -> per-rig shape targets (VRoid Fcl_*, ARKit-52, Oculus visemes, VRM
  *                        presets) with gains (up to max_gain, so a VRoid mouth actually opens), emotion -> channel
  *                        mixes, and the check rule. sets/blender/face_express.py reads the same file.

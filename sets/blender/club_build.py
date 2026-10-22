@@ -1055,6 +1055,11 @@ def lights(sc, mod, look):
               S.srgb(look.get("wash_color", "#FFA080")), (0.0, wy, 1.0), size=4.0)
     add_light(sc, "House Glow", "AREA", (0.0, wy - D * 0.6, H - 0.05), look.get("house", 120.0),
               S.srgb(look.get("house_color", "#FFB070")), (0.0, wy - D * 0.6, -R), size=max(3.0, W * 0.6))
+    # stage spill onto the front of the house: a broad soft source over the lip, facing the audience (it can't reach
+    # the comic behind it), so the crowd reverse (CAM_CROWD / CAM_OTS) shows faces instead of silhouettes
+    front = wy - value(mod, "Stage Depth")
+    add_light(sc, "House Spill", "AREA", (0.0, front - 0.4, min(H - 0.4, 3.6)), look.get("house_spill", 220.0),
+              S.srgb(look.get("key_color", "#FFF0DC")), (0.0, front - 3.5, 0.9), size=max(3.0, min(W * 0.5, 6.0)))
     w = bpy.data.worlds.new("Club World")
     w.color = (0.0, 0.0, 0.0)
     nt = w.node_tree

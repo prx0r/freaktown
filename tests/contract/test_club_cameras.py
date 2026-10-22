@@ -73,6 +73,18 @@ def test_ots_looks_out_from_behind_the_comic():
         assert s["CAM_CROWD"]["tgt"][1] < s["CAM_CROWD"]["pos"][1]
 
 
+def test_crowd_cutaway_never_sees_the_comic_or_the_mic():
+    # basement: the lip is 0.5 m in front of the comic, so a lip camera aimed across the house caught the mic stand
+    for p in PRESETS:
+        r = room(p)
+        front = r["Back Wall Y"] - r["Stage Depth"]
+        for crowd in (None, (1.5, front - 3, 0.9), (-1.5, front - 2, 0.9), (0.3, front - 4, 0.9), (-2.2, front - 1.5, 0.9)):
+            c = CK.shots(r, EYE, crowd=crowd)[0]["CAM_CROWD"]
+            hits = [q for q in CK.comic_points(EYE, r["Riser Height"]) if CK.in_frame(c["pos"], c["tgt"], c["lens"], q)]
+            assert not hits, (p.name, crowd, c["pos"], hits)
+            assert c["tgt"][1] < c["pos"][1]
+
+
 def test_close_clears_the_mic():
     # the mic head sits 0.13 m in front of the mouth and 0.07 m below it: in CAM_CLOSE it must project below the mouth
     for p in PRESETS:

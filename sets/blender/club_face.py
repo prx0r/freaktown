@@ -37,7 +37,7 @@ STILLS = [  # name, expressive state, head (yaw, pitch_down, tilt) radians, came
     ("happy", {"emotions": {"happy": 1.0}}, (0.0, -0.03, 0.04), "CAM_CLOSE"),
     ("smirk", {"smirk": 0.9, "squint": 0.3}, (0.08, 0.0, 0.1), "CAM_CLOSE"),
     ("the-look", {"browDown": 0.45, "squint": 0.35, "lookX": -0.35, "lookY": 0.05}, (0.12, 0.03, 0.0), "CAM_XCU"),
-    ("surprised", {"emotions": {"surprised": 1.0}, "open": 0.3}, (0.0, -0.05, 0.0), "CAM_CLOSE"),
+    ("surprised", {"emotions": {"surprised": 1.0}, "open": 0.5}, (0.0, -0.05, 0.0), "CAM_CLOSE"),
     ("sad", {"emotions": {"sad": 0.9}}, (0.0, 0.1, -0.05), "CAM_CLOSE"),
     ("angry", {"emotions": {"angry": 1.0}}, (0.0, 0.06, 0.0), "CAM_CLOSE"),
     ("eye-dart", {"lookX": 0.9, "lookY": 0.15}, (-0.08, 0.0, 0.0), "CAM_XCU"),
