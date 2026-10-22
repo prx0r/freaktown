@@ -1070,8 +1070,13 @@ def seated_pose(arm):
         rot_world(arm, ll, AX3["x"], 1.45)
         up = _pb(arm, f"J_Bip_{side}_UpperArm", f"{'left' if s > 0 else 'right'}UpperArm")
         lo = _pb(arm, f"J_Bip_{side}_LowerArm", f"{'left' if s > 0 else 'right'}LowerArm")
-        rot_world(arm, up, AX3["z"], -s * 1.25)          # arm down from T-pose
-        rot_world(arm, up, AX3["y"], s * 0.35)           # a little forward
+        # VRoid sleeves/shoulder skin hang off J_Aim_* bones that sit on the upper-arm joint and AIM at the forearm
+        # (VRMC_node_constraint, which three-vrm evaluates and Blender's glTF import drops): swing them with the arm,
+        # else the T-shirt sleeves stay out in T-pose as flat "wings" beside the shoulders
+        aims = [pb for pb in (_pb(arm, f"J_Aim_{side}_Shoulder"), _pb(arm, f"J_Aim_{side}_TopsUpperArm")) if pb is not None]
+        for b in [up] + aims:
+            rot_world(arm, b, AX3["z"], -s * 1.25)       # arm down from T-pose
+            rot_world(arm, b, AX3["y"], s * 0.35)        # a little forward
         rot_world(arm, lo, AX3["x"], -0.9)               # forearm forward onto the desk
     return arm
 
