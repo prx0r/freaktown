@@ -402,7 +402,9 @@ def room(mats):
         drop = g.math("SUBTRACT", H, g.math("ADD", 0.12, rand(g, 0.0, 0.25, 0, 71, idx)))
         ps = g.node("GeometryNodeInstanceOnPoints", Points=pts, Instance=pipe,
                     Scale=g.combine(rand(g, 0.6, 1.5, 0, 72, idx), 1.0, rand(g, 0.6, 1.5, 0, 72, idx)))["Instances"]
-        ps = g.node("GeometryNodeTranslateInstances", Instances=ps, Translation=g.combine(0.0, 0.0, drop))["Instances"]
+        # world space: in local space the drop was multiplied by each pipe's thickness scale (pipes hung at head height)
+        ps = g.node("GeometryNodeTranslateInstances", Instances=ps, Translation=g.combine(0.0, 0.0, drop),
+                    **{"Local Space": False})["Instances"]
         ps = g.node("GeometryNodeRealizeInstances", Geometry=ps)["Geometry"]
         ps = part(g, setmat(g, smooth(g, ps), mats["pipe"]), 17)
     g.output("Geometry", "GEOMETRY", join(g, bw, fl, house, door, sign, ps), desc="The room")

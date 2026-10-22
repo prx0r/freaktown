@@ -100,7 +100,9 @@ export locally under emulation, and let CI (x86-64) do the Cycles stills, the ba
 ```
 
 In CI, push to the `sets-blender-club` branch (or run the **blender sets** workflow by hand) and download the
-`club-<preset>` and `club-camera-move` artifacts.
+`club-<preset>` and `club-camera-move` artifacts. The camera move (240 frames, 10 s at 24 fps) renders as four
+parallel jobs (`--chunk K/4`, one quarter of the frames each, persistent data so the BVH is built once per job)
+and an encode job that joins the frames into the MP4.
 
 ## Add a preset
 
@@ -131,6 +133,15 @@ curtains, stool, crowd), keeps the three.js lights, beam, haze and the mic fitte
 the GLB's own `club_mic` and `club_beam`, and moves the neon text onto the GLB's sign board. If the GLB fails to
 load, the procedural room comes back. `runtime.setVariantStatus()` reports which one is showing.
 `apps/live/e2e/club-variant-shots.mjs` takes desktop and mobile screenshots of each variant with the performer.
+
+## Verdict
+
+- **Blender for hero baked environments.** One node graph gives four believable rooms from a few macro
+  controls, with real bounce light, Cycles stills for docs and marketing, and baked albedo in a GLB the web
+  stage loads as-is. Builds need x86 Linux (no official arm64 Blender), so they run in CI, not on the dev box.
+- **three.js for anything live-reactive.** The spot, beam, haze, mic fitted to the performer's mouth, neon text
+  and camera cuts stay in the runtime, where they can follow the performance frame by frame. A baked GLB can't
+  react, so the variant hides its own mic and beam and keeps the three.js ones.
 
 ## Credits
 
