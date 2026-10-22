@@ -18,7 +18,8 @@
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.0",
     "zustand": "^5.0.1",
-    "@funnier/party": "*"
+    "@funnier/party": "*",
+    "@funnier/characters": "*"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",

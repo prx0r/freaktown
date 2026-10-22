@@ -20,6 +20,8 @@ below. `HANDOVER-2026-10-16.md` (repo root) is the latest build handover —
 |---|---|
 | NORTHSTAR.md | Avatar doctrine: what a freak is, body rules, VRM, face, rig |
 | CHARACTER_PACK.md | Character pack schema (how a freak's identity is described) |
+| CHARACTERS-MCP.md | /characters3 studio MCP server: install (Claude Desktop, Codex, Hark), tool reference, theory model |
+| CHARACTER-THEORY.md | The comedy character theory model (want/need, flaw, status, game, voice, taste...) with sources |
 | avataroptions.md | Renderer research: three.ws, bitHuman, Atlas, rigging options |
 | BLENDER-FACTORY.md | Headless Blender pipeline: inspect, decimate, render, export |
 | VOICE-BANK.md | Voice bank structure, voice profiles, qwen render pipeline |
