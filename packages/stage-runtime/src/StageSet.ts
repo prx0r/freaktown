@@ -5,7 +5,9 @@
  */
 
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MicStand } from './MicStand';
+import type { SetVariantDef } from './sets/types';
 
 export interface StageSetOptions {
   sign?: string;
@@ -155,6 +157,12 @@ export class StageSet {
   readonly mic: MicStand;
   private haze: THREE.Sprite[] = [];
   private hazeBase: THREE.Vector3[] = [];
+  /** Procedural room geometry a GLB variant replaces (lights, mic, beam, haze and sign text stay). */
+  private decor: THREE.Object3D[] = [];
+  private sign: THREE.Mesh;
+  private variantRoot: THREE.Object3D | null = null;
+  /** Which environment is showing: 'procedural', 'loading:<id>', '<id>' or 'error:<id>: <reason>'. */
+  variantStatus = 'procedural';
 
   constructor(scene: THREE.Scene, opts: StageSetOptions = {}) {
     scene.add(this.group);
@@ -165,14 +173,17 @@ export class StageSet {
     deck.position.set(0, -0.3, -0.1);
     deck.receiveShadow = true;
     this.group.add(deck);
+    this.decor.push(deck);
     const lip = new THREE.Mesh(new THREE.BoxGeometry(9, 0.06, 0.06), new THREE.MeshStandardMaterial({ color: 0x111111, emissive: 0x331122 }));
     lip.position.set(0, 0.0, 2.2);
     this.group.add(lip);
+    this.decor.push(lip);
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.MeshStandardMaterial({ color: 0x0b0810, roughness: 1 }));
     floor.rotation.x = -Math.PI / 2;
     floor.position.y = -0.6;
     floor.receiveShadow = true;
     this.group.add(floor);
+    this.decor.push(floor);
 
     // brick back wall
     const bricks = brickTextures();
@@ -180,12 +191,14 @@ export class StageSet {
     wall.position.set(0, 2.9, -2.3);
     wall.receiveShadow = true;
     this.group.add(wall);
+    this.decor.push(wall);
 
     // neon sign
     this.signMat = new THREE.MeshBasicMaterial({ map: neonTexture(opts.sign ?? 'FUNNIER'), transparent: true, depthWrite: false, toneMapped: false });
     const sign = new THREE.Mesh(new THREE.PlaneGeometry(4, 1), this.signMat);
     sign.position.set(0, 3.25, -2.25);
     this.group.add(sign);
+    this.sign = sign;
     const signGlow = new THREE.PointLight(0xff3fa8, 6, 6, 2);
     signGlow.position.set(0, 3.2, -1.6);
     this.group.add(signGlow);
@@ -202,6 +215,7 @@ export class StageSet {
       c.rotation.y = -side * 0.35;
       c.receiveShadow = true;
       this.group.add(c);
+      this.decor.push(c);
     }
 
     // mic stand: fitted to the performer's mouth by StageRuntime (fitMic); default for a 1.7 m body
@@ -224,6 +238,7 @@ export class StageSet {
     stool.position.set(-1.3, 0, -0.9);
     stool.traverse((o) => { (o as THREE.Mesh).castShadow = true; });
     this.group.add(stool);
+    this.decor.push(stool);
 
     // lights — key (front spot), wall wash, back/rim lights, house
     scene.add(new THREE.HemisphereLight(0x3a3060, 0x100808, 0.45));
@@ -293,6 +308,7 @@ export class StageSet {
       const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffd28a, toneMapped: false }));
       bulb.position.set(i * 1.1, 0.04, 2.15);
       this.group.add(bulb);
+      this.decor.push(bulb);
     }
 
     // audience: raked rows of head-and-shoulders silhouettes; a fresnel rim (stage spill)
@@ -326,6 +342,59 @@ export class StageSet {
       }
     }
     this.group.add(this.audience);
+    this.decor.push(this.audience);
+  }
+
+  /**
+   * Swap the procedural room for a pre-built GLB environment (a SetVariantDef). Lights, the fitted mic, the
+   * beam, haze and the sign text stay; the sign text moves onto the variant's sign board. On failure the
+   * procedural room comes back and variantStatus says why.
+   */
+  async loadVariant(v: SetVariantDef, resolveUrl: (u: string) => string = (u) => u): Promise<void> {
+    this.variantStatus = `loading:${v.id}`;
+    try {
+      const gltf = await new GLTFLoader().loadAsync(resolveUrl(v.url));
+      const root = gltf.scene;
+      root.name = `variant:${v.id}`;
+      root.traverse((o) => {
+        if (v.hideNodes?.some((n) => o.name === n || o.name.startsWith(`${n}_`) || o.name.startsWith(`${n}.`))) o.visible = false;
+        const m = o as THREE.Mesh;
+        if (m.isMesh) {
+          m.receiveShadow = true;
+          m.castShadow = !/club_(floor|wall|house|beam)/.test(m.name);
+          const mats = Array.isArray(m.material) ? m.material : [m.material];
+          for (const mat of mats) if ((mat as THREE.MeshStandardMaterial).map) (mat as THREE.MeshStandardMaterial).map!.anisotropy = 4;
+        }
+      });
+      if (this.variantRoot) this.group.remove(this.variantRoot);
+      this.variantRoot = root;
+      this.group.add(root);
+      for (const d of this.decor) d.visible = false;
+      const signNode = v.signNode ? root.getObjectByName(v.signNode) : undefined;
+      if (signNode) {
+        root.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(signNode);
+        const c = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        this.sign.position.set(c.x, c.y, box.max.z + 0.02);
+        this.sign.scale.setScalar(Math.min(1, (size.x * 0.9) / 4, (size.y * 0.9) / 1));
+      }
+      this.variantStatus = v.id;
+    } catch (e) {
+      this.clearVariant();
+      this.variantStatus = `error:${v.id}: ${e instanceof Error ? e.message : String(e)}`;
+      console.warn('[stage set]', this.variantStatus);
+    }
+  }
+
+  /** Back to the procedural room. */
+  clearVariant(): void {
+    if (this.variantRoot) this.group.remove(this.variantRoot);
+    this.variantRoot = null;
+    for (const d of this.decor) d.visible = true;
+    this.sign.position.set(0, 3.25, -2.25);
+    this.sign.scale.setScalar(1);
+    this.variantStatus = 'procedural';
   }
 
   /** Fit the mic stand to the performer's mouth (world space). */
