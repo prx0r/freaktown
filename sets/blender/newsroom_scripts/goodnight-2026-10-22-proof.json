@@ -1,0 +1,55 @@
+{
+ "title": "Goodnight News",
+ "date": "22 October 2026",
+ "about": "Proof cut of the 2026-10-22 Goodnight News script: the open, two stories (each body trimmed to its first sentence), the sign-off.",
+ "lines": [
+  {
+   "speaker": "anchor",
+   "text": "Good evening, and welcome back to Goodnight News — the channel bringing you good news from around the world.",
+   "story": null,
+   "kind": "open"
+  },
+  {
+   "speaker": "anchor",
+   "text": "Here is what the world got right today.",
+   "story": null,
+   "kind": "open"
+  },
+  {
+   "speaker": "anchor",
+   "text": "First: Euclid discovers new comet. From the European Space Agency.",
+   "story": 0,
+   "kind": "tee"
+  },
+  {
+   "speaker": "anchor",
+   "text": "The European Space Agency’s Euclid space telescope has discovered its first previously unknown comet, in images taken between 16 and 24 September 2026.",
+   "story": 0,
+   "kind": "body"
+  },
+  {
+   "speaker": "anchor",
+   "text": "Second: Earth from Space: West Antarctica. From the European Space Agency.",
+   "story": 1,
+   "kind": "tee"
+  },
+  {
+   "speaker": "anchor",
+   "text": "This image over part of West Antarctica was captured by Copernicus Sentinel-3 on 30 September 2026.",
+   "story": 1,
+   "kind": "body"
+  },
+  {
+   "speaker": "anchor",
+   "text": "That is the news the world got right today.",
+   "story": null,
+   "kind": "close"
+  },
+  {
+   "speaker": "anchor",
+   "text": "Sleep well. Same time tomorrow. Goodnight.",
+   "story": null,
+   "kind": "close"
+  }
+ ]
+}

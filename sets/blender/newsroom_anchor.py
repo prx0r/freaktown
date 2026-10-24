@@ -233,6 +233,7 @@ def seat_anchor(sc, path, seat="anchor1", desk_h=0.8, strict=True, desk_eye=DESK
     if arm is not None:
         place_hands(arm, sx, desk_h)
     eye, mouth, src = measure()
+    head_top = bbox_z(new)[1]
     hips = bone(arm, "hips")
     hip_z = wpos(arm, hips).z if hips is not None else eye.z - 0.6
     eye_base = {}
@@ -244,11 +245,11 @@ def seat_anchor(sc, path, seat="anchor1", desk_h=0.8, strict=True, desk_eye=DESK
                 pb.rotation_mode = "QUATERNION"
                 eye_base[n] = pb.rotation_quaternion.copy()
     a = {"holder": holder, "arm": arm, "faces": faces, "face": face, "check": chk, "precheck": pre,
-         "eye": eye.z, "mouth": mouth.z, "eye_xyz": tuple(eye), "mouth_xyz": tuple(mouth), "measured_by": src,
+         "eye": eye.z, "mouth": mouth.z, "head_top": head_top, "eye_xyz": tuple(eye), "mouth_xyz": tuple(mouth), "measured_by": src,
          "height": height * scale, "scale": scale, "seat_h": max(0.4, min(0.8, hip_z - 0.08)), "eye_base": eye_base,
          "objects": new, "seat": seat, "path": str(path)}
     print("ANCHOR", json.dumps({k: (round(v, 3) if isinstance(v, float) else v) for k, v in a.items()
-                                if k in ("eye", "mouth", "height", "scale", "seat_h", "measured_by", "path")}))
+                                if k in ("eye", "mouth", "head_top", "height", "scale", "seat_h", "measured_by", "path")}))
     return a
 
 

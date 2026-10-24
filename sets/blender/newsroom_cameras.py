@@ -133,11 +133,12 @@ def wall_corners(st, inset=0.0):
     return [(-hw, y, st["wall_z"] - hh), (hw, y, st["wall_z"] - hh), (hw, y, st["wall_z"] + hh), (-hw, y, st["wall_z"] + hh)]
 
 
-def anchor_points(seat, eye, mouth=None):
-    """Points on a seated anchor: head top, eyes, mouth, shoulders, chest."""
+def anchor_points(seat, eye, mouth=None, head_top=None):
+    """Points on a seated anchor: head top (measured when known), eyes, mouth, shoulders, chest."""
     x, y = seat
     mouth = eye - 0.075 if mouth is None else mouth
-    return [(x, y, eye + 0.14), (x, y, eye), (x, y - 0.06, mouth), (x - 0.2, y, eye - 0.25), (x + 0.2, y, eye - 0.25),
+    top = max(eye + 0.14, head_top or 0.0)
+    return [(x, y, top), (x - 0.12, y, top - 0.05), (x + 0.12, y, top - 0.05), (x, y, eye), (x, y - 0.06, mouth), (x - 0.2, y, eye - 0.25), (x + 0.2, y, eye - 0.25),
             (x, y - 0.05, eye - 0.32)]
 
 
@@ -165,7 +166,7 @@ def fit_wall(pos, st, margin=0.9, aim=None):
     return tgt, lens
 
 
-def shots(st, eye, mouth=None, seat="anchor1", coanchor=False):
+def shots(st, eye, mouth=None, seat="anchor1", coanchor=False, head_top=None):
     """Every shot as {name: dict(pos, tgt, lens, focus, fstop)} plus marks, from the studio numbers and the anchor's
     measured eye (and mouth) height."""
     sx, sy = SEATS[seat]
@@ -204,14 +205,18 @@ def shots(st, eye, mouth=None, seat="anchor1", coanchor=False):
     tgt, lens = fit_wall(wp, st, 0.88, aim)
     out["CAM_WALL"] = dict(pos=wp, tgt=tgt, lens=lens, focus=(0.0, st["wall_y"], st["wall_z"]), fstop=4.0)
     # screen: the wall alone; walk candidates (further back, higher) until no anchor point is in frame
-    ap = anchor_points(SEATS[seat], eye, mouth) + (anchor_points(SEATS["anchor2"], eye, mouth) if coanchor else [])
+    ap = anchor_points(SEATS[seat], eye, mouth, head_top) + (anchor_points(SEATS["anchor2"], eye, mouth, head_top) if coanchor else [])
     best = None
-    for y in (-1.2, -1.6, -2.0, -2.5, -3.0):
-        for z in (st["wall_z"] + 0.25, st["wall_z"] + 0.45, min(H - 0.3, st["wall_z"] + 0.7)):
-            p = (0.0, y, z)
-            t, ln = fit_wall(p, st, 0.94)
-            if not any(in_frame(p, t, ln, q, ASPECT, 1.04) for q in ap):
-                best = dict(pos=p, tgt=t, lens=ln, focus=(0.0, st["wall_y"], st["wall_z"]), fstop=5.6)
+    # (straight on first, then from the side away from the anchor so its head drops out of the frame's corner)
+    for x in (0.0, -0.9 * side, -1.6 * side):
+        for y in (-1.2, -1.6, -2.0, -2.5, -0.8):
+            for z in (st["wall_z"] + 0.25, st["wall_z"] + 0.45, min(H - 0.3, st["wall_z"] + 0.7)):
+                p = (x, y, z)
+                t, ln = fit_wall(p, st, 0.94)
+                if not any(in_frame(p, t, ln, q, ASPECT, 1.04) for q in ap):
+                    best = dict(pos=p, tgt=t, lens=ln, focus=(0.0, st["wall_y"], st["wall_z"]), fstop=5.6)
+                    break
+            if best:
                 break
         if best:
             break

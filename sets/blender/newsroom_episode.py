@@ -187,6 +187,13 @@ def anchor_bounds(ctx, pose, pad=0.12):
     return max(0.0, x0), min(1.0, x1), max(0.0, y0), min(1.0, y1)
 
 
+def _cpu():
+    try:
+        return next(l.split(":", 1)[1].strip() for l in open("/proc/cpuinfo") if l.startswith("model name"))
+    except Exception:
+        return "?"
+
+
 def render(ctx, rec, cuts, fd, k, nch, width, samples, plate_samples, mode, only=None):
     sc = ctx["sc"]
     fd = pathlib.Path(fd).resolve()
@@ -202,7 +209,7 @@ def render(ctx, rec, cuts, fd, k, nch, width, samples, plate_samples, mode, only
     anchor_objs = [o for o in ctx["anchor"]["objects"] if o.type == "MESH" and not o.hide_render]
     stats = {"chunk": f"{k}/{nch}", "frames": 0, "width": width, "height": H, "samples": samples, "mode": mode,
              "full_frames": 0, "full_s": 0.0, "anchor_frames": 0, "anchor_s": 0.0, "plates": 0, "plate_s": 0.0,
-             "plate_samples": plate_samples, "first_frame_s": None}
+             "plate_samples": plate_samples, "first_frame_s": None, "cpu": _cpu()}
     LK.post(sc, look)
     plates = {}
     t_all = time.time()

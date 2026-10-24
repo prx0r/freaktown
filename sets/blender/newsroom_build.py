@@ -761,8 +761,8 @@ def chair_shape(mats):
                  desc="Seat cushion height (the anchor's measured hips set it)")
     with g.frame("Seat + back (fabric), column + star base (metal)"):
         seat = xform(g, g.group(rounded_box(), Size=(0.52, 0.5, 0.09), Radius=0.03, Segments=2)["Mesh"], t=g.combine(0.0, 0.0, sh))
-        back = xform(g, g.group(rounded_box(), Size=(0.5, 0.08, 0.66), Radius=0.035, Segments=2)["Mesh"],
-                     t=g.combine(0.0, 0.27, g.math("ADD", sh, 0.4)), r=(-0.1, 0.0, 0.0))
+        back = xform(g, g.group(rounded_box(), Size=(0.48, 0.07, 0.46), Radius=0.035, Segments=2)["Mesh"],
+                     t=g.combine(0.0, 0.29, g.math("ADD", sh, 0.3)), r=(-0.12, 0.0, 0.0))
         up = store(g, join(g, seat, back), "news_color", col, "FLOAT_COLOR", "FACE")
         up = setmat(g, up, mats["fabric"])
         colm = g.group(rod(), Start=(0.0, 0.0, 0.08), End=g.combine(0.0, 0.0, g.math("SUBTRACT", sh, 0.04)), Radius=0.025,
@@ -1057,11 +1057,11 @@ def make_camera(sc, name, s):
     return ob
 
 
-def cameras(sc, mod, eye=EYE_Z, mouth=None, seat="anchor1", coanchor=False):
+def cameras(sc, mod, eye=EYE_Z, mouth=None, seat="anchor1", coanchor=False, head_top=None):
     """The camera kit (newsroom_cameras.shots) as named Blender cameras, solved from this studio's numbers and the
     anchor's measured eye/mouth height. Returns ({name: camera}, {name: spec}, studio numbers)."""
     st = CK.studio_numbers(inspect.get_modifier_inputs(mod))
-    spec, marks = CK.shots(st, eye, mouth, seat, coanchor)
+    spec, marks = CK.shots(st, eye, mouth, seat, coanchor, head_top)
     cams = {name: make_camera(sc, name, s) for name, s in spec.items()}
     for name, p in marks.items():
         e = bpy.data.objects.new(name, None)

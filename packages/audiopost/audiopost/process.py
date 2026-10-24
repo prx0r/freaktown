@@ -102,7 +102,7 @@ def build_music(n: int, plan: dict, P: dict, seed: int, sr: int = SR):
     if not q["enabled"]:
         return jin, bed
     for st in plan.get("stings", []):
-        j = music.jingle(st["kind"], seed, sr, key=q["key"], dur=st.get("dur"))
+        j = music.jingle(st["kind"], seed, sr, key=q["key"], dur=st.get("dur"), style=q.get("style", "bells"))
         i = int(st["t"] * sr)
         m = min(len(j), n - i)
         if m > 0:
@@ -111,7 +111,7 @@ def build_music(n: int, plan: dict, P: dict, seed: int, sr: int = SR):
     a = span.get("bed_from", 0.0)
     b = span.get("bed_to", n / sr)
     if q["bed_db"] > -90 and b > a:
-        bd = music.bed(b - a + 2, seed, sr, key=q["key"], bar_s=q["bar_s"])
+        bd = music.bed(b - a + 2, seed, sr, key=q["key"], bar_s=q["bar_s"], style=q.get("style", "bells"))
         i = int(a * sr)
         m = min(len(bd), n - i)
         seg = bd[:m]

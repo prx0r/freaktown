@@ -86,7 +86,8 @@ def setup(skin_name, cards_dir, anchor_path, strict=True, haze="mist", coanchor=
     NB.inspect.set_modifier_inputs(mod, {"Seat Height": an["seat_h"]})
     co = NA.seat_anchor(sc, coanchor, "anchor2", desk_h, strict) if coanchor else None
     NB.lights(sc, mod, look, an["eye"])
-    cams, spec, studio = NB.cameras(sc, mod, an["eye"], an["mouth"], "anchor1", coanchor=bool(co))
+    cams, spec, studio = NB.cameras(sc, mod, an["eye"], an["mouth"], "anchor1", coanchor=bool(co),
+                                       head_top=an["head_top"])
     sm = bpy.data.materials["news_wall_screen"]
     mixes = [n for n in sm.node_tree.nodes if n.bl_idname == "ShaderNodeMix"]
     mixes.sort(key=lambda n: int(n.label.split()[-1]) if n.label.startswith("card") else 0)

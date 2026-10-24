@@ -29,7 +29,7 @@
   "vignette": 0.32,
   "kicker": 40,
   "kicker_color": "#FFD2A0",
-  "wall_brightness": 1.15,
+  "wall_brightness": 0.55,
   "wall_px": [
    360,
    180
