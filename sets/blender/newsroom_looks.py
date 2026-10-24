@@ -107,7 +107,8 @@ def led_material(name, images, uv_px=(480, 240), strength=1.2, subpixel=0.55):
     pb = nt.nodes.new("ShaderNodeBsdfPrincipled")
     for k in ("Color", "Roughness", "Emission", "Emission Strength"):
         nt.links.new(gn.outputs[k], pb.inputs[{"Color": "Base Color", "Emission": "Emission Color"}.get(k, k)])
-    pb.inputs["Coat Weight"].default_value = 0.12
+    pb.inputs["Coat Weight"].default_value = 0.06
+    pb.inputs["Specular IOR Level"].default_value = 0.12   # black LED face: a matte anti-glare pane, not grey sheen
     pb.inputs["Coat Roughness"].default_value = 0.4
     nt.links.new(pb.outputs[0], out.inputs["Surface"])
     facs = []
