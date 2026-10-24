@@ -1,7 +1,7 @@
 """Bake a directed newsroom episode onto the anchor and render a chunk of it (Blender 5.2, Cycles CPU).
 
     blender -b --factory-startup --python sets/blender/newsroom_episode.py -- --skill <video-to-blender>/skills/procedural-blender-nodes \
-        --episode <dir from newsroom_show.py> [--anchor <vrm/glb>] [--show <id>] \
+        --episode <dir from newsroom_show.py> [--anchor <vrm/glb>] [--skin <id>] \
         [--frames out/frames --chunk 3/20 --width 1280 --samples 16 --plate-samples 32 --mode plates|full] [--keys out/keys.json]
 
 The episode directory (newsroom_show.py writes it) holds programme.json (the programme clock: reads with measured
@@ -187,7 +187,7 @@ def anchor_bounds(ctx, pose, pad=0.12):
     return max(0.0, x0), min(1.0, x1), max(0.0, y0), min(1.0, y1)
 
 
-def render(ctx, rec, cuts, fd, k, nch, width, samples, plate_samples, mode):
+def render(ctx, rec, cuts, fd, k, nch, width, samples, plate_samples, mode, only=None):
     sc = ctx["sc"]
     fd = pathlib.Path(fd).resolve()
     fd.mkdir(parents=True, exist_ok=True)
@@ -206,7 +206,7 @@ def render(ctx, rec, cuts, fd, k, nch, width, samples, plate_samples, mode):
     LK.post(sc, look)
     plates = {}
     t_all = time.time()
-    for f in range(f0, f1 + 1):
+    for f in (only or range(f0, f1 + 1)):
         r = rec[f - 1]
         locked = mode == "plates" and not r["moving"] and r["shot"] != "CAM_CRANE_A"
         sc.frame_set(f)
@@ -286,7 +286,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--skill", default="")
     ap.add_argument("--episode", required=True)
-    ap.add_argument("--show", default="")
+    ap.add_argument("--skin", default="")
     ap.add_argument("--anchor", default="")
     ap.add_argument("--fps", type=int, default=25)
     ap.add_argument("--frames", default="")
@@ -302,19 +302,19 @@ def main():
     prog = json.loads((ep / "programme.json").read_text())
     env = json.loads((ep / "env.json").read_text())["env"] if (ep / "env.json").exists() else []
     meta = json.loads((ep / "episode.json").read_text()) if (ep / "episode.json").exists() else {}
-    show = a.show or meta.get("show", "goodnight")
+    skin = a.skin or meta.get("skin", "goodnight")
     anchor = a.anchor or meta.get("anchor") or str(HERE.parent.parent / "static/avatars/default-v1.vrm")
     if not pathlib.Path(anchor).is_absolute():
         anchor = str((HERE.parent.parent / anchor).resolve())
     ts = time.time()
-    ctx = NS.setup(show, ep / "cards", anchor, strict=True)
+    ctx = NS.setup(skin, ep / "cards", anchor, strict=True)
     ctx["sc"].render.fps = a.fps
     rec, cuts = bake(ctx, prog, env, a.fps)
     print(f"BAKED {len(rec)} frames in {time.time() - ts:.1f}s; {len(cuts)} cuts", flush=True)
     print("CUTS", json.dumps([(c["t_ms"], c["shot"], c["move"][1] if c.get("move") else None) for c in cuts]))
     if a.keys:
         pathlib.Path(a.keys).parent.mkdir(parents=True, exist_ok=True)
-        pathlib.Path(a.keys).write_text(json.dumps({"fps": a.fps, "show": show, "anchor": {k: ctx["anchor"][k] for k in
+        pathlib.Path(a.keys).write_text(json.dumps({"fps": a.fps, "skin": skin, "anchor": {k: ctx["anchor"][k] for k in
                                                     ("eye", "mouth", "height", "seat_h", "measured_by", "path")},
                                                     "check": ctx["anchor"]["check"], "cuts": cuts,
                                                     "spec": {k: {kk: list(vv) if isinstance(vv, tuple) else vv for kk, vv in v.items()}
@@ -324,21 +324,8 @@ def main():
         bpy.context.window.scene = ctx["sc"]
     if a.frames:
         k, nch = (int(x) for x in a.chunk.split("/"))
-        if a.only_frames:
-            fl = [int(x) for x in a.only_frames.split(",")]
-            sub = [rec[i - 1] for i in fl]
-            for i, f in enumerate(fl):
-                pass
-            render_list(ctx, rec, fl, a.frames, a.width, a.samples, a.plate_samples, a.mode)
-        else:
-            render(ctx, rec, cuts, a.frames, k, nch, a.width, a.samples, a.plate_samples, a.mode)
-
-
-def render_list(ctx, rec, frames, fd, width, samples, plate_samples, mode):
-    """Render an explicit list of frames (local spot checks): reuse render() one frame at a time."""
-    n = len(rec)
-    for f in frames:
-        render(ctx, rec, [], fd, f - 1, n, width, samples, plate_samples, mode)
+        fl = [int(x) for x in a.only_frames.split(",")] if a.only_frames else None
+        render(ctx, rec, cuts, a.frames, k, nch, a.width, a.samples, a.plate_samples, a.mode, fl)
 
 
 if __name__ == "__main__":

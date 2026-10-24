@@ -258,7 +258,7 @@ def card_wire(skin, kind, story, date, size):
     elif kind == "signoff":
         so = skin["brand"].get("signoff", "Goodnight.")
         d.text((m, H * 0.26), so.upper(), font=font(skin, "head", 190), fill=ink)
-        d.rectangle([m, H * 0.26 + 290, m + 420, H * 0.26 + 302], fill=acc)
+        d.rectangle([m, H * 0.26 + 320, m + 420, H * 0.26 + 332], fill=acc)
     return im
 
 
