@@ -194,7 +194,12 @@ def _cpu():
         return "?"
 
 
-def render(ctx, rec, cuts, fd, k, nch, width, samples, plate_samples, mode, only=None):
+def _set(o, attr, v):
+    if getattr(o, attr) != v:          # assigning an unchanged value still re-syncs the studio under persistent data
+        setattr(o, attr, v)
+
+
+def render(ctx, rec, cuts, fd, k, nch, width, samples, plate_samples, mode, only=None, catcher="holdout"):
     sc = ctx["sc"]
     fd = pathlib.Path(fd).resolve()
     fd.mkdir(parents=True, exist_ok=True)
@@ -209,7 +214,7 @@ def render(ctx, rec, cuts, fd, k, nch, width, samples, plate_samples, mode, only
     anchor_objs = [o for o in ctx["anchor"]["objects"] if o.type == "MESH" and not o.hide_render]
     stats = {"chunk": f"{k}/{nch}", "frames": 0, "width": width, "height": H, "samples": samples, "mode": mode,
              "full_frames": 0, "full_s": 0.0, "anchor_frames": 0, "anchor_s": 0.0, "plates": 0, "plate_s": 0.0,
-             "plate_samples": plate_samples, "first_frame_s": None, "cpu": _cpu()}
+             "plate_samples": plate_samples, "catcher": catcher, "first_frame_s": None, "cpu": _cpu()}
     LK.post(sc, look)
     plates = {}
     t_all = time.time()
@@ -222,7 +227,8 @@ def render(ctx, rec, cuts, fd, k, nch, width, samples, plate_samples, mode, only
             sc.render.film_transparent = False
             sc.render.use_border = False
             for o in stud_objs:
-                o.is_shadow_catcher = False
+                _set(o, "is_shadow_catcher", False)
+                _set(o, "is_holdout", False)
             LK.post(sc, look)
             sc.cycles.samples = samples
             sc.render.filepath = str(fd / f"f_{f:04d}.png")
@@ -239,7 +245,8 @@ def render(ctx, rec, cuts, fd, k, nch, width, samples, plate_samples, mode, only
                 sc.render.film_transparent = False
                 sc.render.use_border = False
                 for o in stud_objs:
-                    o.is_shadow_catcher = False
+                    _set(o, "is_shadow_catcher", False)
+                    _set(o, "is_holdout", False)
                 LK.post(sc, dict(look, vignette=0.0, fringe=0.0))
                 sc.cycles.samples = plate_samples
                 pth = fd / f"plate_{len(plates):02d}_{r['shot']}_{r['wall']}.exr"
@@ -256,10 +263,14 @@ def render(ctx, rec, cuts, fd, k, nch, width, samples, plate_samples, mode, only
                 stats["plate_s"] += time.time() - tp
                 print(f"PLATE {pth.name} {time.time() - tp:.1f}s", flush=True)
                 t0 = time.time()
-            # the anchor alone over the plate: studio = shadow catcher, transparent film, border on the anchor
+            # the anchor alone over the plate, border on the anchor, transparent film. The studio is a holdout by default:
+            # a shadow catcher path-traces the studio twice (with and without the anchor) and measured 2.7x SLOWER than a
+            # full frame; a holdout ends camera rays on the set and keeps it in the anchor's bounce light and shadows.
+            # Cost: no contact shadow of the anchor on the desk (--catcher shadow keeps it, at the old price).
             sc.render.film_transparent = True
             for o in stud_objs:
-                o.is_shadow_catcher = True
+                _set(o, "is_shadow_catcher", catcher == "shadow")
+                _set(o, "is_holdout", catcher == "holdout")
             b = anchor_bounds(ctx, r["pose"])
             if b is None:
                 b = (0.0, 0.01, 0.0, 0.01)
@@ -302,6 +313,8 @@ def main():
     ap.add_argument("--samples", type=int, default=16)
     ap.add_argument("--plate-samples", type=int, default=32)
     ap.add_argument("--mode", default="plates", choices=["plates", "full"])
+    ap.add_argument("--catcher", default="holdout", choices=["holdout", "shadow"],
+                    help="plates mode: studio as holdout (fast) or shadow catcher (contact shadows, slow)")
     ap.add_argument("--keys", default="")
     ap.add_argument("--only-frames", default="", help="comma list of frames to render (local checks)")
     a = ap.parse_args(NB._ARGV)
@@ -332,7 +345,7 @@ def main():
     if a.frames:
         k, nch = (int(x) for x in a.chunk.split("/"))
         fl = [int(x) for x in a.only_frames.split(",")] if a.only_frames else None
-        render(ctx, rec, cuts, a.frames, k, nch, a.width, a.samples, a.plate_samples, a.mode, fl)
+        render(ctx, rec, cuts, a.frames, k, nch, a.width, a.samples, a.plate_samples, a.mode, fl, a.catcher)
 
 
 if __name__ == "__main__":

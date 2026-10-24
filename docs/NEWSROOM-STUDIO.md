@@ -84,6 +84,13 @@ python3 sets/blender/face_express.py check path/to/character.glb
 - Eye and mouth heights are measured from the shapes that move them. Every camera re-solves from those numbers, so a
   taller or shorter presenter is framed the same way.
 - Rigs: VRoid (J_Bip_*), VRM humanoid, Mixamo and Meshy bone names are all recognised.
+- Arms: a two-bone IK rests each wrist on the desk. Any animation clip shipped in the file (Meshy GLBs carry one) is
+  dropped on import; otherwise it replays on every frame and puts the arms back in the rest pose, floating above the
+  desk.
+- Materials: VRoid exports are glTF-unlit (flat, they glow under any light). They are rebuilt as lit Principled
+  materials that keep a share of emission, so the studio's key/fill/rim actually shape the face.
+- Brows: VRoid brows sit under the fringe. The shared expressive map therefore drives the matching eyelid shape with
+  each brow channel (`EYE_Surprised`, `EYE_Angry`, `EYE_Sorrow`), so serious / concerned / brow-flash read anyway.
 - Proof stills:
   `blender -b --factory-startup --python sets/blender/newsroom_studio.py -- --skill $V2B_SKILL --skin goodnight --cards out/cards/goodnight --anchor path/to/character.glb --strict --stills out/swap --views CAM_WIDE,CAM_MEDIUM,CAM_CLOSE`
 - Commit the file under `static/avatars/` and pass `--anchor` to `newsroom_show.py`, or `--anchor` to
@@ -137,6 +144,13 @@ See the PR for measured numbers. The `finish` job writes `throughput.json` with:
 - s/frame for full frames and for anchor-only frames (plates mode)
 - the cost of each plate
 - the CPU model of each runner
+
+Plates mode (`--mode plates`, the default) renders the empty studio once per (locked shot, wall card) at
+`--plate-samples`, then only the anchor, cropped to its bounds, and lays it over the plate. The studio is a
+**holdout** in the anchor pass (`--catcher holdout`, default): camera rays stop on the set, but the set still
+lights, shadows and occludes the anchor. `--catcher shadow` makes the studio a shadow catcher instead, which keeps
+the anchor's contact shadow on the desk but path-traces the studio twice: measured on CI it was no faster than a
+full frame, and locally (480 px, 8 spp) it was 2.7x slower; the holdout was 1.6x faster than a full frame there.
 
 Local previews on an aarch64 box: Blender 5.1 needs a local-only shim, and Intel OIDN crashes there, so set
 `NEWS_DENOISE=0` / `CLUB_DENOISE=0`. Never commit the shim.
