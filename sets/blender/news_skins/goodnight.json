@@ -1,0 +1,89 @@
+{
+ "id": "goodnight",
+ "about": "Goodnight News: the warm late-evening desk. Walnut and brass, moonlit windows, bookshelves, paper-and-sunrise wall cards, soft bells.",
+ "base": "goodnight",
+ "studio": {
+  "Trim Color": [
+   0.55,
+   0.36,
+   0.13,
+   1.0
+  ],
+  "Second Seat": false,
+  "Desk Lamp": true,
+  "Side Lamps": true,
+  "Plants": true,
+  "Bookshelves": true,
+  "Globe": false,
+  "Laptop": false,
+  "LED Pillars": false,
+  "Tiles X": 1,
+  "Tiles Y": 1
+ },
+ "look": {
+  "haze_color": "#3A2616",
+  "haze": 0.16,
+  "glow": 0.35,
+  "glow_threshold": 1.2,
+  "fringe": 0.01,
+  "vignette": 0.32,
+  "kicker": 40,
+  "kicker_color": "#FFD2A0",
+  "wall_brightness": 1.15,
+  "wall_px": [
+   360,
+   180
+  ],
+  "grade_tint": "#FFE8CC",
+  "grade_tint_amount": 0.15,
+  "saturation": 1.05
+ },
+ "brand": {
+  "title": "Goodnight News",
+  "tagline": "Good news from around the world",
+  "anchor_name": "The night desk",
+  "desk_text": "GOODNIGHT NEWS",
+  "card_style": "paper-sun",
+  "palette": {
+   "paper": "#F7EFDD",
+   "paper2": "#F1E3C2",
+   "ink": "#2B211B",
+   "muted": "#7A6A58",
+   "accent": "#E8B04A",
+   "accent2": "#C6862F",
+   "lower_bg": "#1E1712",
+   "lower_ink": "#F7EFDD",
+   "desk_bg": "#1A120D",
+   "desk_ink": "#F3DFB2"
+  },
+  "fonts": {
+   "head": "LibreBaskerville.ttf",
+   "italic": "LibreBaskerville-Italic.ttf",
+   "body": "Inter.ttf"
+  },
+  "signoff": "Goodnight."
+ },
+ "music": {
+  "key": "D",
+  "style": "bells",
+  "bar_s": 8.0
+ },
+ "tone": {
+  "open": [
+   "happy",
+   0.45
+  ],
+  "tee": [
+   "relaxed",
+   0.5
+  ],
+  "body": [
+   "relaxed",
+   0.3
+  ],
+  "close": [
+   "happy",
+   0.65
+  ]
+ }
+}

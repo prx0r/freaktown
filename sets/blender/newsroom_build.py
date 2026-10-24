@@ -60,6 +60,8 @@ from nodekit.materials import material as new_material  # noqa: E402
 from library.shapes import chamfer_box, rod, profile_revolve, rounded_box  # noqa: E402
 from library.materials import make_material, stucco, wood_grain, felt, glow_glass, attribute_tint, lin  # noqa: E402
 from library.post import soft_glow  # noqa: E402
+import newsroom_looks as LK  # noqa: E402
+import newsroom_cameras as CK  # noqa: E402
 
 NAME = "News Set"
 TAU = 2.0 * math.pi
@@ -68,7 +70,8 @@ PARTS = {  # news_part id -> glTF node name
     7: "news_desk_brand", 8: "news_wall_frame", 9: "news_wall_screen", 10: "news_glow", 11: "news_grid",
     12: "news_practicals", 13: "news_lampglow", 14: "news_skyline", 15: "news_glass", 16: "news_chair_anchor1",
     17: "news_chair_anchor2", 18: "news_props", 19: "news_shelves", 20: "news_plants", 21: "news_sky",
-    22: "news_ceiling", 23: "news_books",
+    22: "news_ceiling", 23: "news_books", 24: "news_desk_trim", 25: "news_globe", 26: "news_laptop",
+    27: "news_pillars",
 }
 SEATS = {"anchor1": (0.75, 0.55), "anchor2": (-0.75, 0.55)}   # Blender XY of the three.js seats
 
@@ -352,7 +355,14 @@ def screen_material(name, image_path=None, tint=(0.05, 0.06, 0.09, 1.0), strengt
     return m
 
 
-def materials(wall_card=None, brand_card=None):
+def materials(wall_card=None, brand_card=None, wall_cards=None, wall_px=(480, 240)):
+    """Studio materials. wall_cards: card PNGs for the LED wall (News LED Panel); the first is up unless a bake
+    keys the mix factors (newsroom_studio.show_card)."""
+    cards = list(wall_cards or ([wall_card] if wall_card else []))
+    if cards:
+        screen, _ = LK.led_material("news_wall_screen", [pathlib.Path(c).resolve() for c in cards], wall_px)
+    else:
+        screen = screen_material("news_wall_screen", None)
     return {
         "floor": make_material("News Floor", floor_paint(), Color="attr:news_floor_color", Gloss="attr:news_gloss"),
         "panel": make_material("News Panel", stucco, Color="attr:news_color",
@@ -361,9 +371,12 @@ def materials(wall_card=None, brand_card=None):
                                  Gloss="attr:news_gloss"),
         "black": flat_material("News Matte Black", "#0B0B0E", 0.85),
         "metal": flat_material("News Metal", "#30323A", 0.3, 1.0),
-        "brushed": flat_material("News Brushed Steel", "#9DA3AD", 0.28, 1.0),
+        "brushed": LK.brushed_material("News Brushed Steel", "#9DA3AD", 0.3),
+        "trim": LK.brushed_material("News Desk Trim", "#B8BCC4", 0.24, color_attr="news_trim_color"),
+        "globe": make_material("News Globe", attribute_tint, **{"Base Color": lin("#2D5C8A"), "Value Variation": 0.25,
+                                                                "Hue Variation": 0.05, "Roughness": 0.35}),
         "glow": emissive("News Glow", "news_glow_color", strength=6.0, strength_attr="news_glow_strength"),
-        "screen": screen_material("news_wall_screen", wall_card),
+        "screen": screen,
         "brand": screen_material("news_desk_brand", brand_card, tint=(0.12, 0.08, 0.03, 1.0), strength=1.2),
         "glass": glass_material(),
         "skyline": make_material("News Skyline", skyline_paint(), **{"Lit Color": "attr:news_glow_color",
@@ -592,6 +605,7 @@ def desk(mats):
     brand_h = g.input("Brand Height", "FLOAT", 0.24, min=0.0, max=0.7, subtype="DISTANCE", desc="Height of the brand band")
     glow_c = g.input("Glow Color", "COLOR", lin("#3C8CFF"), desc="LED colour")
     glow_s = g.input("Glow Strength", "FLOAT", 6.0, min=0.0, max=100.0, desc="LED brightness")
+    trim_c = g.input("Trim Color", "COLOR", lin("#B8BCC4"), desc="Brushed metal edge (steel, brass, gunmetal)")
     with g.frame("Front panel and kick plinth"):
         ph = g.math("SUBTRACT", top_h, 0.1)
         panel = xform(g, arc_sweep(g, R, span, 0.06, ph), t=g.combine(0.0, cy, g.math("ADD", 0.08, g.math("MULTIPLY", ph, 0.5))))
@@ -620,7 +634,12 @@ def desk(mats):
         lip = store(g, lip, "news_glow_color", glow_c, "FLOAT_COLOR", "POINT")
         lip = store(g, lip, "news_glow_strength", glow_s, "FLOAT", "POINT")
         lip = part(g, setmat(g, lip, mats["glow"]), 10)
-    g.output("Geometry", "GEOMETRY", join(g, body, kick, top, band, lip), desc="The desk")
+    with g.frame("Trim: a brushed-metal band on the top's front edge (News Brushed Metal, anisotropic)"):
+        trim = xform(g, arc_sweep(g, g.math("ADD", R, 0.096), g.math("ADD", span, 0.06), 0.012, 0.056),
+                     t=g.combine(0.0, cy, g.math("SUBTRACT", top_h, 0.025)))
+        trim = store(g, trim, "news_trim_color", trim_c, "FLOAT_COLOR", "FACE")
+        trim = part(g, setmat(g, smooth(g, trim), mats["trim"]), 24)
+    g.output("Geometry", "GEOMETRY", join(g, body, kick, top, band, lip, trim), desc="The desk")
     return g.finish()
 
 
@@ -738,13 +757,16 @@ def chair_shape(mats):
     g = Graph("News Anchor Chair", description="An anchor's swivel chair facing -Y at the origin: padded seat and tall "
                                                "back (NK Rounded Box, fabric), gas column and a five-star base")
     col = g.input("Color", "COLOR", lin("#1A1A20"), desc="Upholstery colour")
+    sh = g.input("Seat Height", "FLOAT", 0.5, min=0.3, max=0.9, subtype="DISTANCE",
+                 desc="Seat cushion height (the anchor's measured hips set it)")
     with g.frame("Seat + back (fabric), column + star base (metal)"):
-        seat = xform(g, g.group(rounded_box(), Size=(0.52, 0.5, 0.09), Radius=0.03, Segments=2)["Mesh"], t=(0.0, 0.0, 0.5))
-        back = xform(g, g.group(rounded_box(), Size=(0.5, 0.08, 0.66), Radius=0.035, Segments=2)["Mesh"], t=(0.0, 0.27, 0.9),
-                     r=(-0.1, 0.0, 0.0))
+        seat = xform(g, g.group(rounded_box(), Size=(0.52, 0.5, 0.09), Radius=0.03, Segments=2)["Mesh"], t=g.combine(0.0, 0.0, sh))
+        back = xform(g, g.group(rounded_box(), Size=(0.5, 0.08, 0.66), Radius=0.035, Segments=2)["Mesh"],
+                     t=g.combine(0.0, 0.27, g.math("ADD", sh, 0.4)), r=(-0.1, 0.0, 0.0))
         up = store(g, join(g, seat, back), "news_color", col, "FLOAT_COLOR", "FACE")
         up = setmat(g, up, mats["fabric"])
-        colm = g.group(rod(), Start=(0.0, 0.0, 0.08), End=(0.0, 0.0, 0.46), Radius=0.025, Resolution=10)["Mesh"]
+        colm = g.group(rod(), Start=(0.0, 0.0, 0.08), End=g.combine(0.0, 0.0, g.math("SUBTRACT", sh, 0.04)), Radius=0.025,
+                       Resolution=10)["Mesh"]
         legs = [g.group(rod(), Start=(0.0, 0.0, 0.08), End=(0.3 * math.cos(a), 0.3 * math.sin(a), 0.04), Radius=0.018,
                         Resolution=6)["Mesh"] for a in [k * TAU / 5 for k in range(5)]]
         metal = setmat(g, smooth(g, join(g, colm, *legs)), mats["metal"])
@@ -762,16 +784,20 @@ def furniture(mats):
     chair_c = g.input("Chair Color", "COLOR", lin("#1A1A20"), desc="Upholstery")
     plants = g.input("Plants", "BOOL", False, desc="Potted plants either side")
     seed = g.input("Seed", "INT", 0, min=0, max=100000, desc="Random seed")
-    with g.frame("Chairs: one per seat, a little behind the seat point"):
-        ch = g.group(chair_shape(mats), Color=chair_c)["Mesh"]
+    seat_h = g.input("Seat Height", "FLOAT", 0.5, min=0.3, max=0.9, subtype="DISTANCE",
+                     desc="Seat cushion height (the anchor's measured hips set it)")
+    second = g.input("Second Seat", "BOOL", True, desc="The co-anchor's chair and papers (off for a solo show)")
+    with g.frame("Chairs: one per seat, a little behind the seat point; the second only with a co-anchor"):
+        ch = g.group(chair_shape(mats), Color=chair_c, **{"Seat Height": seat_h})["Mesh"]
         c1 = part(g, xform(g, ch, t=(SEATS["anchor1"][0], SEATS["anchor1"][1] + 0.05, 0.0)), 16)
-        c2 = part(g, xform(g, ch, t=(SEATS["anchor2"][0], SEATS["anchor2"][1] + 0.05, 0.0)), 17)
+        c2 = switch(g, "GEOMETRY", second, None, part(g, xform(g, ch, t=(SEATS["anchor2"][0], SEATS["anchor2"][1] + 0.05, 0.0)), 17))
     with g.frame("Desk props: papers before each anchor and a mug (no monitor: it read as clutter in the 3/4 shot)"):
         z = g.math("ADD", top_h, 0.003)
         props = []
         for sx, (x, y) in ((1.0, SEATS["anchor1"]), (-1.0, SEATS["anchor2"])):
-            props.append(part(g, setmat(g, xform(g, box(g, (0.21, 0.29, 0.004), (0.0, 0.0, 0.0)), t=g.combine(x - 0.08 * sx, y - 0.42, z),
-                                                 r=(0.0, 0.0, 0.08 * sx)), mats["paper"]), 18))
+            pp = part(g, setmat(g, xform(g, box(g, (0.21, 0.29, 0.004), (0.0, 0.0, 0.0)), t=g.combine(x - 0.08 * sx, y - 0.42, z),
+                                         r=(0.0, 0.0, 0.08 * sx)), mats["paper"]), 18)
+            props.append(pp if sx > 0 else switch(g, "GEOMETRY", second, None, pp))
         mug = g.group(profile_revolve(), Height=0.1, **{"Radius Bottom": 0.038, "Radius Lower": 0.04, "Radius Middle": 0.041,
                                                         "Radius Upper": 0.042, "Radius Top": 0.043, "Wall Thickness": 0.004,
                                                         "Segments": 24})["Mesh"]
@@ -795,6 +821,58 @@ def furniture(mats):
     return g.finish()
 
 
+
+# ---- News Props (show add-ins) ---------------------------------------------------------------------------------------
+@once
+def addins(mats):
+    g = Graph("News Props", description="Show add-ins a theme switches on: a desk globe on a brushed stand at the "
+                                        "empty end of the desk, a laptop beside the anchor, and two glowing LED "
+                                        "pillars framing the video wall")
+    top_h = g.input("Desk Height", "FLOAT", 0.8, min=0.5, max=1.2, subtype="DISTANCE", desc="Desk top height")
+    ww = g.input("Wall Width", "FLOAT", 5.2, min=1.0, max=20.0, subtype="DISTANCE", desc="Screen width")
+    wy = g.input("Wall Y", "FLOAT", 2.7, min=1.5, max=10.0, subtype="DISTANCE", desc="Wall plane (+Y)")
+    H = g.input("Ceiling Height", "FLOAT", 4.6, min=2.6, max=20.0, subtype="DISTANCE", desc="Ceiling height")
+    glow_c = g.input("Glow Color", "COLOR", lin("#3C8CFF"), desc="LED colour")
+    glow_s = g.input("Glow Strength", "FLOAT", 6.0, min=0.0, max=100.0, desc="LED brightness")
+    globe_on = g.input("Globe", "BOOL", False, desc="A desk globe at the far end of the desk")
+    laptop_on = g.input("Laptop", "BOOL", False, desc="A laptop on the desk beside the anchor")
+    pillars_on = g.input("LED Pillars", "BOOL", False, desc="Glowing pillars either side of the wall")
+    with g.frame("Globe: a sphere on a tilted axis, a brushed meridian and turned base"):
+        ball = g.node("GeometryNodeMeshUVSphere", Segments=32, Rings=16, Radius=0.15)["Mesh"]
+        ball = part(g, setmat(g, smooth(g, xform(g, ball, t=(0.0, 0.0, 0.27), r=(0.0, 0.41, 0.0))), mats["globe"]), 25)
+        stand = join(g, g.group(profile_revolve(), Height=0.05, **{"Radius Bottom": 0.09, "Radius Lower": 0.085,
+                                                                  "Radius Middle": 0.06, "Radius Upper": 0.03,
+                                                                  "Radius Top": 0.015, "Segments": 24})["Mesh"],
+                     g.group(rod(), Start=(0.0, 0.0, 0.04), End=(0.0, 0.0, 0.12), Radius=0.012, Resolution=8)["Mesh"],
+                     xform(g, g.node("GeometryNodeCurveToMesh",
+                                     Curve=g.node("GeometryNodeCurveArc", Resolution=32, Radius=0.17,
+                                                  **{"Sweep Angle": math.pi})["Curve"],
+                                     **{"Profile Curve": g.node("GeometryNodeCurvePrimitiveCircle", Resolution=6,
+                                                                Radius=0.006)["Curve"]})["Mesh"],
+                           t=(0.0, 0.0, 0.27), r=(math.pi / 2, 0.41, 0.0)))
+        stand = part(g, setmat(g, smooth(g, stand), mats["trim"]), 25)
+        globe = switch(g, "GEOMETRY", globe_on, None, xform(g, join(g, ball, stand), t=g.combine(-0.95, 0.2, top_h)))
+    with g.frame("Laptop: base and an open lid in brushed aluminium"):
+        base = g.group(chamfer_box(), Size=(0.32, 0.22, 0.014), Chamfer=0.004)["Mesh"]
+        lid = xform(g, g.group(chamfer_box(), Size=(0.32, 0.008, 0.21), Chamfer=0.003)["Mesh"], t=(0.0, 0.11, 0.1),
+                    r=(-0.32, 0.0, 0.0))
+        lap = part(g, setmat(g, join(g, base, lid), mats["brushed"]), 26)
+        laptop = switch(g, "GEOMETRY", laptop_on, None, xform(g, lap, t=g.combine(1.33, -0.02, g.math("ADD", top_h, 0.008)),
+                                                            r=(0.0, 0.0, 0.5)))
+    with g.frame("Pillars: tall glowing columns either side of the wall"):
+        ph = g.math("SUBTRACT", H, 0.4)
+        col = g.node("GeometryNodeMeshCube", Size=g.combine(0.16, 0.16, ph))["Mesh"]
+        col = xform(g, col, t=g.combine(0.0, 0.0, g.math("MULTIPLY", ph, 0.5)))
+        col = store(g, col, "news_glow_color", glow_c, "FLOAT_COLOR", "POINT")
+        col = store(g, col, "news_glow_strength", g.math("MULTIPLY", glow_s, 0.5), "FLOAT", "POINT")
+        col = part(g, setmat(g, col, mats["glow"]), 27)
+        px = g.math("ADD", g.math("MULTIPLY", ww, 0.5), 0.75)
+        py = g.math("SUBTRACT", wy, 0.2)
+        pil = join(g, xform(g, col, t=g.combine(px, py, 0.0)), xform(g, col, t=g.combine(g.math("MULTIPLY", px, -1.0), py, 0.0)))
+        pillars = switch(g, "GEOMETRY", pillars_on, None, pil)
+    g.output("Geometry", "GEOMETRY", join(g, globe, laptop, pillars), desc="Show add-ins")
+    return g.finish()
+
 # ---- News Set (the modifier) ------------------------------------------------------------------------------------------
 PRIMARY = [
     # name, type, default, min, max, subtype, description
@@ -813,7 +891,7 @@ PRIMARY = [
 
 def build(mats):
     parts = [("Room", room(mats)), ("Backdrop", backdrop(mats)), ("Desk", desk(mats)), ("Wall", video_wall(mats)),
-             ("Practicals", practicals(mats)), ("Furniture", furniture(mats))]
+             ("Practicals", practicals(mats)), ("Furniture", furniture(mats)), ("Props", addins(mats))]
     g = Graph(NAME, modifier=True,
               description="A FUNNIER / Goodnight News studio from a few controls: floor and riser, side flats, a "
                           "backdrop (slats, glass + skyline, or window + bookshelves), a curved anchor desk with a blank "
@@ -894,27 +972,38 @@ def add_light(sc, name, kind, loc, energy, color, target=None, size=None, spot_d
     return ob
 
 
-EYE_Z = 1.03   # seated eye height of the house anchor (default-v1.vrm: eyes 1.449 standing, hips drop 0.46 x 0.908)
+EYE_Z = 1.23   # default seated eye height (newsroom_anchor seats every anchor with its eyes DESK_EYE above the desk)
 
 
-def lights(sc, mod, look, eye=EYE_Z):
-    """Three-point light on the anchor seat plus washes for the wall/backdrop and the practicals' own glow."""
+def lights(sc, mod, look, eye=EYE_Z, seat="anchor1"):
+    """A broadcast three-point rig on the anchor's MEASURED eye-line, plus the studio's washes and practicals.
+
+        Key     soft box 40 deg camera-right, ~1 m above the eyes (the modelling light)
+        Fill    big soft box camera-left, at eye height (look.fill sets the contrast ratio)
+        Back    hard spot from behind and above: the rim on hair and shoulders that cuts the anchor off the wall
+        Kicker  small soft box behind camera-right, skimming the cheek and hair (look.kicker)
+        Desk    overhead wash on the desk; Back Wash on the wall/backdrop; Practicals inside the lamp shades
+    """
     by, H = value(mod, "Back Wall Y"), value(mod, "Ceiling Height")
-    ax, ay = SEATS["anchor1"]
-    head = (ax, ay, eye + 0.05)
-    add_light(sc, "Key", "AREA", (ax + 1.6, ay - 2.6, eye + 1.5), look.get("key", 220.0),
-              S.srgb(look.get("key_color", "#FFF1DE")), head, size=1.2)
-    add_light(sc, "Fill", "AREA", (ax - 2.2, ay - 2.4, eye + 0.6), look.get("fill", 70.0),
-              S.srgb(look.get("fill_color", "#CFE0FF")), head, size=1.6)
-    add_light(sc, "Back", "SPOT", (0.2, ay + 1.4, min(H - 0.4, 3.6)), look.get("rim", 260.0),
-              S.srgb(look.get("rim_color", "#8FB8FF")), (ax * 0.5, ay, eye), size=0.15, spot_deg=55, blend=0.6)
-    add_light(sc, "Desk Wash", "AREA", (0.0, -2.2, 3.0), look.get("desk", 120.0),
-              S.srgb(look.get("desk_color", "#FFFFFF")), (0.0, 0.0, 0.6), size=3.0)
-    add_light(sc, "Back Wash", "AREA", (0.0, by - 1.4, H - 0.3), look.get("wash", 90.0),
-              S.srgb(look.get("wash_color", "#6FA0FF")), (0.0, by, 1.2), size=5.0)
+    ax, ay = SEATS[seat]
+    head = (ax, ay, eye + 0.02)
+    sh = (ax, ay, eye - 0.25)
+    col = lambda k, d: S.srgb(look.get(k, d))
+    add_light(sc, "Key", "AREA", (ax + 1.55, ay - 2.25, eye + 1.05), look.get("key", 220.0), col("key_color", "#FFF1DE"),
+              head, size=1.1)
+    add_light(sc, "Fill", "AREA", (ax - 2.3, ay - 2.0, eye + 0.25), look.get("fill", 70.0), col("fill_color", "#CFE0FF"),
+              head, size=2.0)
+    add_light(sc, "Back", "SPOT", (ax - 0.55, ay + 1.45, min(H - 0.3, eye + 1.75)), look.get("rim", 260.0),
+              col("rim_color", "#8FB8FF"), sh, size=0.15, spot_deg=42, blend=0.55)
+    add_light(sc, "Kicker", "AREA", (ax + 1.25, ay + 1.0, eye + 0.6), look.get("kicker", look.get("rim", 260.0) * 0.18),
+              col("kicker_color", look.get("rim_color", "#8FB8FF")), head, size=0.5)
+    add_light(sc, "Desk Wash", "AREA", (0.0, -2.2, min(H - 0.2, 3.0)), look.get("desk", 120.0), col("desk_color", "#FFFFFF"),
+              (0.0, 0.0, 0.6), size=3.0)
+    add_light(sc, "Back Wash", "AREA", (0.0, by - 1.4, H - 0.3), look.get("wash", 90.0), col("wash_color", "#6FA0FF"),
+              (0.0, by, 1.2), size=5.0)
     for k, (x, y, z) in enumerate(look.get("practicals", [])):
-        add_light(sc, f"Practical {k}", "POINT", (x, y, z), look.get("practical", 25.0),
-                  S.srgb(look.get("practical_color", "#FFC88A")), size=0.08)
+        add_light(sc, f"Practical {k}", "POINT", (x, y, z), look.get("practical", 25.0), col("practical_color", "#FFC88A"),
+                  size=0.08)
     w = bpy.data.worlds.new("News World")
     nt = w.node_tree
     nt.nodes["Background"].inputs["Color"].default_value = (*S.srgb(look.get("ambient", "#0A0C14")), 1.0)
@@ -922,175 +1011,86 @@ def lights(sc, mod, look, eye=EYE_Z):
     sc.world = w
 
 
-def cam_from_three(name, pos3, tgt3, fov_deg, focus=None, fstop=2.8):
-    """A camera given three.js coordinates (Y up, +Z toward the cameras) and a vertical fov."""
-    b = lambda v: Vector((v[0], -v[2], v[1]))
-    cd = bpy.data.cameras.new(name)
-    cd.sensor_fit = "VERTICAL"
-    cd.angle_y = math.radians(fov_deg)
-    cd.clip_start, cd.clip_end = 0.05, 200.0
-    ob = bpy.data.objects.new(name, cd)
-    ob.location = b(pos3)
-    ob.rotation_euler = (b(tgt3) - b(pos3)).to_track_quat("-Z", "Y").to_euler()
-    bpy.context.scene.collection.objects.link(ob)
-    if focus is not None:
-        cd.dof.use_dof = True
-        cd.dof.focus_distance = (Vector(focus) - ob.location).length
-        cd.dof.aperture_fstop = fstop
+def volume_haze(sc, mod, density=0.012, color="#FFFFFF"):
+    """A real scattering volume filling the studio (hero stills; it costs several times the render time, so
+    episodes use the Mist-pass haze in News Lens instead)."""
+    import bmesh
+    W, H, by = value(mod, "Room Width"), value(mod, "Ceiling Height"), value(mod, "Back Wall Y")
+    me = bpy.data.meshes.new("news_haze")
+    bm = bmesh.new()
+    bmesh.ops.create_cube(bm, size=1.0)
+    bm.to_mesh(me)
+    bm.free()
+    ob = bpy.data.objects.new("news_haze", me)
+    ob.scale = (W * 0.98, by + 9.0, H * 0.98)
+    ob.location = (0.0, (by - 9.0) / 2, H / 2)
+    sc.collection.objects.link(ob)
+    m = bpy.data.materials.new("News Haze Volume")
+    nt = m.node_tree
+    nt.nodes.clear()
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+    vs = nt.nodes.new("ShaderNodeVolumeScatter")
+    vs.inputs["Density"].default_value = density
+    vs.inputs["Anisotropy"].default_value = 0.45
+    vs.inputs["Color"].default_value = (*S.srgb(color), 1.0)
+    nt.links.new(vs.outputs[0], out.inputs["Volume"])
+    me.materials.append(m)
+    ob.visible_shadow = False
     return ob
 
 
-def close_shot(eye=EYE_Z, d=2.3, fov=22.0):
-    """Anchor close-up with the eyes on the upper third: camera at eye height, aimed below the eyes by the angle
-    that puts them 1/3 down the frame (NDC y = +1/3)."""
-    ax, ay = SEATS["anchor1"]
-    drop = d * math.tan(math.radians(fov / 2)) / 3.0
-    pos3 = (ax - 0.15, eye + 0.03, -ay + d)
-    tgt3 = (ax, eye - drop, -ay)
-    return pos3, tgt3, fov
+def make_camera(sc, name, s):
+    cd = bpy.data.cameras.new(name)
+    cd.sensor_fit = "VERTICAL"
+    cd.sensor_height = CK.SENSOR_H
+    cd.lens = s["lens"]
+    cd.clip_start, cd.clip_end = 0.05, 200.0
+    ob = bpy.data.objects.new(name, cd)
+    # location/rotation, never matrix_world, on objects made this run (black frames otherwise)
+    ob.location = s["pos"]
+    ob.rotation_euler = (Vector(s["tgt"]) - Vector(s["pos"])).to_track_quat("-Z", "Y").to_euler()
+    cd.dof.use_dof = True
+    cd.dof.focus_distance = (Vector(s["focus"]) - Vector(s["pos"])).length
+    cd.dof.aperture_fstop = s["fstop"]
+    sc.collection.objects.link(ob)
+    ob["news_shot"] = {"tgt": list(s["tgt"]), "focus": list(s["focus"])}
+    return ob
 
 
-def cameras(sc, mod, eye=EYE_Z, fstop=2.8):
-    """Camera marks shared with the web stage (three.js news-studio presets), each focused on the anchor."""
-    ax, ay = SEATS["anchor1"]
-    head = (ax, ay, eye)
-    cams = {
-        "wide": cam_from_three("cam_wide", (0.0, 2.1, 6.6), (0.0, 1.35, -0.9), 42.0, head, fstop * 1.6),
-        "medium": cam_from_three("cam_medium", (1.55, 1.45, 3.1), (0.45, 1.05, -0.55), 30.0, head, fstop),
-        "wall": cam_from_three("cam_wall", (2.35, 1.8, 3.0), (-0.1, 1.8, -1.7), 39.0, head, fstop * 1.4),
-    }
-    p, t, f = close_shot(eye)
-    cams["close"] = cam_from_three("cam_close", p, t, f, head, fstop * 0.8)
-    return cams
+def cameras(sc, mod, eye=EYE_Z, mouth=None, seat="anchor1", coanchor=False):
+    """The camera kit (newsroom_cameras.shots) as named Blender cameras, solved from this studio's numbers and the
+    anchor's measured eye/mouth height. Returns ({name: camera}, {name: spec}, studio numbers)."""
+    st = CK.studio_numbers(inspect.get_modifier_inputs(mod))
+    spec, marks = CK.shots(st, eye, mouth, seat, coanchor)
+    cams = {name: make_camera(sc, name, s) for name, s in spec.items()}
+    for name, p in marks.items():
+        e = bpy.data.objects.new(name, None)
+        e.empty_display_type, e.empty_display_size = "SPHERE", 0.05
+        e.location = p
+        sc.collection.objects.link(e)
+    return cams, spec, st
 
 
 def post(sc, look):
-    sc.render.film_transparent = False
-    g = Graph(f"News Post {sc.name}", kind="COMPOSITOR",
-              description="NK Soft Glow on the wall, LEDs and lamp shades (no haze: depth comes from the lens)")
-    with g.frame("Render layers, glow"):
-        rl = g.node("CompositorNodeRLayers")
-        rl.b.scene = sc
-        gl = g.group(soft_glow(), Image=rl["Image"], Threshold=look.get("glow_threshold", 1.4),
-                     Strength=look.get("glow", 0.25), Size=0.6, Tint=(1.0, 0.95, 0.9, 1.0))
-    g.output("Image", "COLOR", gl["Image"])
-    sc.compositing_node_group = g.finish()
+    LK.post(sc, look)
 
 
 def render_setup(sc, width, height, samples):
     sc.render.engine = "CYCLES"
     sc.cycles.device = "CPU"
     sc.cycles.samples = samples
-    sc.cycles.use_denoising = True
+    # OIDN dies with SIGILL on the aarch64 sandbox: NEWS_DENOISE=0 for local previews; CI (x86) keeps it
+    sc.cycles.use_denoising = os.environ.get("NEWS_DENOISE", "1") != "0"
     sc.cycles.max_bounces = 6
     sc.cycles.transparent_max_bounces = 12
     sc.cycles.transmission_bounces = 8
+    sc.cycles.volume_bounces = 1
     sc.render.resolution_x, sc.render.resolution_y = width, height
     sc.render.resolution_percentage = 100
     sc.view_settings.view_transform = "AgX"
     sc.view_settings.look = "AgX - Medium High Contrast"
     sc.view_settings.exposure = 0.0
     sc.render.image_settings.file_format = "PNG"
-
-
-# ---- the anchor (a VRM/GLB avatar, seated at anchor1) ----------------------------------------------------------------
-def import_anchor(sc, path, seat="anchor1"):
-    """Import a VRM (glTF with VRM extensions; Blender's importer ignores those) or GLB, pose it seated at the seat
-    the way the web stage's VrmAvatar does (hips down 0.46 x hip height, thighs forward, arms down to the desk), and
-    return (armature, face meshes with shape keys, eye height)."""
-    p = pathlib.Path(path)
-    src = p
-    if p.suffix.lower() == ".vrm":
-        src = pathlib.Path("/tmp", p.stem + "_anchor.glb")
-        src.write_bytes(p.read_bytes())
-    before = set(bpy.data.objects)
-    bpy.ops.import_scene.gltf(filepath=str(src), import_shading="NORMALS")
-    new = [o for o in bpy.data.objects if o not in before]
-    for o in new:
-        if o.name not in sc.collection.all_objects:
-            sc.collection.objects.link(o)
-    arm = next((o for o in new if o.type == "ARMATURE"), None)
-    meshes = [o for o in new if o.type == "MESH"]
-    roots = [o for o in new if o.parent is None]
-    x, y = SEATS[seat]
-    holder = bpy.data.objects.new(f"anchor_{seat}", None)
-    sc.collection.objects.link(holder)
-    holder.location = (x, y, 0.0)
-    for r in roots:
-        r.parent = holder
-    bpy.context.view_layer.update()
-    if arm is not None:
-        seated_pose(arm)
-    eye = anchor_eye_height(arm, meshes)
-    for m in meshes:          # anime shading: no self-shadow blotches on the face/hair cards
-        m.visible_shadow = True
-    return holder, arm, [m for m in meshes if m.data.shape_keys], eye
-
-
-def _pb(arm, *names):
-    for n in names:
-        if n in arm.pose.bones:
-            return arm.pose.bones[n]
-    low = {b.name.lower(): b for b in arm.pose.bones}
-    for n in names:
-        for k, b in low.items():
-            if n.lower() in k:
-                return b
-    return None
-
-
-def rot_world(arm, pb, axis, angle):
-    """Rotate a pose bone about a WORLD axis through its head (VRM normalised-bone semantics, axis order safe)."""
-    if pb is None:
-        return
-    bpy.context.view_layer.update()
-    mw = arm.matrix_world
-    head = mw @ pb.head
-    R = Matrix.Translation(head) @ Matrix.Rotation(angle, 4, Vector(axis)) @ Matrix.Translation(-head)
-    pb.matrix = mw.inverted() @ R @ mw @ pb.matrix
-    bpy.context.view_layer.update()
-
-
-# three.js (Y up, +Z forward) axis -> Blender world axis
-AX3 = {"x": (1, 0, 0), "y": (0, 0, 1), "z": (0, -1, 0)}
-
-
-def seated_pose(arm):
-    """Mirror VrmAvatar.setPose for a seated anchor at rest (three.js rotations, applied about world axes)."""
-    hips = _pb(arm, "J_Bip_C_Hips", "hips", "Hips")
-    if hips is not None:
-        bpy.context.view_layer.update()
-        hy = (arm.matrix_world @ hips.head).z
-        hips.matrix = arm.matrix_world.inverted() @ Matrix.Translation((0, 0, -0.46 * hy)) @ arm.matrix_world @ hips.matrix
-        bpy.context.view_layer.update()
-    for side, s in (("L", 1.0), ("R", -1.0)):
-        ul = _pb(arm, f"J_Bip_{side}_UpperLeg", f"{'left' if s > 0 else 'right'}UpperLeg")
-        ll = _pb(arm, f"J_Bip_{side}_LowerLeg", f"{'left' if s > 0 else 'right'}LowerLeg")
-        rot_world(arm, ul, AX3["x"], -1.45)
-        rot_world(arm, ll, AX3["x"], 1.45)
-        up = _pb(arm, f"J_Bip_{side}_UpperArm", f"{'left' if s > 0 else 'right'}UpperArm")
-        lo = _pb(arm, f"J_Bip_{side}_LowerArm", f"{'left' if s > 0 else 'right'}LowerArm")
-        # VRoid sleeves/shoulder skin hang off J_Aim_* bones that sit on the upper-arm joint and AIM at the forearm
-        # (VRMC_node_constraint, which three-vrm evaluates and Blender's glTF import drops): swing them with the arm,
-        # else the T-shirt sleeves stay out in T-pose as flat "wings" beside the shoulders
-        aims = [pb for pb in (_pb(arm, f"J_Aim_{side}_Shoulder"), _pb(arm, f"J_Aim_{side}_TopsUpperArm")) if pb is not None]
-        for b in [up] + aims:
-            rot_world(arm, b, AX3["z"], -s * 1.25)       # arm down from T-pose
-            rot_world(arm, b, AX3["y"], s * 0.35)        # a little forward
-        rot_world(arm, lo, AX3["x"], -0.9)               # forearm forward onto the desk
-    return arm
-
-
-def anchor_eye_height(arm, meshes):
-    if arm is not None:
-        bpy.context.view_layer.update()
-        eyes = [b for b in arm.pose.bones if "faceeye" in b.name.lower() or b.name.lower() in ("lefteye", "righteye")]
-        if eyes:
-            return sum((arm.matrix_world @ b.head).z for b in eyes) / len(eyes)
-        head = _pb(arm, "J_Bip_C_Head", "Head", "head")
-        if head is not None:
-            return (arm.matrix_world @ head.head).z + 0.07
-    return EYE_Z
 
 
 # ---- export ----------------------------------------------------------------------------------------------------------
@@ -1374,10 +1374,13 @@ def main():
         inspect.dump_groups(a.dump, prefix="News ")
     eye = EYE_Z
     if a.anchor and (a.render or a.out):
-        _, _, faces, eye = import_anchor(sc, a.anchor)
-        print(f"ANCHOR {a.anchor}: eye height {eye:.3f} m, face meshes {[f.name for f in faces]}")
+        import newsroom_anchor as NA
+        an = NA.seat_anchor(sc, a.anchor, desk_h=value(mod, "Desk Height"), strict=False)
+        inspect.set_modifier_inputs(mod, {"Seat Height": an["seat_h"]})
+        eye = an["eye"]
     lights(sc, mod, look, eye)
-    cams = cameras(sc, mod, eye, look.get("fstop", 2.8))
+    cams, _, _ = cameras(sc, mod, eye)
+    cams = {"wide": cams["CAM_WIDE"], "medium": cams["CAM_MEDIUM"], "close": cams["CAM_CLOSE"], "wall": cams["CAM_WALL"]}
     post(sc, look)
     if a.out:
         out = pathlib.Path(a.out).resolve()
