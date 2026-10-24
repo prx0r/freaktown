@@ -6,7 +6,7 @@ name: blender newsroom studio
 #   hero       one 1920 px wide of the master studio with volumetric haze
 #   emotions   the anchor's expressive range on the close / XCU (shared expressive map only)
 #   swap       character swap: a second anchor (static/avatars/buddha.glb) in the same studio, re-solved kit
-#   episode    the committed episode folder rendered in N chunks (plates + anchor-only shortcut)
+#   episode    the committed episode folder rendered in 16 chunks (plates + anchor-only shortcut)
 #   finish     overlays + grain + encode with the -14 LUFS master, blackdetect, sample sheet, throughput.json
 # Only free hosted runners. Nothing here rents or pays for anything.
 on:
@@ -36,7 +36,7 @@ env:
   BLENDER_SHA256: "84098912789dc450e95697c4184fb8a90acbe5111c2ba4aede3fecb57806a168"
   V2B_COMMIT: "bfeca3ff77d1468f3f9c6a801342cb6286e3f6b1"
   EPISODE: ${{ inputs.episode || 'goodnight-2026-10-22-proof' }}
-  CHUNKS: "12"
+  CHUNKS: "16"
 
 jobs:
   check:
@@ -154,13 +154,13 @@ jobs:
         with: { name: swap, path: "out/swap\nout/*.log" }
 
   episode:
-    name: episode chunk ${{ matrix.chunk }}/12
+    name: episode chunk ${{ matrix.chunk }}/16
     runs-on: ubuntu-24.04
     timeout-minutes: 150
     strategy:
       fail-fast: false
       matrix:
-        chunk: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+        chunk: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/cache@v4

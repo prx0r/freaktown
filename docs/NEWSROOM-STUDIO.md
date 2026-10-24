@@ -29,7 +29,7 @@ free GitHub runners. Three things change per show, and none of them needs a code
 | `episodes/<name>/`          | An episode folder (what CI renders)                                                            |
 
 CI: `.github/workflows/blender-newsroom-studio.yml` (Blender 5.2.2, x86-64, free `ubuntu-24.04` runners):
-`check` → `stills` × skin (every camera) → `hero` → `emotions` → `swap` → `episode` × 12 chunks → `finish`
+`check` → `stills` × skin (every camera) → `hero` → `emotions` → `swap` → `episode` × 16 chunks → `finish`
 (episode.mp4, sheet.jpg, throughput.json). It runs on pushes to the PR branch and by hand (Actions → "blender
 newsroom studio" → Run workflow, with `episode`, `samples`, `mode`).
 
