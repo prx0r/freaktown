@@ -188,9 +188,58 @@ def shape_centroid(meshes, names, frac=0.5):
     return sum(pts, Vector()) / len(pts)
 
 
+
+ANCHOR_EMIT = {"default": 0.18, "SKIN": 0.28, "EYE": 0.55, "FACE": 0.55}
+
+
+def light_unlit(objs, emit=None):
+    """VRoid/VRM materials import as glTF UNLIT: emission to camera rays, transparent to every other ray. Such an
+    anchor ignores the studio's lights, casts no shadow and bounces nothing (flat, pasted-in, blown-out whites).
+    Rebuild each unlit material as a lit Principled BSDF on the same texture plus a small share of the original
+    emission (more on eyes and face lines so the anime read survives). NEWS_ANCHOR_UNLIT=1 keeps the import as is."""
+    import os
+    if os.environ.get("NEWS_ANCHOR_UNLIT") == "1":
+        return 0
+    emit = dict(ANCHOR_EMIT, **(emit or {}))
+    done = set()
+    for o in objs:
+        for slot in getattr(o, "material_slots", []):
+            m = slot.material
+            if m is None or m.name in done or not m.use_nodes:
+                continue
+            nt = m.node_tree
+            ems = [n for n in nt.nodes if n.type == "EMISSION"]
+            if not ems or any(n.type == "BSDF_PRINCIPLED" for n in nt.nodes):
+                continue
+            em = ems[0]
+            col = em.inputs["Color"]
+            src = col.links[0].from_socket if col.is_linked else None
+            out = next((n for n in nt.nodes if n.type == "OUTPUT_MATERIAL"), None)
+            if out is None:
+                continue
+            pb = nt.nodes.new("ShaderNodeBsdfPrincipled")
+            pb.inputs["Roughness"].default_value = 0.62
+            pb.inputs["Specular IOR Level"].default_value = 0.25
+            if src is not None:
+                nt.links.new(src, pb.inputs["Base Color"])
+            else:
+                pb.inputs["Base Color"].default_value = col.default_value
+            up = m.name.upper()
+            k = next((v for key, v in emit.items() if key != "default" and key in up), emit["default"])
+            em.inputs["Strength"].default_value = k
+            add = nt.nodes.new("ShaderNodeAddShader")
+            nt.links.new(pb.outputs[0], add.inputs[0])
+            nt.links.new(em.outputs[0], add.inputs[1])
+            nt.links.new(add.outputs[0], out.inputs["Surface"])
+            done.add(m.name)
+    print("ANCHOR-LIT", len(done), "unlit materials relit")
+    return len(done)
+
+
 def seat_anchor(sc, path, seat="anchor1", desk_h=0.8, strict=True, desk_eye=DESK_EYE):
     pre = precheck(path, strict)
     new = import_mesh(sc, path)
+    light_unlit(new)
     arm = next((o for o in new if o.type == "ARMATURE"), None)
     sx, sy = SEATS[seat]
     holder = bpy.data.objects.new(f"anchor_{seat}", None)
