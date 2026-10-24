@@ -187,9 +187,9 @@ def shots(st, eye, mouth=None, seat="anchor1", coanchor=False, head_top=None):
     out["CAM_CRANE_A"] = dict(pos=(-2.4 * side, -8.2, cz), tgt=(0.0, 1.6, 0.9), lens=max(16.0, lens * 0.82), focus=head, fstop=8.0)
     # singles on the measured eye line
     out["CAM_MEDIUM"] = framed(SEATS[seat], eye, (sx - 0.1 * side, sy - 3.15), 0.98, 1 / 3, z_off=-0.05, fstop=2.8)
-    # close: 3/4 from camera-right, ~30 deg round from the medium axis, so medium -> close is never a jump cut
+    # close: 3/4 from camera-right, ~34 deg round from the medium axis (32 + the medium sits 1.8 deg the other way), so medium -> close is never a jump cut
     # (the anchor turns to it: gaze to camera on cuts)
-    a = math.radians(28.0) * side
+    a = math.radians(32.0) * side
     out["CAM_CLOSE"] = framed(SEATS[seat], eye, (sx + 2.15 * math.sin(a), sy - 2.15 * math.cos(a)), 0.5, 1 / 3, z_off=-0.02, fstop=2.0)
     a = math.radians(-24.0) * side
     out["CAM_XCU"] = framed(SEATS[seat], eye, (sx + 1.55 * math.sin(a), sy - 1.55 * math.cos(a)), 0.27, 0.36, z_off=0.0, fstop=2.0)
@@ -263,29 +263,37 @@ def wall_mode(pose, st, margin=1.0):
 
 # ---- the director -----------------------------------------------------------------------------------------------------
 def word_gaps(lines):
-    """[(start_ms, end_ms)] of the silences between measured words and between lines (programme clock)."""
+    """[(start_ms, end_ms)] between measured words and between lines (programme clock). Forced alignment often
+    gives abutting words (no silence at all), so every word boundary is kept, as a zero-width gap: a cut there is
+    still between two words."""
     gaps = []
     prev = 0
     for ln in lines:
         for w in ln.get("words", []):
-            if w["start_ms"] > prev:
+            if w["start_ms"] >= prev:
                 gaps.append((prev, w["start_ms"]))
             prev = max(prev, w["end_ms"])
     gaps.append((prev, prev + 10 ** 7))
     return gaps
 
 
-def snap(t, gaps, window=700):
-    """Move a cut into the nearest gap between words, within window ms."""
-    best, bd = t, None
-    for a, b in gaps:
-        if a <= t <= b:
-            return int(t)
-        c = a + min(120, (b - a) / 2) if t < a else b - min(120, (b - a) / 2)
-        d = abs(c - t)
-        if d <= window and (bd is None or d < bd):
-            best, bd = c, d
-    return int(best)
+def snap(t, gaps, window=700, min_gap=60):
+    """Move a cut between words: into the nearest real pause (>= min_gap ms) within window ms, else onto the nearest
+    word boundary (never left mid-word)."""
+    for pass_min, win in ((min_gap, window), (0, None)):
+        best, bd = None, None
+        for a, b in gaps:
+            if b - a < pass_min:
+                continue
+            if a <= t <= b and (b - a > 0 or t == a):
+                return int(t)
+            c = a + min(120, (b - a) / 2) if t < a else b - min(120, (b - a) / 2)
+            d = abs(c - t)
+            if (win is None or d <= win) and (bd is None or d < bd):
+                best, bd = c, d
+        if best is not None:
+            return int(best)
+    return int(t)
 
 
 def is_emphasis(word):
