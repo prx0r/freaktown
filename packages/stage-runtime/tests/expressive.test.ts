@@ -97,7 +97,7 @@ describe('ExpressiveFace on a three.js mesh', () => {
     });
     const dict = m.morphTargetDictionary!;
     expect(m.morphTargetInfluences![dict['Face_Blendshape.Fcl_MTH_A']]).toBeCloseTo(1.35);
-    expect(m.morphTargetInfluences![dict['Face_Blendshape.Fcl_BRW_Angry']]).toBeCloseTo(0.9 * 1.3);  // angry 1 -> browDown 0.9 x VRoid brow gain 1.3
+    expect(m.morphTargetInfluences![dict['Face_Blendshape.Fcl_BRW_Angry']]).toBeCloseTo(Math.min(1.5, 0.9 * 1.5));  // angry 1 -> browDown 0.9 x VRoid brow gain 1.5
     expect(m.morphTargetInfluences![dict['Face_Blendshape.Fcl_EYE_Close_L']]).toBe(1);
     expect(m.morphTargetInfluences![dict['Face_Blendshape.Fcl_EYE_Close_R']]).toBe(0);
   });

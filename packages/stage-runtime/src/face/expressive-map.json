@@ -30,6 +30,7 @@
   },
   "rigs": {
     "vroid": {
+      "about_brows": "VRoid brows sit under the fringe, so the brow channels also carry the matching eyelid shape (EYE_Surprised / EYE_Angry / EYE_Sorrow): the eyes read the emotion when the hair hides the brows.",
       "detect": ["Fcl_MTH_A", "Fcl_EYE_Close_L", "Fcl_BRW_Angry"],
       "shapes": {
         "open":     [["Fcl_MTH_A", 1.35]],
@@ -44,9 +45,9 @@
         "smileR":   [["Fcl_MTH_Fun_R", 1.0], ["Fcl_MTH_Joy_R", 0.45]],
         "grin":     [["Fcl_MTH_Joy", 0.8]],
         "frown":    [["Fcl_MTH_Sorrow", 0.9]],
-        "browUp":   [["Fcl_BRW_Surprised", 1.2]],
-        "browDown": [["Fcl_BRW_Angry", 1.3]],
-        "browSad":  [["Fcl_BRW_Sorrow", 1.2]],
+        "browUp":   [["Fcl_BRW_Surprised", 1.5], ["Fcl_EYE_Surprised", 0.3]],
+        "browDown": [["Fcl_BRW_Angry", 1.5], ["Fcl_EYE_Angry", 0.55]],
+        "browSad":  [["Fcl_BRW_Sorrow", 1.5], ["Fcl_EYE_Sorrow", 0.6]],
         "squint":   [["Fcl_EYE_Joy", 0.42]],
         "eyeWide":  [["Fcl_EYE_Surprised", 1.0]]
       },

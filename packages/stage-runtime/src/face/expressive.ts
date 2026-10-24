@@ -140,6 +140,8 @@ export interface ExpressiveState {
   /** extra brow raise (setup flash, emphasis) and furrow (the look) */
   browUp?: number;
   browDown?: number;
+  /** inner brows up (worry): VRoid also drops the outer lids, since the fringe hides the brows */
+  browSad?: number;
   squint?: number;
   /** -1 = smirk on the face's right, +1 = on its left */
   smirk?: number;
@@ -167,6 +169,7 @@ export function channelsFromState(s: ExpressiveState): Channels {
   put('blinkR', c01(s.blinkR ?? 0));
   put('browUp', c01(s.browUp ?? 0));
   put('browDown', c01(s.browDown ?? 0));
+  put('browSad', c01(s.browSad ?? 0));
   put('squint', c01(s.squint ?? 0));
   const sm = s.smirk ?? 0;
   if (sm > 0) put('smileL', c01(sm));

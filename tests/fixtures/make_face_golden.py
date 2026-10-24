@@ -19,6 +19,7 @@ STATES = {
     "angry_flash": {"emotions": {"angry": 0.9}, "browUp": 0.4},
     "blink_left": {"blinkL": 1.0, "blinkR": 0.2},
     "dart": {"lookX": 0.9, "lookY": -0.3},
+    "worried": {"browSad": 0.7, "speaking": True},
 }
 ARKIT = ["jawOpen", "mouthFunnel", "mouthPucker", "mouthStretchLeft", "mouthStretchRight", "eyeBlinkLeft", "eyeBlinkRight",
          "mouthSmileLeft", "mouthSmileRight", "cheekSquintLeft", "cheekSquintRight", "mouthFrownLeft", "mouthFrownRight",

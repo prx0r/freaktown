@@ -239,6 +239,13 @@ def light_unlit(objs, emit=None):
 def seat_anchor(sc, path, seat="anchor1", desk_h=0.8, strict=True, desk_eye=DESK_EYE):
     pre = precheck(path, strict)
     new = import_mesh(sc, path)
+    # a GLB that ships a clip (Meshy: 'Armature|clip0|baselayer') would replay it on every frame change and undo the
+    # seated pose (arms back in the rest T, floating over the desk): drop imported animation; the bake keys its own
+    for o in new:
+        o.animation_data_clear()
+        sk = getattr(getattr(o, "data", None), "shape_keys", None)
+        if sk is not None:
+            sk.animation_data_clear()
     light_unlit(new)
     arm = next((o for o in new if o.type == "ARMATURE"), None)
     sx, sy = SEATS[seat]

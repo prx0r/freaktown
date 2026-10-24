@@ -61,6 +61,10 @@
   "dart": {
    "lookX": 0.9,
    "lookY": -0.3
+  },
+  "worried": {
+   "browSad": 0.7,
+   "speaking": true
   }
  },
  "meshes": {
@@ -234,6 +238,9 @@
   "dart": {
    "lookX": 0.9,
    "lookY": -0.3
+  },
+  "worried": {
+   "browSad": 0.7
   }
  },
  "shapes": {
@@ -249,7 +256,8 @@
     "Face_Blendshape.Fcl_MTH_A": 0.945
    },
    "happy_talk": {
-    "Face_Blendshape.Fcl_BRW_Surprised": 0.18,
+    "Face_Blendshape.Fcl_BRW_Surprised": 0.225,
+    "Face_Blendshape.Fcl_EYE_Surprised": 0.045,
     "Face_Blendshape.Fcl_MTH_E": 0.8,
     "Face_Blendshape.Fcl_MTH_A": 0.32,
     "Face_Blendshape.Fcl_MTH_Joy": 0.14,
@@ -269,21 +277,25 @@
     "Fcl_MTH_Joy_R": 0.27
    },
    "the_look": {
-    "Face_Blendshape.Fcl_BRW_Angry": 0.455,
+    "Face_Blendshape.Fcl_BRW_Angry": 0.525,
+    "Face_Blendshape.Fcl_EYE_Angry": 0.1925,
     "Face_Blendshape.Fcl_EYE_Joy": 0.126
    },
    "surprised": {
-    "Face_Blendshape.Fcl_BRW_Surprised": 1.08,
-    "Face_Blendshape.Fcl_EYE_Surprised": 0.9,
+    "Face_Blendshape.Fcl_BRW_Surprised": 1.35,
+    "Face_Blendshape.Fcl_EYE_Surprised": 1.17,
     "Face_Blendshape.Fcl_MTH_A": 0.4725
    },
    "sad": {
-    "Face_Blendshape.Fcl_BRW_Sorrow": 0.864,
+    "Face_Blendshape.Fcl_BRW_Sorrow": 1.08,
+    "Face_Blendshape.Fcl_EYE_Sorrow": 0.432,
     "Face_Blendshape.Fcl_MTH_Sorrow": 0.504
    },
    "angry_flash": {
-    "Face_Blendshape.Fcl_BRW_Angry": 1.053,
-    "Face_Blendshape.Fcl_BRW_Surprised": 0.24,
+    "Face_Blendshape.Fcl_BRW_Angry": 1.215,
+    "Face_Blendshape.Fcl_EYE_Angry": 0.4455,
+    "Face_Blendshape.Fcl_BRW_Surprised": 0.3,
+    "Face_Blendshape.Fcl_EYE_Surprised": 0.06,
     "Face_Blendshape.Fcl_MTH_Sorrow": 0.2025,
     "Face_Blendshape.Fcl_EYE_Joy": 0.1512
    },
@@ -291,7 +303,11 @@
     "Face_Blendshape.Fcl_EYE_Close_L": 1.0,
     "Face_Blendshape.Fcl_EYE_Close_R": 0.2
    },
-   "dart": {}
+   "dart": {},
+   "worried": {
+    "Face_Blendshape.Fcl_BRW_Sorrow": 1.05,
+    "Face_Blendshape.Fcl_EYE_Sorrow": 0.42
+   }
   },
   "arkit": {
    "talk_aa": {
@@ -376,6 +392,9 @@
     "eyeLookInRight": 0.9,
     "eyeLookDownLeft": 0.3,
     "eyeLookDownRight": 0.3
+   },
+   "worried": {
+    "browInnerUp": 0.7
    }
   },
   "lantern": {
@@ -409,7 +428,8 @@
     "eyeBlinkLeft": 1.0,
     "eyeBlinkRight": 0.2
    },
-   "dart": {}
+   "dart": {},
+   "worried": {}
   },
   "bare": {
    "talk_aa": {},
@@ -423,7 +443,8 @@
    "sad": {},
    "angry_flash": {},
    "blink_left": {},
-   "dart": {}
+   "dart": {},
+   "worried": {}
   }
  },
  "checks": {

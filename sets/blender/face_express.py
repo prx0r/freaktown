@@ -106,7 +106,7 @@ def channels_from_state(s):
         if e > 0:
             for k, w in mix.items():
                 put(k, e * w)
-    for k in ("blinkL", "blinkR", "browUp", "browDown", "squint"):
+    for k in ("blinkL", "blinkR", "browUp", "browDown", "browSad", "squint"):
         put(k, _c01(s.get(k) or 0))
     sm = s.get("smirk") or 0
     if sm > 0:

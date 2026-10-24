@@ -192,7 +192,8 @@ def shots(st, eye, mouth=None, seat="anchor1", coanchor=False, head_top=None):
     a = math.radians(32.0) * side
     out["CAM_CLOSE"] = framed(SEATS[seat], eye, (sx + 2.15 * math.sin(a), sy - 2.15 * math.cos(a)), 0.5, 1 / 3, z_off=-0.02, fstop=2.0)
     a = math.radians(-24.0) * side
-    out["CAM_XCU"] = framed(SEATS[seat], eye, (sx + 1.55 * math.sin(a), sy - 1.55 * math.cos(a)), 0.27, 0.36, z_off=0.0, fstop=2.0)
+    # (0.34 m tall, eyes 0.41 down: the brows and the fringe line stay in; 0.27/0.36 cropped the forehead)
+    out["CAM_XCU"] = framed(SEATS[seat], eye, (sx + 1.55 * math.sin(a), sy - 1.55 * math.cos(a)), 0.34, 0.41, z_off=0.0, fstop=2.0)
     out["CAM_PUSH_A"] = dict(out["CAM_MEDIUM"])
     out["CAM_PUSH_B"] = framed(SEATS[seat], eye, (sx - 0.04 * side, sy - 2.35), 0.56, 1 / 3, z_off=-0.035, fstop=2.2)
     # desk 3/4 from the anchor's far side (camera-left for anchor1): desk curve + wall behind, eyes upper third
