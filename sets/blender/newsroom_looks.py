@@ -59,7 +59,7 @@ def led_panel():
         lit = mixc(g, 1.0, col, grid, "MULTIPLY")
         lit = mixc(g, 1.0, lit, g.combine(black, black, black), "ADD")
     g.output("Color", "COLOR", (0.0, 0.0, 0.0, 1.0), desc="Base colour (the LED face is near black)")
-    g.output("Roughness", "FLOAT", 0.18, desc="Glossy front pane")
+    g.output("Roughness", "FLOAT", 0.55, desc="Anti-glare front pane (a glossy pane mirrored the key light as a white blob)")
     g.output("Emission", "COLOR", lit, desc="Pixel light")
     g.output("Emission Strength", "FLOAT", bright, desc="Emission strength")
     return g.finish()
@@ -107,8 +107,8 @@ def led_material(name, images, uv_px=(480, 240), strength=1.2, subpixel=0.55):
     pb = nt.nodes.new("ShaderNodeBsdfPrincipled")
     for k in ("Color", "Roughness", "Emission", "Emission Strength"):
         nt.links.new(gn.outputs[k], pb.inputs[{"Color": "Base Color", "Emission": "Emission Color"}.get(k, k)])
-    pb.inputs["Coat Weight"].default_value = 0.6
-    pb.inputs["Coat Roughness"].default_value = 0.08
+    pb.inputs["Coat Weight"].default_value = 0.12
+    pb.inputs["Coat Roughness"].default_value = 0.4
     nt.links.new(pb.outputs[0], out.inputs["Surface"])
     facs = []
     cur = None
