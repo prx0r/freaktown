@@ -1,3 +1,4 @@
+import type { Channels, FaceCheck } from '../face/expressive';
 /**
  * AvatarDriver — one interface over every body tier (NORTHSTAR):
  *   VRM (humanoid + expressions) → GLB (sniffed morphs/jaw/bones) → BASIC.
@@ -83,6 +84,13 @@ export interface AvatarDriver {
    * stage fits the mic to it; tests measure mic↔mouth distance from it.
    */
   mouthAnchor?(): THREE.Object3D | null;
+  /**
+   * Optional expressive face (face/expressive.ts, expressive-map.json): semantic channels (visemes with gain,
+   * one-sided smiles, brows, squint, wide eyes, gaze) written to whatever rig the mesh carries — the same shapes and
+   * numbers the Blender bake keys. faceCheck says whether this mesh can express (ok / warn / fail).
+   */
+  setExpressive?(channels: Channels): void;
+  readonly faceCheck?: FaceCheck;
   update(dt: number): void;
   dispose(): void;
 }
