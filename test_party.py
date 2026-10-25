@@ -79,11 +79,12 @@ r = json.loads(c.post(f"/party/{code}/input",
                             "points": [[0.1, 0.2], [0.3, 0.4]]}).data)
 check("drawer batch accepted", r.get("ok") is True)
 
-# immediate re-draw hits rate limit
-r = json.loads(c.post(f"/party/{code}/input",
-                      json={"seat_token": drawer_tok, "client_seq": 2,
-                            "kind": "draw.batch",
-                            "points": [[0.5, 0.5]]}).data)
+# a scripted flood of batches hits the rate limit (a real finger never does)
+for _i in range(40):
+    r = json.loads(c.post(f"/party/{code}/input",
+                          json={"seat_token": drawer_tok, "client_seq": f"f{_i}",
+                                "kind": "draw.batch",
+                                "points": [[0.5, 0.5]]}).data)
 check("draw rate-limited", r.get("ok") is False)
 
 # wrong then right guess

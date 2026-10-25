@@ -42,12 +42,7 @@ def sim_night(mode, nbots=4, deck=None, label=""):
     code, ht = r["code"], r["host_token"]
     c.post(f"/party/{code}/host", json={"host_token": ht, "cmd": "lock"})
     kw = {"deck": deck} if deck else {}
-    if mode in ("freeze-night",) or mode.startswith("quip-"):
-        host(code, ht, "bots", n=nbots)
-    else:
-        # roast/freaktionary have no bot seats yet: seed bot players via join
-        # is human-only; all-bot needs engine seats — covered when wired.
-        return None
+    host(code, ht, "bots", n=nbots)  # every mode seats deck bots now
     r = host(code, ht, "start", mode=mode, **kw)
     assert r.get("ok"), r
     room = ROOMS[code]
@@ -84,6 +79,16 @@ def main():
         kinds = [e["kind"] for e in evs]
         check("round lifecycle complete",
               kinds.count("round.started") >= 7)
+
+    for mode in ("freaktionary", "roast-relay"):
+        room = sim_night(mode, nbots=3, label=mode)
+        check(f"{mode} completes with zero humans",
+              room is not None and room["phase"] == "done")
+        # honest finish: a clear leader is crowned, a shared top score is a tie
+        res = (room or {}).get("result") or {}
+        check(f"{mode} result decided",
+              res.get("kind") in ("win", "tie", "none")
+              and bool(room.get("winner")) == (res.get("kind") == "win"))
 
     for deck in ("endings", "lies", "nonsense"):
         r = json.loads(c.post("/party/create").data)
