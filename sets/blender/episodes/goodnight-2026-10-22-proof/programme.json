@@ -1,0 +1,703 @@
+{
+ "duration_ms": 74122,
+ "intro_ms": 6000,
+ "outro_ms": 5000,
+ "lines": [
+  {
+   "id": "open-ritual#1",
+   "kind": "open",
+   "story": null,
+   "text": "Good evening, and welcome back to Goodnight News \u2014 the channel bringing you good news from around the world. Here is what the world got right today.",
+   "start_ms": 6000,
+   "end_ms": 15660,
+   "wav_ms": 10277,
+   "words": [
+    {
+     "word": "Good",
+     "start_ms": 6000,
+     "end_ms": 6360
+    },
+    {
+     "word": "evening,",
+     "start_ms": 6360,
+     "end_ms": 6520
+    },
+    {
+     "word": "and",
+     "start_ms": 6520,
+     "end_ms": 6940
+    },
+    {
+     "word": "welcome",
+     "start_ms": 6940,
+     "end_ms": 7280
+    },
+    {
+     "word": "back",
+     "start_ms": 7280,
+     "end_ms": 7620
+    },
+    {
+     "word": "to",
+     "start_ms": 7620,
+     "end_ms": 7820
+    },
+    {
+     "word": "Goodnight",
+     "start_ms": 7820,
+     "end_ms": 8380
+    },
+    {
+     "word": "News",
+     "start_ms": 8380,
+     "end_ms": 8720
+    },
+    {
+     "word": "\u2014",
+     "start_ms": 8720,
+     "end_ms": 9160
+    },
+    {
+     "word": "the",
+     "start_ms": 9160,
+     "end_ms": 9180
+    },
+    {
+     "word": "channel",
+     "start_ms": 9180,
+     "end_ms": 9560
+    },
+    {
+     "word": "bringing",
+     "start_ms": 9560,
+     "end_ms": 9920
+    },
+    {
+     "word": "you",
+     "start_ms": 9920,
+     "end_ms": 10280
+    },
+    {
+     "word": "good",
+     "start_ms": 10280,
+     "end_ms": 10560
+    },
+    {
+     "word": "news",
+     "start_ms": 10560,
+     "end_ms": 10980
+    },
+    {
+     "word": "from",
+     "start_ms": 10980,
+     "end_ms": 11360
+    },
+    {
+     "word": "around",
+     "start_ms": 11360,
+     "end_ms": 11640
+    },
+    {
+     "word": "the",
+     "start_ms": 11640,
+     "end_ms": 11940
+    },
+    {
+     "word": "world.",
+     "start_ms": 11940,
+     "end_ms": 12340
+    },
+    {
+     "word": "Here",
+     "start_ms": 13060,
+     "end_ms": 13160
+    },
+    {
+     "word": "is",
+     "start_ms": 13160,
+     "end_ms": 13460
+    },
+    {
+     "word": "what",
+     "start_ms": 13460,
+     "end_ms": 13840
+    },
+    {
+     "word": "the",
+     "start_ms": 13840,
+     "end_ms": 14020
+    },
+    {
+     "word": "world",
+     "start_ms": 14020,
+     "end_ms": 14360
+    },
+    {
+     "word": "got",
+     "start_ms": 14360,
+     "end_ms": 14720
+    },
+    {
+     "word": "right",
+     "start_ms": 14720,
+     "end_ms": 15240
+    },
+    {
+     "word": "today.",
+     "start_ms": 15240,
+     "end_ms": 15660
+    }
+   ]
+  },
+  {
+   "id": "s1#1",
+   "kind": "tee",
+   "story": 0,
+   "text": "First: Euclid discovers new comet. From the European Space Agency.",
+   "start_ms": 17877,
+   "end_ms": 24037,
+   "wav_ms": 6562,
+   "words": [
+    {
+     "word": "First:",
+     "start_ms": 17877,
+     "end_ms": 18577
+    },
+    {
+     "word": "Euclid",
+     "start_ms": 19257,
+     "end_ms": 19677
+    },
+    {
+     "word": "discovers",
+     "start_ms": 19677,
+     "end_ms": 20177
+    },
+    {
+     "word": "new",
+     "start_ms": 20177,
+     "end_ms": 20757
+    },
+    {
+     "word": "comet.",
+     "start_ms": 20757,
+     "end_ms": 21237
+    },
+    {
+     "word": "From",
+     "start_ms": 21237,
+     "end_ms": 22257
+    },
+    {
+     "word": "the",
+     "start_ms": 22257,
+     "end_ms": 22437
+    },
+    {
+     "word": "European",
+     "start_ms": 22437,
+     "end_ms": 22737
+    },
+    {
+     "word": "Space",
+     "start_ms": 22737,
+     "end_ms": 23297
+    },
+    {
+     "word": "Agency.",
+     "start_ms": 23297,
+     "end_ms": 24037
+    }
+   ]
+  },
+  {
+   "id": "s1#2",
+   "kind": "body",
+   "story": 0,
+   "text": "The European Space Agency\u2019s Euclid space telescope has discovered its first previously unknown comet, in images taken between 16 and 24 September 2026.",
+   "start_ms": 25339,
+   "end_ms": 39979,
+   "wav_ms": 15168,
+   "words": [
+    {
+     "word": "The",
+     "start_ms": 25339,
+     "end_ms": 25739
+    },
+    {
+     "word": "European",
+     "start_ms": 25739,
+     "end_ms": 25999
+    },
+    {
+     "word": "Space",
+     "start_ms": 25999,
+     "end_ms": 26539
+    },
+    {
+     "word": "Agency\u2019s",
+     "start_ms": 26539,
+     "end_ms": 27539
+    },
+    {
+     "word": "Euclid",
+     "start_ms": 27539,
+     "end_ms": 28179
+    },
+    {
+     "word": "space",
+     "start_ms": 28179,
+     "end_ms": 28499
+    },
+    {
+     "word": "telescope",
+     "start_ms": 28499,
+     "end_ms": 29299
+    },
+    {
+     "word": "has",
+     "start_ms": 29299,
+     "end_ms": 29659
+    },
+    {
+     "word": "discovered",
+     "start_ms": 29659,
+     "end_ms": 30239
+    },
+    {
+     "word": "its",
+     "start_ms": 30239,
+     "end_ms": 30539
+    },
+    {
+     "word": "first",
+     "start_ms": 30539,
+     "end_ms": 30959
+    },
+    {
+     "word": "previously",
+     "start_ms": 30959,
+     "end_ms": 31559
+    },
+    {
+     "word": "unknown",
+     "start_ms": 31559,
+     "end_ms": 32259
+    },
+    {
+     "word": "comet,",
+     "start_ms": 32259,
+     "end_ms": 33059
+    },
+    {
+     "word": "in",
+     "start_ms": 33059,
+     "end_ms": 33819
+    },
+    {
+     "word": "images",
+     "start_ms": 33819,
+     "end_ms": 34199
+    },
+    {
+     "word": "taken",
+     "start_ms": 34199,
+     "end_ms": 34899
+    },
+    {
+     "word": "between",
+     "start_ms": 34899,
+     "end_ms": 35339
+    },
+    {
+     "word": "16",
+     "start_ms": 35339,
+     "end_ms": 35839
+    },
+    {
+     "word": "and",
+     "start_ms": 35839,
+     "end_ms": 36459
+    },
+    {
+     "word": "24",
+     "start_ms": 36459,
+     "end_ms": 36899
+    },
+    {
+     "word": "September",
+     "start_ms": 36899,
+     "end_ms": 38499
+    },
+    {
+     "word": "2026.",
+     "start_ms": 39119,
+     "end_ms": 39979
+    }
+   ]
+  },
+  {
+   "id": "s2#1",
+   "kind": "tee",
+   "story": 1,
+   "text": "Second: Earth from Space: West Antarctica. From the European Space Agency.",
+   "start_ms": 42107,
+   "end_ms": 48327,
+   "wav_ms": 6871,
+   "words": [
+    {
+     "word": "Second:",
+     "start_ms": 42107,
+     "end_ms": 42647
+    },
+    {
+     "word": "Earth",
+     "start_ms": 43247,
+     "end_ms": 43367
+    },
+    {
+     "word": "from",
+     "start_ms": 43367,
+     "end_ms": 43767
+    },
+    {
+     "word": "Space:",
+     "start_ms": 43767,
+     "end_ms": 44127
+    },
+    {
+     "word": "West",
+     "start_ms": 45007,
+     "end_ms": 45147
+    },
+    {
+     "word": "Antarctica.",
+     "start_ms": 45147,
+     "end_ms": 45787
+    },
+    {
+     "word": "From",
+     "start_ms": 45787,
+     "end_ms": 46767
+    },
+    {
+     "word": "the",
+     "start_ms": 46767,
+     "end_ms": 46907
+    },
+    {
+     "word": "European",
+     "start_ms": 46907,
+     "end_ms": 47147
+    },
+    {
+     "word": "Space",
+     "start_ms": 47147,
+     "end_ms": 47707
+    },
+    {
+     "word": "Agency.",
+     "start_ms": 47707,
+     "end_ms": 48327
+    }
+   ]
+  },
+  {
+   "id": "s2#2",
+   "kind": "body",
+   "story": 1,
+   "text": "This image over part of West Antarctica was captured by Copernicus Sentinel-3 on 30 September 2026.",
+   "start_ms": 49878,
+   "end_ms": 59798,
+   "wav_ms": 10463,
+   "words": [
+    {
+     "word": "This",
+     "start_ms": 49878,
+     "end_ms": 50318
+    },
+    {
+     "word": "image",
+     "start_ms": 50318,
+     "end_ms": 50858
+    },
+    {
+     "word": "over",
+     "start_ms": 50858,
+     "end_ms": 51378
+    },
+    {
+     "word": "part",
+     "start_ms": 51378,
+     "end_ms": 51758
+    },
+    {
+     "word": "of",
+     "start_ms": 51758,
+     "end_ms": 51918
+    },
+    {
+     "word": "West",
+     "start_ms": 51918,
+     "end_ms": 52198
+    },
+    {
+     "word": "Antarctica",
+     "start_ms": 52198,
+     "end_ms": 52598
+    },
+    {
+     "word": "was",
+     "start_ms": 52598,
+     "end_ms": 53178
+    },
+    {
+     "word": "captured",
+     "start_ms": 53178,
+     "end_ms": 53618
+    },
+    {
+     "word": "by",
+     "start_ms": 53618,
+     "end_ms": 54058
+    },
+    {
+     "word": "Copernicus",
+     "start_ms": 54058,
+     "end_ms": 54838
+    },
+    {
+     "word": "Sentinel-3",
+     "start_ms": 54838,
+     "end_ms": 55218
+    },
+    {
+     "word": "on",
+     "start_ms": 56038,
+     "end_ms": 56858
+    },
+    {
+     "word": "30",
+     "start_ms": 56858,
+     "end_ms": 56998
+    },
+    {
+     "word": "September",
+     "start_ms": 58038,
+     "end_ms": 58498
+    },
+    {
+     "word": "2026.",
+     "start_ms": 58498,
+     "end_ms": 59798
+    }
+   ]
+  },
+  {
+   "id": "close-ritual#1",
+   "kind": "close",
+   "story": null,
+   "text": "That is the news the world got right today. Sleep well. Same time tomorrow. Goodnight.",
+   "start_ms": 61941,
+   "end_ms": 68541,
+   "wav_ms": 7181,
+   "words": [
+    {
+     "word": "That",
+     "start_ms": 61941,
+     "end_ms": 62361
+    },
+    {
+     "word": "is",
+     "start_ms": 62361,
+     "end_ms": 62561
+    },
+    {
+     "word": "the",
+     "start_ms": 62561,
+     "end_ms": 62781
+    },
+    {
+     "word": "news",
+     "start_ms": 62781,
+     "end_ms": 63101
+    },
+    {
+     "word": "the",
+     "start_ms": 63101,
+     "end_ms": 63461
+    },
+    {
+     "word": "world",
+     "start_ms": 63461,
+     "end_ms": 63741
+    },
+    {
+     "word": "got",
+     "start_ms": 63741,
+     "end_ms": 63981
+    },
+    {
+     "word": "right",
+     "start_ms": 63981,
+     "end_ms": 64361
+    },
+    {
+     "word": "today.",
+     "start_ms": 64361,
+     "end_ms": 64821
+    },
+    {
+     "word": "Sleep",
+     "start_ms": 65741,
+     "end_ms": 65861
+    },
+    {
+     "word": "well.",
+     "start_ms": 65861,
+     "end_ms": 66241
+    },
+    {
+     "word": "Same",
+     "start_ms": 66861,
+     "end_ms": 66981
+    },
+    {
+     "word": "time",
+     "start_ms": 66981,
+     "end_ms": 67301
+    },
+    {
+     "word": "tomorrow.",
+     "start_ms": 67301,
+     "end_ms": 67701
+    },
+    {
+     "word": "Goodnight.",
+     "start_ms": 68401,
+     "end_ms": 68541
+    }
+   ]
+  }
+ ],
+ "cards": [
+  {
+   "t_ms": 0,
+   "card": "title"
+  },
+  {
+   "t_ms": 8500,
+   "card": "ambient"
+  },
+  {
+   "t_ms": 17177,
+   "card": "story0"
+  },
+  {
+   "t_ms": 40479,
+   "card": "ambient"
+  },
+  {
+   "t_ms": 41407,
+   "card": "story1"
+  },
+  {
+   "t_ms": 60298,
+   "card": "ambient"
+  },
+  {
+   "t_ms": 61341,
+   "card": "signoff"
+  },
+  {
+   "t_ms": 69722,
+   "card": "title"
+  }
+ ],
+ "lowers": [
+  {
+   "t_ms": 7200,
+   "dur_ms": 4200,
+   "kind": "name",
+   "title": "The night desk",
+   "sub": "Goodnight News"
+  },
+  {
+   "t_ms": 26139,
+   "dur_ms": 5200,
+   "kind": "story",
+   "title": "Euclid discovers new comet",
+   "sub": "the European Space Agency"
+  },
+  {
+   "t_ms": 50678,
+   "dur_ms": 5200,
+   "kind": "story",
+   "title": "Earth from Space: West Antarctica",
+   "sub": "the European Space Agency"
+  }
+ ],
+ "moods": [
+  {
+   "t_ms": 6000,
+   "dur_ms": 9660,
+   "emotion": "happy",
+   "intensity": 0.45
+  },
+  {
+   "t_ms": 17877,
+   "dur_ms": 6160,
+   "emotion": "relaxed",
+   "intensity": 0.5
+  },
+  {
+   "t_ms": 25339,
+   "dur_ms": 14640,
+   "emotion": "relaxed",
+   "intensity": 0.3
+  },
+  {
+   "t_ms": 42107,
+   "dur_ms": 6220,
+   "emotion": "relaxed",
+   "intensity": 0.5
+  },
+  {
+   "t_ms": 49878,
+   "dur_ms": 9920,
+   "emotion": "relaxed",
+   "intensity": 0.3
+  },
+  {
+   "t_ms": 61941,
+   "dur_ms": 6600,
+   "emotion": "happy",
+   "intensity": 0.65
+  }
+ ],
+ "stings": [
+  {
+   "t_ms": 0,
+   "kind": "open",
+   "dur_ms": 6000
+  },
+  {
+   "t_ms": 68922,
+   "kind": "close",
+   "dur_ms": 5000
+  }
+ ],
+ "stories": [
+  {
+   "title": "Euclid discovers new comet",
+   "source": "the European Space Agency"
+  },
+  {
+   "title": "Earth from Space: West Antarctica",
+   "source": "the European Space Agency"
+  }
+ ],
+ "show": "goodnight",
+ "title": "Goodnight News",
+ "date": "22 October 2026"
+}

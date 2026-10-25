@@ -1,0 +1,542 @@
+{
+ "open-ritual#1": {
+  "words": [
+   {
+    "word": "Good",
+    "start_ms": 0,
+    "end_ms": 360
+   },
+   {
+    "word": "evening,",
+    "start_ms": 360,
+    "end_ms": 520
+   },
+   {
+    "word": "and",
+    "start_ms": 520,
+    "end_ms": 940
+   },
+   {
+    "word": "welcome",
+    "start_ms": 940,
+    "end_ms": 1280
+   },
+   {
+    "word": "back",
+    "start_ms": 1280,
+    "end_ms": 1620
+   },
+   {
+    "word": "to",
+    "start_ms": 1620,
+    "end_ms": 1820
+   },
+   {
+    "word": "Goodnight",
+    "start_ms": 1820,
+    "end_ms": 2380
+   },
+   {
+    "word": "News",
+    "start_ms": 2380,
+    "end_ms": 2720
+   },
+   {
+    "word": "\u2014",
+    "start_ms": 2720,
+    "end_ms": 3160
+   },
+   {
+    "word": "the",
+    "start_ms": 3160,
+    "end_ms": 3180
+   },
+   {
+    "word": "channel",
+    "start_ms": 3180,
+    "end_ms": 3560
+   },
+   {
+    "word": "bringing",
+    "start_ms": 3560,
+    "end_ms": 3920
+   },
+   {
+    "word": "you",
+    "start_ms": 3920,
+    "end_ms": 4280
+   },
+   {
+    "word": "good",
+    "start_ms": 4280,
+    "end_ms": 4560
+   },
+   {
+    "word": "news",
+    "start_ms": 4560,
+    "end_ms": 4980
+   },
+   {
+    "word": "from",
+    "start_ms": 4980,
+    "end_ms": 5360
+   },
+   {
+    "word": "around",
+    "start_ms": 5360,
+    "end_ms": 5640
+   },
+   {
+    "word": "the",
+    "start_ms": 5640,
+    "end_ms": 5940
+   },
+   {
+    "word": "world.",
+    "start_ms": 5940,
+    "end_ms": 6340
+   },
+   {
+    "word": "Here",
+    "start_ms": 7060,
+    "end_ms": 7160
+   },
+   {
+    "word": "is",
+    "start_ms": 7160,
+    "end_ms": 7460
+   },
+   {
+    "word": "what",
+    "start_ms": 7460,
+    "end_ms": 7840
+   },
+   {
+    "word": "the",
+    "start_ms": 7840,
+    "end_ms": 8020
+   },
+   {
+    "word": "world",
+    "start_ms": 8020,
+    "end_ms": 8360
+   },
+   {
+    "word": "got",
+    "start_ms": 8360,
+    "end_ms": 8720
+   },
+   {
+    "word": "right",
+    "start_ms": 8720,
+    "end_ms": 9240
+   },
+   {
+    "word": "today.",
+    "start_ms": 9240,
+    "end_ms": 9660
+   }
+  ],
+  "coverage": 0.963
+ },
+ "s1#1": {
+  "words": [
+   {
+    "word": "First:",
+    "start_ms": 0,
+    "end_ms": 700
+   },
+   {
+    "word": "Euclid",
+    "start_ms": 1380,
+    "end_ms": 1800
+   },
+   {
+    "word": "discovers",
+    "start_ms": 1800,
+    "end_ms": 2300
+   },
+   {
+    "word": "new",
+    "start_ms": 2300,
+    "end_ms": 2880
+   },
+   {
+    "word": "comet.",
+    "start_ms": 2880,
+    "end_ms": 3360
+   },
+   {
+    "word": "From",
+    "start_ms": 3360,
+    "end_ms": 4380
+   },
+   {
+    "word": "the",
+    "start_ms": 4380,
+    "end_ms": 4560
+   },
+   {
+    "word": "European",
+    "start_ms": 4560,
+    "end_ms": 4860
+   },
+   {
+    "word": "Space",
+    "start_ms": 4860,
+    "end_ms": 5420
+   },
+   {
+    "word": "Agency.",
+    "start_ms": 5420,
+    "end_ms": 6160
+   }
+  ],
+  "coverage": 1.0
+ },
+ "s1#2": {
+  "words": [
+   {
+    "word": "The",
+    "start_ms": 0,
+    "end_ms": 400
+   },
+   {
+    "word": "European",
+    "start_ms": 400,
+    "end_ms": 660
+   },
+   {
+    "word": "Space",
+    "start_ms": 660,
+    "end_ms": 1200
+   },
+   {
+    "word": "Agency\u2019s",
+    "start_ms": 1200,
+    "end_ms": 2200
+   },
+   {
+    "word": "Euclid",
+    "start_ms": 2200,
+    "end_ms": 2840
+   },
+   {
+    "word": "space",
+    "start_ms": 2840,
+    "end_ms": 3160
+   },
+   {
+    "word": "telescope",
+    "start_ms": 3160,
+    "end_ms": 3960
+   },
+   {
+    "word": "has",
+    "start_ms": 3960,
+    "end_ms": 4320
+   },
+   {
+    "word": "discovered",
+    "start_ms": 4320,
+    "end_ms": 4900
+   },
+   {
+    "word": "its",
+    "start_ms": 4900,
+    "end_ms": 5200
+   },
+   {
+    "word": "first",
+    "start_ms": 5200,
+    "end_ms": 5620
+   },
+   {
+    "word": "previously",
+    "start_ms": 5620,
+    "end_ms": 6220
+   },
+   {
+    "word": "unknown",
+    "start_ms": 6220,
+    "end_ms": 6920
+   },
+   {
+    "word": "comet,",
+    "start_ms": 6920,
+    "end_ms": 7720
+   },
+   {
+    "word": "in",
+    "start_ms": 7720,
+    "end_ms": 8480
+   },
+   {
+    "word": "images",
+    "start_ms": 8480,
+    "end_ms": 8860
+   },
+   {
+    "word": "taken",
+    "start_ms": 8860,
+    "end_ms": 9560
+   },
+   {
+    "word": "between",
+    "start_ms": 9560,
+    "end_ms": 10000
+   },
+   {
+    "word": "16",
+    "start_ms": 10000,
+    "end_ms": 10500
+   },
+   {
+    "word": "and",
+    "start_ms": 10500,
+    "end_ms": 11120
+   },
+   {
+    "word": "24",
+    "start_ms": 11120,
+    "end_ms": 11560
+   },
+   {
+    "word": "September",
+    "start_ms": 11560,
+    "end_ms": 13160
+   },
+   {
+    "word": "2026.",
+    "start_ms": 13780,
+    "end_ms": 14640
+   }
+  ],
+  "coverage": 1.0
+ },
+ "s2#1": {
+  "words": [
+   {
+    "word": "Second:",
+    "start_ms": 0,
+    "end_ms": 540
+   },
+   {
+    "word": "Earth",
+    "start_ms": 1140,
+    "end_ms": 1260
+   },
+   {
+    "word": "from",
+    "start_ms": 1260,
+    "end_ms": 1660
+   },
+   {
+    "word": "Space:",
+    "start_ms": 1660,
+    "end_ms": 2020
+   },
+   {
+    "word": "West",
+    "start_ms": 2900,
+    "end_ms": 3040
+   },
+   {
+    "word": "Antarctica.",
+    "start_ms": 3040,
+    "end_ms": 3680
+   },
+   {
+    "word": "From",
+    "start_ms": 3680,
+    "end_ms": 4660
+   },
+   {
+    "word": "the",
+    "start_ms": 4660,
+    "end_ms": 4800
+   },
+   {
+    "word": "European",
+    "start_ms": 4800,
+    "end_ms": 5040
+   },
+   {
+    "word": "Space",
+    "start_ms": 5040,
+    "end_ms": 5600
+   },
+   {
+    "word": "Agency.",
+    "start_ms": 5600,
+    "end_ms": 6220
+   }
+  ],
+  "coverage": 1.0
+ },
+ "s2#2": {
+  "words": [
+   {
+    "word": "This",
+    "start_ms": 0,
+    "end_ms": 440
+   },
+   {
+    "word": "image",
+    "start_ms": 440,
+    "end_ms": 980
+   },
+   {
+    "word": "over",
+    "start_ms": 980,
+    "end_ms": 1500
+   },
+   {
+    "word": "part",
+    "start_ms": 1500,
+    "end_ms": 1880
+   },
+   {
+    "word": "of",
+    "start_ms": 1880,
+    "end_ms": 2040
+   },
+   {
+    "word": "West",
+    "start_ms": 2040,
+    "end_ms": 2320
+   },
+   {
+    "word": "Antarctica",
+    "start_ms": 2320,
+    "end_ms": 2720
+   },
+   {
+    "word": "was",
+    "start_ms": 2720,
+    "end_ms": 3300
+   },
+   {
+    "word": "captured",
+    "start_ms": 3300,
+    "end_ms": 3740
+   },
+   {
+    "word": "by",
+    "start_ms": 3740,
+    "end_ms": 4180
+   },
+   {
+    "word": "Copernicus",
+    "start_ms": 4180,
+    "end_ms": 4960
+   },
+   {
+    "word": "Sentinel-3",
+    "start_ms": 4960,
+    "end_ms": 5340
+   },
+   {
+    "word": "on",
+    "start_ms": 6160,
+    "end_ms": 6980
+   },
+   {
+    "word": "30",
+    "start_ms": 6980,
+    "end_ms": 7120
+   },
+   {
+    "word": "September",
+    "start_ms": 8160,
+    "end_ms": 8620
+   },
+   {
+    "word": "2026.",
+    "start_ms": 8620,
+    "end_ms": 9920
+   }
+  ],
+  "coverage": 1.0
+ },
+ "close-ritual#1": {
+  "words": [
+   {
+    "word": "That",
+    "start_ms": 0,
+    "end_ms": 420
+   },
+   {
+    "word": "is",
+    "start_ms": 420,
+    "end_ms": 620
+   },
+   {
+    "word": "the",
+    "start_ms": 620,
+    "end_ms": 840
+   },
+   {
+    "word": "news",
+    "start_ms": 840,
+    "end_ms": 1160
+   },
+   {
+    "word": "the",
+    "start_ms": 1160,
+    "end_ms": 1520
+   },
+   {
+    "word": "world",
+    "start_ms": 1520,
+    "end_ms": 1800
+   },
+   {
+    "word": "got",
+    "start_ms": 1800,
+    "end_ms": 2040
+   },
+   {
+    "word": "right",
+    "start_ms": 2040,
+    "end_ms": 2420
+   },
+   {
+    "word": "today.",
+    "start_ms": 2420,
+    "end_ms": 2880
+   },
+   {
+    "word": "Sleep",
+    "start_ms": 3800,
+    "end_ms": 3920
+   },
+   {
+    "word": "well.",
+    "start_ms": 3920,
+    "end_ms": 4300
+   },
+   {
+    "word": "Same",
+    "start_ms": 4920,
+    "end_ms": 5040
+   },
+   {
+    "word": "time",
+    "start_ms": 5040,
+    "end_ms": 5360
+   },
+   {
+    "word": "tomorrow.",
+    "start_ms": 5360,
+    "end_ms": 5760
+   },
+   {
+    "word": "Goodnight.",
+    "start_ms": 6460,
+    "end_ms": 6600
+   }
+  ],
+  "coverage": 1.0
+ }
+}

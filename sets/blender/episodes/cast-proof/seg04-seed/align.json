@@ -1,0 +1,72 @@
+{
+ "seed#1": {
+  "words": [
+   {
+    "word": "And",
+    "start_ms": 0,
+    "end_ms": 200
+   },
+   {
+    "word": "that",
+    "start_ms": 200,
+    "end_ms": 360
+   },
+   {
+    "word": "is",
+    "start_ms": 360,
+    "end_ms": 500
+   },
+   {
+    "word": "the",
+    "start_ms": 500,
+    "end_ms": 660
+   },
+   {
+    "word": "desk",
+    "start_ms": 660,
+    "end_ms": 860
+   },
+   {
+    "word": "for",
+    "start_ms": 860,
+    "end_ms": 1160
+   },
+   {
+    "word": "tonight.",
+    "start_ms": 1160,
+    "end_ms": 1500
+   },
+   {
+    "word": "Be",
+    "start_ms": 2120,
+    "end_ms": 2240
+   },
+   {
+    "word": "kind",
+    "start_ms": 2240,
+    "end_ms": 2440
+   },
+   {
+    "word": "to",
+    "start_ms": 2440,
+    "end_ms": 2620
+   },
+   {
+    "word": "someone",
+    "start_ms": 2620,
+    "end_ms": 2880
+   },
+   {
+    "word": "tomorrow.",
+    "start_ms": 2880,
+    "end_ms": 3280
+   },
+   {
+    "word": "Goodnight!",
+    "start_ms": 4000,
+    "end_ms": 4100
+   }
+  ],
+  "coverage": 1.0
+ }
+}

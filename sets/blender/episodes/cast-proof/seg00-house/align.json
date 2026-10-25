@@ -1,0 +1,117 @@
+{
+ "house#1": {
+  "words": [
+   {
+    "word": "Good",
+    "start_ms": 0,
+    "end_ms": 240
+   },
+   {
+    "word": "evening,",
+    "start_ms": 240,
+    "end_ms": 480
+   },
+   {
+    "word": "and",
+    "start_ms": 480,
+    "end_ms": 1100
+   },
+   {
+    "word": "welcome",
+    "start_ms": 1100,
+    "end_ms": 1540
+   },
+   {
+    "word": "to",
+    "start_ms": 1540,
+    "end_ms": 1780
+   },
+   {
+    "word": "the",
+    "start_ms": 1780,
+    "end_ms": 1900
+   },
+   {
+    "word": "night",
+    "start_ms": 1900,
+    "end_ms": 2100
+   },
+   {
+    "word": "desk.",
+    "start_ms": 2100,
+    "end_ms": 2620
+   },
+   {
+    "word": "Tonight",
+    "start_ms": 3140,
+    "end_ms": 3280
+   },
+   {
+    "word": "the",
+    "start_ms": 3280,
+    "end_ms": 3600
+   },
+   {
+    "word": "whole",
+    "start_ms": 3600,
+    "end_ms": 3820
+   },
+   {
+    "word": "team",
+    "start_ms": 3820,
+    "end_ms": 4240
+   },
+   {
+    "word": "is",
+    "start_ms": 4240,
+    "end_ms": 4460
+   },
+   {
+    "word": "in,",
+    "start_ms": 4460,
+    "end_ms": 4660
+   },
+   {
+    "word": "and",
+    "start_ms": 4660,
+    "end_ms": 5160
+   },
+   {
+    "word": "every",
+    "start_ms": 5160,
+    "end_ms": 5600
+   },
+   {
+    "word": "one",
+    "start_ms": 5600,
+    "end_ms": 5860
+   },
+   {
+    "word": "of",
+    "start_ms": 5860,
+    "end_ms": 6000
+   },
+   {
+    "word": "us",
+    "start_ms": 6000,
+    "end_ms": 6160
+   },
+   {
+    "word": "brought",
+    "start_ms": 6160,
+    "end_ms": 6440
+   },
+   {
+    "word": "a",
+    "start_ms": 6440,
+    "end_ms": 6640
+   },
+   {
+    "word": "story.",
+    "start_ms": 6640,
+    "end_ms": 7020
+   }
+  ],
+  "coverage": 1.0
+ }
+}

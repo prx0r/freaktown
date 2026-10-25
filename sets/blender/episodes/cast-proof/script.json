@@ -1,0 +1,25 @@
+{
+ "title": "The Night Desk",
+ "date": "25 October 2026",
+ "about": "Cast proof: five presenters, three skins, one programme clock. Each segment is one cast member in their own studio skin; the director cuts inside each segment, the segments hard-cut into each other.",
+ "segments": [
+  {"cast": "house", "skin": "goodnight", "intro_ms": 4500,
+   "lines": [{"kind": "open", "text": "Good evening, and welcome to the night desk. Tonight the whole team is in, and every one of us brought a story.",
+              "emotion": ["happy", 0.6], "gestures": [{"word": "whole", "kind": "browflash"}, {"after": true, "kind": "smirk"}]}]},
+  {"cast": "vivi", "skin": "galactic", "open_shot": "CAM_MEDIUM",
+   "story": {"title": "Sleeping probe wakes up", "source": "Mission control"},
+   "lines": [{"kind": "body", "text": "Out past the moon, a tiny probe has just woken up after eleven years asleep. Nobody expected that!",
+              "emotion": ["surprised", 0.75], "gestures": [{"word": "eleven", "kind": "browflash"}]}]},
+  {"cast": "fumiriya", "skin": "night-wire", "open_shot": "CAM_DESK34",
+   "story": {"title": "River crews work through the night", "source": "City desk"},
+   "lines": [{"kind": "body", "text": "Closer to home, the river is rising again. Crews are working through the night, and they are asking for volunteers.",
+              "emotion": ["concerned", 0.8], "gestures": [{"word": "rising", "kind": "dart", "x": -0.8}]}]},
+  {"cast": "theo", "skin": "galactic", "open_shot": "CAM_MEDIUM",
+   "story": {"title": "Markets: flat", "source": "The money desk"},
+   "lines": [{"kind": "body", "text": "The markets, meanwhile, were flat. Very flat. I checked twice, and they were still flat.",
+              "emotion": ["serious", 0.75], "gestures": [{"word": "twice", "kind": "dart", "x": 0.85}, {"after": true, "kind": "wink"}]}]},
+  {"cast": "seed", "skin": "goodnight", "open_shot": "CAM_MEDIUM", "outro_ms": 4000,
+   "lines": [{"kind": "close", "text": "And that is the desk for tonight. Be kind to someone tomorrow. Goodnight!",
+              "emotion": ["happy", 0.8], "gestures": [{"word": "kind", "kind": "smirk"}, {"word": "Goodnight", "kind": "wink"}]}]}
+ ]
+}

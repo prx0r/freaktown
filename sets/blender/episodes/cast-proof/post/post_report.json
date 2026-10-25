@@ -1,0 +1,71 @@
+{
+ "seed": 7,
+ "preset": "goodnight-studio",
+ "sr": 48000,
+ "duration_s": 45.32,
+ "voice": {
+  "plosive_events": [
+   [
+    "pop",
+    12.95
+   ]
+  ],
+  "mic_drift": {
+   "turn_aways": [
+    [
+     23.53,
+     1.21,
+     0.85
+    ],
+    [
+     27.47,
+     0.68,
+     0.65
+    ]
+   ],
+   "level_dip_db_p95": 1.12,
+   "level_dip_db_max": 2.21
+  },
+  "breaths": [
+   4.002,
+   12.189,
+   20.409,
+   28.733
+  ],
+  "chain": {
+   "deess_max_db": 4.42,
+   "comp_gr_p95_db": 6.93
+  }
+ },
+ "foley": [
+  {
+   "kind": "paper",
+   "t": 11.132368801216277
+  },
+  {
+   "kind": "paper",
+   "t": 19.361287735138585
+  },
+  {
+   "kind": "paper",
+   "t": 27.629725158498076
+  },
+  {
+   "kind": "paper",
+   "t": 34.9967042669071
+  }
+ ],
+ "mix": {
+  "vo_over_bed_db": 14.53,
+  "duck_depth_db": 7.61,
+  "duck_target_db": 8.0,
+  "room_tone_rel_db": -48.0
+ },
+ "master": {
+  "lufs_i": -14.2,
+  "lra": 5.2,
+  "true_peak_dbtp": -1.5
+ },
+ "master_gain_approx": 0.8951,
+ "sha256_master": "a268d6b9b7b7e168b12b02156287fec01f990c0a6ea958f99d164ee8dae4ba8b"
+}

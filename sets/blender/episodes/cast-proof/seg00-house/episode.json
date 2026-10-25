@@ -1,0 +1,59 @@
+{
+ "skin": "goodnight",
+ "anchor": "house",
+ "cast": "house",
+ "fps": 25,
+ "frames": 307,
+ "duration_ms": 12280,
+ "show_t0_ms": 0,
+ "tts": {
+  "model": "s2.1-pro-free",
+  "voice": "9a9cf47702da476aa4629e2506d4a857",
+  "voice_name": "Hannah (Fish Official, public)",
+  "speed": 0.85,
+  "reads": [
+   {
+    "id": "house#1",
+    "key": "facb434962a3ce76",
+    "source": "cache",
+    "dur_ms": 7326,
+    "voice": "9a9cf47702da476aa4629e2506d4a857",
+    "speed": 0.85
+   }
+  ]
+ },
+ "align_coverage": {
+  "house#1": 1.0
+ },
+ "facecheck": {
+  "rig": "vroid",
+  "level": "ok",
+  "channels": [
+   "open",
+   "aa",
+   "ih",
+   "ou",
+   "ee",
+   "oh",
+   "blinkL",
+   "blinkR",
+   "smileL",
+   "smileR",
+   "grin",
+   "frown",
+   "browUp",
+   "browDown",
+   "browSad",
+   "squint",
+   "eyeWide"
+  ],
+  "missingCore": [],
+  "warnings": [],
+  "generated": [
+   "Fcl_MTH_Fun_L",
+   "Fcl_MTH_Fun_R",
+   "Fcl_MTH_Joy_L",
+   "Fcl_MTH_Joy_R"
+  ]
+ }
+}

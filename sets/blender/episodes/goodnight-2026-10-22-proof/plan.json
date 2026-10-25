@@ -1,0 +1,583 @@
+{
+ "duration_s": 74.122,
+ "lines": [
+  {
+   "id": "open-ritual#1",
+   "start": 6.0,
+   "end": 15.66,
+   "wav_end": 16.277,
+   "words": [
+    {
+     "word": "Good",
+     "start": 6.0,
+     "end": 6.36
+    },
+    {
+     "word": "evening,",
+     "start": 6.36,
+     "end": 6.52
+    },
+    {
+     "word": "and",
+     "start": 6.52,
+     "end": 6.94
+    },
+    {
+     "word": "welcome",
+     "start": 6.94,
+     "end": 7.28
+    },
+    {
+     "word": "back",
+     "start": 7.28,
+     "end": 7.62
+    },
+    {
+     "word": "to",
+     "start": 7.62,
+     "end": 7.82
+    },
+    {
+     "word": "Goodnight",
+     "start": 7.82,
+     "end": 8.38
+    },
+    {
+     "word": "News",
+     "start": 8.38,
+     "end": 8.72
+    },
+    {
+     "word": "\u2014",
+     "start": 8.72,
+     "end": 9.16
+    },
+    {
+     "word": "the",
+     "start": 9.16,
+     "end": 9.18
+    },
+    {
+     "word": "channel",
+     "start": 9.18,
+     "end": 9.56
+    },
+    {
+     "word": "bringing",
+     "start": 9.56,
+     "end": 9.92
+    },
+    {
+     "word": "you",
+     "start": 9.92,
+     "end": 10.28
+    },
+    {
+     "word": "good",
+     "start": 10.28,
+     "end": 10.56
+    },
+    {
+     "word": "news",
+     "start": 10.56,
+     "end": 10.98
+    },
+    {
+     "word": "from",
+     "start": 10.98,
+     "end": 11.36
+    },
+    {
+     "word": "around",
+     "start": 11.36,
+     "end": 11.64
+    },
+    {
+     "word": "the",
+     "start": 11.64,
+     "end": 11.94
+    },
+    {
+     "word": "world.",
+     "start": 11.94,
+     "end": 12.34
+    },
+    {
+     "word": "Here",
+     "start": 13.06,
+     "end": 13.16
+    },
+    {
+     "word": "is",
+     "start": 13.16,
+     "end": 13.46
+    },
+    {
+     "word": "what",
+     "start": 13.46,
+     "end": 13.84
+    },
+    {
+     "word": "the",
+     "start": 13.84,
+     "end": 14.02
+    },
+    {
+     "word": "world",
+     "start": 14.02,
+     "end": 14.36
+    },
+    {
+     "word": "got",
+     "start": 14.36,
+     "end": 14.72
+    },
+    {
+     "word": "right",
+     "start": 14.72,
+     "end": 15.24
+    },
+    {
+     "word": "today.",
+     "start": 15.24,
+     "end": 15.66
+    }
+   ]
+  },
+  {
+   "id": "s1#1",
+   "start": 17.877,
+   "end": 24.037,
+   "wav_end": 24.439,
+   "words": [
+    {
+     "word": "First:",
+     "start": 17.877,
+     "end": 18.577
+    },
+    {
+     "word": "Euclid",
+     "start": 19.257,
+     "end": 19.677
+    },
+    {
+     "word": "discovers",
+     "start": 19.677,
+     "end": 20.177
+    },
+    {
+     "word": "new",
+     "start": 20.177,
+     "end": 20.757
+    },
+    {
+     "word": "comet.",
+     "start": 20.757,
+     "end": 21.237
+    },
+    {
+     "word": "From",
+     "start": 21.237,
+     "end": 22.257
+    },
+    {
+     "word": "the",
+     "start": 22.257,
+     "end": 22.437
+    },
+    {
+     "word": "European",
+     "start": 22.437,
+     "end": 22.737
+    },
+    {
+     "word": "Space",
+     "start": 22.737,
+     "end": 23.297
+    },
+    {
+     "word": "Agency.",
+     "start": 23.297,
+     "end": 24.037
+    }
+   ]
+  },
+  {
+   "id": "s1#2",
+   "start": 25.339,
+   "end": 39.979,
+   "wav_end": 40.507,
+   "words": [
+    {
+     "word": "The",
+     "start": 25.339,
+     "end": 25.739
+    },
+    {
+     "word": "European",
+     "start": 25.739,
+     "end": 25.999
+    },
+    {
+     "word": "Space",
+     "start": 25.999,
+     "end": 26.539
+    },
+    {
+     "word": "Agency\u2019s",
+     "start": 26.539,
+     "end": 27.539
+    },
+    {
+     "word": "Euclid",
+     "start": 27.539,
+     "end": 28.179
+    },
+    {
+     "word": "space",
+     "start": 28.179,
+     "end": 28.499
+    },
+    {
+     "word": "telescope",
+     "start": 28.499,
+     "end": 29.299
+    },
+    {
+     "word": "has",
+     "start": 29.299,
+     "end": 29.659
+    },
+    {
+     "word": "discovered",
+     "start": 29.659,
+     "end": 30.239
+    },
+    {
+     "word": "its",
+     "start": 30.239,
+     "end": 30.539
+    },
+    {
+     "word": "first",
+     "start": 30.539,
+     "end": 30.959
+    },
+    {
+     "word": "previously",
+     "start": 30.959,
+     "end": 31.559
+    },
+    {
+     "word": "unknown",
+     "start": 31.559,
+     "end": 32.259
+    },
+    {
+     "word": "comet,",
+     "start": 32.259,
+     "end": 33.059
+    },
+    {
+     "word": "in",
+     "start": 33.059,
+     "end": 33.819
+    },
+    {
+     "word": "images",
+     "start": 33.819,
+     "end": 34.199
+    },
+    {
+     "word": "taken",
+     "start": 34.199,
+     "end": 34.899
+    },
+    {
+     "word": "between",
+     "start": 34.899,
+     "end": 35.339
+    },
+    {
+     "word": "16",
+     "start": 35.339,
+     "end": 35.839
+    },
+    {
+     "word": "and",
+     "start": 35.839,
+     "end": 36.459
+    },
+    {
+     "word": "24",
+     "start": 36.459,
+     "end": 36.899
+    },
+    {
+     "word": "September",
+     "start": 36.899,
+     "end": 38.499
+    },
+    {
+     "word": "2026.",
+     "start": 39.119,
+     "end": 39.979
+    }
+   ]
+  },
+  {
+   "id": "s2#1",
+   "start": 42.107,
+   "end": 48.327,
+   "wav_end": 48.978,
+   "words": [
+    {
+     "word": "Second:",
+     "start": 42.107,
+     "end": 42.647
+    },
+    {
+     "word": "Earth",
+     "start": 43.247,
+     "end": 43.367
+    },
+    {
+     "word": "from",
+     "start": 43.367,
+     "end": 43.767
+    },
+    {
+     "word": "Space:",
+     "start": 43.767,
+     "end": 44.127
+    },
+    {
+     "word": "West",
+     "start": 45.007,
+     "end": 45.147
+    },
+    {
+     "word": "Antarctica.",
+     "start": 45.147,
+     "end": 45.787
+    },
+    {
+     "word": "From",
+     "start": 45.787,
+     "end": 46.767
+    },
+    {
+     "word": "the",
+     "start": 46.767,
+     "end": 46.907
+    },
+    {
+     "word": "European",
+     "start": 46.907,
+     "end": 47.147
+    },
+    {
+     "word": "Space",
+     "start": 47.147,
+     "end": 47.707
+    },
+    {
+     "word": "Agency.",
+     "start": 47.707,
+     "end": 48.327
+    }
+   ]
+  },
+  {
+   "id": "s2#2",
+   "start": 49.878,
+   "end": 59.798,
+   "wav_end": 60.341,
+   "words": [
+    {
+     "word": "This",
+     "start": 49.878,
+     "end": 50.318
+    },
+    {
+     "word": "image",
+     "start": 50.318,
+     "end": 50.858
+    },
+    {
+     "word": "over",
+     "start": 50.858,
+     "end": 51.378
+    },
+    {
+     "word": "part",
+     "start": 51.378,
+     "end": 51.758
+    },
+    {
+     "word": "of",
+     "start": 51.758,
+     "end": 51.918
+    },
+    {
+     "word": "West",
+     "start": 51.918,
+     "end": 52.198
+    },
+    {
+     "word": "Antarctica",
+     "start": 52.198,
+     "end": 52.598
+    },
+    {
+     "word": "was",
+     "start": 52.598,
+     "end": 53.178
+    },
+    {
+     "word": "captured",
+     "start": 53.178,
+     "end": 53.618
+    },
+    {
+     "word": "by",
+     "start": 53.618,
+     "end": 54.058
+    },
+    {
+     "word": "Copernicus",
+     "start": 54.058,
+     "end": 54.838
+    },
+    {
+     "word": "Sentinel-3",
+     "start": 54.838,
+     "end": 55.218
+    },
+    {
+     "word": "on",
+     "start": 56.038,
+     "end": 56.858
+    },
+    {
+     "word": "30",
+     "start": 56.858,
+     "end": 56.998
+    },
+    {
+     "word": "September",
+     "start": 58.038,
+     "end": 58.498
+    },
+    {
+     "word": "2026.",
+     "start": 58.498,
+     "end": 59.798
+    }
+   ]
+  },
+  {
+   "id": "close-ritual#1",
+   "start": 61.941,
+   "end": 68.541,
+   "wav_end": 69.122,
+   "words": [
+    {
+     "word": "That",
+     "start": 61.941,
+     "end": 62.361
+    },
+    {
+     "word": "is",
+     "start": 62.361,
+     "end": 62.561
+    },
+    {
+     "word": "the",
+     "start": 62.561,
+     "end": 62.781
+    },
+    {
+     "word": "news",
+     "start": 62.781,
+     "end": 63.101
+    },
+    {
+     "word": "the",
+     "start": 63.101,
+     "end": 63.461
+    },
+    {
+     "word": "world",
+     "start": 63.461,
+     "end": 63.741
+    },
+    {
+     "word": "got",
+     "start": 63.741,
+     "end": 63.981
+    },
+    {
+     "word": "right",
+     "start": 63.981,
+     "end": 64.361
+    },
+    {
+     "word": "today.",
+     "start": 64.361,
+     "end": 64.821
+    },
+    {
+     "word": "Sleep",
+     "start": 65.741,
+     "end": 65.861
+    },
+    {
+     "word": "well.",
+     "start": 65.861,
+     "end": 66.241
+    },
+    {
+     "word": "Same",
+     "start": 66.861,
+     "end": 66.981
+    },
+    {
+     "word": "time",
+     "start": 66.981,
+     "end": 67.301
+    },
+    {
+     "word": "tomorrow.",
+     "start": 67.301,
+     "end": 67.701
+    },
+    {
+     "word": "Goodnight.",
+     "start": 68.401,
+     "end": 68.541
+    }
+   ]
+  }
+ ],
+ "story_starts": [
+  17.877,
+  42.107
+ ],
+ "stings": [
+  {
+   "t": 0.0,
+   "kind": "open",
+   "dur": 6.0
+  },
+  {
+   "t": 68.922,
+   "kind": "close",
+   "dur": 5.0
+  }
+ ],
+ "music": {
+  "bed_from": 5.0,
+  "bed_to": 69.122
+ }
+}

@@ -1,0 +1,59 @@
+{
+ "skin": "galactic",
+ "anchor": "theo",
+ "cast": "theo",
+ "fps": 25,
+ "frames": 186,
+ "duration_ms": 7440,
+ "show_t0_ms": 28760,
+ "tts": {
+  "model": "s2.1-pro-free",
+  "voice": "63d5460e91e2411fa2e6bf95e7456f03",
+  "voice_name": "Anchor News (public)",
+  "speed": 0.85,
+  "reads": [
+   {
+    "id": "theo#1",
+    "key": "afade44370e64947",
+    "source": "cache",
+    "dur_ms": 6616,
+    "voice": "63d5460e91e2411fa2e6bf95e7456f03",
+    "speed": 0.85
+   }
+  ]
+ },
+ "align_coverage": {
+  "theo#1": 1.0
+ },
+ "facecheck": {
+  "rig": "vroid",
+  "level": "ok",
+  "channels": [
+   "open",
+   "aa",
+   "ih",
+   "ou",
+   "ee",
+   "oh",
+   "blinkL",
+   "blinkR",
+   "smileL",
+   "smileR",
+   "grin",
+   "frown",
+   "browUp",
+   "browDown",
+   "browSad",
+   "squint",
+   "eyeWide"
+  ],
+  "missingCore": [],
+  "warnings": [],
+  "generated": [
+   "Fcl_MTH_Fun_L",
+   "Fcl_MTH_Fun_R",
+   "Fcl_MTH_Joy_L",
+   "Fcl_MTH_Joy_R"
+  ]
+ }
+}

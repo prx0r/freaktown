@@ -1,0 +1,217 @@
+{
+ "duration_ms": 12280,
+ "intro_ms": 4500,
+ "outro_ms": 0,
+ "lines": [
+  {
+   "id": "house#1",
+   "kind": "open",
+   "story": null,
+   "text": "Good evening, and welcome to the night desk. Tonight the whole team is in, and every one of us brought a story.",
+   "emotion": [
+    "happy",
+    0.6
+   ],
+   "gestures": [
+    {
+     "word": "whole",
+     "kind": "browflash"
+    },
+    {
+     "after": true,
+     "kind": "smirk"
+    }
+   ],
+   "start_ms": 4500,
+   "end_ms": 11520,
+   "wav_ms": 7326,
+   "words": [
+    {
+     "word": "Good",
+     "start_ms": 4500,
+     "end_ms": 4740
+    },
+    {
+     "word": "evening,",
+     "start_ms": 4740,
+     "end_ms": 4980
+    },
+    {
+     "word": "and",
+     "start_ms": 4980,
+     "end_ms": 5600
+    },
+    {
+     "word": "welcome",
+     "start_ms": 5600,
+     "end_ms": 6040
+    },
+    {
+     "word": "to",
+     "start_ms": 6040,
+     "end_ms": 6280
+    },
+    {
+     "word": "the",
+     "start_ms": 6280,
+     "end_ms": 6400
+    },
+    {
+     "word": "night",
+     "start_ms": 6400,
+     "end_ms": 6600
+    },
+    {
+     "word": "desk.",
+     "start_ms": 6600,
+     "end_ms": 7120
+    },
+    {
+     "word": "Tonight",
+     "start_ms": 7640,
+     "end_ms": 7780
+    },
+    {
+     "word": "the",
+     "start_ms": 7780,
+     "end_ms": 8100
+    },
+    {
+     "word": "whole",
+     "start_ms": 8100,
+     "end_ms": 8320
+    },
+    {
+     "word": "team",
+     "start_ms": 8320,
+     "end_ms": 8740
+    },
+    {
+     "word": "is",
+     "start_ms": 8740,
+     "end_ms": 8960
+    },
+    {
+     "word": "in,",
+     "start_ms": 8960,
+     "end_ms": 9160
+    },
+    {
+     "word": "and",
+     "start_ms": 9160,
+     "end_ms": 9660
+    },
+    {
+     "word": "every",
+     "start_ms": 9660,
+     "end_ms": 10100
+    },
+    {
+     "word": "one",
+     "start_ms": 10100,
+     "end_ms": 10360
+    },
+    {
+     "word": "of",
+     "start_ms": 10360,
+     "end_ms": 10500
+    },
+    {
+     "word": "us",
+     "start_ms": 10500,
+     "end_ms": 10660
+    },
+    {
+     "word": "brought",
+     "start_ms": 10660,
+     "end_ms": 10940
+    },
+    {
+     "word": "a",
+     "start_ms": 10940,
+     "end_ms": 11140
+    },
+    {
+     "word": "story.",
+     "start_ms": 11140,
+     "end_ms": 11520
+    }
+   ]
+  }
+ ],
+ "cards": [
+  {
+   "t_ms": 0,
+   "card": "ambient"
+  },
+  {
+   "t_ms": 3825,
+   "card": "title"
+  },
+  {
+   "t_ms": 4500,
+   "card": "ambient"
+  }
+ ],
+ "lowers": [
+  {
+   "t_ms": 4750,
+   "dur_ms": 3600,
+   "kind": "name",
+   "title": "Juno Hale",
+   "sub": "Goodnight News"
+  }
+ ],
+ "moods": [
+  {
+   "t_ms": 4500,
+   "dur_ms": 7020,
+   "emotion": "happy",
+   "intensity": 0.6
+  }
+ ],
+ "stings": [
+  {
+   "t_ms": 0,
+   "kind": "open",
+   "dur_ms": 4500
+  },
+  {
+   "t_ms": 11626,
+   "kind": "close",
+   "dur_ms": 0
+  }
+ ],
+ "stories": [],
+ "show": "goodnight",
+ "title": "The Night Desk",
+ "date": "25 October 2026",
+ "sentence_cut_ms": 2600,
+ "max_hold_ms": 5200,
+ "rotation": [
+  "CAM_CLOSE",
+  "push",
+  "CAM_DESK34",
+  "CAM_MEDIUM"
+ ],
+ "open_settle": 0.22,
+ "gestures": [
+  {
+   "t_ms": 8020,
+   "dur_ms": 520,
+   "kind": "browflash"
+  },
+  {
+   "t_ms": 11590,
+   "dur_ms": 1300,
+   "kind": "smirk"
+  }
+ ],
+ "segment": {
+  "index": 0,
+  "of": 5,
+  "cast": "house",
+  "name": "Juno Hale",
+  "skin": "goodnight"
+ }
+}
