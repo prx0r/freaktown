@@ -1,0 +1,87 @@
+{
+ "id": "night-wire",
+ "about": "Night Wire: a hard-news glass studio. Black and red, a city skyline behind glass, condensed caps, a desk globe, brass-like stabs.",
+ "base": "breaking",
+ "studio": {
+  "Trim Color": [
+   0.3,
+   0.3,
+   0.33,
+   1.0
+  ],
+  "Second Seat": false,
+  "Globe": true,
+  "Laptop": false,
+  "LED Pillars": false,
+  "Glow Strength": 7.0
+ },
+ "look": {
+  "anchor": {"exposure": 0.75, "skin_saturation": 1.3, "skin_tint": "#FFD8C0"},
+  "haze_color": "#3A0A10",
+  "haze": 0.28,
+  "glow": 0.3,
+  "glow_threshold": 1.3,
+  "fringe": 0.016,
+  "vignette": 0.36,
+  "kicker": 70,
+  "kicker_color": "#FFD6D6",
+  "wall_brightness": 1.2,
+  "wall_px": [
+   576,
+   278
+  ],
+  "grade_tint": "#FFE0E0",
+  "grade_tint_amount": 0.1,
+  "saturation": 0.92
+ },
+ "brand": {
+  "title": "Night Wire",
+  "tagline": "The stories that moved tonight",
+  "anchor_name": "On the wire",
+  "desk_text": "NIGHT WIRE",
+  "card_style": "wire",
+  "palette": {
+   "paper": "#0B0B0E",
+   "paper2": "#1A0A0D",
+   "ink": "#FFFFFF",
+   "muted": "#B9B9C2",
+   "accent": "#FF2B3A",
+   "accent2": "#B3121F",
+   "lower_bg": "#0B0B0E",
+   "lower_ink": "#FFFFFF",
+   "desk_bg": "#0B0B0E",
+   "desk_ink": "#FFFFFF"
+  },
+  "fonts": {
+   "head": "Oswald.ttf",
+   "italic": "Inter.ttf",
+   "body": "Inter.ttf"
+  },
+  "head_weight": "SemiBold",
+  "caps": true,
+  "signoff": "That's the wire."
+ },
+ "music": {
+  "key": "E",
+  "style": "stabs",
+  "bar_s": 4.0
+ },
+ "tone": {
+  "open": [
+   "relaxed",
+   0.3
+  ],
+  "tee": [
+   "angry",
+   0.15
+  ],
+  "body": [
+   "relaxed",
+   0.2
+  ],
+  "close": [
+   "happy",
+   0.35
+  ]
+ }
+}

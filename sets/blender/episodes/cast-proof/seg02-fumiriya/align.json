@@ -1,0 +1,107 @@
+{
+ "fumiriya#1": {
+  "words": [
+   {
+    "word": "Closer",
+    "start_ms": 0,
+    "end_ms": 380
+   },
+   {
+    "word": "to",
+    "start_ms": 380,
+    "end_ms": 560
+   },
+   {
+    "word": "home,",
+    "start_ms": 560,
+    "end_ms": 800
+   },
+   {
+    "word": "the",
+    "start_ms": 1320,
+    "end_ms": 1440
+   },
+   {
+    "word": "river",
+    "start_ms": 1440,
+    "end_ms": 1640
+   },
+   {
+    "word": "is",
+    "start_ms": 1640,
+    "end_ms": 1960
+   },
+   {
+    "word": "rising",
+    "start_ms": 1960,
+    "end_ms": 2220
+   },
+   {
+    "word": "again.",
+    "start_ms": 2220,
+    "end_ms": 2660
+   },
+   {
+    "word": "Crews",
+    "start_ms": 3540,
+    "end_ms": 3760
+   },
+   {
+    "word": "are",
+    "start_ms": 3760,
+    "end_ms": 3840
+   },
+   {
+    "word": "working",
+    "start_ms": 3840,
+    "end_ms": 4140
+   },
+   {
+    "word": "through",
+    "start_ms": 4140,
+    "end_ms": 4380
+   },
+   {
+    "word": "the",
+    "start_ms": 4380,
+    "end_ms": 4540
+   },
+   {
+    "word": "night,",
+    "start_ms": 4540,
+    "end_ms": 4800
+   },
+   {
+    "word": "and",
+    "start_ms": 5260,
+    "end_ms": 5460
+   },
+   {
+    "word": "they",
+    "start_ms": 5460,
+    "end_ms": 5580
+   },
+   {
+    "word": "are",
+    "start_ms": 5580,
+    "end_ms": 5700
+   },
+   {
+    "word": "asking",
+    "start_ms": 5700,
+    "end_ms": 6040
+   },
+   {
+    "word": "for",
+    "start_ms": 6040,
+    "end_ms": 6280
+   },
+   {
+    "word": "volunteers.",
+    "start_ms": 6280,
+    "end_ms": 6600
+   }
+  ],
+  "coverage": 1.0
+ }
+}

@@ -1,0 +1,122 @@
+{
+ "title": "The Night Desk",
+ "date": "25 October 2026",
+ "fps": 25,
+ "frames": 1133,
+ "duration_ms": 45320,
+ "segments": [
+  {
+   "dir": "seg00-house",
+   "cast": "house",
+   "name": "Juno Hale",
+   "skin": "goodnight",
+   "t0_ms": 0,
+   "duration_ms": 12280,
+   "frames": 307,
+   "voice": "9a9cf47702da476aa4629e2506d4a857",
+   "voice_name": "Hannah (Fish Official, public)",
+   "lines": [
+    "Good evening, and welcome to the night desk. Tonight the whole team is in, and every one of us brought a story."
+   ],
+   "emotions": [
+    "happy"
+   ],
+   "gestures": [
+    "browflash",
+    "smirk"
+   ],
+   "frame0": 0
+  },
+  {
+   "dir": "seg01-vivi",
+   "cast": "vivi",
+   "name": "Vivi Sato",
+   "skin": "galactic",
+   "t0_ms": 12280,
+   "duration_ms": 8240,
+   "frames": 206,
+   "voice": "933563129e564b19a115bedd57b7406a",
+   "voice_name": "Sarah (Fish Official, public)",
+   "lines": [
+    "Out past the moon, a tiny probe has just woken up after eleven years asleep. Nobody expected that!"
+   ],
+   "emotions": [
+    "surprised"
+   ],
+   "gestures": [
+    "browflash"
+   ],
+   "frame0": 307
+  },
+  {
+   "dir": "seg02-fumiriya",
+   "cast": "fumiriya",
+   "name": "Fumiriya Sakurada",
+   "skin": "night-wire",
+   "t0_ms": 20520,
+   "duration_ms": 8240,
+   "frames": 206,
+   "voice": "536d3a5e000945adb7038665781a4aca",
+   "voice_name": "Ethan (Fish Official, public)",
+   "lines": [
+    "Closer to home, the river is rising again. Crews are working through the night, and they are asking for volunteers."
+   ],
+   "emotions": [
+    "concerned"
+   ],
+   "gestures": [
+    "dart"
+   ],
+   "frame0": 513
+  },
+  {
+   "dir": "seg03-theo",
+   "cast": "theo",
+   "name": "Theo Marsh",
+   "skin": "galactic",
+   "t0_ms": 28760,
+   "duration_ms": 7440,
+   "frames": 186,
+   "voice": "63d5460e91e2411fa2e6bf95e7456f03",
+   "voice_name": "Anchor News (public)",
+   "lines": [
+    "The markets, meanwhile, were flat. Very flat. I checked twice, and they were still flat."
+   ],
+   "emotions": [
+    "serious"
+   ],
+   "gestures": [
+    "dart",
+    "wink"
+   ],
+   "frame0": 719
+  },
+  {
+   "dir": "seg04-seed",
+   "cast": "seed",
+   "name": "Seed-san",
+   "skin": "goodnight",
+   "t0_ms": 36200,
+   "duration_ms": 9120,
+   "frames": 228,
+   "voice": "b545c585f631496c914815291da4e893",
+   "voice_name": "Friendly Women (public)",
+   "lines": [
+    "And that is the desk for tonight. Be kind to someone tomorrow. Goodnight!"
+   ],
+   "emotions": [
+    "happy"
+   ],
+   "gestures": [
+    "smirk",
+    "wink"
+   ],
+   "frame0": 905
+  }
+ ],
+ "loudness": {
+  "lufs_i": -14.2,
+  "true_peak_dbfs": -1.5
+ },
+ "tts_model": "s2.1-pro-free"
+}

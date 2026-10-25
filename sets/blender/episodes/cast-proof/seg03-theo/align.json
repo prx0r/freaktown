@@ -1,0 +1,82 @@
+{
+ "theo#1": {
+  "words": [
+   {
+    "word": "The",
+    "start_ms": 0,
+    "end_ms": 320
+   },
+   {
+    "word": "markets,",
+    "start_ms": 320,
+    "end_ms": 620
+   },
+   {
+    "word": "meanwhile,",
+    "start_ms": 620,
+    "end_ms": 1080
+   },
+   {
+    "word": "were",
+    "start_ms": 1080,
+    "end_ms": 1860
+   },
+   {
+    "word": "flat.",
+    "start_ms": 1860,
+    "end_ms": 2300
+   },
+   {
+    "word": "Very",
+    "start_ms": 2660,
+    "end_ms": 2980
+   },
+   {
+    "word": "flat.",
+    "start_ms": 2980,
+    "end_ms": 3500
+   },
+   {
+    "word": "I",
+    "start_ms": 4160,
+    "end_ms": 4180
+   },
+   {
+    "word": "checked",
+    "start_ms": 4180,
+    "end_ms": 4380
+   },
+   {
+    "word": "twice,",
+    "start_ms": 4380,
+    "end_ms": 4700
+   },
+   {
+    "word": "and",
+    "start_ms": 4700,
+    "end_ms": 5340
+   },
+   {
+    "word": "they",
+    "start_ms": 5340,
+    "end_ms": 5460
+   },
+   {
+    "word": "were",
+    "start_ms": 5460,
+    "end_ms": 5600
+   },
+   {
+    "word": "still",
+    "start_ms": 5600,
+    "end_ms": 5940
+   },
+   {
+    "word": "flat.",
+    "start_ms": 5940,
+    "end_ms": 6340
+   }
+  ],
+  "coverage": 1.0
+ }
+}

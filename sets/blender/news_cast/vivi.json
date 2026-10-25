@@ -1,0 +1,23 @@
+{
+ "id": "vivi",
+ "name": "Vivi Sato",
+ "model": "static/avatars/cast/vivi.vrm",
+ "licence": "CC0-1.0",
+ "source": "https://vroid.pixiv.help/hc/en-us/articles/360014900273 (beta AvatarSample_2 'Vivi'); file https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/beta/Vivi.vrm",
+ "author": "pixiv Inc. / VRoid Project",
+ "credit": "Vivi (beta AvatarSample_2) by pixiv Inc., CC0",
+ "voice": {
+  "id": "933563129e564b19a115bedd57b7406a",
+  "name": "Sarah (Fish Official, public)",
+  "speed": 0.9
+ },
+ "wardrobe": {},
+ "face": {
+  "gains": {
+   "browDown": 1.3,
+   "browUp": 1.2,
+   "browSad": 1.15
+  }
+ },
+ "eye_line": 0.0
+}

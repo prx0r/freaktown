@@ -64,6 +64,8 @@ export interface FaceFrame {
   blink: number;
   /** Raw ARKit weights, for drivers that carry them (GLB morphs / VRM custom). */
   blendshapes?: Blendshapes;
+  /** Extra expressive channels (brow flash, the look's furrow, squint, smirk, gaze, per-eye blink). */
+  expressive?: { browUp?: number; browDown?: number; squint?: number; smirk?: number; lookX?: number; lookY?: number; blinkL?: number; blinkR?: number };
 }
 
 /**

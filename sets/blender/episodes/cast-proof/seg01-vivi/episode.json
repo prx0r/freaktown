@@ -1,0 +1,59 @@
+{
+ "skin": "galactic",
+ "anchor": "vivi",
+ "cast": "vivi",
+ "fps": 25,
+ "frames": 206,
+ "duration_ms": 8240,
+ "show_t0_ms": 12280,
+ "tts": {
+  "model": "s2.1-pro-free",
+  "voice": "933563129e564b19a115bedd57b7406a",
+  "voice_name": "Sarah (Fish Official, public)",
+  "speed": 0.9,
+  "reads": [
+   {
+    "id": "vivi#1",
+    "key": "78131103f7895903",
+    "source": "cache",
+    "dur_ms": 7439,
+    "voice": "933563129e564b19a115bedd57b7406a",
+    "speed": 0.9
+   }
+  ]
+ },
+ "align_coverage": {
+  "vivi#1": 1.0
+ },
+ "facecheck": {
+  "rig": "vroid",
+  "level": "ok",
+  "channels": [
+   "open",
+   "aa",
+   "ih",
+   "ou",
+   "ee",
+   "oh",
+   "blinkL",
+   "blinkR",
+   "smileL",
+   "smileR",
+   "grin",
+   "frown",
+   "browUp",
+   "browDown",
+   "browSad",
+   "squint",
+   "eyeWide"
+  ],
+  "missingCore": [],
+  "warnings": [],
+  "generated": [
+   "Fcl_MTH_Fun_L",
+   "Fcl_MTH_Fun_R",
+   "Fcl_MTH_Joy_L",
+   "Fcl_MTH_Joy_R"
+  ]
+ }
+}
