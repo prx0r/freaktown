@@ -1,0 +1,17 @@
+{
+ "id": "fumiriya",
+ "name": "Fumiriya Sakurada",
+ "model": "static/avatars/cast/fumiriya.vrm",
+ "licence": "CC0-1.0",
+ "source": "https://vroid.pixiv.help/hc/en-us/articles/360014788554 (Sakurada Fumiriya); file https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/beta/Sakurada_Fumiriya.vrm",
+ "author": "pixiv Inc. / VRoid Project",
+ "credit": "Sakurada Fumiriya by pixiv Inc., CC0",
+ "voice": {
+  "id": "536d3a5e000945adb7038665781a4aca",
+  "name": "Ethan (Fish Official, public)",
+  "speed": 0.9
+ },
+ "wardrobe": {},
+ "face": {},
+ "eye_line": 0.0
+}

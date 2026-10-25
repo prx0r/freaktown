@@ -1,0 +1,507 @@
+{
+ "duration_s": 45.32,
+ "lines": [
+  {
+   "id": "house#1",
+   "start": 4.5,
+   "end": 11.52,
+   "wav_end": 11.826,
+   "words": [
+    {
+     "word": "Good",
+     "start": 4.5,
+     "end": 4.74
+    },
+    {
+     "word": "evening,",
+     "start": 4.74,
+     "end": 4.98
+    },
+    {
+     "word": "and",
+     "start": 4.98,
+     "end": 5.6
+    },
+    {
+     "word": "welcome",
+     "start": 5.6,
+     "end": 6.04
+    },
+    {
+     "word": "to",
+     "start": 6.04,
+     "end": 6.28
+    },
+    {
+     "word": "the",
+     "start": 6.28,
+     "end": 6.4
+    },
+    {
+     "word": "night",
+     "start": 6.4,
+     "end": 6.6
+    },
+    {
+     "word": "desk.",
+     "start": 6.6,
+     "end": 7.12
+    },
+    {
+     "word": "Tonight",
+     "start": 7.64,
+     "end": 7.78
+    },
+    {
+     "word": "the",
+     "start": 7.78,
+     "end": 8.1
+    },
+    {
+     "word": "whole",
+     "start": 8.1,
+     "end": 8.32
+    },
+    {
+     "word": "team",
+     "start": 8.32,
+     "end": 8.74
+    },
+    {
+     "word": "is",
+     "start": 8.74,
+     "end": 8.96
+    },
+    {
+     "word": "in,",
+     "start": 8.96,
+     "end": 9.16
+    },
+    {
+     "word": "and",
+     "start": 9.16,
+     "end": 9.66
+    },
+    {
+     "word": "every",
+     "start": 9.66,
+     "end": 10.1
+    },
+    {
+     "word": "one",
+     "start": 10.1,
+     "end": 10.36
+    },
+    {
+     "word": "of",
+     "start": 10.36,
+     "end": 10.5
+    },
+    {
+     "word": "us",
+     "start": 10.5,
+     "end": 10.66
+    },
+    {
+     "word": "brought",
+     "start": 10.66,
+     "end": 10.94
+    },
+    {
+     "word": "a",
+     "start": 10.94,
+     "end": 11.14
+    },
+    {
+     "word": "story.",
+     "start": 11.14,
+     "end": 11.52
+    }
+   ]
+  },
+  {
+   "id": "vivi#1",
+   "start": 12.63,
+   "end": 19.81,
+   "wav_end": 20.069,
+   "words": [
+    {
+     "word": "Out",
+     "start": 12.63,
+     "end": 12.95
+    },
+    {
+     "word": "past",
+     "start": 12.95,
+     "end": 13.17
+    },
+    {
+     "word": "the",
+     "start": 13.17,
+     "end": 13.49
+    },
+    {
+     "word": "moon,",
+     "start": 13.49,
+     "end": 13.73
+    },
+    {
+     "word": "a",
+     "start": 14.35,
+     "end": 14.47
+    },
+    {
+     "word": "tiny",
+     "start": 14.47,
+     "end": 14.71
+    },
+    {
+     "word": "probe",
+     "start": 14.71,
+     "end": 15.11
+    },
+    {
+     "word": "has",
+     "start": 15.11,
+     "end": 15.37
+    },
+    {
+     "word": "just",
+     "start": 15.37,
+     "end": 15.65
+    },
+    {
+     "word": "woken",
+     "start": 15.65,
+     "end": 16.01
+    },
+    {
+     "word": "up",
+     "start": 16.01,
+     "end": 16.23
+    },
+    {
+     "word": "after",
+     "start": 16.23,
+     "end": 16.65
+    },
+    {
+     "word": "eleven",
+     "start": 16.65,
+     "end": 16.99
+    },
+    {
+     "word": "years",
+     "start": 16.99,
+     "end": 17.27
+    },
+    {
+     "word": "asleep.",
+     "start": 17.27,
+     "end": 17.47
+    },
+    {
+     "word": "Nobody",
+     "start": 18.85,
+     "end": 18.87
+    },
+    {
+     "word": "expected",
+     "start": 18.85,
+     "end": 19.27
+    },
+    {
+     "word": "that!",
+     "start": 19.27,
+     "end": 19.81
+    }
+   ]
+  },
+  {
+   "id": "fumiriya#1",
+   "start": 20.87,
+   "end": 27.47,
+   "wav_end": 28.309,
+   "words": [
+    {
+     "word": "Closer",
+     "start": 20.87,
+     "end": 21.25
+    },
+    {
+     "word": "to",
+     "start": 21.25,
+     "end": 21.43
+    },
+    {
+     "word": "home,",
+     "start": 21.43,
+     "end": 21.67
+    },
+    {
+     "word": "the",
+     "start": 22.19,
+     "end": 22.31
+    },
+    {
+     "word": "river",
+     "start": 22.31,
+     "end": 22.51
+    },
+    {
+     "word": "is",
+     "start": 22.51,
+     "end": 22.83
+    },
+    {
+     "word": "rising",
+     "start": 22.83,
+     "end": 23.09
+    },
+    {
+     "word": "again.",
+     "start": 23.09,
+     "end": 23.53
+    },
+    {
+     "word": "Crews",
+     "start": 24.41,
+     "end": 24.63
+    },
+    {
+     "word": "are",
+     "start": 24.63,
+     "end": 24.71
+    },
+    {
+     "word": "working",
+     "start": 24.71,
+     "end": 25.01
+    },
+    {
+     "word": "through",
+     "start": 25.01,
+     "end": 25.25
+    },
+    {
+     "word": "the",
+     "start": 25.25,
+     "end": 25.41
+    },
+    {
+     "word": "night,",
+     "start": 25.41,
+     "end": 25.67
+    },
+    {
+     "word": "and",
+     "start": 26.13,
+     "end": 26.33
+    },
+    {
+     "word": "they",
+     "start": 26.33,
+     "end": 26.45
+    },
+    {
+     "word": "are",
+     "start": 26.45,
+     "end": 26.57
+    },
+    {
+     "word": "asking",
+     "start": 26.57,
+     "end": 26.91
+    },
+    {
+     "word": "for",
+     "start": 26.91,
+     "end": 27.15
+    },
+    {
+     "word": "volunteers.",
+     "start": 27.15,
+     "end": 27.47
+    }
+   ]
+  },
+  {
+   "id": "theo#1",
+   "start": 29.11,
+   "end": 35.45,
+   "wav_end": 35.726,
+   "words": [
+    {
+     "word": "The",
+     "start": 29.11,
+     "end": 29.43
+    },
+    {
+     "word": "markets,",
+     "start": 29.43,
+     "end": 29.73
+    },
+    {
+     "word": "meanwhile,",
+     "start": 29.73,
+     "end": 30.19
+    },
+    {
+     "word": "were",
+     "start": 30.19,
+     "end": 30.97
+    },
+    {
+     "word": "flat.",
+     "start": 30.97,
+     "end": 31.41
+    },
+    {
+     "word": "Very",
+     "start": 31.77,
+     "end": 32.09
+    },
+    {
+     "word": "flat.",
+     "start": 32.09,
+     "end": 32.61
+    },
+    {
+     "word": "I",
+     "start": 33.27,
+     "end": 33.29
+    },
+    {
+     "word": "checked",
+     "start": 33.29,
+     "end": 33.49
+    },
+    {
+     "word": "twice,",
+     "start": 33.49,
+     "end": 33.81
+    },
+    {
+     "word": "and",
+     "start": 33.81,
+     "end": 34.45
+    },
+    {
+     "word": "they",
+     "start": 34.45,
+     "end": 34.57
+    },
+    {
+     "word": "were",
+     "start": 34.57,
+     "end": 34.71
+    },
+    {
+     "word": "still",
+     "start": 34.71,
+     "end": 35.05
+    },
+    {
+     "word": "flat.",
+     "start": 35.05,
+     "end": 35.45
+    }
+   ]
+  },
+  {
+   "id": "seed#1",
+   "start": 36.55,
+   "end": 40.65,
+   "wav_end": 41.306,
+   "words": [
+    {
+     "word": "And",
+     "start": 36.55,
+     "end": 36.75
+    },
+    {
+     "word": "that",
+     "start": 36.75,
+     "end": 36.91
+    },
+    {
+     "word": "is",
+     "start": 36.91,
+     "end": 37.05
+    },
+    {
+     "word": "the",
+     "start": 37.05,
+     "end": 37.21
+    },
+    {
+     "word": "desk",
+     "start": 37.21,
+     "end": 37.41
+    },
+    {
+     "word": "for",
+     "start": 37.41,
+     "end": 37.71
+    },
+    {
+     "word": "tonight.",
+     "start": 37.71,
+     "end": 38.05
+    },
+    {
+     "word": "Be",
+     "start": 38.67,
+     "end": 38.79
+    },
+    {
+     "word": "kind",
+     "start": 38.79,
+     "end": 38.99
+    },
+    {
+     "word": "to",
+     "start": 38.99,
+     "end": 39.17
+    },
+    {
+     "word": "someone",
+     "start": 39.17,
+     "end": 39.43
+    },
+    {
+     "word": "tomorrow.",
+     "start": 39.43,
+     "end": 39.83
+    },
+    {
+     "word": "Goodnight!",
+     "start": 40.55,
+     "end": 40.65
+    }
+   ]
+  }
+ ],
+ "story_starts": [
+  12.28,
+  20.52,
+  28.76,
+  36.2
+ ],
+ "stings": [
+  {
+   "t": 0.0,
+   "kind": "open",
+   "dur": 4.5
+  },
+  {
+   "t": 41.12,
+   "kind": "close",
+   "dur": 4.0
+  }
+ ],
+ "music": {
+  "bed_from": 3.5,
+  "bed_to": 41.32
+ }
+}

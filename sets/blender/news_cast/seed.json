@@ -1,0 +1,21 @@
+{
+ "id": "seed",
+ "name": "Seed-san",
+ "model": "static/avatars/cast/seed-san.vrm",
+ "licence": "VRM Public License 1.0 (credit required; modification and redistribution allowed; corporate commercial use allowed)",
+ "source": "https://github.com/vrm-c/vrm-specification/tree/master/samples/Seed-san (mirror https://raw.githubusercontent.com/madjin/vrm-samples/master/Seed-san/vrm/Seed-san.vrm); licence https://vrm.dev/licenses/1.0/",
+ "author": "VirtualCast, Inc.",
+ "credit": "Seed-san model by VirtualCast, Inc. (VRM Public License 1.0)",
+ "voice": {
+  "id": "b545c585f631496c914815291da4e893",
+  "name": "Friendly Women (public)",
+  "speed": 0.9
+ },
+ "wardrobe": {},
+ "face": {},
+ "eye_line": 0.0,
+ "rig": "seed",
+ "hide": [
+  "robo_arm"
+ ]
+}

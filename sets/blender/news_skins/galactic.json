@@ -50,8 +50,9 @@
   "Floor Gloss": 0.9
  },
  "look": {
+  "anchor": {"exposure": 0.82, "skin_saturation": 1.3},
   "key": 230,
-  "key_color": "#E8F0FF",
+  "key_color": "#FFF2E8",
   "fill": 60,
   "fill_color": "#B8C8FF",
   "rim": 320,

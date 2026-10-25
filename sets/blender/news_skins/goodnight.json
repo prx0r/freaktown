@@ -21,6 +21,7 @@
   "Tiles Y": 1
  },
  "look": {
+  "anchor": {"exposure": 1.0, "skin_saturation": 1.15},
   "haze_color": "#3A2616",
   "haze": 0.16,
   "glow": 0.35,

@@ -379,7 +379,7 @@ def direct(prog, kit, subject, coanchor=False):
     if intro > 0:
         add(0, "CAM_CRANE_A", "intro: crane down onto the set", move=("CAM_CRANE_A", "CAM_WIDE", max(2500, intro - 300)), force=True)
     else:
-        add(0, "CAM_WIDE", "open wide", force=True)
+        add(0, prog.get("open_shot", "CAM_WIDE"), "open on " + prog.get("open_shot", "CAM_WIDE").lower(), force=True)
     for i, ln in enumerate(lines):
         t0, t1 = ln["start_ms"], ln["end_ms"]
         kind = ln.get("kind", "body")

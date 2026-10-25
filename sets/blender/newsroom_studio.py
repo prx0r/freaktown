@@ -82,9 +82,9 @@ def setup(skin_name, cards_dir, anchor_path, strict=True, haze="mist", coanchor=
     for p in lint:
         print("  LINT", p)
     desk_h = NB.value(mod, "Desk Height")
-    an = NA.seat_anchor(sc, anchor_path, "anchor1", desk_h, strict)
+    an = NA.seat_anchor(sc, anchor_path, "anchor1", desk_h, strict, look=look)
     NB.inspect.set_modifier_inputs(mod, {"Seat Height": an["seat_h"]})
-    co = NA.seat_anchor(sc, coanchor, "anchor2", desk_h, strict) if coanchor else None
+    co = NA.seat_anchor(sc, coanchor, "anchor2", desk_h, strict, look=look) if coanchor else None
     NB.lights(sc, mod, look, an["eye"])
     cams, spec, studio = NB.cameras(sc, mod, an["eye"], an["mouth"], "anchor1", coanchor=bool(co),
                                        head_top=an["head_top"])
@@ -175,6 +175,20 @@ def face_cam(ctx, pose):
     return yaw * 0.85, -pitch * 0.7
 
 
+def face_px(ctx, pose):
+    """Where the face is in this frame, for the exposure check (newsroom_sheets.py facestats): the point between the
+    measured eye and mouth (the nose / upper cheeks, skin on every rig) as (u, v, r) in 0..1 of width/height, v down."""
+    a = ctx["anchor"]
+    e, m = a["eye_xyz"], a["mouth_xyz"]
+    c = tuple((e[i] + m[i]) / 2 for i in range(3))
+    pc, pe = CK.project(pose["pos"], pose["tgt"], pose["lens"], c), CK.project(pose["pos"], pose["tgt"], pose["lens"], e)
+    if pc is None or pe is None:
+        return None
+    u, v = (pc[0] + 1) / 2, 1 - (pc[1] + 1) / 2
+    r = abs(pe[1] - pc[1]) / 2 * 0.8
+    return [round(u, 4), round(v, 4), round(r, 4)]
+
+
 def stills(ctx, out, views, width, samples, tag, head_to_cam=True):
     sc = ctx["sc"]
     out = pathlib.Path(out).resolve()
@@ -198,7 +212,7 @@ def stills(ctx, out, views, width, samples, tag, head_to_cam=True):
         f = out / f"{tag}__{v}.png"
         sc.render.filepath = str(f)
         bpy.ops.render.render(write_still=True, scene=sc.name)
-        rows.append({"view": v, "file": f.name, "wall": mode, "lens": round(pose["lens"], 1),
+        rows.append({"view": v, "file": f.name, "wall": mode, "lens": round(pose["lens"], 1), "face_px": face_px(ctx, pose),
                      "pos": [round(x, 3) for x in pose["pos"]], "tgt": [round(x, 3) for x in pose["tgt"]]})
         print("RENDERED", f, flush=True)
     (out / f"{tag}__views.json").write_text(json.dumps({"anchor": {k: ctx["anchor"][k] for k in ("eye", "mouth", "height", "seat_h", "measured_by", "path")},
@@ -226,9 +240,10 @@ def emotions(ctx, out, width, samples, tag, only=""):
         f = out / f"{tag}__emo_{name}.png"
         sc.render.filepath = str(f)
         bpy.ops.render.render(write_still=True, scene=sc.name)
-        rep.append({"still": name, "camera": cam, "channels": ch, "shapes": w})
+        rep.append({"still": name, "file": f.name, "camera": cam, "channels": ch, "shapes": w, "face_px": face_px(ctx, pose)})
         print("EMOTION", name, json.dumps(w), flush=True)
-    (out / f"{tag}__emotions.json").write_text(json.dumps({"check": ctx["anchor"]["check"], "stills": rep}, indent=1))
+    (out / f"{tag}__emotions.json").write_text(json.dumps({"check": ctx["anchor"]["check"], "cast": ctx["anchor"]["cast"].get("id"),
+                                                           "stills": rep}, indent=1))
 
 
 def main():

@@ -1,0 +1,196 @@
+{
+ "duration_ms": 8240,
+ "intro_ms": 0,
+ "outro_ms": 0,
+ "lines": [
+  {
+   "id": "fumiriya#1",
+   "kind": "body",
+   "story": 0,
+   "text": "Closer to home, the river is rising again. Crews are working through the night, and they are asking for volunteers.",
+   "emotion": [
+    "concerned",
+    0.8
+   ],
+   "gestures": [
+    {
+     "word": "rising",
+     "kind": "dart",
+     "x": -0.8
+    }
+   ],
+   "start_ms": 350,
+   "end_ms": 6950,
+   "wav_ms": 7439,
+   "words": [
+    {
+     "word": "Closer",
+     "start_ms": 350,
+     "end_ms": 730
+    },
+    {
+     "word": "to",
+     "start_ms": 730,
+     "end_ms": 910
+    },
+    {
+     "word": "home,",
+     "start_ms": 910,
+     "end_ms": 1150
+    },
+    {
+     "word": "the",
+     "start_ms": 1670,
+     "end_ms": 1790
+    },
+    {
+     "word": "river",
+     "start_ms": 1790,
+     "end_ms": 1990
+    },
+    {
+     "word": "is",
+     "start_ms": 1990,
+     "end_ms": 2310
+    },
+    {
+     "word": "rising",
+     "start_ms": 2310,
+     "end_ms": 2570
+    },
+    {
+     "word": "again.",
+     "start_ms": 2570,
+     "end_ms": 3010
+    },
+    {
+     "word": "Crews",
+     "start_ms": 3890,
+     "end_ms": 4110
+    },
+    {
+     "word": "are",
+     "start_ms": 4110,
+     "end_ms": 4190
+    },
+    {
+     "word": "working",
+     "start_ms": 4190,
+     "end_ms": 4490
+    },
+    {
+     "word": "through",
+     "start_ms": 4490,
+     "end_ms": 4730
+    },
+    {
+     "word": "the",
+     "start_ms": 4730,
+     "end_ms": 4890
+    },
+    {
+     "word": "night,",
+     "start_ms": 4890,
+     "end_ms": 5150
+    },
+    {
+     "word": "and",
+     "start_ms": 5610,
+     "end_ms": 5810
+    },
+    {
+     "word": "they",
+     "start_ms": 5810,
+     "end_ms": 5930
+    },
+    {
+     "word": "are",
+     "start_ms": 5930,
+     "end_ms": 6050
+    },
+    {
+     "word": "asking",
+     "start_ms": 6050,
+     "end_ms": 6390
+    },
+    {
+     "word": "for",
+     "start_ms": 6390,
+     "end_ms": 6630
+    },
+    {
+     "word": "volunteers.",
+     "start_ms": 6630,
+     "end_ms": 6950
+    }
+   ]
+  }
+ ],
+ "cards": [
+  {
+   "t_ms": 0,
+   "card": "story0"
+  }
+ ],
+ "lowers": [
+  {
+   "t_ms": 600,
+   "dur_ms": 3600,
+   "kind": "name",
+   "title": "Fumiriya Sakurada",
+   "sub": "Night Wire"
+  },
+  {
+   "t_ms": 4450,
+   "dur_ms": 3600,
+   "kind": "story",
+   "title": "River crews work through the night",
+   "sub": "City desk"
+  }
+ ],
+ "moods": [
+  {
+   "t_ms": 350,
+   "dur_ms": 6600,
+   "emotion": "concerned",
+   "intensity": 0.8
+  }
+ ],
+ "stings": [
+  {
+   "t_ms": 0,
+   "kind": "open",
+   "dur_ms": 0
+  },
+  {
+   "t_ms": 7589,
+   "kind": "close",
+   "dur_ms": 0
+  }
+ ],
+ "stories": [
+  {
+   "title": "River crews work through the night",
+   "source": "City desk"
+  }
+ ],
+ "show": "night-wire",
+ "title": "The Night Desk",
+ "date": "25 October 2026",
+ "open_shot": "CAM_DESK34",
+ "gestures": [
+  {
+   "t_ms": 2230,
+   "dur_ms": 900,
+   "kind": "dart",
+   "x": -0.8
+  }
+ ],
+ "segment": {
+  "index": 2,
+  "of": 5,
+  "cast": "fumiriya",
+  "name": "Fumiriya Sakurada",
+  "skin": "night-wire"
+ }
+}

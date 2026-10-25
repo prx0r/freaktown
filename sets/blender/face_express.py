@@ -25,6 +25,9 @@ def norm_name(name):
     cut = max(s.rfind("."), s.rfind("|"), s.rfind(":"))
     if 0 <= cut < len(s) - 1:
         s = s[cut + 1:]
+    i = s.lower().find("fcl_")         # VRoid beta exports: "M_F00_000_00_Fcl_MTH_A" -> "Fcl_MTH_A"
+    if i > 0:
+        s = s[i:]
     return "".join(ch for ch in s.lower() if ch.isascii() and ch.isalnum())
 
 
@@ -78,6 +81,26 @@ def check_face(names, bones=(), gaze_by_head=False):
     return {"rig": b["rig"], "level": "fail" if missing else "warn" if warnings else "ok",
             "channels": list(b["bound"]), "missingCore": missing, "warnings": warnings,
             "generated": [g[0] for g in b["generate"]]}
+
+
+def apply_overrides(b, face=None, names=()):
+    """A cast file's per-character face overrides on a binding (sets/blender/news_cast/<id>.json "face"):
+    "shapes": {channel: [[shape, w], ...]} replaces a channel's targets (names matched like bind_rig: only shapes the
+    mesh has; pass names= every shape key name), then "gains": {channel: k} scales every target weight of that channel. Returns a new binding."""
+    if not face:
+        return b
+    out = dict(b, bound={c: [list(t) for t in ts] for c, ts in b["bound"].items()})
+    avail = {norm_name(n): n for ts in b["bound"].values() for n, _ in ts}
+    for n in names:
+        avail.setdefault(norm_name(n), n)
+    for c, targets in (face.get("shapes") or {}).items():
+        t = [[avail[norm_name(n)], float(w)] for n, w in targets if norm_name(n) in avail]
+        if t:
+            out["bound"][c] = t
+    for c, k in (face.get("gains") or {}).items():
+        if c in out["bound"]:
+            out["bound"][c] = [[n, _r6(w * float(k))] for n, w in out["bound"][c]]
+    return out
 
 
 def _c01(x):

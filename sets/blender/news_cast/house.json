@@ -1,0 +1,23 @@
+{
+ "id": "house",
+ "name": "Juno Hale",
+ "model": "static/avatars/default-v1.vrm",
+ "licence": "house model (repo asset)",
+ "source": "static/avatars/default-v1.vrm (the repo's house VRoid anchor)",
+ "author": "repo",
+ "credit": "",
+ "voice": {
+  "id": "9a9cf47702da476aa4629e2506d4a857",
+  "name": "Hannah (Fish Official, public)",
+  "speed": 0.85
+ },
+ "wardrobe": {
+  "match": [
+   "Tops"
+  ],
+  "tint": "#5A6E96",
+  "amount": 0.8
+ },
+ "face": {},
+ "eye_line": 0.0
+}

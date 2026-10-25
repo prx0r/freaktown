@@ -39,3 +39,4 @@ snldb/
 !packages/sketch/data/
 packages/sketch/data/*
 !packages/sketch/data/structure-stats.json
+sets/blender/episodes/*/post/master.wav

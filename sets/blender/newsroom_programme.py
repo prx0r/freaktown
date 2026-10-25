@@ -84,13 +84,14 @@ GAPS = {("intro", "open"): 0, ("open", "tee"): 1600, ("tee", "body"): 900, ("bod
         ("body", "body"): 700}
 
 
-def layout(rds, durations_ms, words, script, show, intro_ms=6000, outro_ms=5000):
-    """Put reads on the programme clock. durations_ms[id] = wav length; words[id] = measured words (read clock)."""
+def layout(rds, durations_ms, words, script, show, intro_ms=6000, outro_ms=5000, lead_ms=None):
+    """Put reads on the programme clock. durations_ms[id] = wav length; words[id] = measured words (read clock).
+    lead_ms: the gap before the first read (default: the show's GAPS; a cast segment cut in mid-show uses ~400 ms)."""
     t = intro_ms
     lines = []
     prev = "intro"
     for r in rds:
-        t += GAPS.get((prev, r["kind"]), 1000)
+        t += lead_ms if (prev == "intro" and lead_ms is not None) else GAPS.get((prev, r["kind"]), 1000)
         d = int(durations_ms[r["id"]])
         ws = [{"word": w["word"], "start_ms": t + int(w["start_ms"]), "end_ms": t + int(w["end_ms"])} for w in words.get(r["id"], [])]
         end = ws[-1]["end_ms"] if ws else t + d
@@ -101,7 +102,11 @@ def layout(rds, durations_ms, words, script, show, intro_ms=6000, outro_ms=5000)
     stories = script.get("stories", [])
     brand = show.get("brand", {})
     tone = show.get("tone", {})
-    cards = [{"t_ms": 0, "card": "title"}]
+    # the wall shows the ambient art while the intro title sequence plays over the crane (the overlay title and the
+    # wall's own title card read on top of each other otherwise: the date line landed on the wall's "News"), and
+    # the title card only once the overlay has lifted
+    cards = [{"t_ms": 0, "card": "ambient"}, {"t_ms": int(intro_ms * 0.85), "card": "title"}] if intro_ms > 0 else \
+        [{"t_ms": 0, "card": "title"}]
     lowers, moods = [], []
     named = False
     for i, ln in enumerate(lines):

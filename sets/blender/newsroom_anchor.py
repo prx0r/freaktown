@@ -126,12 +126,53 @@ def precheck(path, strict=True):
     return chk
 
 
+def hoist_target_names(data):
+    """VRoid beta exports keep morph names in each PRIMITIVE's extras.targetNames; Blender's glTF importer reads the
+    MESH's, so their shape keys import as target_0.. and checkFace fails after import. Copy them up (GLB bytes in,
+    GLB bytes out; unchanged when nothing needs hoisting)."""
+    import struct
+    if data[:4] != b"glTF":
+        return data
+    n = struct.unpack("<I", data[12:16])[0]
+    j = json.loads(data[20:20 + n])
+    hit = False
+    for m in j.get("meshes", []):
+        if (m.get("extras") or {}).get("targetNames"):
+            continue
+        tn = next(((p.get("extras") or {}).get("targetNames") for p in m.get("primitives", [])
+                   if (p.get("extras") or {}).get("targetNames")), None)
+        if tn:
+            m.setdefault("extras", {})["targetNames"] = tn
+            hit = True
+    if not hit:
+        return data
+    js = json.dumps(j, separators=(",", ":")).encode()
+    js += b" " * (-len(js) % 4)
+    rest = data[20 + n:]
+    total = 12 + 8 + len(js) + len(rest)
+    return data[:8] + struct.pack("<I", total) + struct.pack("<I", len(js)) + b"JSON" + js + rest
+
+
+def vrm_version(path):
+    """0 for a VRM 0.x file (extensions.VRM), 1 for VRM 1.0 (VRMC_vrm), None for a plain glTF/GLB."""
+    import struct
+    with open(path, "rb") as fh:
+        head = fh.read(20)
+        if head[:4] != b"glTF":
+            return None
+        j = json.loads(fh.read(struct.unpack("<I", head[12:16])[0]))
+    ext = j.get("extensions") or {}
+    return 1 if "VRMC_vrm" in ext else 0 if "VRM" in ext else None
+
+
 def import_mesh(sc, path):
     p = pathlib.Path(path).resolve()
     src = p
-    if p.suffix.lower() == ".vrm":
+    data = p.read_bytes()
+    fixed = hoist_target_names(data)
+    if p.suffix.lower() == ".vrm" or fixed is not data:
         src = pathlib.Path("/tmp", p.stem + "_anchor.glb")
-        src.write_bytes(p.read_bytes())
+        src.write_bytes(fixed)
     before = set(bpy.data.objects)
     bpy.ops.import_scene.gltf(filepath=str(src), import_shading="NORMALS")
     new = [o for o in bpy.data.objects if o not in before]
@@ -189,19 +230,45 @@ def shape_centroid(meshes, names, frac=0.5):
 
 
 
-ANCHOR_EMIT = {"default": 0.18, "SKIN": 0.28, "EYE": 0.55, "FACE": 0.55}
+# Lit response for VRoid/VRM toon exports (PR #14 loop 3). Their textures are authored as FINAL shaded colour
+# (albedo ~0.95 on pale skin, pure white shirts), so a lit Principled on the raw texture plus 0.28 of emission went
+# past 1.0 under the key/rim and AgX rolled the skin and shirt off to white. Now: albedo is scaled to a physical
+# range per material class, emission is a small share (eyes and face lines keep more, so the anime read survives),
+# and skin gets a touch of saturation back (AgX desaturates highlights). Classes come from the VRoid suffix
+# (_SKIN/_CLOTH/_HAIR/_EYE/_FACE); other names use "default". A cast file can override any of them.
+ANCHOR_EMIT = {"default": 0.06, "SKIN": 0.06, "HAIR": 0.05, "CLOTH": 0.03, "EYE": 0.45, "FACE": 0.40}
+ANCHOR_ALBEDO = {"default": 0.7, "SKIN": 0.5, "HAIR": 0.7, "CLOTH": 0.55, "EYE": 1.0, "FACE": 1.0}
+ANCHOR_SAT = {"default": 1.0, "SKIN": 1.15}
 
 
-def light_unlit(objs, emit=None):
+def mat_class(name):
+    import re
+    m = re.search(r"_(EYE|FACE|SKIN|HAIR|CLOTH)(?:_\d+)?(?:\.\d+)?$", name.upper())
+    return m.group(1) if m else "default"
+
+
+def _hex(h):
+    h = h.lstrip("#")
+    return tuple(int(h[i:i + 2], 16) / 255.0 for i in (0, 2, 4)) + (1.0,)
+
+
+def light_unlit(objs, emit=None, albedo=None, wardrobe=None, exposure=1.0, skin_sat=None):
     """VRoid/VRM materials import as glTF UNLIT: emission to camera rays, transparent to every other ray. Such an
     anchor ignores the studio's lights, casts no shadow and bounces nothing (flat, pasted-in, blown-out whites).
-    Rebuild each unlit material as a lit Principled BSDF on the same texture plus a small share of the original
-    emission (more on eyes and face lines so the anime read survives). NEWS_ANCHOR_UNLIT=1 keeps the import as is."""
+    Rebuild each unlit material as a lit Principled BSDF on the texture (albedo scaled per class, ANCHOR_ALBEDO) plus
+    a small share of the original emission (ANCHOR_EMIT). wardrobe={"match": [...], "tint": "#hex", "amount": a}
+    multiplies the matching clothes by a tint (a mid-tone top instead of a white one that clips under the key).
+    exposure / skin_sat come from the SKIN (look.anchor): a hotter or cooler studio rig scales the anchor's albedo and
+    puts the skin's saturation back, so skin still reads as skin under cool or bright studio lights.
+    NEWS_ANCHOR_UNLIT=1 keeps the import as is."""
     import os
     if os.environ.get("NEWS_ANCHOR_UNLIT") == "1":
         return 0
     emit = dict(ANCHOR_EMIT, **(emit or {}))
+    alb = dict(ANCHOR_ALBEDO, **(albedo or {}))
+    wardrobe = wardrobe or {}
     done = set()
+    report = {}
     for o in objs:
         for slot in getattr(o, "material_slots", []):
             m = slot.material
@@ -217,26 +284,64 @@ def light_unlit(objs, emit=None):
             out = next((n for n in nt.nodes if n.type == "OUTPUT_MATERIAL"), None)
             if out is None:
                 continue
+            # keep the texture's alpha: the importer wraps BLEND/HASHED unlit materials in Mix(alpha, Transparent, ..)
+            # (eye highlights, the VRoid beta EyeExtra star layer, iris cut-outs); dropping it painted those layers
+            # opaque over the eyes
+            alpha = None
+            surf = out.inputs["Surface"].links[0].from_node if out.inputs["Surface"].is_linked else None
+            if surf is not None and surf.type == "MIX_SHADER" and surf.inputs[0].is_linked and \
+                    surf.inputs[0].links[0].from_node.type != "LIGHT_PATH" and \
+                    any(l.from_node.type == "BSDF_TRANSPARENT" for i in surf.inputs[1:] for l in i.links):
+                alpha = surf.inputs[0].links[0].from_socket
+            cls = mat_class(m.name)
             pb = nt.nodes.new("ShaderNodeBsdfPrincipled")
-            pb.inputs["Roughness"].default_value = 0.62
-            pb.inputs["Specular IOR Level"].default_value = 0.25
+            pb.inputs["Roughness"].default_value = 0.62 if cls != "HAIR" else 0.5
+            pb.inputs["Specular IOR Level"].default_value = 0.25 if cls != "SKIN" else 0.18
+            hs = nt.nodes.new("ShaderNodeHueSaturation")
+            hs.inputs["Value"].default_value = alb.get(cls, alb["default"]) * (exposure if cls not in ("EYE", "FACE") else 1.0)
+            hs.inputs["Saturation"].default_value = (skin_sat or ANCHOR_SAT["SKIN"]) if cls == "SKIN" else \
+                ANCHOR_SAT.get(cls, ANCHOR_SAT["default"])
             if src is not None:
-                nt.links.new(src, pb.inputs["Base Color"])
+                nt.links.new(src, hs.inputs["Color"])
             else:
-                pb.inputs["Base Color"].default_value = col.default_value
-            up = m.name.upper()
-            k = next((v for key, v in emit.items() if key != "default" and key in up), emit["default"])
-            em.inputs["Strength"].default_value = k
+                hs.inputs["Color"].default_value = col.default_value
+            base = hs.outputs["Color"]
+            tint = wardrobe.get("tint")
+            if tint and any(k.upper() in m.name.upper() for k in wardrobe.get("match", ["Tops"])):
+                mx = nt.nodes.new("ShaderNodeMix")
+                mx.data_type, mx.blend_type = "RGBA", "MULTIPLY"
+                mx.inputs["Factor"].default_value = float(wardrobe.get("amount", 0.85))
+                nt.links.new(base, mx.inputs["A"])
+                mx.inputs["B"].default_value = _hex(tint)
+                base = mx.outputs["Result"]
+                cls = cls + "+tint"
+            nt.links.new(base, pb.inputs["Base Color"])
+            em.inputs["Strength"].default_value = emit.get(cls.split("+")[0], emit["default"])
             add = nt.nodes.new("ShaderNodeAddShader")
             nt.links.new(pb.outputs[0], add.inputs[0])
             nt.links.new(em.outputs[0], add.inputs[1])
-            nt.links.new(add.outputs[0], out.inputs["Surface"])
+            if alpha is not None:
+                tr = nt.nodes.new("ShaderNodeBsdfTransparent")
+                mx = nt.nodes.new("ShaderNodeMixShader")
+                nt.links.new(alpha, mx.inputs[0])
+                nt.links.new(tr.outputs[0], mx.inputs[1])
+                nt.links.new(add.outputs[0], mx.inputs[2])
+                nt.links.new(mx.outputs[0], out.inputs["Surface"])
+                cls = cls + "+alpha"
+            else:
+                nt.links.new(add.outputs[0], out.inputs["Surface"])
             done.add(m.name)
-    print("ANCHOR-LIT", len(done), "unlit materials relit")
+            report[m.name] = cls
+    print("ANCHOR-LIT", len(done), "unlit materials relit", json.dumps(report))
     return len(done)
 
 
-def seat_anchor(sc, path, seat="anchor1", desk_h=0.8, strict=True, desk_eye=DESK_EYE):
+def seat_anchor(sc, path, seat="anchor1", desk_h=0.8, strict=True, desk_eye=DESK_EYE, cast=None, look=None):
+    """path: a model path or a cast id (sets/blender/news_cast/<id>.json); the cast entry adds face overrides, an
+    eye-line offset, a wardrobe tint and lighting overrides."""
+    import news_cast as NC
+    path, cast = (path, cast) if cast is not None else NC.resolve(path)
+    desk_eye = desk_eye + float(cast.get("eye_line") or 0.0)
     pre = precheck(path, strict)
     new = import_mesh(sc, path)
     # a GLB that ships a clip (Meshy: 'Armature|clip0|baselayer') would replay it on every frame change and undo the
@@ -246,13 +351,21 @@ def seat_anchor(sc, path, seat="anchor1", desk_h=0.8, strict=True, desk_eye=DESK
         sk = getattr(getattr(o, "data", None), "shape_keys", None)
         if sk is not None:
             sk.animation_data_clear()
-    light_unlit(new)
+    la = (look or {}).get("anchor", {})
+    light_unlit(new, cast.get("light", {}).get("emit"), cast.get("light", {}).get("albedo"), cast.get("wardrobe"),
+                float(la.get("exposure", 1.0)) * float(cast.get("light", {}).get("exposure", 1.0)), la.get("skin_saturation"))
     arm = next((o for o in new if o.type == "ARMATURE"), None)
     sx, sy = SEATS[seat]
     holder = bpy.data.objects.new(f"anchor_{seat}", None)
     sc.collection.objects.link(holder)
     for r in [o for o in new if o.parent is None]:
         r.parent = holder
+    if vrm_version(path) == 0:
+        holder.rotation_euler = (0.0, 0.0, math.pi)   # VRM 0.x faces -Z in glTF (VRM 1.0 faces +Z): turn it to the lens
+    hide = [h.lower() for h in cast.get("hide", [])]
+    for o in new:
+        if o.type == "MESH" and any(h in o.name.lower() or h in o.data.name.lower() for h in hide):
+            o.hide_render = o.hide_viewport = True     # cast "hide": props that fight the framing (Seed-san's robot arm)
     _upd()
     z0, z1 = bbox_z(new)
     height = z1 - z0
@@ -263,7 +376,8 @@ def seat_anchor(sc, path, seat="anchor1", desk_h=0.8, strict=True, desk_eye=DESK
     if arm is not None:
         pose_seated(arm)
     faces = [o for o in new if o.type == "MESH" and o.data.shape_keys and not o.hide_render]
-    face, chk = FX.bind_meshes(faces, arm)
+    face, chk = FX.bind_meshes(faces, arm, force=cast.get("rig"))
+    face = FX.apply_overrides(face, cast.get("face"), [kb.name for ob in faces for kb in ob.data.shape_keys.key_blocks])
     print("FACECHECK", json.dumps(chk))
     if strict and chk["level"] == "fail":
         raise AnchorRefused(f"ANCHOR REFUSED: {path} cannot express after binding ({chk['missingCore']})")
@@ -303,9 +417,10 @@ def seat_anchor(sc, path, seat="anchor1", desk_h=0.8, strict=True, desk_eye=DESK
     a = {"holder": holder, "arm": arm, "faces": faces, "face": face, "check": chk, "precheck": pre,
          "eye": eye.z, "mouth": mouth.z, "head_top": head_top, "eye_xyz": tuple(eye), "mouth_xyz": tuple(mouth), "measured_by": src,
          "height": height * scale, "scale": scale, "seat_h": max(0.4, min(0.8, hip_z - 0.08)), "eye_base": eye_base,
-         "objects": new, "seat": seat, "path": str(path)}
+         "objects": new, "seat": seat, "path": str(path), "cast": cast}
     print("ANCHOR", json.dumps({k: (round(v, 3) if isinstance(v, float) else v) for k, v in a.items()
-                                if k in ("eye", "mouth", "head_top", "height", "scale", "seat_h", "measured_by", "path")}))
+                                if k in ("eye", "mouth", "head_top", "height", "scale", "seat_h", "measured_by", "path")}),
+          "cast", cast.get("id"))
     return a
 
 

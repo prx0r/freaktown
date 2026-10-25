@@ -51,6 +51,34 @@ def vowel_groups(word):
     return v or ["a"]
 
 
+def apply_gestures(state, gestures, t):
+    """Scripted face beats on the programme clock (newsroom_cast_show.py writes them from the script's per-line
+    "gestures"): wink, dart (eyes off-lens and back), browflash, smirk. Envelope: fast attack, short hold, ease out.
+    Everything still goes through the shared expressive map (channels_from_state)."""
+    on = []
+    for g in gestures:
+        u = (t - g["t_ms"]) / max(1.0, g.get("dur_ms", 600))
+        if not 0.0 <= u < 1.0:
+            continue
+        r = max(0.0, min(1.0, u / 0.18, (1.0 - u) / 0.3))
+        r = r * r * (3 - 2 * r)
+        k = g["kind"]
+        if k == "wink":
+            state["blinkL"] = max(state.get("blinkL", 0.0), r)
+            state["smirk"] = 0.65 * r
+            state["squint"] = max(state.get("squint", 0.0), 0.25 * r)
+        elif k == "dart":
+            state["lookX"] = state.get("lookX", 0.0) * (1 - r) + g.get("x", 0.85) * r
+            state["lookY"] = state.get("lookY", 0.0) * (1 - r) + g.get("y", 0.05) * r
+        elif k == "browflash":
+            state["browUp"] = max(state.get("browUp", 0.0), 0.95 * r)
+        elif k == "smirk":
+            state["smirk"] = g.get("side", 1.0) * 0.85 * r
+            state["squint"] = max(state.get("squint", 0.0), 0.3 * r)
+        on.append(k)
+    return on
+
+
 def bake(ctx, prog, env, fps, seed=7):
     sc, an = ctx["sc"], ctx["anchor"]
     spec, st = ctx["spec"], ctx["studio"]
@@ -154,11 +182,13 @@ def bake(ctx, prog, env, fps, seed=7):
         nod = 0.035 * mouth + 0.01 * math.sin(ts * 1.3)
         pitch += (wp + nod - pitch) * min(1.0, 12.0 / fps)
         tilt = 0.02 * math.sin(ts * 0.45 + 0.7) + (0.05 * state.get("smirk", 0.0))
+        gest = apply_gestures(state, prog.get("gestures", []), t)
         ch = FX.channels_from_state(state)
         FX.apply_channels(an["faces"], an["face"], ch, an["arm"], frame=frame, eye_base=an["eye_base"])
         head.pose(yaw, pitch, tilt, breath=0.01 * math.sin(ts * 2 * math.pi / 4.2), frame=frame)
         rec.append({"f": frame, "t_ms": round(t), "shot": shot, "moving": moving, "cut": cur["t_ms"], "card": card,
-                    "wall": shown, "mouth": round(mouth, 3), "vis": vis, "blink": round(bl, 2),
+                    "wall": shown, "mouth": round(mouth, 3), "env": round(env[f], 4) if f < len(env) else 0.0, "vis": vis,
+                    "blink": round(bl, 2), "gestures": gest,
                     "channels": ch, "pose": {"pos": [round(x, 4) for x in pose["pos"]], "tgt": [round(x, 4) for x in pose["tgt"]],
                                              "lens": round(pose["lens"], 3)}})
     sc.frame_start, sc.frame_end = 1, n
@@ -324,8 +354,8 @@ def main():
     meta = json.loads((ep / "episode.json").read_text()) if (ep / "episode.json").exists() else {}
     skin = a.skin or meta.get("skin", "goodnight")
     anchor = a.anchor or meta.get("anchor") or str(HERE.parent.parent / "static/avatars/default-v1.vrm")
-    if not pathlib.Path(anchor).is_absolute():
-        anchor = str((HERE.parent.parent / anchor).resolve())
+    if pathlib.Path(anchor).suffix.lower() in (".vrm", ".glb", ".gltf") and not pathlib.Path(anchor).is_absolute():
+        anchor = str((HERE.parent.parent / anchor).resolve())       # else a cast id (sets/blender/news_cast/<id>.json)
     ts = time.time()
     ctx = NS.setup(skin, ep / "cards", anchor, strict=True)
     ctx["sc"].render.fps = a.fps

@@ -126,6 +126,39 @@
         "squint":   [["relaxed", 0.4]],
         "eyeWide":  [["surprised", 0.4]]
       }
+    },
+    "seed": {
+      "about": "VRM Consortium Seed-san (VRM 1.0 sample): its own morph names; real brow shapes, gaze by morphs.",
+      "detect": ["lip_a", "blink_L", "eye_brow_up"],
+      "shapes": {
+        "open":     [["mouse_open", 1.0]],
+        "aa":       [["lip_a", 1.0], ["mouse_open", 0.25]],
+        "ih":       [["lip_i", 1.0]],
+        "ou":       [["lip_u", 1.0]],
+        "ee":       [["lip_e", 1.0]],
+        "oh":       [["lip_o", 1.0], ["mouse_open", 0.15]],
+        "blinkL":   [["blink_L", 1.0]],
+        "blinkR":   [["blink_R", 1.0]],
+        "smileL":   [["lip_up_L", 1.0]],
+        "smileR":   [["lip_up_R", 1.0]],
+        "grin":     [["face_happy", 0.7]],
+        "frown":    [["lip_down", 0.8]],
+        "browUp":   [["eye_brow_up", 1.0]],
+        "browDown": [["eye_brow_down", 1.0], ["eye_angry", 0.35]],
+        "browSad":  [["face_sad", 0.6]],
+        "squint":   [["eye_smile", 0.4]],
+        "eyeWide":  [["eye_open", 1.0]]
+      },
+      "generate": {
+        "lip_up_L": {"from": "lip_up", "side": "L", "gain": 1.6},
+        "lip_up_R": {"from": "lip_up", "side": "R", "gain": 1.6}
+      },
+      "gaze_morphs": {
+        "left":  [["look_left", 1.0]],
+        "right": [["look_right", 1.0]],
+        "up":    [["look_up", 1.0]],
+        "down":  [["look_down", 1.0]]
+      }
     }
   },
   "emotions": {
@@ -133,7 +166,9 @@
     "relaxed":   {"smileL": 0.3, "smileR": 0.3, "squint": 0.15},
     "angry":     {"browDown": 0.9, "squint": 0.4, "frown": 0.25},
     "sad":       {"browSad": 0.9, "frown": 0.7},
-    "surprised": {"browUp": 0.9, "eyeWide": 0.9, "open": 0.35}
+    "surprised": {"browUp": 0.9, "eyeWide": 0.9, "open": 0.35},
+    "serious":   {"browDown": 0.6, "squint": 0.2},
+    "concerned": {"browSad": 0.85, "frown": 0.45}
   },
   "speech": {
     "about": "While the mouth is speaking, expression shapes that fight the lips are scaled down; brows and eyes keep full range.",

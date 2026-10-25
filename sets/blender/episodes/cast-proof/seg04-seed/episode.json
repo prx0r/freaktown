@@ -1,0 +1,57 @@
+{
+ "skin": "goodnight",
+ "anchor": "seed",
+ "cast": "seed",
+ "fps": 25,
+ "frames": 228,
+ "duration_ms": 9120,
+ "show_t0_ms": 36200,
+ "tts": {
+  "model": "s2.1-pro-free",
+  "voice": "b545c585f631496c914815291da4e893",
+  "voice_name": "Friendly Women (public)",
+  "speed": 0.9,
+  "reads": [
+   {
+    "id": "seed#1",
+    "key": "15b09f44b2d3b88a",
+    "source": "fish s2.1-pro-free",
+    "dur_ms": 4756,
+    "voice": "b545c585f631496c914815291da4e893",
+    "speed": 0.9
+   }
+  ]
+ },
+ "align_coverage": {
+  "seed#1": 1.0
+ },
+ "facecheck": {
+  "rig": "seed",
+  "level": "ok",
+  "channels": [
+   "open",
+   "aa",
+   "ih",
+   "ou",
+   "ee",
+   "oh",
+   "blinkL",
+   "blinkR",
+   "smileL",
+   "smileR",
+   "grin",
+   "frown",
+   "browUp",
+   "browDown",
+   "browSad",
+   "squint",
+   "eyeWide"
+  ],
+  "missingCore": [],
+  "warnings": [],
+  "generated": [
+   "lip_up_L",
+   "lip_up_R"
+  ]
+ }
+}

@@ -36,11 +36,14 @@ export const CHANNELS = Object.keys(MAP.channels) as Channel[];
 export const MAX_GAIN: number = MAP.max_gain;
 const RIGS = MAP.rigs as unknown as Record<RigId, RigSpec>;
 
-/** Same normalisation as meshBinding / newsroom_perform.norm: drop any "Prefix." / "a|b" path, keep [a-z0-9]. */
+/** Same normalisation as meshBinding / newsroom_perform.norm: drop any "Prefix." / "a|b" path and a VRoid beta
+ * "M_F00_000_00_" prefix before "Fcl_", keep [a-z0-9]. */
 export function normName(name: string): string {
   let s = name.trim();
   const cut = Math.max(s.lastIndexOf('.'), s.lastIndexOf('|'), s.lastIndexOf(':'));
   if (cut >= 0 && cut < s.length - 1) s = s.slice(cut + 1);
+  const i = s.toLowerCase().indexOf('fcl_'); // VRoid beta exports: "M_F00_000_00_Fcl_MTH_A" -> "Fcl_MTH_A"
+  if (i > 0) s = s.slice(i);
   return s.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 

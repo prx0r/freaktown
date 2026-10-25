@@ -54,6 +54,37 @@ def sheet(cells, ncols, cw=480, out="sheet.jpg", title="", col_heads=None, row_h
     return out
 
 
+def face_stats(png, face_px):
+    """Exposure of the anchor's face in a still: mean sRGB of a patch between the eyes and the mouth, the share of
+    clipped pixels (any channel >= 0.985) and the warmth R-B (skin reads as skin when it stays clearly > 0; the
+    washed-out relit anchor of loop 2 measured ~0.0 at 0.93 mean, i.e. shirt-white)."""
+    import numpy as np
+    if not face_px:
+        return None
+    x = np.asarray(Image.open(png).convert("RGB")).astype(np.float32) / 255.0
+    H, W = x.shape[:2]
+    u, v, r = face_px
+    cx, cy, rr = int(u * W), int(v * H), max(3, int(r * H))
+    patch = x[max(0, cy - rr):cy + rr, max(0, cx - rr):cx + rr].reshape(-1, 3)
+    if not len(patch):
+        return None
+    m = patch.mean(0)
+    return {"mean": [round(float(c), 3) for c in m], "luma": round(float(m @ [0.2126, 0.7152, 0.0722]), 3),
+            "clipped": round(float((patch.max(1) >= 0.985).mean()), 3), "warmth": round(float(m[0] - m[2]), 3)}
+
+
+def facestats(jsons):
+    import json
+    rows = []
+    for j in jsons:
+        d = json.loads(pathlib.Path(j).read_text())
+        for r in d.get("views", []) + d.get("stills", []):
+            png = pathlib.Path(j).parent / r["file"]
+            if png.exists():
+                rows.append({"file": r["file"], **(face_stats(png, r.get("face_px")) or {})})
+    return rows
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -70,7 +101,14 @@ def main():
     f.add_argument("--title", default="")
     f.add_argument("--width", type=int, default=420)
     f.add_argument("files", nargs="+")
+    fs = sub.add_parser("facestats", help="face exposure numbers from views/emotions JSON written next to the stills")
+    fs.add_argument("jsons", nargs="+")
     a = ap.parse_args()
+    if a.cmd == "facestats":
+        import json
+        for r in facestats(a.jsons):
+            print(json.dumps(r))
+        return
     if a.cmd == "grid":
         parse = lambda s: KIT if s == "kit" else s.split(":", 1)[1].split(",")
         rows, cols = parse(a.rows), parse(a.cols)
