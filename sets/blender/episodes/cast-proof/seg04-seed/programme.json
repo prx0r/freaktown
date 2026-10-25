@@ -142,6 +142,15 @@
  "title": "The Night Desk",
  "date": "25 October 2026",
  "open_shot": "CAM_MEDIUM",
+ "sentence_cut_ms": 2600,
+ "max_hold_ms": 5200,
+ "rotation": [
+  "CAM_CLOSE",
+  "push",
+  "CAM_DESK34",
+  "CAM_MEDIUM"
+ ],
+ "open_settle": 0.22,
  "gestures": [
   {
    "t_ms": 2510,

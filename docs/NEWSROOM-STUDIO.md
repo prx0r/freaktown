@@ -6,7 +6,9 @@ free GitHub runners. Three things change per show, and none of them needs a code
 | You want to…            | You touch                                   | Command flag            |
 |-------------------------|---------------------------------------------|-------------------------|
 | make a new episode      | a script file (tagged text or JSON)         | `--script`              |
-| swap the presenter      | a VRM / GLB file                            | `--anchor`              |
+| swap the presenter      | a cast id, or any VRM / GLB file            | `--anchor <id or path>` |
+| add a character         | one JSON file in `sets/blender/news_cast/`  | `--anchor <id>`         |
+| several presenters      | a cast script (segments: cast + skin + lines) | `newsroom_cast_show.py` |
 | add a new show look     | one JSON file in `sets/blender/news_skins/` | `--skin`                |
 
 ## Pieces
@@ -21,6 +23,10 @@ free GitHub runners. Three things change per show, and none of them needs a code
 | `newsroom_studio.py`        | Master studio + skin + anchor: stills of every camera, emotion close-ups, hero with volume haze |
 | `newsroom_anchor.py`        | Any VRM/GLB at the desk: checkFace (exit 3 if it cannot express), seat, measure eye/mouth      |
 | `face_express.py`           | The shared expressive map (same JSON as the web stage's `face/expressive.ts`)                  |
+| `news_cast.py`              | The cast: `news_cast/<id>.json` (model, licence, voice, face overrides, eye-line, wardrobe, light); `list` / `check` |
+| `newsroom_cast_show.py`     | Multi-character show: one segment per cast member (own skin, own voice), one programme clock, one master |
+| `newsroom_cast_plan.py`     | Splits a cast show into CI render chunks (matrix JSON)                                         |
+| `newsroom_cast_finish.py`   | Overlays per segment, one encode, blackdetect, loudness, lip-sync correlation, throughput      |
 | `newsroom_gfx.py`           | Wall cards, desk band, bug, lower thirds, intro/outro (OFL fonts in `newsroom_fonts/`)          |
 | `newsroom_episode.py`       | Direct + bake the episode onto the anchor, render a chunk (plates + anchor-only shortcut)       |
 | `newsroom_finish.py`        | Overlays + grain + encode with the master, blackdetect, sample sheet, throughput               |
@@ -88,13 +94,75 @@ python3 sets/blender/face_express.py check path/to/character.glb
   dropped on import; otherwise it replays on every frame and puts the arms back in the rest pose, floating above the
   desk.
 - Materials: VRoid exports are glTF-unlit (flat, they glow under any light). They are rebuilt as lit Principled
-  materials that keep a share of emission, so the studio's key/fill/rim actually shape the face.
+  materials so the studio's key/fill/rim shape the face. VRoid textures are authored as final shaded colour (skin
+  albedo ~0.95), so the albedo is scaled per material class (`SKIN` 0.5, `CLOTH` 0.55, `HAIR` 0.7), only a small share
+  of emission is kept (eyes and face lines more), skin saturation is put back, and each skin's `look.anchor` adjusts
+  for its rig. Loop 2's washed-out anchor (face mean 0.93, R-B 0.0 = shirt-white) measures ~0.72-0.76 luma with
+  R-B 0.12-0.25 now, nothing clipped.
 - Brows: VRoid brows sit under the fringe. The shared expressive map therefore drives the matching eyelid shape with
   each brow channel (`EYE_Surprised`, `EYE_Angry`, `EYE_Sorrow`), so serious / concerned / brow-flash read anyway.
 - Proof stills:
   `blender -b --factory-startup --python sets/blender/newsroom_studio.py -- --skill $V2B_SKILL --skin goodnight --cards out/cards/goodnight --anchor path/to/character.glb --strict --stills out/swap --views CAM_WIDE,CAM_MEDIUM,CAM_CLOSE`
 - Commit the file under `static/avatars/` and pass `--anchor` to `newsroom_show.py`, or `--anchor` to
   `newsroom_episode.py` to re-render an existing episode with a new presenter.
+
+## 2b. Add a character (the cast)
+
+A character is one JSON file; nothing else changes. The cast so far (licences and sources in
+`sets/blender/news_cast/CAST.md`):
+
+| id | name | model | licence | voice (public Fish, s2.1-pro-free) |
+|---|---|---|---|---|
+| `house` | Juno Hale | `static/avatars/default-v1.vrm` | repo asset | Hannah |
+| `vivi` | Vivi Sato | `static/avatars/cast/vivi.vrm` (VRoid beta AvatarSample_2) | CC0 | Sarah |
+| `fumiriya` | Fumiriya Sakurada | `static/avatars/cast/fumiriya.vrm` (VRoid) | CC0 | Ethan |
+| `theo` | Theo Marsh | `static/avatars/cast/hairsample-male.vrm` (VRoid HairSample_Male) | CC0 | Anchor News |
+| `seed` | Seed-san | `static/avatars/cast/seed-san.vrm` (VRM Consortium) | VRM Public License 1.0, credit required | Friendly Women |
+
+To add one:
+
+1. Put the model under `static/avatars/cast/` and record where it came from and its licence (CC0 / CC-BY / MIT /
+   VRM-PL with redistribution allowed only) in `news_cast/CAST.md`.
+2. `python3 sets/blender/face_express.py check static/avatars/cast/<file>.vrm`. `fail` means the mesh has no mouth,
+   blink, smile or brow channel: it cannot be cast. A rig with unknown morph names needs a rig entry in
+   `packages/stage-runtime/src/face/expressive-map.json` (see `seed`), then `python3 tests/fixtures/make_face_golden.py`.
+3. Copy a cast file (`news_cast/vivi.json`) to `news_cast/<id>.json` and edit it:
+   - `name` (lower third), `model`, `licence`, `source`, `author`, `credit`;
+   - `voice`: a PUBLIC Fish voice id (`curl "https://api.fish.audio/model?tag=female&language=en"`), its name and speed;
+     every cast member needs a different one; TTS stays on `s2.1-pro-free` (anything else is refused in code);
+   - `face`: per-character overrides on top of the shared map, never tuned inside a bake:
+     `"gains": {"browDown": 1.3}` scales a channel (brows under a heavy fringe), `"shapes": {"grin": [["face_happy", 0.7]]}`
+     replaces a channel's targets for this mesh only;
+   - `eye_line` (m added to the desk eye-line), `wardrobe` (`{"match": ["Tops"], "tint": "#3F5A8A", "amount": 0.9}`: a
+     white top clips under the key, a mid-tone does not), `light` (`albedo` / `emit` / `sat` per material class,
+     `exposure`), `hide` (mesh names that fight the framing, e.g. Seed-san's robot arm), `rig` (force a map rig).
+4. `python3 sets/blender/news_cast.py check <id>`, then the emotion stills:
+   `blender -b --factory-startup --python sets/blender/newsroom_studio.py -- --skill $V2B_SKILL --skin goodnight --cards out/cards/goodnight --anchor <id> --strict --emotions out/emo --stills out/emo --views CAM_MEDIUM,CAM_CLOSE --tag cast__<id>`
+   and look at every one (`newsroom_sheets.py facestats out/emo/*.json` gives face luma / warmth / clipping).
+   Push: the `cast` CI job renders every cast file it finds in its matrix (add the id there) and `castsheets` builds
+   the cast x emotion grid.
+
+What the importer fixes for you (each was a real failure): VRoid **beta** exports name morphs
+`Face.M_F00_000_00_Fcl_*` (normalised to `Fcl_*`) and keep them per glTF primitive (hoisted to the mesh, else Blender
+calls them `target_0`); VRM 0.x faces -Z (turned 180 degrees); alpha-blended eye layers keep their alpha when the
+unlit material is relit (the beta `EyeExtra` star layer painted over the eyes otherwise); bones are found through the
+file's VRM humanoid map (Seed-san's head bone is `head 1`).
+
+## 2c. A multi-character show
+
+```bash
+python3 sets/blender/newsroom_cast_show.py --script sets/blender/episodes/cast-proof/script.json \
+    --out sets/blender/episodes/cast-proof
+```
+
+The script is a list of segments: `{"cast", "skin", "lines": [{"kind", "text", "emotion": [name, k],
+"gestures": [{"word" | "after", "kind": wink|dart|browflash|smirk}]}], "story"?, "open_shot"?, "intro_ms"?
+(first segment), "outro_ms"? (last)}`. Emotions are the map's (`happy`, `relaxed`, `surprised`, `sad`, `angry`,
+`serious`, `concerned`). Each segment becomes an ordinary episode folder (`segNN-<cast>/`) with its own skin, cast,
+programme and mouth drive; the director cuts inside a segment (short segments: a sentence-end cut from 2.6 s, never
+a wall-only insert), segments hard-cut into each other, and the whole show has one -14 LUFS master. CI renders it
+with `castplan` -> `castep` (one job per <= 46 frames of a segment) -> `castfinish` (cast_proof.mp4, finish.json with
+loudness, blackdetect and the lip-sync correlation per segment).
 
 ## 3. Add a skin (a new show look)
 
@@ -114,6 +182,7 @@ python3 sets/blender/newsroom_gfx.py cards --skin morning-desk --sample --out /t
 | `brand`   | `title`, `tagline`, `anchor_name`, `desk_text`, `signoff`, `palette` (paper, ink, accent, lower-third and desk colours), `fonts` (any OFL font in `newsroom_fonts/` or next to the skin), `card_style`, `caps` |
 | `music`   | `key`, `style` (`bells` = the Goodnight default, `pulse`, `stabs`) and `bar_s`. The music is procedural (audiopost), never a licensed track |
 | `tone`    | The anchor's mood per read kind: `[emotion, intensity]` for open / tee / body / close                  |
+| `look.anchor` | How the lit anchor sits in this rig: `exposure` (albedo scale), `skin_saturation`, `skin_tint` (a warm make-up tint under a cool rig). Check with `newsroom_sheets.py facestats` (face luma ~0.7, warmth R-B > 0.1, nothing clipped) |
 
 `card_style`: `paper-sun`, `starfield` and `wire` are the built-in painters. **Any other value uses the generic
 painter**, which draws a clean layout from the palette over `brand.assets.card_background` (an image path relative

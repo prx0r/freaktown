@@ -12,6 +12,12 @@
   "speed": 0.9
  },
  "wardrobe": {},
- "face": {},
+ "face": {
+  "gains": {
+   "browDown": 1.3,
+   "browUp": 1.2,
+   "browSad": 1.15
+  }
+ },
  "eye_line": 0.0
 }

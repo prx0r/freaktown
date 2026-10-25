@@ -12,10 +12,72 @@
   "speed": 0.9
  },
  "wardrobe": {},
- "face": {},
+ "face": {
+  "shapes": {
+   "grin": [
+    [
+     "face_happy",
+     0.7
+    ],
+    [
+     "cheek",
+     0.6
+    ]
+   ],
+   "frown": [
+    [
+     "face_angry",
+     0.45
+    ]
+   ],
+   "eyeWide": [
+    [
+     "face_surprise",
+     0.5
+    ],
+    [
+     "eye_open",
+     1.0
+    ]
+   ],
+   "smileL": [
+    [
+     "lip_up_L",
+     1.0
+    ],
+    [
+     "cheek",
+     0.35
+    ]
+   ],
+   "smileR": [
+    [
+     "lip_up_R",
+     1.0
+    ],
+    [
+     "cheek",
+     0.35
+    ]
+   ]
+  },
+  "gains": {
+   "browUp": 1.3,
+   "browSad": 1.3
+  }
+ },
  "eye_line": 0.0,
  "rig": "seed",
  "hide": [
   "robo_arm"
- ]
+ ],
+ "light": {
+  "albedo": {
+   "default": 0.55
+  },
+  "sat": {
+   "default": 1.15
+  }
+ },
+ "face_notes": "Seed-san's lips are painted lines: talk visemes read through the jaw (map), smirk barely reads (one-sided lip_up is tiny); happy closes the eyes (face_happy, the model's own anime happy); brows hide under the fringe."
 }

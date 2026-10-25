@@ -16,7 +16,7 @@
   "Glow Strength": 7.0
  },
  "look": {
-  "anchor": {"exposure": 0.8, "skin_saturation": 1.3},
+  "anchor": {"exposure": 0.75, "skin_saturation": 1.3, "skin_tint": "#FFD8C0"},
   "haze_color": "#3A0A10",
   "haze": 0.28,
   "glow": 0.3,

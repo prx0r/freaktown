@@ -177,10 +177,11 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--script", required=True)
     ap.add_argument("--skin", default="goodnight")
-    ap.add_argument("--anchor", default="static/avatars/default-v1.vrm")
+    ap.add_argument("--anchor", default="static/avatars/default-v1.vrm",
+                    help="a cast id (sets/blender/news_cast/<id>.json: model, voice, face overrides) or a VRM/GLB path")
     ap.add_argument("--out", required=True)
     ap.add_argument("--date", default="")
-    ap.add_argument("--voice", default=VOICE)
+    ap.add_argument("--voice", default="", help="Fish voice id (default: the cast member's voice, else the Goodnight voice)")
     ap.add_argument("--speed", type=float, default=0.75)
     ap.add_argument("--tts-cache", default=str(pathlib.Path.home() / ".cache/newsroom-tts"))
     ap.add_argument("--tts-seed", default="", help="an existing TTS cache dir (<key>.wav) to reuse")
@@ -198,7 +199,10 @@ def main():
     skin = G.load_skin(a.skin)
     # refuse an anchor that cannot express before spending anything
     import face_express as FX
-    names, nodes = FX.glb_names(a.anchor)
+    import news_cast as NC
+    model, cast = NC.resolve(a.anchor)
+    a.voice = a.voice or (cast.get("voice") or {}).get("id") or VOICE
+    names, nodes = FX.glb_names(model)
     chk = FX.check_face(names, nodes)
     if chk["level"] == "fail":
         raise SystemExit(f"ANCHOR REFUSED: {a.anchor} cannot express (no {', '.join(chk['missingCore'])} channel)")
@@ -245,7 +249,8 @@ def main():
         rep = build_audio(out, prog, wavs, skin, a.fps)
     loud = measure_lufs(out / "master.wav")
     print(f"[6 audio] master {loud}", flush=True)
-    anchor_rel = os.path.relpath(pathlib.Path(a.anchor).resolve(), ROOT) if str(pathlib.Path(a.anchor).resolve()).startswith(str(ROOT)) else a.anchor
+    anchor_rel = cast["id"] if (NC.CAST_DIR / f"{cast['id']}.json").exists() else \
+        os.path.relpath(pathlib.Path(model).resolve(), ROOT) if str(pathlib.Path(model).resolve()).startswith(str(ROOT)) else model
     meta = {"skin": skin["id"], "anchor": anchor_rel, "fps": a.fps, "frames": int(round(prog["duration_ms"] / 1000 * a.fps)),
             "duration_ms": prog["duration_ms"], "tts": {"model": FREE_MODEL, "voice": a.voice, "speed": a.speed, "reads": tts_log},
             "align_coverage": {k: v["coverage"] for k, v in al.items()}, "loudness": loud, "facecheck": chk,

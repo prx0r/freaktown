@@ -5,9 +5,13 @@ name: blender newsroom studio
 #   stills     every camera in the kit, per skin (goodnight / galactic / night-wire), house anchor seated
 #   hero       one 1920 px wide of the master studio with volumetric haze
 #   emotions   the anchor's expressive range on the close / XCU (shared expressive map only)
-#   swap       character swap: a second anchor (static/avatars/buddha.glb) in the same studio, re-solved kit
-#   episode    the committed episode folder rendered in 16 chunks (plates + anchor-only shortcut)
-#   finish     overlays + grain + encode with the -14 LUFS master, blackdetect, sample sheet, throughput.json
+#   cast       per cast member (sets/blender/news_cast/*.json): checkFace, the full emotion set on the close/XCU, the
+#              desk lineup still, and the close-up in every skin with face-exposure numbers (facestats)
+#   castsheets cast x emotions grid (cast_emotions.jpg), lineup (cast_lineup.jpg), cast x skin exposure sheet
+#   castplan   splits the multi-character proof (episodes/cast-proof, newsroom_cast_show.py) into render chunks
+#   castep     one chunk of one segment (each segment: its own cast member, skin and director)
+#   castfinish every segment's overlays, one encode with the show master, blackdetect, loudness, lip-sync r
+#   swap / episode / finish   the single-anchor proof (workflow_dispatch only since the cast proof)
 # Only free hosted runners. Nothing here rents or pays for anything.
 on:
   push:
@@ -49,11 +53,11 @@ jobs:
         with: { python-version: "3.11" }
       - run: pip install -q pytest pillow numpy
       - name: Contract tests (camera kit, director, skins, expressive map parity)
-        run: python -m pytest -q tests/contract/test_newsroom_cameras.py tests/contract/test_news_skins.py tests/contract/test_face_expressive.py
-      - name: checkFace on both anchors
+        run: python -m pytest -q tests/contract/test_newsroom_cameras.py tests/contract/test_news_skins.py tests/contract/test_face_expressive.py tests/contract/test_news_cast.py
+      - name: checkFace on every anchor and cast member
         run: |
-          python3 sets/blender/face_express.py check static/avatars/default-v1.vrm
-          python3 sets/blender/face_express.py check static/avatars/buddha.glb
+          python3 sets/blender/face_express.py check static/avatars/default-v1.vrm static/avatars/buddha.glb static/avatars/cast/*.vrm
+          python3 sets/blender/news_cast.py list
       - uses: actions/cache@v4
         with: { path: ~/blender, key: "blender-${{ env.BLENDER_VERSION }}-linux-x64" }
       - run: bash sets/blender/ci_setup.sh
@@ -79,10 +83,11 @@ jobs:
           mkdir -p out/stills
           python3 sets/blender/newsroom_gfx.py cards --skin ${{ matrix.skin }} --sample --out out/cards/${{ matrix.skin }}
           "$BLENDER" -b --factory-startup --python sets/blender/newsroom_studio.py -- --skill "$V2B_SKILL" \
-            --skin ${{ matrix.skin }} --cards out/cards/${{ matrix.skin }} --anchor static/avatars/default-v1.vrm --strict \
+            --skin ${{ matrix.skin }} --cards out/cards/${{ matrix.skin }} --anchor house --strict \
             --stills out/stills --views kit --width 1280 --samples ${{ inputs.still_samples || '48' }} \
             2>&1 | tee out/stills_${{ matrix.skin }}.log | grep -E "STUDIO|FACECHECK|ANCHOR|RENDERED|Error|Traceback" || true
           test "$(ls out/stills/*.png | wc -l)" -ge 12
+          python3 sets/blender/newsroom_sheets.py facestats out/stills/*__views.json | tee out/stills/facestats.jsonl
       - uses: actions/upload-artifact@v4
         with:
           name: stills-${{ matrix.skin }}
@@ -104,7 +109,7 @@ jobs:
           mkdir -p out/hero
           python3 sets/blender/newsroom_gfx.py cards --skin goodnight --sample --out out/cards/goodnight
           "$BLENDER" -b --factory-startup --python sets/blender/newsroom_studio.py -- --skill "$V2B_SKILL" \
-            --skin goodnight --cards out/cards/goodnight --anchor static/avatars/default-v1.vrm --strict --haze volume \
+            --skin goodnight --cards out/cards/goodnight --anchor house --strict --haze volume \
             --stills out/hero --views CAM_WIDE --width 1920 --samples 128 --tag hero \
             2>&1 | tee out/hero.log | grep -E "STUDIO|ANCHOR|RENDERED|Error|Traceback" || true
           test -f out/hero/hero__CAM_WIDE.png
@@ -113,6 +118,7 @@ jobs:
 
   emotions:
     name: emotion close-ups
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
@@ -125,7 +131,7 @@ jobs:
           mkdir -p out/emo
           python3 sets/blender/newsroom_gfx.py cards --skin goodnight --sample --out out/cards/goodnight
           "$BLENDER" -b --factory-startup --python sets/blender/newsroom_studio.py -- --skill "$V2B_SKILL" \
-            --skin goodnight --cards out/cards/goodnight --anchor static/avatars/default-v1.vrm --strict \
+            --skin goodnight --cards out/cards/goodnight --anchor house --strict \
             --emotions out/emo --width 960 --samples 48 \
             2>&1 | tee out/emotions.log | grep -E "FACECHECK|ANCHOR|RENDERED|EMO|Error|Traceback" || true
           test "$(ls out/emo/*.png | wc -l)" -ge 10
@@ -134,6 +140,7 @@ jobs:
 
   swap:
     name: character swap (buddha.glb)
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
@@ -155,6 +162,7 @@ jobs:
 
   episode:
     name: episode chunk ${{ matrix.chunk }}/16
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 150
     strategy:
@@ -187,6 +195,7 @@ jobs:
   finish:
     name: finish + encode + throughput
     needs: episode
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -223,3 +232,152 @@ jobs:
             final/finish.json
             final/throughput.json
             dl/*.log
+
+  cast:
+    name: cast ${{ matrix.cast }} (emotions, lineup, exposure per skin)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        cast: [house, vivi, fumiriya, theo, seed]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with: { path: ~/blender, key: "blender-${{ env.BLENDER_VERSION }}-linux-x64" }
+      - run: bash sets/blender/ci_setup.sh
+      - run: pip install -q pillow numpy
+      - name: checkFace, the full emotion set (shared map + this cast file's overrides only) and the desk lineup
+        run: |
+          c=${{ matrix.cast }}
+          mkdir -p out/cast/$c
+          python3 sets/blender/news_cast.py check $c
+          for sk in goodnight galactic night-wire; do
+            python3 sets/blender/newsroom_gfx.py cards --skin $sk --sample --out out/cards/$sk
+          done
+          "$BLENDER" -b --factory-startup --python sets/blender/newsroom_studio.py -- --skill "$V2B_SKILL" \
+            --skin goodnight --cards out/cards/goodnight --anchor $c --strict \
+            --emotions out/cast/$c --stills out/cast/$c --views CAM_MEDIUM,CAM_CLOSE --width 960 --samples 32 --tag cast__$c \
+            2>&1 | tee out/cast/$c/cast_$c.log | grep -E "FACECHECK|ANCHOR|RENDERED|EMOTION|Error|Traceback" || true
+          for sk in galactic night-wire; do
+            "$BLENDER" -b --factory-startup --python sets/blender/newsroom_studio.py -- --skill "$V2B_SKILL" \
+              --skin $sk --cards out/cards/$sk --anchor $c --strict \
+              --stills out/cast/$c --views CAM_CLOSE --width 960 --samples 32 --tag skin_${sk}__$c \
+              2>&1 | tee out/cast/$c/skin_${sk}_$c.log | grep -E "ANCHOR|RENDERED|Error|Traceback" || true
+          done
+          test "$(ls out/cast/$c/cast__${c}__emo_*.png | wc -l)" -ge 12
+          python3 sets/blender/newsroom_sheets.py facestats out/cast/$c/*__views.json out/cast/$c/*__emotions.json \
+            | tee out/cast/$c/facestats.jsonl
+      - uses: actions/upload-artifact@v4
+        with: { name: "cast-${{ matrix.cast }}", path: "out/cast" }
+
+  castsheets:
+    name: cast sheets (emotions grid, lineup, exposure per skin)
+    needs: cast
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -q pillow numpy
+      - uses: actions/download-artifact@v4
+        with: { pattern: cast-*, merge-multiple: true, path: dl }
+      - name: Sheets
+        run: |
+          ls -R dl | head -50
+          mkdir -p sheets
+          python3 sets/blender/newsroom_sheets.py castsheets --dir dl --out sheets | tee -a "$GITHUB_STEP_SUMMARY"
+          ls -la sheets
+      - uses: actions/upload-artifact@v4
+        with: { name: cast-sheets, path: sheets }
+
+  castplan:
+    name: cast proof render plan
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: plan
+        run: |
+          m=$(python3 sets/blender/newsroom_cast_plan.py sets/blender/episodes/cast-proof --max-frames 46)
+          echo "$m" | python3 -m json.tool | head -60
+          echo "matrix=$m" >> "$GITHUB_OUTPUT"
+
+  castep:
+    name: cast proof ${{ matrix.seg }} chunk ${{ matrix.k }}/${{ matrix.n }}
+    needs: castplan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.castplan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with: { path: ~/blender, key: "blender-${{ env.BLENDER_VERSION }}-linux-x64" }
+      - run: bash sets/blender/ci_setup.sh
+      - name: Direct + bake the segment, render this chunk (1280x720, 25 fps)
+        run: |
+          d=out/frames/${{ matrix.seg }}
+          mkdir -p $d
+          nproc; lscpu | grep -E "Model name|^CPU\(s\)" || true
+          "$BLENDER" -b --factory-startup --python sets/blender/newsroom_episode.py -- --skill "$V2B_SKILL" \
+            --episode sets/blender/episodes/cast-proof/${{ matrix.seg }} --frames $d --chunk ${{ matrix.k }}/${{ matrix.n }} \
+            --width 1280 --samples ${{ inputs.samples || '16' }} --mode ${{ inputs.mode || 'plates' }} \
+            --keys $d/keys.json 2>&1 | tee $d/episode_${{ matrix.k }}.log \
+            | grep -E "ANCHOR|BAKED|CUTS|FRAMETIME|PLATE|PERFSTATS|Error|Traceback" || true
+          test "$(ls $d/f_*.png | wc -l)" -gt 0
+          if [ "${{ matrix.k }}" != "0" ]; then rm -f $d/keys.json; fi
+          # a file at out/ keeps the artifact's common root at out/, so merged downloads land in dl/frames/<seg>/
+          echo "${{ matrix.seg }} ${{ matrix.k }}/${{ matrix.n }}" > out/chunk.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: castep-${{ matrix.seg }}-${{ matrix.k }}
+          path: |
+            out/chunk.txt
+            out/frames/*/f_*.png
+            out/frames/*/stats_*.json
+            out/frames/*/keys.json
+            out/frames/*/episode_*.log
+
+  castfinish:
+    name: cast proof finish + encode + checks
+    needs: castep
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg >/dev/null
+          pip install -q pillow numpy
+      - uses: actions/download-artifact@v4
+        with: { pattern: castep-*, merge-multiple: true, path: dl }
+      - name: Overlays per segment, encode with the show master, blackdetect, loudness, lip-sync, throughput
+        run: |
+          ls dl/frames
+          python3 sets/blender/newsroom_cast_finish.py --episode sets/blender/episodes/cast-proof --frames dl/frames \
+            --out final/cast_proof.mp4 --max-mb 19.5
+          python3 - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
+          import json
+          s = json.load(open("final/finish.json"))
+          print("### Cast proof\n")
+          for k in ("frames", "programme_frames", "missing", "duration_s", "size_mb", "crf", "lufs_i", "true_peak_dbfs", "black",
+                    "lipsync_r_all", "chunks", "s_per_frame_all_in", "full_s_per_frame", "anchor_s_per_frame", "plates",
+                    "slowest_chunk_s", "cpus"):
+              print(f"- {k}: {s.get(k)}")
+          for g in s["segments"]:
+              print(f"- {g['dir']} ({g['skin']}): frames {g['frames']}/{g['programme_frames']} lipsync {g['lipsync']}")
+          PY
+          rm -rf final/jpg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cast-proof
+          path: |
+            final
+            dl/frames/*/episode_*.log

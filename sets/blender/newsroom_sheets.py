@@ -85,6 +85,44 @@ def facestats(jsons):
     return rows
 
 
+CAST_EMOS = ["neutral-read", "talk-aa", "talk-oh", "warm", "happy", "smirk", "wink", "surprised", "concerned", "serious",
+             "brow-flash", "eye-dart"]
+
+
+def castsheets(d, out):
+    """From the cast job artifacts (d/<cast>/...): cast_emotions.jpg (cast x emotion grid), cast_lineup.jpg (every
+    cast member at the desk, one skin), cast_skins.jpg (cast x skin close-ups) and facestats.md (exposure numbers)."""
+    import json
+    d, out = pathlib.Path(d), pathlib.Path(out)
+    out.mkdir(parents=True, exist_ok=True)
+    order = ["house", "vivi", "fumiriya", "theo", "seed"]
+    casts = [c for c in order if (d / c).is_dir()] + sorted(p.name for p in d.iterdir() if p.is_dir() and p.name not in order)
+    names = {}
+    here = pathlib.Path(__file__).resolve().parent / "news_cast"
+    for c in casts:
+        try:
+            names[c] = json.loads((here / f"{c}.json").read_text()).get("name", c)
+        except Exception:
+            names[c] = c
+    cells = [(d / c / f"cast__{c}__emo_{e}.png", e) for c in casts for e in CAST_EMOS]
+    sheet(cells, len(CAST_EMOS), 300, str(out / "cast_emotions.jpg"), "Cast x emotions (shared expressive map + per-cast overrides, goodnight skin)",
+          CAST_EMOS, [f"{names[c]} ({c})" for c in casts])
+    sheet([(d / c / f"cast__{c}__CAM_MEDIUM.png", f"{names[c]} ({c})") for c in casts], len(casts), 420, str(out / "cast_lineup.jpg"),
+          "The cast at the desk (goodnight skin, CAM_MEDIUM)")
+    skins = ["goodnight", "galactic", "night-wire"]
+    pat = {"goodnight": "cast__{c}__CAM_CLOSE.png", "galactic": "skin_galactic__{c}__CAM_CLOSE.png", "night-wire": "skin_night-wire__{c}__CAM_CLOSE.png"}
+    sheet([(d / c / pat[sk].format(c=c), f"{c} / {sk}") for c in casts for sk in skins], 3, 420, str(out / "cast_skins.jpg"),
+          "Lit anchor exposure: every cast member's close-up in every skin", skins, [names[c] for c in casts])
+    rows = ["| cast | still | luma | warmth (R-B) | clipped |", "|---|---|---|---|---|"]
+    for c in casts:
+        for line in (d / c / "facestats.jsonl").read_text().splitlines() if (d / c / "facestats.jsonl").exists() else []:
+            r = json.loads(line)
+            if "luma" in r and ("CAM_CLOSE" in r["file"] or "emo_neutral" in r["file"]):
+                rows.append(f"| {c} | {r['file']} | {r['luma']} | {r['warmth']} | {r['clipped']} |")
+    (out / "facestats.md").write_text("\n".join(rows) + "\n")
+    print("\n".join(rows))
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -101,9 +139,15 @@ def main():
     f.add_argument("--title", default="")
     f.add_argument("--width", type=int, default=420)
     f.add_argument("files", nargs="+")
+    cs = sub.add_parser("castsheets", help="cast emotions grid, lineup and exposure sheets from the cast job artifacts")
+    cs.add_argument("--dir", required=True)
+    cs.add_argument("--out", required=True)
     fs = sub.add_parser("facestats", help="face exposure numbers from views/emotions JSON written next to the stills")
     fs.add_argument("jsons", nargs="+")
     a = ap.parse_args()
+    if a.cmd == "castsheets":
+        castsheets(a.dir, a.out)
+        return
     if a.cmd == "facestats":
         import json
         for r in facestats(a.jsons):

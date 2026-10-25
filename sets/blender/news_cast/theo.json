@@ -11,7 +11,18 @@
   "name": "Anchor News (public)",
   "speed": 0.85
  },
- "wardrobe": {},
- "face": {},
+ "wardrobe": {
+  "match": [
+   "Tops"
+  ],
+  "tint": "#59606E",
+  "amount": 0.9
+ },
+ "face": {
+  "gains": {
+   "browDown": 1.3,
+   "browUp": 1.2
+  }
+ },
  "eye_line": 0.0
 }

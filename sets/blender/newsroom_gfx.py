@@ -393,22 +393,34 @@ class Overlay:
         x = (W - d.textlength(title, font=ft)) / 2
         y = H * 0.36
         sc = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-        ImageDraw.Draw(sc).rectangle([0, y - 60 * k, W, y + 190 * k], fill=(0, 0, 0, int(120 * out * min(1.0, u * 4))))
+        ImageDraw.Draw(sc).rectangle([0, y - 50 * k, W, y + 235 * k], fill=(0, 0, 0, int(150 * out * min(1.0, u * 4))))
         im.alpha_composite(sc.filter(ImageFilter.GaussianBlur(30 * k)))
+        # every element is placed from the MEASURED box of the one above it (textbbox), so a taller display font or a
+        # long date can never run into the title (loop 2: the date sat 40 px over the title and read into "News")
+        x0 = x
+        boxes = {"title": d.textbbox((x0, y), title, font=ft)}
         for i, w in enumerate(title.split()):
             wu = ease((u - 0.12 - i * 0.07) / 0.18)
             d.text((x, y + (1 - wu) * 40 * k), w, font=ft, fill=(255, 255, 255, int(255 * wu * out)))
             x += d.textlength(w + " ", font=ft)
+        ry = boxes["title"][3] + 16 * k
         half = 260 * k * ease((u - 0.3) / 0.25)
-        d.rectangle([W / 2 - half, y + 112 * k, W / 2 + half, y + 118 * k], fill=acc[:3] + (int(255 * out),))
+        d.rectangle([W / 2 - half, ry, W / 2 + half, ry + 6 * k], fill=acc[:3] + (int(255 * out),))
+        boxes["rule"] = (W / 2 - 260 * k, ry, W / 2 + 260 * k, ry + 6 * k)
         tu = ease((u - 0.42) / 0.2)
         ftg = self.f("italic", 26)
-        d.text(((W - d.textlength(b["tagline"], font=ftg)) / 2, y + 134 * k), b["tagline"], font=ftg,
-               fill=(255, 255, 255, int(220 * tu * out)))
+        ty = ry + 6 * k + 14 * k
+        tx = (W - d.textlength(b["tagline"], font=ftg)) / 2
+        d.text((tx, ty), b["tagline"], font=ftg, fill=(255, 255, 255, int(220 * tu * out)))
+        boxes["tagline"] = d.textbbox((tx, ty), b["tagline"], font=ftg)
         date = self.prog.get("date", "")
         if date:
             fd = self.f("body", 18, "SemiBold")
-            d.text(((W - d.textlength(date.upper(), font=fd)) / 2, y - 40 * k), date.upper(), font=fd, fill=acc[:3] + (int(230 * tu * out),))
+            dy = boxes["tagline"][3] + 16 * k
+            dx = (W - d.textlength(date.upper(), font=fd)) / 2
+            d.text((dx, dy), date.upper(), font=fd, fill=acc[:3] + (int(230 * tu * out),))
+            boxes["date"] = d.textbbox((dx, dy), date.upper(), font=fd)
+        self.intro_boxes = boxes
         style = b.get("intro_fx", b.get("card_style"))
         if style == "wire":
             d.rectangle([0, H * 0.3, W * ease(u / 0.3), H * 0.3 + 8 * k], fill=acc[:3] + (int(255 * out),))

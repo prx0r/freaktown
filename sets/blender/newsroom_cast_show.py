@@ -126,6 +126,11 @@ def main():
         prog["duration_ms"] = frame_ms(prog["duration_ms"] + int(seg.get("tail_ms", 0 if outro else 450)), a.fps)
         if not intro:
             prog["open_shot"] = seg.get("open_shot", "CAM_MEDIUM")
+        prog["sentence_cut_ms"] = int(seg.get("sentence_cut_ms", 2600))
+        prog["max_hold_ms"] = int(seg.get("max_hold_ms", 5200))
+        # short single-read segments keep the presenter in frame (no wall-only SCREEN insert) and settle sooner
+        prog["rotation"] = seg.get("rotation", ["CAM_CLOSE", "push", "CAM_DESK34", "CAM_MEDIUM"])
+        prog["open_settle"] = float(seg.get("open_settle", 0.22))
         # moods: the script's emotion per line (falls back to the skin's tone per kind)
         moods = []
         for ln, r in zip(prog["lines"], rds):

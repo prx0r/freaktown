@@ -64,6 +64,64 @@ def resolve(arg):
     return c["model_path"], c
 
 
+def hoist_target_names(data):
+    """VRoid beta exports keep morph names in each PRIMITIVE's extras.targetNames; Blender's glTF importer reads the
+    MESH's, so their shape keys import as target_0.. and checkFace fails after import. Copy them up (GLB bytes in,
+    GLB bytes out; unchanged when nothing needs hoisting)."""
+    import struct
+    if data[:4] != b"glTF":
+        return data
+    n = struct.unpack("<I", data[12:16])[0]
+    j = json.loads(data[20:20 + n])
+    hit = False
+    for m in j.get("meshes", []):
+        if (m.get("extras") or {}).get("targetNames"):
+            continue
+        tn = next(((p.get("extras") or {}).get("targetNames") for p in m.get("primitives", [])
+                   if (p.get("extras") or {}).get("targetNames")), None)
+        if tn:
+            m.setdefault("extras", {})["targetNames"] = tn
+            hit = True
+    if not hit:
+        return data
+    js = json.dumps(j, separators=(",", ":")).encode()
+    js += b" " * (-len(js) % 4)
+    rest = data[20 + n:]
+    total = 12 + 8 + len(js) + len(rest)
+    return data[:8] + struct.pack("<I", total) + struct.pack("<I", len(js)) + b"JSON" + js + rest
+
+
+def vrm_version(path):
+    """0 for a VRM 0.x file (extensions.VRM), 1 for VRM 1.0 (VRMC_vrm), None for a plain glTF/GLB."""
+    import struct
+    with open(path, "rb") as fh:
+        head = fh.read(20)
+        if head[:4] != b"glTF":
+            return None
+        j = json.loads(fh.read(struct.unpack("<I", head[12:16])[0]))
+    ext = j.get("extensions") or {}
+    return 1 if "VRMC_vrm" in ext else 0 if "VRM" in ext else None
+
+
+def humanoid_bones(path):
+    """{VRM humanoid bone name: node name} from a VRM 0.x / 1.0 file ({} for a plain GLB). A rig whose bones are not
+    named like VRoid / Mixamo (Seed-san's head is "head 1") is still posed by its humanoid map."""
+    import struct
+    with open(path, "rb") as fh:
+        head = fh.read(20)
+        if head[:4] != b"glTF":
+            return {}
+        j = json.loads(fh.read(struct.unpack("<I", head[12:16])[0]))
+    ext, nodes = j.get("extensions") or {}, j.get("nodes", [])
+    if "VRMC_vrm" in ext:
+        hb = ext["VRMC_vrm"].get("humanoid", {}).get("humanBones", {})
+        return {k: nodes[v["node"]].get("name", "") for k, v in hb.items() if "node" in v and v["node"] < len(nodes)}
+    if "VRM" in ext:
+        hb = ext["VRM"].get("humanoid", {}).get("humanBones", [])
+        return {b["bone"]: nodes[b["node"]].get("name", "") for b in hb if b.get("node", -1) >= 0 and b["node"] < len(nodes)}
+    return {}
+
+
 def check(cid):
     import face_express as FX
     c = load(cid)

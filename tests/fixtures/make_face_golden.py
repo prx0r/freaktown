@@ -20,6 +20,8 @@ STATES = {
     "blink_left": {"blinkL": 1.0, "blinkR": 0.2},
     "dart": {"lookX": 0.9, "lookY": -0.3},
     "worried": {"browSad": 0.7, "speaking": True},
+    "serious": {"emotions": {"serious": 1.0}},
+    "concerned_talk": {"emotions": {"concerned": 0.8}, "visemes": {"oh": 0.6}, "speaking": True},
 }
 ARKIT = ["jawOpen", "mouthFunnel", "mouthPucker", "mouthStretchLeft", "mouthStretchRight", "eyeBlinkLeft", "eyeBlinkRight",
          "mouthSmileLeft", "mouthSmileRight", "cheekSquintLeft", "cheekSquintRight", "mouthFrownLeft", "mouthFrownRight",
@@ -30,7 +32,11 @@ ARKIT = ["jawOpen", "mouthFunnel", "mouthPucker", "mouthStretchLeft", "mouthStre
 
 def main():
     vroid, _ = F.glb_names(ROOT / "static/avatars/default-v1.vrm")
+    beta, _ = F.glb_names(ROOT / "static/avatars/cast/vivi.vrm")          # VRoid beta: "Face.M_F00_000_00_Fcl_*" names
+    seed, _ = F.glb_names(ROOT / "static/avatars/cast/seed-san.vrm")      # VRM 1.0 Seed-san: its own morph names
     meshes = {"vroid": {"names": vroid, "bones": ["J_Adj_L_FaceEye", "J_Adj_R_FaceEye"]},
+              "vroid_beta": {"names": beta, "bones": ["J_Adj_L_FaceEye", "J_Adj_R_FaceEye"]},
+              "seed": {"names": seed, "bones": []},
               "arkit": {"names": ARKIT, "bones": []},
               "lantern": {"names": ["jawOpen", "mouthSmileLeft", "mouthSmileRight", "eyeBlinkLeft", "eyeBlinkRight"], "bones": []},
               "bare": {"names": ["Key 1"], "bones": []}}

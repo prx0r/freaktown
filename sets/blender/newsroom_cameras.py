@@ -309,8 +309,12 @@ def direct(prog, kit, subject, coanchor=False):
            words: [{word, start_ms, end_ms}]}]} on the programme clock."""
     lines = prog["lines"]
     gaps = word_gaps(lines)
+    # a programme can tighten the rhythm (newsroom_cast_show.py: short single-read segments cut on sentence ends from
+    # 2.6 s and never hold past 5.2 s); the long-form show keeps 4.5 s / MAX_HOLD_MS
+    sent_cut = int(prog.get("sentence_cut_ms", 4500))
+    max_hold = int(prog.get("max_hold_ms", MAX_HOLD_MS))
     cuts = []
-    rot = ["CAM_DESK34", "CAM_SCREEN", "push", "CAM_CLOSE", "dolly", "CAM_MEDIUM"]
+    rot = list(prog.get("rotation") or ["CAM_DESK34", "CAM_SCREEN", "push", "CAM_CLOSE", "dolly", "CAM_MEDIUM"])
     state = {"alt": 0}
 
     def add(t, shot, why, move=None, force=False):
@@ -360,9 +364,9 @@ def direct(prog, kit, subject, coanchor=False):
                 used.update(range(k, min(len(ws), k + 6)))
                 if add(tc, "CAM_XCU" if on == "CAM_CLOSE" else "CAM_CLOSE", "emphasis: punch in"):
                     continue
-            if not pause and held(tc) < MAX_HOLD_MS:
+            if not pause and held(tc) < max_hold:
                 continue
-            if (sent and held(tc) >= 4500) or held(tc) >= MAX_HOLD_MS - 1500:
+            if (sent and held(tc) >= sent_cut) or held(tc) >= max_hold - 1500:
                 for _ in range(len(rot)):
                     pick = rot[state["alt"] % len(rot)]
                     state["alt"] += 1
@@ -385,7 +389,9 @@ def direct(prog, kit, subject, coanchor=False):
         kind = ln.get("kind", "body")
         if kind == "open":
             if i == 0 or lines[i - 1].get("kind") != "open":
-                add(snap(t0 + 0.4 * (t1 - t0), gaps), "CAM_MEDIUM", "first read: settle on the medium")
+                add(snap(t0 + float(prog.get("open_settle", 0.4)) * (t1 - t0), gaps), "CAM_MEDIUM", "first read: settle on the medium")
+                if "sentence_cut_ms" in prog:
+                    body_beats(ln)
         elif kind == "tee":
             add(snap(t0 - 250, gaps), "CAM_WALL", "story tee: the wall carries the headline")
         elif kind == "body":

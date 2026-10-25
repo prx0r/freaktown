@@ -65,6 +65,20 @@
   "worried": {
    "browSad": 0.7,
    "speaking": true
+  },
+  "serious": {
+   "emotions": {
+    "serious": 1.0
+   }
+  },
+  "concerned_talk": {
+   "emotions": {
+    "concerned": 0.8
+   },
+   "visemes": {
+    "oh": 0.6
+   },
+   "speaking": true
   }
  },
  "meshes": {
@@ -132,6 +146,103 @@
     "J_Adj_L_FaceEye",
     "J_Adj_R_FaceEye"
    ]
+  },
+  "vroid_beta": {
+   "names": [
+    "Face.M_F00_000_00_Fcl_ALL_Angry",
+    "Face.M_F00_000_00_Fcl_ALL_Fun",
+    "Face.M_F00_000_00_Fcl_ALL_Joy",
+    "Face.M_F00_000_00_Fcl_ALL_Sorrow",
+    "Face.M_F00_000_00_Fcl_ALL_Surprised",
+    "Face.M_F00_000_00_Fcl_BRW_Angry",
+    "Face.M_F00_000_00_Fcl_BRW_Fun",
+    "Face.M_F00_000_00_Fcl_BRW_Joy",
+    "Face.M_F00_000_00_Fcl_BRW_Sorrow",
+    "Face.M_F00_000_00_Fcl_BRW_Surprised",
+    "Face.M_F00_000_00_Fcl_EYE_Natural",
+    "Face.M_F00_000_00_Fcl_EYE_Angry",
+    "Face.M_F00_000_00_Fcl_EYE_Close",
+    "Face.M_F00_000_00_Fcl_EYE_Close_R",
+    "Face.M_F00_000_00_Fcl_EYE_Close_L",
+    "Face.M_F00_000_00_Fcl_EYE_Joy",
+    "Face.M_F00_000_00_Fcl_EYE_Joy_R",
+    "Face.M_F00_000_00_Fcl_EYE_Joy_L",
+    "Face.M_F00_000_00_Fcl_EYE_Sorrow",
+    "Face.M_F00_000_00_Fcl_EYE_Surprised",
+    "Face.M_F00_000_00_Fcl_EYE_Extra",
+    "Face.M_F00_000_00_Fcl_MTH_Up",
+    "Face.M_F00_000_00_Fcl_MTH_Down",
+    "Face.M_F00_000_00_Fcl_MTH_Angry",
+    "Face.M_F00_000_00_Fcl_MTH_Neutral",
+    "Face.M_F00_000_00_Fcl_MTH_Fun",
+    "Face.M_F00_000_00_Fcl_MTH_Joy",
+    "Face.M_F00_000_00_Fcl_MTH_Sorrow",
+    "Face.M_F00_000_00_Fcl_MTH_Surprised",
+    "Face.M_F00_000_00_Fcl_MTH_A",
+    "Face.M_F00_000_00_Fcl_MTH_I",
+    "Face.M_F00_000_00_Fcl_MTH_U",
+    "Face.M_F00_000_00_Fcl_MTH_E",
+    "Face.M_F00_000_00_Fcl_MTH_O",
+    "Face.M_F00_000_00_Fcl_HA_Fung1",
+    "Face.M_F00_000_00_Fcl_HA_Fung1_Low",
+    "Face.M_F00_000_00_Fcl_HA_Fung1_Up",
+    "Face.M_F00_000_00_Fcl_HA_Fung2",
+    "Face.M_F00_000_00_Fcl_HA_Fung2_Low",
+    "Face.M_F00_000_00_Fcl_HA_Fung2_Up",
+    "EyeExtra_01.M_F00_000_00_EyeExtra_On"
+   ],
+   "bones": [
+    "J_Adj_L_FaceEye",
+    "J_Adj_R_FaceEye"
+   ]
+  },
+  "seed": {
+   "names": [
+    "eye_close",
+    "blink_L",
+    "blink_R",
+    "eye_open",
+    "eye_smile",
+    "eye_brow_up",
+    "eye_brow_up_L",
+    "eye_brow_up_R",
+    "eye_brow_down",
+    "eye_brow_down_L",
+    "eye_brow_down_R",
+    "eye_small",
+    "eye_no_hilight",
+    "eye_black_big",
+    "eye_black_small",
+    "eye_star",
+    "eye_V",
+    "eye_zitome",
+    "shock_plane",
+    "eye_angry",
+    "cheek",
+    "cheek_pop",
+    "mouse_open",
+    "mouth_wide",
+    "mouth_short",
+    "lip_a",
+    "lip_i",
+    "lip_u",
+    "lip_e",
+    "lip_o",
+    "lip_w",
+    "lip_up",
+    "lip_down",
+    "face_happy",
+    "face_angry",
+    "face_sad",
+    "face_relax",
+    "face_relax2",
+    "face_surprise",
+    "look_up",
+    "look_down",
+    "look_left",
+    "look_right"
+   ],
+   "bones": []
   },
   "arkit": {
    "names": [
@@ -241,6 +352,16 @@
   },
   "worried": {
    "browSad": 0.7
+  },
+  "serious": {
+   "browDown": 0.8,
+   "frown": 0.15,
+   "squint": 0.2
+  },
+  "concerned_talk": {
+   "browSad": 0.68,
+   "frown": 0.18,
+   "oh": 0.6
   }
  },
  "shapes": {
@@ -307,6 +428,172 @@
    "worried": {
     "Face_Blendshape.Fcl_BRW_Sorrow": 1.05,
     "Face_Blendshape.Fcl_EYE_Sorrow": 0.42
+   },
+   "serious": {
+    "Face_Blendshape.Fcl_BRW_Angry": 1.2,
+    "Face_Blendshape.Fcl_EYE_Angry": 0.44,
+    "Face_Blendshape.Fcl_MTH_Sorrow": 0.135,
+    "Face_Blendshape.Fcl_EYE_Joy": 0.084
+   },
+   "concerned_talk": {
+    "Face_Blendshape.Fcl_BRW_Sorrow": 1.02,
+    "Face_Blendshape.Fcl_EYE_Sorrow": 0.408,
+    "Face_Blendshape.Fcl_MTH_Sorrow": 0.162,
+    "Face_Blendshape.Fcl_MTH_O": 0.72,
+    "Face_Blendshape.Fcl_MTH_A": 0.15
+   }
+  },
+  "vroid_beta": {
+   "talk_aa": {
+    "Face.M_F00_000_00_Fcl_MTH_A": 1.35
+   },
+   "talk_oh_half": {
+    "Face.M_F00_000_00_Fcl_MTH_O": 0.6,
+    "Face.M_F00_000_00_Fcl_MTH_A": 0.125
+   },
+   "jaw_only": {
+    "Face.M_F00_000_00_Fcl_MTH_A": 0.945
+   },
+   "happy_talk": {
+    "Face.M_F00_000_00_Fcl_BRW_Surprised": 0.225,
+    "Face.M_F00_000_00_Fcl_EYE_Surprised": 0.045,
+    "Face.M_F00_000_00_Fcl_MTH_E": 0.8,
+    "Face.M_F00_000_00_Fcl_MTH_A": 0.32,
+    "Face.M_F00_000_00_Fcl_MTH_Joy": 0.14,
+    "Fcl_MTH_Fun_L": 0.48,
+    "Fcl_MTH_Joy_L": 0.216,
+    "Fcl_MTH_Fun_R": 0.48,
+    "Fcl_MTH_Joy_R": 0.216,
+    "Face.M_F00_000_00_Fcl_EYE_Joy": 0.21
+   },
+   "smirk_left": {
+    "Fcl_MTH_Fun_L": 0.8,
+    "Fcl_MTH_Joy_L": 0.36,
+    "Face.M_F00_000_00_Fcl_EYE_Joy": 0.126
+   },
+   "smirk_right": {
+    "Fcl_MTH_Fun_R": 0.6,
+    "Fcl_MTH_Joy_R": 0.27
+   },
+   "the_look": {
+    "Face.M_F00_000_00_Fcl_BRW_Angry": 0.525,
+    "Face.M_F00_000_00_Fcl_EYE_Angry": 0.1925,
+    "Face.M_F00_000_00_Fcl_EYE_Joy": 0.126
+   },
+   "surprised": {
+    "Face.M_F00_000_00_Fcl_BRW_Surprised": 1.35,
+    "Face.M_F00_000_00_Fcl_EYE_Surprised": 1.17,
+    "Face.M_F00_000_00_Fcl_MTH_A": 0.4725
+   },
+   "sad": {
+    "Face.M_F00_000_00_Fcl_BRW_Sorrow": 1.08,
+    "Face.M_F00_000_00_Fcl_EYE_Sorrow": 0.432,
+    "Face.M_F00_000_00_Fcl_MTH_Sorrow": 0.504
+   },
+   "angry_flash": {
+    "Face.M_F00_000_00_Fcl_BRW_Angry": 1.215,
+    "Face.M_F00_000_00_Fcl_EYE_Angry": 0.4455,
+    "Face.M_F00_000_00_Fcl_BRW_Surprised": 0.3,
+    "Face.M_F00_000_00_Fcl_EYE_Surprised": 0.06,
+    "Face.M_F00_000_00_Fcl_MTH_Sorrow": 0.2025,
+    "Face.M_F00_000_00_Fcl_EYE_Joy": 0.1512
+   },
+   "blink_left": {
+    "Face.M_F00_000_00_Fcl_EYE_Close_L": 1.0,
+    "Face.M_F00_000_00_Fcl_EYE_Close_R": 0.2
+   },
+   "dart": {},
+   "worried": {
+    "Face.M_F00_000_00_Fcl_BRW_Sorrow": 1.05,
+    "Face.M_F00_000_00_Fcl_EYE_Sorrow": 0.42
+   },
+   "serious": {
+    "Face.M_F00_000_00_Fcl_BRW_Angry": 1.2,
+    "Face.M_F00_000_00_Fcl_EYE_Angry": 0.44,
+    "Face.M_F00_000_00_Fcl_MTH_Sorrow": 0.135,
+    "Face.M_F00_000_00_Fcl_EYE_Joy": 0.084
+   },
+   "concerned_talk": {
+    "Face.M_F00_000_00_Fcl_BRW_Sorrow": 1.02,
+    "Face.M_F00_000_00_Fcl_EYE_Sorrow": 0.408,
+    "Face.M_F00_000_00_Fcl_MTH_Sorrow": 0.162,
+    "Face.M_F00_000_00_Fcl_MTH_O": 0.72,
+    "Face.M_F00_000_00_Fcl_MTH_A": 0.15
+   }
+  },
+  "seed": {
+   "talk_aa": {
+    "lip_a": 1.0,
+    "mouse_open": 0.6
+   },
+   "talk_oh_half": {
+    "lip_o": 0.5,
+    "mouse_open": 0.225
+   },
+   "jaw_only": {
+    "mouse_open": 0.7
+   },
+   "happy_talk": {
+    "eye_brow_up": 0.15,
+    "lip_e": 0.8,
+    "mouse_open": 0.24,
+    "face_happy": 0.1225,
+    "lip_up_L": 0.48,
+    "lip_up_R": 0.48,
+    "eye_smile": 0.2
+   },
+   "smirk_left": {
+    "lip_up_L": 0.8,
+    "eye_smile": 0.12
+   },
+   "smirk_right": {
+    "lip_up_R": 0.6
+   },
+   "the_look": {
+    "eye_brow_down": 0.35,
+    "eye_angry": 0.1225,
+    "eye_smile": 0.12,
+    "look_right": 0.2,
+    "look_up": 0.05
+   },
+   "surprised": {
+    "eye_brow_up": 0.9,
+    "eye_open": 0.9,
+    "mouse_open": 0.35
+   },
+   "sad": {
+    "face_sad": 0.432,
+    "lip_down": 0.448
+   },
+   "angry_flash": {
+    "eye_brow_down": 0.81,
+    "eye_angry": 0.2835,
+    "eye_brow_up": 0.2,
+    "lip_down": 0.18,
+    "eye_smile": 0.144
+   },
+   "blink_left": {
+    "blink_L": 1.0,
+    "blink_R": 0.2
+   },
+   "dart": {
+    "look_left": 0.9,
+    "look_down": 0.3
+   },
+   "worried": {
+    "face_sad": 0.42
+   },
+   "serious": {
+    "eye_brow_down": 0.8,
+    "eye_angry": 0.28,
+    "lip_down": 0.12,
+    "eye_smile": 0.08
+   },
+   "concerned_talk": {
+    "face_sad": 0.408,
+    "lip_down": 0.144,
+    "lip_o": 0.6,
+    "mouse_open": 0.27
    }
   },
   "arkit": {
@@ -395,6 +682,23 @@
    },
    "worried": {
     "browInnerUp": 0.7
+   },
+   "serious": {
+    "browDownLeft": 0.8,
+    "browDownRight": 0.8,
+    "mouthFrownLeft": 0.135,
+    "mouthFrownRight": 0.135,
+    "eyeSquintLeft": 0.16,
+    "eyeSquintRight": 0.16,
+    "cheekSquintLeft": 0.08,
+    "cheekSquintRight": 0.08
+   },
+   "concerned_talk": {
+    "browInnerUp": 0.68,
+    "mouthFrownLeft": 0.162,
+    "mouthFrownRight": 0.162,
+    "mouthFunnel": 0.48,
+    "jawOpen": 0.27
    }
   },
   "lantern": {
@@ -429,7 +733,11 @@
     "eyeBlinkRight": 0.2
    },
    "dart": {},
-   "worried": {}
+   "worried": {},
+   "serious": {},
+   "concerned_talk": {
+    "jawOpen": 0.27
+   }
   },
   "bare": {
    "talk_aa": {},
@@ -444,7 +752,9 @@
    "angry_flash": {},
    "blink_left": {},
    "dart": {},
-   "worried": {}
+   "worried": {},
+   "serious": {},
+   "concerned_talk": {}
   }
  },
  "checks": {
@@ -477,6 +787,66 @@
     "Fcl_MTH_Fun_R",
     "Fcl_MTH_Joy_L",
     "Fcl_MTH_Joy_R"
+   ]
+  },
+  "vroid_beta": {
+   "rig": "vroid",
+   "level": "ok",
+   "channels": [
+    "open",
+    "aa",
+    "ih",
+    "ou",
+    "ee",
+    "oh",
+    "blinkL",
+    "blinkR",
+    "smileL",
+    "smileR",
+    "grin",
+    "frown",
+    "browUp",
+    "browDown",
+    "browSad",
+    "squint",
+    "eyeWide"
+   ],
+   "missingCore": [],
+   "warnings": [],
+   "generated": [
+    "Fcl_MTH_Fun_L",
+    "Fcl_MTH_Fun_R",
+    "Fcl_MTH_Joy_L",
+    "Fcl_MTH_Joy_R"
+   ]
+  },
+  "seed": {
+   "rig": "seed",
+   "level": "ok",
+   "channels": [
+    "open",
+    "aa",
+    "ih",
+    "ou",
+    "ee",
+    "oh",
+    "blinkL",
+    "blinkR",
+    "smileL",
+    "smileR",
+    "grin",
+    "frown",
+    "browUp",
+    "browDown",
+    "browSad",
+    "squint",
+    "eyeWide"
+   ],
+   "missingCore": [],
+   "warnings": [],
+   "generated": [
+    "lip_up_L",
+    "lip_up_R"
    ]
   },
   "arkit": {

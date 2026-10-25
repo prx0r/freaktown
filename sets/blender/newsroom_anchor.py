@@ -24,6 +24,7 @@ import bpy
 from mathutils import Matrix, Vector, Quaternion
 
 import face_express as FX
+from news_cast import hoist_target_names, vrm_version, humanoid_bones  # noqa: E402  (pure: tested without Blender)
 
 DESK_EYE = 0.43          # eyes this far above the desk top: a broadcast anchor's seated eye-line
 SEATS = {"anchor1": (0.75, 0.55), "anchor2": (-0.75, 0.55)}
@@ -53,9 +54,23 @@ class AnchorRefused(SystemExit):
     pass
 
 
+VRM_KEYS = {"hips": ["hips"], "spine": ["spine"], "chest": ["upperChest", "chest"], "neck": ["neck"], "head": ["head"],
+            "upperLeg.L": ["leftUpperLeg"], "lowerLeg.L": ["leftLowerLeg"], "foot.L": ["leftFoot"],
+            "upperLeg.R": ["rightUpperLeg"], "lowerLeg.R": ["rightLowerLeg"], "foot.R": ["rightFoot"],
+            "upperArm.L": ["leftUpperArm"], "lowerArm.L": ["leftLowerArm"], "hand.L": ["leftHand"],
+            "upperArm.R": ["rightUpperArm"], "lowerArm.R": ["rightLowerArm"], "hand.R": ["rightHand"]}
+
+
 def bone(arm, key):
     if arm is None:
         return None
+    hm = arm.get("vrm_bones")                 # the file's own humanoid map first (set by seat_anchor)
+    if hm:
+        hm = json.loads(hm)
+        for k in VRM_KEYS.get(key, []):
+            n = hm.get(k)
+            if n and n in arm.pose.bones:
+                return arm.pose.bones[n]
     for n in ALIASES.get(key, [key]):
         if n in arm.pose.bones:
             return arm.pose.bones[n]
@@ -124,45 +139,6 @@ def precheck(path, strict=True):
         raise AnchorRefused(f"ANCHOR REFUSED: {path} cannot express (no {', '.join(chk['missingCore'])} channel). "
                             f"Add face shapes (npm run face:rig -- in.glb out.glb bakes jaw/blink/brow/smile) and retry.")
     return chk
-
-
-def hoist_target_names(data):
-    """VRoid beta exports keep morph names in each PRIMITIVE's extras.targetNames; Blender's glTF importer reads the
-    MESH's, so their shape keys import as target_0.. and checkFace fails after import. Copy them up (GLB bytes in,
-    GLB bytes out; unchanged when nothing needs hoisting)."""
-    import struct
-    if data[:4] != b"glTF":
-        return data
-    n = struct.unpack("<I", data[12:16])[0]
-    j = json.loads(data[20:20 + n])
-    hit = False
-    for m in j.get("meshes", []):
-        if (m.get("extras") or {}).get("targetNames"):
-            continue
-        tn = next(((p.get("extras") or {}).get("targetNames") for p in m.get("primitives", [])
-                   if (p.get("extras") or {}).get("targetNames")), None)
-        if tn:
-            m.setdefault("extras", {})["targetNames"] = tn
-            hit = True
-    if not hit:
-        return data
-    js = json.dumps(j, separators=(",", ":")).encode()
-    js += b" " * (-len(js) % 4)
-    rest = data[20 + n:]
-    total = 12 + 8 + len(js) + len(rest)
-    return data[:8] + struct.pack("<I", total) + struct.pack("<I", len(js)) + b"JSON" + js + rest
-
-
-def vrm_version(path):
-    """0 for a VRM 0.x file (extensions.VRM), 1 for VRM 1.0 (VRMC_vrm), None for a plain glTF/GLB."""
-    import struct
-    with open(path, "rb") as fh:
-        head = fh.read(20)
-        if head[:4] != b"glTF":
-            return None
-        j = json.loads(fh.read(struct.unpack("<I", head[12:16])[0]))
-    ext = j.get("extensions") or {}
-    return 1 if "VRMC_vrm" in ext else 0 if "VRM" in ext else None
 
 
 def import_mesh(sc, path):
@@ -252,20 +228,22 @@ def _hex(h):
     return tuple(int(h[i:i + 2], 16) / 255.0 for i in (0, 2, 4)) + (1.0,)
 
 
-def light_unlit(objs, emit=None, albedo=None, wardrobe=None, exposure=1.0, skin_sat=None):
+def light_unlit(objs, emit=None, albedo=None, wardrobe=None, exposure=1.0, skin_sat=None, skin_tint=None, sat=None):
     """VRoid/VRM materials import as glTF UNLIT: emission to camera rays, transparent to every other ray. Such an
     anchor ignores the studio's lights, casts no shadow and bounces nothing (flat, pasted-in, blown-out whites).
     Rebuild each unlit material as a lit Principled BSDF on the texture (albedo scaled per class, ANCHOR_ALBEDO) plus
     a small share of the original emission (ANCHOR_EMIT). wardrobe={"match": [...], "tint": "#hex", "amount": a}
     multiplies the matching clothes by a tint (a mid-tone top instead of a white one that clips under the key).
     exposure / skin_sat come from the SKIN (look.anchor): a hotter or cooler studio rig scales the anchor's albedo and
-    puts the skin's saturation back, so skin still reads as skin under cool or bright studio lights.
+    puts the skin's saturation back, so skin still reads as skin under cool or bright studio lights; skin_tint
+    (look.anchor.skin_tint) multiplies the skin albedo, compensating a cool rig the way a make-up artist would.
     NEWS_ANCHOR_UNLIT=1 keeps the import as is."""
     import os
     if os.environ.get("NEWS_ANCHOR_UNLIT") == "1":
         return 0
     emit = dict(ANCHOR_EMIT, **(emit or {}))
     alb = dict(ANCHOR_ALBEDO, **(albedo or {}))
+    sats = dict(ANCHOR_SAT, **(sat or {}))
     wardrobe = wardrobe or {}
     done = set()
     report = {}
@@ -299,13 +277,20 @@ def light_unlit(objs, emit=None, albedo=None, wardrobe=None, exposure=1.0, skin_
             pb.inputs["Specular IOR Level"].default_value = 0.25 if cls != "SKIN" else 0.18
             hs = nt.nodes.new("ShaderNodeHueSaturation")
             hs.inputs["Value"].default_value = alb.get(cls, alb["default"]) * (exposure if cls not in ("EYE", "FACE") else 1.0)
-            hs.inputs["Saturation"].default_value = (skin_sat or ANCHOR_SAT["SKIN"]) if cls == "SKIN" else \
-                ANCHOR_SAT.get(cls, ANCHOR_SAT["default"])
+            hs.inputs["Saturation"].default_value = (skin_sat or sats["SKIN"]) if cls == "SKIN" else \
+                sats.get(cls, sats["default"])
             if src is not None:
                 nt.links.new(src, hs.inputs["Color"])
             else:
                 hs.inputs["Color"].default_value = col.default_value
             base = hs.outputs["Color"]
+            if skin_tint and cls == "SKIN":
+                st = nt.nodes.new("ShaderNodeMix")
+                st.data_type, st.blend_type = "RGBA", "MULTIPLY"
+                st.inputs["Factor"].default_value = 1.0
+                nt.links.new(base, st.inputs["A"])
+                st.inputs["B"].default_value = _hex(skin_tint)
+                base = st.outputs["Result"]
             tint = wardrobe.get("tint")
             if tint and any(k.upper() in m.name.upper() for k in wardrobe.get("match", ["Tops"])):
                 mx = nt.nodes.new("ShaderNodeMix")
@@ -353,8 +338,11 @@ def seat_anchor(sc, path, seat="anchor1", desk_h=0.8, strict=True, desk_eye=DESK
             sk.animation_data_clear()
     la = (look or {}).get("anchor", {})
     light_unlit(new, cast.get("light", {}).get("emit"), cast.get("light", {}).get("albedo"), cast.get("wardrobe"),
-                float(la.get("exposure", 1.0)) * float(cast.get("light", {}).get("exposure", 1.0)), la.get("skin_saturation"))
+                float(la.get("exposure", 1.0)) * float(cast.get("light", {}).get("exposure", 1.0)), la.get("skin_saturation"),
+                la.get("skin_tint"), cast.get("light", {}).get("sat"))
     arm = next((o for o in new if o.type == "ARMATURE"), None)
+    if arm is not None:
+        arm["vrm_bones"] = json.dumps(humanoid_bones(path))
     sx, sy = SEATS[seat]
     holder = bpy.data.objects.new(f"anchor_{seat}", None)
     sc.collection.objects.link(holder)
