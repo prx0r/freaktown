@@ -1,0 +1,23 @@
+PASS 3 bots seated
+PASS room has 4 players
+PASS night starts with bots counting as players
+PASS bots pre-submitted entries
+PASS R1 auto-reveal (bots+human)
+PASS R1 scored
+PASS R2 walkin live
+PASS R3 ritual live
+PASS victim is a bot
+PASS ritual judging
+PASS ritual author phase
+PASS ritual scored
+PASS scene2-object live
+PASS scene2-ending live
+PASS wheel live
+PASS wheel scored
+PASS final live
+PASS solo night done
+PASS champion crowned
+PASS scores moved
+scores: {'Solo': 219, 'Ralph (AI)': 60, 'Nolan (AI)': 117, 'Ella-2 (AI)': 12}
+
+20 passed, 0 failed

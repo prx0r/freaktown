@@ -1,0 +1,41 @@
+PASS quip-endings: full game to a winner  {"champion": "quip-e2", "end": "game.done", "secs": 1.3, "actions": {"entry": 9, "vote": 9}, "phase_changes": 6, "scores": {"quip-e0": 0, "quip-e1": 33, "quip-e2": 134}}
+PASS quip-endings: play again  {"champion": "quip-e0", "secs": 0.5}
+PASS quip-endings: back to lobby  {}
+PASS quip-walkins: full game to a winner  {"champion": "quip-w0", "end": "game.done", "secs": 1.2, "actions": {"entry": 9, "vote": 9}, "phase_changes": 6, "scores": {"quip-w0": 67, "quip-w1": 67, "quip-w2": 33}}
+PASS quip-walkins: play again  {"champion": "quip-w1", "secs": 0.4}
+PASS quip-walkins: back to lobby  {}
+PASS quip-objects: full game to a winner  {"champion": "quip-o0", "end": "game.done", "secs": 1.1, "actions": {"entry": 9, "vote": 9}, "phase_changes": 6, "scores": {"quip-o0": 67, "quip-o1": 33, "quip-o2": 33}}
+PASS quip-objects: play again  {"champion": "quip-o0", "secs": 0.3}
+PASS quip-objects: back to lobby  {}
+PASS quip-least-funny: full game to a winner  {"champion": "quip-l2", "end": "game.done", "secs": 1.2, "actions": {"entry": 9, "vote": 9}, "phase_changes": 6, "scores": {"quip-l0": 33, "quip-l1": 33, "quip-l2": 233}}
+PASS quip-least-funny: play again  {"champion": "quip-l2", "secs": 0.2}
+PASS quip-least-funny: back to lobby  {}
+PASS quip-wrong-answers: full game to a winner  {"champion": "quip-w2", "end": "game.done", "secs": 0.8, "actions": {"entry": 9, "vote": 9}, "phase_changes": 6, "scores": {"quip-w0": 33, "quip-w1": 33, "quip-w2": 233}}
+PASS quip-wrong-answers: play again  {"champion": "quip-w0", "secs": 0.3}
+PASS quip-wrong-answers: back to lobby  {}
+PASS quip-lies: full game to a winner  {"champion": "quip-l2", "end": "game.done", "secs": 1.1, "actions": {"entry": 9, "vote": 9}, "phase_changes": 6, "scores": {"quip-l0": 30, "quip-l1": 45, "quip-l2": 55}}
+PASS quip-lies: play again  {"champion": "quip-l0", "secs": 0.3}
+PASS quip-lies: back to lobby  {}
+PASS quip-monologues: full game to a winner  {"champion": "quip-m1", "end": "game.done", "secs": 0.8, "actions": {"entry": 9, "vote": 9}, "phase_changes": 6, "scores": {"quip-m0": 0, "quip-m1": 134, "quip-m2": 33}}
+PASS quip-monologues: play again  {"champion": "quip-m2", "secs": 0.3}
+PASS quip-monologues: back to lobby  {}
+PASS quip-dubs: full game to a winner  {"champion": "quip-d1", "end": "game.done", "secs": 1.0, "actions": {"entry": 9, "vote": 9}, "phase_changes": 6, "scores": {"quip-d0": 0, "quip-d1": 134, "quip-d2": 67}}
+PASS quip-dubs: play again  {"champion": "quip-d1", "secs": 0.3}
+PASS quip-dubs: back to lobby  {}
+PASS quip-eulogies: full game to a winner  {"champion": "quip-e2", "end": "game.done", "secs": 1.2, "actions": {"entry": 9, "vote": 9}, "phase_changes": 6, "scores": {"quip-e0": 0, "quip-e1": 33, "quip-e2": 134}}
+PASS quip-eulogies: play again  {"champion": "quip-e0", "secs": 0.3}
+PASS quip-eulogies: back to lobby  {}
+PASS quip-lyrics: full game to a winner  {"champion": "quip-l0", "end": "game.done", "secs": 1.0, "actions": {"entry": 9, "vote": 9}, "phase_changes": 6, "scores": {"quip-l0": 67, "quip-l1": 67, "quip-l2": 33}}
+PASS quip-lyrics: play again  {"champion": "quip-l0", "secs": 0.4}
+PASS quip-lyrics: back to lobby  {}
+PASS quip-nonsense: full game to a winner  {"champion": "quip-n2", "end": "game.done", "secs": 0.9, "actions": {"entry": 9, "vote": 9}, "phase_changes": 6, "scores": {"quip-n0": 67, "quip-n1": 0, "quip-n2": 100}}
+PASS quip-nonsense: play again  {"champion": "quip-n1", "secs": 0.3}
+PASS quip-nonsense: back to lobby  {}
+PASS quip-lies+bots: full game to a winner  {"champion": "Ralph (AI)", "end": "game.done", "secs": 0.5, "actions": {"entry": 3, "vote": 3}, "phase_changes": 6, "scores": {"quip-l0": 35, "Ralph (AI)": 50, "Nolan (AI)": 20, "Ella-2 (AI)": 30}}
+PASS quip-lies+bots: play again  {"champion": "quip-l0", "secs": 0.1}
+PASS quip-lies+bots: back to lobby  {}
+PASS quip-endings hostless: full game to a winner  {"champion": "quip-e2", "end": "game.done", "secs": 25.3, "actions": {"entry": 6, "vote": 6}, "phase_changes": 4, "scores": {"quip-e0": 0, "quip-e1": 33, "quip-e2": 67}}
+PASS quip-endings hostless: play again  {"champion": "quip-e2", "secs": 12.5}
+PASS quip-endings hostless: back to lobby  {}
+
+39 passed, 0 failed

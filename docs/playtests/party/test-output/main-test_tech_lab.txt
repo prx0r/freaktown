@@ -1,0 +1,12 @@
+PASS /party/lab serves
+PASS /party/lab/smile serves
+PASS /party/lab/voice serves
+PASS /party/lab/props serves
+PASS /party/lab/jev serves
+PASS valid manifest accepted
+PASS rogue op rejected
+PASS unknown style rejected
+PASS empty manifest rejected
+PASS smile module serves
+
+10 passed, 0 failed

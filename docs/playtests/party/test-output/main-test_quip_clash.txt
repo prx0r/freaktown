@@ -1,0 +1,38 @@
+PASS endings: starts
+PASS endings: round scores (normal)
+PASS endings: advances to round 2
+PASS walkins: starts
+PASS walkins: round scores (normal)
+PASS walkins: advances to round 2
+PASS objects: starts
+PASS objects: round scores (normal)
+PASS objects: advances to round 2
+PASS least-funny: starts
+PASS least-funny: round scores (inverted)
+PASS least-funny: advances to round 2
+PASS wrong-answers: starts
+PASS wrong-answers: round scores (inverted)
+PASS wrong-answers: advances to round 2
+PASS lies: starts
+PASS lies: round scores (liar)
+PASS lies: secrets revealed at score
+PASS lies: advances to round 2
+PASS lies: points moved
+PASS monologues: starts
+PASS monologues: round scores (normal)
+PASS monologues: advances to round 2
+PASS dubs: starts
+PASS dubs: round scores (normal)
+PASS dubs: advances to round 2
+PASS eulogies: starts
+PASS eulogies: round scores (normal)
+PASS eulogies: advances to round 2
+PASS lyrics: starts
+PASS lyrics: round scores (normal)
+PASS lyrics: advances to round 2
+PASS nonsense: starts
+PASS nonsense: round scores (normal)
+PASS nonsense: advances to round 2
+PASS inverted: round resolved
+
+36 passed, 0 failed
