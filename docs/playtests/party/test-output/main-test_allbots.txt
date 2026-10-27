@@ -1,0 +1,20 @@
+PASS freeze-night completes with zero humans
+PASS scores moved
+PASS archive grew
+PASS winner crowned
+PASS event log sane
+PASS round lifecycle complete
+PASS quip-endings progresses (round>=2)
+PASS quip-endings scores moved
+PASS quip-lies progresses (round>=2)
+PASS quip-lies scores moved
+PASS quip-nonsense progresses (round>=2)
+PASS quip-nonsense scores moved
+
+--- timings (mode, phase-changes, advances, seconds) ---
+  freeze-night     phases=7   advances=7   0.25s
+  quip-endings     phases=13  advances=12  0.46s
+  quip-lies        phases=13  advances=12  0.36s
+  quip-nonsense    phases=13  advances=12  0.49s
+
+12 passed, 0 failed

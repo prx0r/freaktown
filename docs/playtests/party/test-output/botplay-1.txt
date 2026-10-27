@@ -1,0 +1,24 @@
+PASS freaktionary: full game to a winner  {"champion": "freakt0", "end": "game.done", "secs": 1.8, "actions": {"draw": 19, "guess": 55, "guess-hit": 4}, "phase_changes": 7, "scores": {"freakt0": 5, "freakt1": 1, "freakt2": 1, "freakt3": 5}}
+PASS freaktionary: play again  {"champion": "freakt1", "secs": 0.2}
+PASS freaktionary: back to lobby  {}
+PASS freaktionary+bots: full game to a winner  {"champion": "Ralph (AI)", "end": "game.done", "secs": 0.7, "actions": {"draw": 7, "guess": 6}, "phase_changes": 6, "scores": {"freakt0": 1, "freakt1": 1, "Ralph (AI)": 5, "Nolan (AI)": 5}}
+PASS freaktionary+bots: play again  {"champion": "freakt1", "secs": 0.1}
+PASS freaktionary+bots: back to lobby  {}
+PASS roast-relay: full game to a winner  {"champion": "roast-1", "end": "game.done", "secs": 0.4, "actions": {"line": 12, "vote": 12}, "phase_changes": 6, "scores": {"roast-0": 0, "roast-1": 3, "roast-2": 3, "roast-3": 3}}
+PASS roast-relay: play again  {"champion": "roast-1", "secs": 0.2}
+PASS roast-relay: back to lobby  {}
+PASS roast-relay+bots: full game to a winner  {"champion": "Ralph (AI)", "end": "game.done", "secs": 0.4, "actions": {"line": 3, "vote": 3}, "phase_changes": 6, "scores": {"roast-0": 0, "Ralph (AI)": 6, "Nolan (AI)": 3}}
+PASS roast-relay+bots: play again  {"champion": "Nolan (AI)", "secs": 0.1}
+PASS roast-relay+bots: back to lobby  {}
+PASS freeze-night: full game to a winner  {"champion": "freeze1", "end": "night.done", "secs": 1.2, "actions": {"entry": 20, "vote": 20, "rite": 3, "pass": 3, "author": 3, "verdict": 4}, "phase_changes": 14, "scores": {"freeze0": 60, "freeze1": 172, "freeze2": 125, "freeze3": 2}}
+PASS freeze-night: play again  {"champion": "freeze3", "secs": 1.5}
+PASS freeze-night: back to lobby  {}
+PASS freeze-night+bots: full game to a winner  {"champion": "freeze0", "end": "night.done", "secs": 1.0, "actions": {"entry": 10, "vote": 10, "rite": 2, "pass": 2, "author": 2, "verdict": 2}, "phase_changes": 14, "scores": {"freeze0": 165, "freeze1": 100, "Ralph (AI)": 50, "Nolan (AI)": 22}}
+PASS freeze-night+bots: play again  {"champion": "freeze0", "secs": 1.0}
+PASS freeze-night+bots: back to lobby  {}
+PASS pack FREAK NIGHT: full game to a winner  {"champion": "pack F3", "end": "pack.done", "secs": 2.4, "actions": {"draw": 23, "guess": 66, "guess-hit": 4, "line": 8, "vote": 8}, "phase_changes": 12, "scores": {"pack F0": 7, "pack F1": 2, "pack F2": 0, "pack F3": 9}}
+PASS pack FREAK NIGHT: back to lobby  {}
+PASS pack QUICK FIRE: full game to a winner  {"champion": "pack Q2", "end": "pack.done", "secs": 0.3, "actions": {"line": 6, "vote": 6}, "phase_changes": 4, "scores": {"pack Q0": 0, "pack Q1": 0, "pack Q2": 6}}
+PASS pack QUICK FIRE: back to lobby  {}
+
+22 passed, 0 failed

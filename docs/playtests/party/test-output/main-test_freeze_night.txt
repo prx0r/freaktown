@@ -1,0 +1,52 @@
+PASS freeze-night starts
+PASS round 1 is scene1-ending
+PASS controller gets prompt screen
+PASS empty entry rejected
+PASS vote before reveal rejected
+PASS R1 entry 0 accepted
+PASS R1 entry 1 accepted
+PASS R1 entry 2 accepted
+PASS R1 entry 3 accepted
+PASS auto-reveal after all entries
+PASS archive holds 4 events
+PASS self-vote rejected
+PASS R1 scored
+PASS R1 winner P0 gets 75 (3/4 of 100, no sweep)
+PASS caught-that accepted
+PASS recognition counted
+PASS bogus event rejected
+PASS dup client_seq short-circuits
+PASS round 2 is scene1-walkin
+PASS R2 callback x1.5 paid (75 -> 75+112)
+PASS event e2 marked paid
+PASS round 3 is ritual
+PASS victim is 3rd player (rotation)
+PASS victim cannot write
+PASS spotlight is longest line
+PASS ritual in passfail
+PASS victim sees judgement screen
+PASS ritual in author phase
+PASS victim paid 67 (2/3 of 100)
+PASS bad guess rejected
+PASS ritual scored
+PASS round 4 is scene2-object
+PASS round 5 is scene2-ending
+PASS round 6 is wheel
+PASS wheel spun for lowest scorer
+PASS segment burned
+PASS stage exposes wheel
+PASS wheel scored
+PASS round 7 is last-lash
+PASS spread votes counted
+PASS night done
+PASS champion crowned
+PASS running gag picked
+PASS stage page serves
+PASS controller page serves
+PASS join page serves
+PASS vote choice carries action contract
+PASS walkin round live
+PASS ritual round live
+PASS victim gets perform screen with line
+
+50 passed, 0 failed

@@ -1,0 +1,37 @@
+/workspace/work/freaktown-main/app.py:2178: SyntaxWarning: invalid escape sequence '\s'
+  const words = (b.text || '').split(/\s+/).filter(Boolean).length;
+/workspace/work/freaktown-main/app.py:2544: SyntaxWarning: invalid escape sequence '\/'
+  if (/wv|WebView|FBAN|FBAV|Twitter|WhatsApp|Line\//i.test(ua)) {
+PASS 4 players seated
+PASS overflow becomes audience
+PASS bad host token rejected
+PASS freaktionary starts
+PASS drawer gets secret word
+PASS no leakage to guesser
+PASS non-drawer draw rejected
+PASS drawer batch accepted
+PASS draw rate-limited
+PASS wrong guess accepted, not correct
+PASS dup client_seq deduped
+PASS correct guess wins
+PASS reconnect restores seat
+PASS stream has round lifecycle
+PASS stream never leaks word
+PASS all lines trigger reveal
+PASS vote screen hides authorship
+PASS self-vote rejected
+PASS all votes trigger scoring
+PASS winner got 3 points
+PASS late input rejected
+PASS round two auto-reveals
+
+22 passed, 0 failed
+PASS winner freak banked a party win
+PASS head-to-head recorded
+PASS lore event broadcast at start
+PASS stage snapshot carries lore
+PASS room survives restart
+PASS seat token survives restart
+PASS scores survive restart
+
+29 passed, 0 failed

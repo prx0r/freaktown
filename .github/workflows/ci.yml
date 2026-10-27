@@ -17,6 +17,26 @@ jobs:
       - run: python -m pytest tests/unit tests/contract -q
       - run: python test_party.py
 
+  party:
+    # party games end to end (in-process, no network, no spend); kept apart
+    # from the python job so a red avatar/golden test can't hide them
+    runs-on: ubuntu-latest
+    env:
+      PARTY_TTS: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: python -m pytest tests/contract/test_party_games.py -q
+      - run: |
+          python test_party.py
+          python test_quip_clash.py
+          python test_freeze_night.py
+          python test_solo_night.py
+          python test_allbots.py
+
   contracts:
     runs-on: ubuntu-latest
     steps:

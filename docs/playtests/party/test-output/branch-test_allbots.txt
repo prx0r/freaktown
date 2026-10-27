@@ -1,0 +1,26 @@
+PASS freeze-night completes with zero humans
+PASS scores moved
+PASS archive grew
+PASS winner crowned
+PASS event log sane
+PASS round lifecycle complete
+PASS freaktionary completes with zero humans
+PASS freaktionary winner crowned
+PASS roast-relay completes with zero humans
+PASS roast-relay winner crowned
+PASS quip-endings progresses (round>=2)
+PASS quip-endings scores moved
+PASS quip-lies progresses (round>=2)
+PASS quip-lies scores moved
+PASS quip-nonsense progresses (round>=2)
+PASS quip-nonsense scores moved
+
+--- timings (mode, phase-changes, advances, seconds) ---
+  freeze-night     phases=7   advances=7   0.83s
+  freaktionary     phases=4   advances=4   0.36s
+  roast-relay      phases=3   advances=3   0.63s
+  quip-endings     phases=3   advances=12  0.23s
+  quip-lies        phases=3   advances=12  0.2s
+  quip-nonsense    phases=3   advances=12  0.21s
+
+16 passed, 0 failed
